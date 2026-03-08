@@ -1123,7 +1123,7 @@ export default function EventsPage() {
                 }`}
               >
                 <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}</span>
+                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `ethniCity (${selectedHeritage.length})` : 'ethniCity'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 

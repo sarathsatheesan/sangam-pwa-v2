@@ -1567,7 +1567,7 @@ export default function ProfilePage() {
 
             {/* Heritage */}
             <div>
-              <label className="block text-xs font-bold text-[var(--aurora-text-muted)] mb-2 uppercase tracking-wider">Heritage / Ethnicity</label>
+              <label className="block text-xs font-bold text-[var(--aurora-text-muted)] mb-2 uppercase tracking-wider">Heritage / ethniCity</label>
               {editForm.heritage.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   {editForm.heritage.map((h) => (
