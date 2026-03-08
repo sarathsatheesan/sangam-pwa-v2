@@ -1325,7 +1325,7 @@ export default function ForumScreen() {
 
         {/* Search Header */}
         <div className="relative bg-gradient-to-br from-orange-500/8 via-aurora-surface to-rose-500/8 border-b border-aurora-border">
-          <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
+          <div className="max-w-6xl mx-auto px-4 py-3">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-aurora-text-muted" />
               <input

@@ -251,7 +251,7 @@ export default function TravelPage() {
 
       {/* Search + Ethnicity Header */}
       <div className="relative bg-gradient-to-br from-teal-500/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
-        <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
+        <div className="max-w-6xl mx-auto px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
