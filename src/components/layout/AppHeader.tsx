@@ -106,41 +106,37 @@ export const AppHeader: React.FC = () => {
     <>
       <header className="sticky top-0 z-40 glass-strong">
         <div className="flex items-center justify-between h-14 px-4">
-          {/* Left: Logo + Avatar + Greeting */}
+          {/* Left: Logo + App Name + Avatar + Greeting */}
           <div className="flex items-center gap-2 shrink-0 min-w-0">
-            <Link to="/feed" className="flex items-center shrink-0">
+            <Link to="/feed" className="flex items-center gap-1.5 shrink-0">
               <img src="/ethnicity-logo.svg" alt="ethniCity" className="w-7 h-7 sm:w-8 sm:h-8" />
+              <span className="text-lg sm:text-xl font-extrabold tracking-tight leading-none">
+                <span style={{ color: '#c96830' }}>ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">City</span>
+              </span>
             </Link>
 
             {user && (
               <>
+                <span className="text-gray-300 text-lg font-light">|</span>
                 {userProfile?.avatar && userProfile.avatar.startsWith('http') ? (
                   <img
                     src={userProfile.avatar}
                     alt={userProfile.name}
-                    className="w-8 h-8 rounded-full object-cover ring-2 ring-aurora-indigo/30 shrink-0"
+                    className="w-7 h-7 rounded-full object-cover ring-2 ring-aurora-indigo/30 shrink-0"
                   />
                 ) : userProfile?.avatar ? (
-                  <span className="w-8 h-8 rounded-full bg-aurora-indigo/20 flex items-center justify-center text-lg shrink-0">
+                  <span className="w-7 h-7 rounded-full bg-aurora-indigo/20 flex items-center justify-center text-sm shrink-0">
                     {userProfile.avatar}
                   </span>
                 ) : (
-                  <span className="w-8 h-8 rounded-full bg-aurora-indigo/20 flex items-center justify-center shrink-0">
-                    <User size={18} />
+                  <span className="w-7 h-7 rounded-full bg-aurora-indigo/20 flex items-center justify-center shrink-0">
+                    <User size={16} />
                   </span>
                 )}
-                <span className="text-sm font-semibold text-[var(--aurora-text)] truncate max-w-[120px] sm:max-w-[200px]">
-                  Welcome, {(userProfile as any)?.preferredName || userProfile?.name?.split(' ')[0] || 'there'}!
+                <span className="text-xs font-medium text-[var(--aurora-text-secondary)] truncate max-w-[90px] sm:max-w-[160px]">
+                  Hi, {(userProfile as any)?.preferredName || userProfile?.name?.split(' ')[0] || 'there'}!
                 </span>
               </>
-            )}
-
-            {!user && (
-              <div className="flex flex-col leading-none ml-1">
-                <span className="text-lg sm:text-xl font-extrabold tracking-tight">
-                  <span style={{ color: '#c96830' }}>ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">City</span>
-                </span>
-              </div>
             )}
           </div>
 
