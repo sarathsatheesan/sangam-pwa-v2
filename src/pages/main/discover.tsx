@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, limit, doc, getDoc, setDoc, deleteDoc, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '../../constants/config';
@@ -441,13 +441,24 @@ export default function DiscoverPage() {
     setConnectingId(personId);
     const connId = getConnectionId(user.uid, personId);
     try {
-      await setDoc(doc(db, 'connections', connId), {
-        users: [user.uid, personId].sort(),
-        status: 'connected',
-        initiatedBy: connectionDetails.get(personId)?.initiatedBy || personId,
-        connectedAt: serverTimestamp(),
-        createdAt: connectionDetails.get(personId)?.connectedAt || serverTimestamp(),
-      });
+      const connRef = doc(db, 'connections', connId);
+      const connSnap = await getDoc(connRef);
+      if (connSnap.exists()) {
+        // Existing pending request — update status to connected
+        await updateDoc(connRef, {
+          status: 'connected',
+          connectedAt: serverTimestamp(),
+        });
+      } else {
+        // No existing doc (edge case) — create fresh
+        await setDoc(connRef, {
+          users: [user.uid, personId].sort(),
+          status: 'connected',
+          initiatedBy: personId,
+          createdAt: serverTimestamp(),
+          connectedAt: serverTimestamp(),
+        });
+      }
       setConnections((prev) => new Map(prev).set(personId, 'connected'));
       setConnectionDetails((prev) =>
         new Map(prev).set(personId, {
@@ -456,6 +467,7 @@ export default function DiscoverPage() {
           connectedAt: new Date(),
         })
       );
+      setToastMessage('Connection accepted!');
     } catch (err) {
       console.error('Error accepting connection:', err);
       setToastMessage('Failed to accept connection. Please try again.');
