@@ -1267,17 +1267,7 @@ export default function HousingPage() {
           <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
           <div className="absolute bottom-0 right-0 w-64 h-64 bg-white rounded-full translate-x-1/3 translate-y-1/3" />
         </div>
-        <div className="relative max-w-6xl mx-auto px-4 py-8 pb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Home size={24} /> Housing
-              </h1>
-              <p className="text-white/70 text-sm mt-1">Find your next home in the community</p>
-            </div>
-            {/* My Properties moved to Profile page */}
-          </div>
-
+        <div className="relative max-w-6xl mx-auto px-4 pt-4 pb-4">
           {/* Search bar */}
           <div className="relative">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -1286,7 +1276,7 @@ export default function HousingPage() {
               placeholder="Search by address, city, neighborhood..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-10 py-3.5 rounded-2xl bg-white/95 backdrop-blur-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 shadow-xl text-sm"
+              className="w-full pl-11 pr-10 py-3 rounded-2xl bg-white/95 backdrop-blur-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 shadow-xl text-sm"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">

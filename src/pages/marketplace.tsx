@@ -1162,15 +1162,7 @@ export default function MarketplacePage() {
     <div className="min-h-screen bg-[var(--aurora-bg)]">
       {/* Header */}
       <div className="sticky top-0 z-40 bg-[var(--aurora-surface)] border-b border-[var(--aurora-border)] backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-6">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <div>
-              <h1 className="text-xl sm:text-3xl font-bold text-[var(--aurora-text)]">Marketplace</h1>
-              <p className="text-xs sm:text-sm text-[var(--aurora-text-muted)]">Buy & sell items in your community</p>
-            </div>
-            {/* My Listings moved to Profile page */}
-          </div>
-
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
           {/* Search & Filter Controls */}
           <div className="flex gap-2 sm:gap-3 flex-wrap items-center">
             <div className="flex-1 min-w-0 relative">

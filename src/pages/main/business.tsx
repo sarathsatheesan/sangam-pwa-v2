@@ -855,29 +855,13 @@ export default function BusinessPage() {
 
   return (
     <div className="bg-aurora-bg">
-      {/* ── Hero Header ── */}
+      {/* ── Search & Filter Bar ── */}
       <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
-        <div className="max-w-6xl mx-auto px-4 pt-5 pb-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-2xl font-bold text-aurora-text flex items-center gap-2">
-                  <Store className="w-6 h-6 text-aurora-indigo" />
-                  Businesses
-                </h1>
-                {/* My Businesses moved to Profile page */}
-              </div>
-              <p className="text-sm text-aurora-text-secondary mt-0.5">
-                {merchantView ? 'Manage your businesses' : 'Discover businesses from our community'}
-              </p>
-            </div>
-          </div>
-
+        <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           {!merchantView && (
-            <>
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-aurora-text-muted" />
+            <div className="relative flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
                 <input
                   type="text"
                   placeholder="Search restaurants, services, markets..."
@@ -885,7 +869,7 @@ export default function BusinessPage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setSearchFocused(false)}
-                  className={`w-full pl-12 pr-12 py-3 bg-aurora-surface border rounded-full
+                  className={`w-full pl-11 pr-10 py-2.5 bg-aurora-surface border rounded-full
                              text-sm text-aurora-text placeholder:text-aurora-text-muted
                              focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all
                              ${searchFocused ? 'border-aurora-indigo shadow-md' : 'border-aurora-border'}`}
@@ -907,7 +891,7 @@ export default function BusinessPage() {
                   </button>
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

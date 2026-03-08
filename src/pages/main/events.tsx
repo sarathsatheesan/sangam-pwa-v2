@@ -1084,20 +1084,16 @@ export default function EventsPage() {
 
   return (
     <div className="bg-aurora-bg">
-      {/* ── Hero Header ── */}
+      {/* ── Search & Filter Bar ── */}
       <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-orange-500/8 border-b border-aurora-border">
-        <div className="max-w-6xl mx-auto px-4 pt-5 pb-4">
-          {/* Row 1: Module Name + Search */}
-          <div className="flex items-center gap-3 mb-3">
-            <h1 className="text-xl font-bold text-aurora-text flex items-center gap-2 shrink-0">
-              <CalendarDays className="w-5 h-5 text-aurora-indigo" />
-              Events
-            </h1>
+        <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
+          {/* Search + Ethnicity Filter on same row */}
+          <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
               <input
                 type="text"
-                placeholder="Search events..."
+                placeholder="Search events by name, type, location..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setSearchFocused(true)}
@@ -1113,27 +1109,24 @@ export default function EventsPage() {
                 </button>
               )}
             </div>
-          </div>
 
-          {/* Row 2: Ethnicity Filter Dropdown */}
-          <div className="flex items-center gap-2">
-            <div className="relative" ref={heritageRef}>
+            {/* Ethnicity Filter Dropdown */}
+            <div className="relative shrink-0" ref={heritageRef}>
               <button
                 onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all border ${
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
                   selectedHeritage.length > 0
                     ? 'bg-amber-50 border-amber-300 text-amber-800'
                     : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted/50'
                 }`}
               >
                 <Globe className="w-4 h-4" />
-                {selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}
+                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {heritageDropdownOpen && (
-                <div className="absolute top-full left-0 mt-1.5 w-60 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
-                  {/* Preferred ethnicity first */}
+                <div className="absolute top-full right-0 mt-1.5 w-60 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
                   {(() => {
                     const userHeritage = Array.isArray(userProfile?.heritage)
                       ? userProfile.heritage
@@ -1183,9 +1176,6 @@ export default function EventsPage() {
                 </div>
               )}
             </div>
-            <p className="text-xs text-aurora-text-muted hidden sm:block">
-              Discover & attend community events
-            </p>
           </div>
         </div>
       </div>
