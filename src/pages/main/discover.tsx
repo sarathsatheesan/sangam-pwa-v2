@@ -682,7 +682,7 @@ export default function DiscoverPage() {
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm">
         <div className="max-w-6xl mx-auto px-4">
           {/* Search + Ethnicity + Tabs row */}
-          <div className="flex items-center gap-2 py-3 border-b">
+          <div className="flex items-center gap-2 py-3 border-b border-aurora-border">
             {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
