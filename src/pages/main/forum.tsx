@@ -1299,22 +1299,24 @@ export default function ForumScreen() {
     return (
       <>{renderOverlays()}
       <div className="bg-[var(--aurora-bg)]">
-        {/* Stats Tiles — Discover/Travel style */}
+        {/* Header Bar */}
         <div className="bg-gradient-to-r from-orange-500 via-red-500 to-rose-600 text-white py-3">
           <div className="max-w-6xl mx-auto px-4">
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
-                <div className="text-xs text-orange-100">Topics</div>
-                <div className="text-xl sm:text-2xl font-bold">{topics.length}</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-lg font-bold flex items-center gap-2">
+                  <MessageSquare size={18} /> Community Forum
+                </h1>
+                <p className="text-white/70 text-xs mt-0.5">Connect, share & discuss with your community</p>
               </div>
-              <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
-                <div className="text-xs text-orange-100">Discussions</div>
-                <div className="text-xl sm:text-2xl font-bold">{totalThreads}</div>
-              </div>
-              <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
-                <div className="text-xs text-orange-100">Community</div>
-                <div className="text-xl sm:text-2xl font-bold flex items-center gap-1.5">
-                  <MessageSquare size={18} /> Forum
+              <div className="flex items-center gap-2">
+                <div className="rounded-lg px-3 py-1.5 bg-white/20 backdrop-blur text-center">
+                  <div className="text-[10px] text-orange-100">Topics</div>
+                  <div className="text-lg font-bold leading-tight">{topics.length}</div>
+                </div>
+                <div className="rounded-lg px-3 py-1.5 bg-white/20 backdrop-blur text-center">
+                  <div className="text-[10px] text-orange-100">Discussions</div>
+                  <div className="text-lg font-bold leading-tight">{totalThreads}</div>
                 </div>
               </div>
             </div>
