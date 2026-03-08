@@ -1627,35 +1627,34 @@ export default function MessagesPage() {
         </div>
 
         {/* Search bar */}
-        <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: '#F0F2F5' }}>
-          <Search size={16} style={{ color: '#667781' }} className="flex-shrink-0" />
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
           <input
             type="text"
             placeholder="Search or start new chat"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 py-1 bg-transparent outline-none text-sm placeholder-gray-400"
-            style={{ color: '#111B21' }}
+            className="w-full pl-10 pr-10 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all"
           />
           {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className="p-0.5">
-              <X size={14} style={{ color: '#667781' }} />
+            <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text">
+              <X size={16} />
             </button>
           )}
         </div>
       </div>
 
       {/* Filter pills */}
-      <div className="px-4 py-2 flex gap-2 overflow-x-auto" style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #F0F2F5' }}>
+      <div className="px-4 py-2 flex gap-1.5 overflow-x-auto border-b border-aurora-border bg-aurora-surface/95 backdrop-blur-md">
         {(['all', 'unread', 'connects'] as const).map((filter) => (
           <button
             key={filter}
             onClick={() => setActiveFilter(filter)}
-            className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors"
-            style={{
-              backgroundColor: activeFilter === filter ? '#25D366' : '#F0F2F5',
-              color: activeFilter === filter ? '#FFFFFF' : '#667781',
-            }}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+              activeFilter === filter
+                ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                : 'bg-aurora-surface border-aurora-border text-aurora-text-muted hover:text-aurora-text-secondary hover:border-aurora-text-muted/30'
+            }`}
           >
             {filter.charAt(0).toUpperCase() + filter.slice(1)}
           </button>
