@@ -1280,7 +1280,7 @@ export default function HousingPage() {
     <div className="bg-[var(--aurora-bg)]">
 
       {/* ===== Search Header ===== */}
-      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
+      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-40">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           {/* Search bar + Listing Type dropdown */}
           <div className="flex items-center gap-2">
@@ -1316,7 +1316,7 @@ export default function HousingPage() {
               </button>
 
               {typeDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-2">
+                <div className="absolute top-full right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-2">
                   {(['rent', 'sale', 'roommate', 'sublet'] as const).map((type) => {
                     const config = TYPE_CONFIG[type];
                     const Icon = config.icon;
@@ -1363,6 +1363,19 @@ export default function HousingPage() {
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
 
+            {/* Sort pill (leftmost) */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="px-3 py-1.5 border border-aurora-border rounded-full text-xs font-semibold bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40 shrink-0 appearance-none cursor-pointer"
+            >
+              <option value="newest">Newest</option>
+              <option value="price-low">Price ↑</option>
+              <option value="price-high">Price ↓</option>
+              <option value="largest">Largest</option>
+              <option value="popular">Popular</option>
+            </select>
+
             {/* Price pill dropdown */}
             <div className="relative shrink-0" ref={priceDropRef}>
               <button
@@ -1381,7 +1394,7 @@ export default function HousingPage() {
                 <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'price' ? 'rotate-180' : ''}`} />
               </button>
               {activeDropdown === 'price' && (
-                <div className="absolute top-full left-0 mt-1.5 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-40 p-4">
+                <div className="absolute top-full left-0 mt-1.5 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Price Range</p>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
@@ -1403,7 +1416,7 @@ export default function HousingPage() {
               )}
             </div>
 
-            {/* Beds & Baths pill dropdown */}
+            {/* Beds pill dropdown */}
             <div className="relative shrink-0" ref={bedsDropRef}>
               <button
                 onClick={() => setActiveDropdown(activeDropdown === 'beds' ? null : 'beds')}
@@ -1420,7 +1433,7 @@ export default function HousingPage() {
                 <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'beds' ? 'rotate-180' : ''}`} />
               </button>
               {activeDropdown === 'beds' && (
-                <div className="absolute top-full left-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-40 py-1.5">
+                <div className="absolute top-full left-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1.5">
                   {[{ val: 'any', label: 'Any' }, { val: '1', label: '1+' }, { val: '2', label: '2+' }, { val: '3', label: '3+' }, { val: '4', label: '4+' }, { val: '5', label: '5+' }].map((opt) => (
                     <button
                       key={opt.val}
@@ -1436,20 +1449,7 @@ export default function HousingPage() {
               )}
             </div>
 
-            {/* Sort pill */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-3 py-1.5 border border-aurora-border rounded-full text-xs font-semibold bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40 shrink-0 appearance-none cursor-pointer"
-            >
-              <option value="newest">Newest</option>
-              <option value="price-low">Price ↑</option>
-              <option value="price-high">Price ↓</option>
-              <option value="largest">Largest</option>
-              <option value="popular">Popular</option>
-            </select>
-
-            {/* More pill dropdown (Status) */}
+            {/* Status pill dropdown */}
             <div className="relative shrink-0" ref={moreDropRef}>
               <button
                 onClick={() => setActiveDropdown(activeDropdown === 'more' ? null : 'more')}
@@ -1465,7 +1465,7 @@ export default function HousingPage() {
                 <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'more' ? 'rotate-180' : ''}`} />
               </button>
               {activeDropdown === 'more' && (
-                <div className="absolute top-full right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-40 py-1.5">
+                <div className="absolute top-full left-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1.5">
                   {[{ val: 'all', label: 'All Status' }, { val: 'active', label: 'Active' }, { val: 'pending', label: 'Pending' }, { val: 'under_contract', label: 'Under Contract' }, { val: 'sold', label: 'Sold' }, { val: 'rented', label: 'Rented' }].map((opt) => (
                     <button
                       key={opt.val}
