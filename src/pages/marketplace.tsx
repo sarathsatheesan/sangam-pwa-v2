@@ -1159,17 +1159,6 @@ export default function MarketplacePage() {
               )}
             </div>
 
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
-            >
-              <option value="newest">Newest</option>
-              <option value="price-low">Price: Low to High</option>
-              <option value="price-high">Price: High to Low</option>
-              <option value="popular">Most Popular</option>
-            </select>
-
             {/* Ethnicity Dropdown - Multi-select with checkboxes */}
             <div className="relative shrink-0" ref={heritageRef}>
               <button
@@ -1237,38 +1226,60 @@ export default function MarketplacePage() {
           </div>
         </div>
 
-        {/* Category Pills */}
-        {isFeatureEnabled('marketplace_categoryFilter') && (
-          <div className="border-t border-[var(--aurora-border)] overflow-x-auto">
-            <div className="max-w-6xl mx-auto px-4 py-3 flex gap-2 flex-nowrap">
-              <button
-                onClick={() => setSelectedCategory('all')}
-                className={`px-4 py-1 rounded-full whitespace-nowrap text-sm font-medium transition-colors flex-shrink-0 ${
-                  selectedCategory === 'all'
-                    ? 'bg-aurora-indigo text-white'
-                    : 'bg-[var(--aurora-bg)] text-[var(--aurora-text)] border border-[var(--aurora-border)] hover:border-aurora-indigo hover:bg-aurora-indigo/5'
-                }`}
-              >
-                All
-              </button>
-              {CATEGORIES.map((cat) => (
+      </div>
+
+      {/* ── Filter Bar — Sort dropdown | Category pills ── */}
+      <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+        <div className="max-w-6xl mx-auto px-4 py-2.5">
+          <div className="flex items-center gap-1.5">
+
+            {/* Sort dropdown */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-1.5 border border-aurora-border rounded-full text-xs font-semibold bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40 shrink-0 appearance-none cursor-pointer"
+            >
+              <option value="newest">Newest</option>
+              <option value="price-low">Price ↑</option>
+              <option value="price-high">Price ↓</option>
+              <option value="popular">Popular</option>
+            </select>
+
+            {/* Separator */}
+            <div className="w-px h-5 bg-aurora-border shrink-0 mx-0.5" />
+
+            {/* Category pills — scrollable */}
+            {isFeatureEnabled('marketplace_categoryFilter') && (
+              <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
                 <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-4 py-1 rounded-full whitespace-nowrap text-sm font-medium transition-colors flex items-center gap-2 flex-shrink-0 ${
-                    selectedCategory === cat
+                  onClick={() => setSelectedCategory('all')}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-semibold shrink-0 transition-all ${
+                    selectedCategory === 'all'
                       ? 'bg-aurora-indigo text-white'
-                      : 'bg-[var(--aurora-bg)] text-[var(--aurora-text)] border border-[var(--aurora-border)] hover:border-aurora-indigo hover:bg-aurora-indigo/5'
+                      : 'bg-aurora-surface border border-aurora-border text-aurora-text-muted hover:text-aurora-text-secondary hover:border-aurora-text-muted/30'
                   }`}
                 >
-                  {CATEGORY_ICONS[cat]}
-                  <span>{cat}</span>
+                  All
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-semibold shrink-0 transition-all ${
+                      selectedCategory === cat
+                        ? 'bg-aurora-indigo text-white'
+                        : 'bg-aurora-surface border border-aurora-border text-aurora-text-muted hover:text-aurora-text-secondary hover:border-aurora-text-muted/30'
+                    }`}
+                  >
+                    {CATEGORY_ICONS[cat]}
+                    <span>{cat}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
+          </div>
+        </div>
       </div>
 
       {/* Featured Carousel */}
