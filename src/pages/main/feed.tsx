@@ -1046,10 +1046,10 @@ export default function FeedPage() {
   // ─── Render ────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-gradient-to-b from-indigo-100/80 via-indigo-50/50 to-emerald-100/60">
+    <div className="bg-gradient-to-b from-indigo-100/50 via-indigo-50/30 to-emerald-100/40">
 
       {/* ─── Search & Ethnicity Filter ─── */}
-      <div className="relative bg-gradient-to-br from-indigo-600/35 via-indigo-200/50 to-emerald-600/30 border-b border-aurora-border z-30">
+      <div className="relative bg-gradient-to-br from-indigo-400/25 via-indigo-100/40 to-emerald-400/20 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           <div className="flex items-center gap-2">
             {/* Search */}
@@ -1220,7 +1220,7 @@ export default function FeedPage() {
                   onClick={() => setSortMode(mode)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap shrink-0 ${
                     sortMode === mode
-                      ? 'bg-gradient-to-r from-indigo-700 via-violet-600 to-emerald-600 text-white shadow-md'
+                      ? 'bg-gradient-to-r from-indigo-500 via-violet-400 to-emerald-500 text-white shadow-md'
                       : 'bg-aurora-surface border border-aurora-border text-aurora-text-secondary hover:text-aurora-text hover:border-aurora-text-muted/30'
                   }`}
                 >
