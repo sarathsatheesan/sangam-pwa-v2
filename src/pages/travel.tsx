@@ -228,29 +228,30 @@ export default function TravelPage() {
   };
 
   return (
-    <div className="bg-[#F8FAFC]">
-      {/* Stats Bar */}
-      <div className="bg-aurora-surface border-b border-aurora-border">
-        <div className="max-w-6xl mx-auto px-4 py-4 grid grid-cols-3 gap-4">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-aurora-indigo">{stats.total}</p>
-            <p className="text-xs text-aurora-text-secondary">Active Trips</p>
-          </div>
-          <div className="border-l border-r border-aurora-border text-center">
-            <p className="text-2xl font-bold text-aurora-indigo">{stats.assistance}</p>
-            <p className="text-xs text-aurora-text-secondary">Need Help</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-aurora-indigo">{stats.offering}</p>
-            <p className="text-xs text-aurora-text-secondary">Offering</p>
+    <div className="bg-aurora-bg">
+      {/* Stats Tiles — Discover-style */}
+      <div className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white py-3">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
+              <div className="text-xs text-teal-100">Active Trips</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.total}</div>
+            </div>
+            <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
+              <div className="text-xs text-teal-100">Need Help</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.assistance}</div>
+            </div>
+            <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
+              <div className="text-xs text-teal-100">Offering</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.offering}</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Search + Ethnicity + Filter Pills */}
-      <div className="bg-aurora-surface border-b border-aurora-border px-4 py-3">
-        <div className="max-w-6xl mx-auto space-y-3">
-          {/* Search + Ethnicity Dropdown */}
+      {/* Search + Ethnicity Header */}
+      <div className="relative bg-gradient-to-br from-teal-500/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
+        <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
@@ -333,17 +334,21 @@ export default function TravelPage() {
               )}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Filter Pills */}
-          <div className="flex gap-2">
+      {/* Filter Pills — Sticky bar */}
+      <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+        <div className="max-w-6xl mx-auto px-4 py-2.5">
+          <div className="flex items-center gap-1.5">
             {(['all', 'assistance', 'offer'] as FilterMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setFilterMode(mode)}
-                className={`px-4 py-2 rounded-full font-medium text-sm transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap shrink-0 ${
                   filterMode === mode
                     ? 'bg-aurora-indigo text-white'
-                    : 'bg-aurora-surface-variant text-aurora-text-secondary hover:bg-gray-100'
+                    : 'bg-aurora-surface border border-aurora-border text-aurora-text-muted hover:text-aurora-text-secondary hover:border-aurora-text-muted/30'
                 }`}
               >
                 {mode === 'all'
