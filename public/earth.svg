@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#93c5fd" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="sphere" cx="40%" cy="35%" r="55%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="50%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1e3a5f"/>
+    </radialGradient>
+    <radialGradient id="atmosphere" cx="50%" cy="50%" r="50%">
+      <stop offset="85%" stop-color="transparent"/>
+      <stop offset="95%" stop-color="#93c5fd" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#bfdbfe" stop-opacity="0.4"/>
+    </radialGradient>
+  </defs>
+  <!-- Outer glow -->
+  <circle cx="200" cy="200" r="190" fill="url(#glow)"/>
+  <!-- Ocean base -->
+  <circle cx="200" cy="200" r="150" fill="url(#sphere)"/>
+  <!-- Continents - stylized land masses -->
+  <!-- North America -->
+  <path d="M130 110 C135 105, 145 100, 155 102 C160 103, 165 108, 162 115 C160 120, 155 125, 150 130 C148 135, 152 140, 148 148 C144 155, 135 158, 130 155 C125 148, 120 140, 118 130 C116 120, 125 115, 130 110Z" fill="#4ade80" opacity="0.7"/>
+  <!-- South America -->
+  <path d="M155 185 C160 180, 168 178, 170 185 C172 192, 175 200, 173 210 C171 220, 168 230, 163 240 C158 248, 155 255, 157 260 C159 265, 158 270, 155 268 C150 264, 148 255, 147 245 C146 235, 148 225, 150 215 C152 205, 150 195, 155 185Z" fill="#4ade80" opacity="0.7"/>
+  <!-- Europe -->
+  <path d="M195 100 C200 97, 210 95, 215 100 C218 104, 216 110, 212 115 C208 118, 203 120, 198 118 C193 116, 190 110, 192 105Z" fill="#4ade80" opacity="0.65"/>
+  <!-- Africa -->
+  <path d="M205 130 C212 125, 222 128, 228 135 C234 142, 237 152, 235 162 C233 172, 228 182, 222 192 C218 198, 215 205, 218 212 C220 218, 217 225, 212 222 C207 218, 204 210, 202 200 C200 190, 198 180, 200 170 C201 160, 199 150, 200 140 C201 135, 200 132, 205 130Z" fill="#4ade80" opacity="0.7"/>
+  <!-- Asia -->
+  <path d="M230 90 C240 85, 255 88, 265 95 C275 102, 280 112, 278 122 C276 130, 270 135, 262 138 C255 140, 248 138, 242 140 C236 142, 232 148, 228 145 C224 140, 226 132, 230 125 C234 118, 238 112, 235 105 C232 98, 228 95, 230 90Z" fill="#4ade80" opacity="0.65"/>
+  <!-- India -->
+  <path d="M248 148 C253 145, 258 147, 260 153 C262 160, 260 168, 256 175 C252 180, 248 178, 246 172 C244 165, 244 155, 248 148Z" fill="#4ade80" opacity="0.7"/>
+  <!-- Australia -->
+  <path d="M278 210 C285 207, 295 210, 300 218 C304 225, 302 234, 296 238 C290 242, 282 240, 278 234 C274 228, 273 218, 278 210Z" fill="#4ade80" opacity="0.6"/>
+  <!-- Cloud wisps -->
+  <ellipse cx="160" cy="120" rx="25" ry="6" fill="white" opacity="0.25" transform="rotate(-15 160 120)"/>
+  <ellipse cx="240" cy="160" rx="30" ry="5" fill="white" opacity="0.2" transform="rotate(10 240 160)"/>
+  <ellipse cx="190" cy="210" rx="20" ry="4" fill="white" opacity="0.2" transform="rotate(-5 190 210)"/>
+  <ellipse cx="270" cy="120" rx="18" ry="4" fill="white" opacity="0.15" transform="rotate(5 270 120)"/>
+  <!-- Atmosphere rim -->
+  <circle cx="200" cy="200" r="150" fill="url(#atmosphere)"/>
+  <!-- Specular highlight -->
+  <ellipse cx="165" cy="135" rx="40" ry="30" fill="white" opacity="0.08" transform="rotate(-30 165 135)"/>
+</svg>

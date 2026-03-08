@@ -1,0 +1,1596 @@
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { collection, getDocs, query, limit, doc, getDoc, setDoc, deleteDoc, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  Search, MapPin, Users, UserPlus, UserCheck, UserMinus,
+  X, ChevronDown, ChevronUp, MessageCircle, Sparkles,
+  Globe, Loader2, SlidersHorizontal,
+  Clock, Check,
+} from 'lucide-react';
+
+// Interfaces
+interface User {
+  id: string;
+  name: string;
+  avatar: string;
+  heritage: string | string[];
+  city: string;
+  profession: string;
+  bio: string;
+  interests: string[];
+  email?: string;
+  phone?: string;
+  showLocation?: boolean;
+  showEmail?: boolean;
+  showPhone?: boolean;
+  updatedAt?: any;
+  createdAt?: any;
+}
+
+interface ConnectionDetail {
+  status: 'pending' | 'connected';
+  initiatedBy: string;
+  connectedAt?: any;
+}
+
+// Constants
+const HERITAGE_OPTIONS = [
+  'Indian', 'Pakistani', 'Bangladeshi', 'Sri Lankan',
+  'Nepali', 'Bhutanese', 'Maldivian', 'Afghan',
+];
+
+const HERITAGE_COLORS: Record<string, string> = {
+  'Indian': 'from-orange-400/20 to-green-400/20',
+  'Pakistani': 'from-green-500/20 to-white/10',
+  'Bangladeshi': 'from-green-400/20 to-red-400/20',
+  'Sri Lankan': 'from-yellow-400/20 to-red-500/20',
+  'Nepali': 'from-blue-400/20 to-red-400/20',
+  'Bhutanese': 'from-orange-400/20 to-yellow-400/20',
+  'Maldivian': 'from-red-400/20 to-green-400/20',
+  'Afghan': 'from-green-400/20 to-red-400/20',
+};
+
+// Helper Functions
+const computeMatchScore = (person: User, currentUserProfile: any, mutualCount: number = 0): number => {
+  let score = 0;
+
+  if (!currentUserProfile) return score;
+
+  // Shared interests
+  const sharedInterests = (person.interests || []).filter(
+    (interest) => (currentUserProfile.interests || []).includes(interest)
+  );
+  score += sharedInterests.length * 20;
+
+  // Shared heritage
+  const userHeritage = Array.isArray(currentUserProfile.heritage)
+    ? currentUserProfile.heritage
+    : [currentUserProfile.heritage].filter(Boolean);
+  const personHeritage = Array.isArray(person.heritage)
+    ? person.heritage
+    : [person.heritage].filter(Boolean);
+  const sharedHeritage = personHeritage.filter((h) => userHeritage.includes(h));
+  if (sharedHeritage.length > 0) score += 25;
+
+  // Same city
+  if (
+    currentUserProfile.city &&
+    person.city &&
+    currentUserProfile.city.toLowerCase() === person.city.toLowerCase()
+  ) {
+    score += 20;
+  }
+
+  // Same profession
+  if (currentUserProfile.profession && person.profession === currentUserProfile.profession) {
+    score += 15;
+  }
+
+  // Mutual connections bonus (capped at 30)
+  score += Math.min(mutualCount * 15, 30);
+
+  return Math.min(score, 100);
+};
+
+const fuzzyMatch = (text: string, query: string): boolean => {
+  const t = text.toLowerCase();
+  const q = query.toLowerCase();
+  let idx = 0;
+  for (const char of q) {
+    idx = t.indexOf(char, idx);
+    if (idx === -1) return false;
+    idx++;
+  }
+  return true;
+};
+
+const renderAvatar = (avatar: string | undefined, name: string): string => {
+  if (avatar && avatar.length === 1 && /\p{Emoji}/u.test(avatar)) {
+    return avatar;
+  }
+  return name.charAt(0).toUpperCase() || '👤';
+};
+
+const MatchBadge: React.FC<{ score: number }> = ({ score }) => {
+  if (score < 40) return null;
+  const color = score >= 75 ? 'from-green-400 to-emerald-500' : 'from-blue-400 to-cyan-500';
+  return (
+    <div className={`absolute top-3 right-3 bg-gradient-to-r ${color} text-white text-xs font-bold px-2 py-1 rounded-full`}>
+      {score}%
+    </div>
+  );
+};
+
+const isNewMember = (person: User): boolean => {
+  if (!person.createdAt) return false;
+  const created = person.createdAt?.toDate ? person.createdAt.toDate() : new Date(person.createdAt);
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  return created > fourteenDaysAgo;
+};
+
+const isRecentlyActive = (person: User): boolean => {
+  if (!person.updatedAt) return false;
+  const updated = person.updatedAt?.toDate ? person.updatedAt.toDate() : new Date(person.updatedAt);
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  return updated > sevenDaysAgo;
+};
+
+const SkeletonCard: React.FC = () => (
+  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 animate-pulse">
+    <div className="w-16 h-16 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
+    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded mb-3" />
+    <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded mb-3" />
+    <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded mb-4" />
+    <div className="h-10 bg-gray-300 dark:bg-gray-600 rounded" />
+  </div>
+);
+
+// Main Component
+export default function DiscoverPage() {
+  const { user, userProfile } = useAuth();
+  const navigate = useNavigate();
+
+  // State
+  const [people, setPeople] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedHeritage, setSelectedHeritage] = useState('All');
+  const [connections, setConnections] = useState<Map<string, 'pending' | 'connected'>>(new Map());
+  const [connectionDetails, setConnectionDetails] = useState<Map<string, ConnectionDetail>>(new Map());
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<User | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortBy, setSortBy] = useState<'match' | 'name' | 'recent'>('match');
+  const [hoveringDisconnect, setHoveringDisconnect] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'discover' | 'network'>('discover');
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+  const [disconnectPersonId, setDisconnectPersonId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [activeTile, setActiveTile] = useState<'connections' | 'pending' | 'members' | null>(null);
+
+  // Ref for scrolling to tab section when tiles are clicked
+  const tabSectionRef = useRef<HTMLDivElement>(null);
+
+  // Handle tile click — switch tab, highlight tile, and scroll into view
+  const handleTileClick = useCallback((tile: 'connections' | 'pending' | 'members') => {
+    setActiveTile(tile);
+    if (tile === 'members') {
+      setActiveTab('discover');
+    } else {
+      setActiveTab('network');
+    }
+    // Scroll the tab section into view smoothly
+    setTimeout(() => {
+      tabSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }, []);
+
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (toastMessage) {
+      const t = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [toastMessage]);
+
+  // Helper function
+  const getConnectionId = (uid1: string, uid2: string) => {
+    return [uid1, uid2].sort().join('_');
+  };
+
+  // Fetch people data
+  useEffect(() => {
+    const fetchPeople = async () => {
+      try {
+        setFetchError(null);
+        const q = query(collection(db, 'users'), limit(100));
+        const snapshot = await getDocs(q);
+
+        const settingsPromises: Promise<{ uid: string; settings: any } | null>[] = [];
+        const usersData: { docId: string; data: any }[] = [];
+
+        snapshot.forEach((d) => {
+          if (d.id !== user?.uid) {
+            usersData.push({ docId: d.id, data: d.data() });
+            settingsPromises.push(
+              getDoc(doc(db, 'userSettings', d.id))
+                .then((snap) => ({ uid: d.id, settings: snap.exists() ? snap.data() : null }))
+                .catch(() => ({ uid: d.id, settings: null }))
+            );
+          }
+        });
+
+        const allSettings = await Promise.all(settingsPromises);
+        const settingsMap = new Map(allSettings.filter(Boolean).map((s) => [s!.uid, s!.settings]));
+
+        const peopleData: User[] = [];
+        for (const { docId, data } of usersData) {
+          const privacy = settingsMap.get(docId)?.privacy;
+          if (privacy?.searchable === false) continue;
+          if (privacy?.profileVisibility === 'private') continue;
+
+          peopleData.push({
+            id: docId,
+            name: data.name || '',
+            avatar: data.avatar || '👤',
+            heritage: data.heritage || 'Other',
+            city: data.city || 'Earth',
+            profession: data.profession || 'Community Member',
+            bio: data.bio || '',
+            interests: Array.isArray(data.interests) ? data.interests : [],
+            email: data.email || '',
+            phone: data.phone || '',
+            showLocation: privacy?.showLocation !== false,
+            showEmail: privacy?.showEmail === true,
+            showPhone: privacy?.showPhone === true,
+            updatedAt: data.updatedAt || null,
+            createdAt: data.createdAt || null,
+          });
+        }
+
+        setPeople(peopleData);
+      } catch (error) {
+        console.error('Error fetching people:', error);
+        setFetchError('Failed to load people. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPeople();
+  }, [user?.uid]);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedPerson) {
+        setSelectedPerson(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [selectedPerson]);
+
+  // Load connections
+  useEffect(() => {
+    if (!user?.uid) return;
+    const loadConnections = async () => {
+      try {
+        const q1 = query(collection(db, 'connections'), where('users', 'array-contains', user.uid));
+        const connSnap = await getDocs(q1);
+        const connMap = new Map<string, 'pending' | 'connected'>();
+        const detailsMap = new Map<string, ConnectionDetail>();
+
+        connSnap.forEach((d) => {
+          const data = d.data();
+          const otherUid = (data.users as string[]).find((uid: string) => uid !== user.uid);
+          if (otherUid) {
+            const status = data.status || 'connected';
+            connMap.set(otherUid, status);
+            detailsMap.set(otherUid, {
+              status,
+              initiatedBy: data.initiatedBy || '',
+              connectedAt: data.connectedAt || null,
+            });
+          }
+        });
+
+        // Legacy migration
+        try {
+          const legacySnap = await getDocs(collection(db, 'users', user.uid, 'connections'));
+          for (const d of legacySnap.docs) {
+            if (!connMap.has(d.id)) {
+              const connId = getConnectionId(user.uid, d.id);
+              try {
+                await setDoc(doc(db, 'connections', connId), {
+                  users: [user.uid, d.id].sort(),
+                  status: 'connected',
+                  connectedAt: d.data().connectedAt || serverTimestamp(),
+                  migratedAt: serverTimestamp(),
+                });
+                connMap.set(d.id, 'connected');
+                detailsMap.set(d.id, { status: 'connected', initiatedBy: '', connectedAt: d.data().connectedAt });
+              } catch {
+                connMap.set(d.id, d.data().status || 'connected');
+                detailsMap.set(d.id, { status: d.data().status || 'connected', initiatedBy: '' });
+              }
+            }
+          }
+        } catch {
+          // Legacy subcollection may not exist
+        }
+
+        setConnections(connMap);
+        setConnectionDetails(detailsMap);
+      } catch (err) {
+        console.error('Error loading connections:', err);
+      }
+    };
+    loadConnections();
+  }, [user?.uid]);
+
+  // Handle connect
+  const handleConnect = async (personId: string) => {
+    if (!user?.uid || connectingId) return;
+
+    const currentStatus = connections.get(personId);
+    if (currentStatus === 'connected') {
+      // Show disconnect confirmation modal instead of window.confirm
+      setDisconnectPersonId(personId);
+      setShowDisconnectConfirm(true);
+      return;
+    }
+
+    setConnectingId(personId);
+    const connId = getConnectionId(user.uid, personId);
+
+    try {
+      if (currentStatus === 'pending') {
+        // Withdraw pending request
+        await deleteDoc(doc(db, 'connections', connId));
+        setConnections((prev) => {
+          const m = new Map(prev);
+          m.delete(personId);
+          return m;
+        });
+        setConnectionDetails((prev) => {
+          const m = new Map(prev);
+          m.delete(personId);
+          return m;
+        });
+      } else {
+        // Send connection request
+        await setDoc(doc(db, 'connections', connId), {
+          users: [user.uid, personId].sort(),
+          status: 'pending',
+          initiatedBy: user.uid,
+          connectedAt: null,
+          createdAt: serverTimestamp(),
+        });
+        setConnections((prev) => new Map(prev).set(personId, 'pending'));
+        setConnectionDetails((prev) =>
+          new Map(prev).set(personId, { status: 'pending', initiatedBy: user.uid })
+        );
+      }
+    } catch (err) {
+      console.error('Error toggling connection:', err);
+      setToastMessage('Connection failed. Please try again.');
+    } finally {
+      setConnectingId(null);
+    }
+  };
+
+  // Confirm disconnect (replaces window.confirm)
+  const confirmDisconnect = async () => {
+    if (!disconnectPersonId || !user?.uid) return;
+    setConnectingId(disconnectPersonId);
+    const connId = getConnectionId(user.uid, disconnectPersonId);
+    try {
+      await deleteDoc(doc(db, 'connections', connId));
+      try {
+        await deleteDoc(doc(db, 'users', user.uid, 'connections', disconnectPersonId));
+      } catch {}
+      try {
+        await deleteDoc(doc(db, 'users', disconnectPersonId, 'connections', user.uid));
+      } catch {}
+      setConnections((prev) => {
+        const m = new Map(prev);
+        m.delete(disconnectPersonId);
+        return m;
+      });
+      setConnectionDetails((prev) => {
+        const m = new Map(prev);
+        m.delete(disconnectPersonId);
+        return m;
+      });
+    } catch (err) {
+      console.error('Error disconnecting:', err);
+      setToastMessage('Failed to disconnect. Please try again.');
+    } finally {
+      setConnectingId(null);
+      setShowDisconnectConfirm(false);
+      setDisconnectPersonId(null);
+    }
+  };
+
+  // Handle accept connection
+  const handleAcceptConnection = async (personId: string) => {
+    if (!user?.uid || connectingId) return;
+    setConnectingId(personId);
+    const connId = getConnectionId(user.uid, personId);
+    try {
+      await setDoc(doc(db, 'connections', connId), {
+        users: [user.uid, personId].sort(),
+        status: 'connected',
+        initiatedBy: connectionDetails.get(personId)?.initiatedBy || personId,
+        connectedAt: serverTimestamp(),
+        createdAt: connectionDetails.get(personId)?.connectedAt || serverTimestamp(),
+      });
+      setConnections((prev) => new Map(prev).set(personId, 'connected'));
+      setConnectionDetails((prev) =>
+        new Map(prev).set(personId, {
+          status: 'connected',
+          initiatedBy: connectionDetails.get(personId)?.initiatedBy || personId,
+          connectedAt: new Date(),
+        })
+      );
+    } catch (err) {
+      console.error('Error accepting connection:', err);
+      setToastMessage('Failed to accept connection. Please try again.');
+    } finally {
+      setConnectingId(null);
+    }
+  };
+
+  // Handle decline connection
+  const handleDeclineConnection = async (personId: string) => {
+    if (!user?.uid || connectingId) return;
+    setConnectingId(personId);
+    const connId = getConnectionId(user.uid, personId);
+    try {
+      await deleteDoc(doc(db, 'connections', connId));
+      setConnections((prev) => {
+        const m = new Map(prev);
+        m.delete(personId);
+        return m;
+      });
+      setConnectionDetails((prev) => {
+        const m = new Map(prev);
+        m.delete(personId);
+        return m;
+      });
+    } catch (err) {
+      console.error('Error declining connection:', err);
+      setToastMessage('Failed to decline connection. Please try again.');
+    } finally {
+      setConnectingId(null);
+    }
+  };
+
+  // Computed values
+  const connectedCount = Array.from(connections.values()).filter((s) => s === 'connected').length;
+  const pendingCount = Array.from(connections.entries()).filter(
+    ([pid, s]) => s === 'pending' && connectionDetails.get(pid)?.initiatedBy !== user?.uid
+  ).length;
+  // sentCount available via sentRequests.length
+
+  // Get mutual connection count
+  const getMutualConnectionCount = (personId: string): number => {
+    let count = 0;
+    const targetPerson = people.find((p) => p.id === personId);
+    if (!targetPerson) return 0;
+
+    connections.forEach((status, uid) => {
+      if (status === 'connected' && uid !== personId) {
+        const connectedPerson = people.find((p) => p.id === uid);
+        if (connectedPerson) {
+          const tHeritage = Array.isArray(targetPerson.heritage)
+            ? targetPerson.heritage
+            : [targetPerson.heritage];
+          const cHeritage = Array.isArray(connectedPerson.heritage)
+            ? connectedPerson.heritage
+            : [connectedPerson.heritage];
+          const sharedHeritage = tHeritage.some((h) => cHeritage.includes(h));
+          const sharedCity = targetPerson.city === connectedPerson.city;
+          if (sharedHeritage || sharedCity) count++;
+        }
+      }
+    });
+    return count;
+  };
+
+  // Filtered people
+  const filteredPeople = useMemo(() => {
+    let filtered = people;
+
+    // Tab filtering
+    if (activeTab === 'discover') {
+      filtered = filtered.filter((p) => {
+        const status = connections.get(p.id);
+        if (!status) return true; // not connected
+        if (status === 'pending' && connectionDetails.get(p.id)?.initiatedBy !== user?.uid)
+          return false; // incoming request shows in network
+        return status === 'pending' && connectionDetails.get(p.id)?.initiatedBy === user?.uid; // sent pending still shows
+      });
+    } else {
+      // My Network: only connected people
+      filtered = filtered.filter((p) => connections.get(p.id) === 'connected');
+    }
+
+    if (selectedHeritage !== 'All') {
+      filtered = filtered.filter((person) => {
+        if (Array.isArray(person.heritage)) return person.heritage.includes(selectedHeritage);
+        return person.heritage === selectedHeritage;
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim();
+      filtered = filtered.filter(
+        (person) =>
+          fuzzyMatch(person.name, q) ||
+          fuzzyMatch(person.city, q) ||
+          fuzzyMatch(person.profession, q) ||
+          person.interests.some((i) => fuzzyMatch(i, q))
+      );
+    }
+
+    return filtered.sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'recent') {
+        const aTime = a.updatedAt?.toDate
+          ? a.updatedAt.toDate().getTime()
+          : a.updatedAt
+            ? new Date(a.updatedAt).getTime()
+            : 0;
+        const bTime = b.updatedAt?.toDate
+          ? b.updatedAt.toDate().getTime()
+          : b.updatedAt
+            ? new Date(b.updatedAt).getTime()
+            : 0;
+        return bTime - aTime;
+      }
+      const mutualA = getMutualConnectionCount(a.id);
+      const mutualB = getMutualConnectionCount(b.id);
+      return (
+        computeMatchScore(b, userProfile, mutualB) - computeMatchScore(a, userProfile, mutualA)
+      );
+    });
+  }, [people, selectedHeritage, searchQuery, userProfile, sortBy, connections, connectionDetails, activeTab, user?.uid]);
+
+  // PYMK Groups
+  const pymkGroups = useMemo(() => {
+    if (activeTab !== 'discover' || !userProfile)
+      return { sameCity: [], sameHeritage: [], similarInterests: [] };
+
+    const nonConnected = people.filter((p) => !connections.has(p.id));
+
+    const userCity = userProfile.city || '';
+    const userHeritage = Array.isArray(userProfile.heritage)
+      ? userProfile.heritage
+      : [userProfile.heritage].filter(Boolean);
+    const userInterests: string[] = userProfile.interests || [];
+
+    const sameCity = nonConnected
+      .filter(
+        (p) =>
+          p.city && userCity && p.city.toLowerCase() === userCity.toLowerCase()
+      )
+      .slice(0, 10);
+    const sameHeritage = nonConnected
+      .filter((p) => {
+        const pH = Array.isArray(p.heritage) ? p.heritage : [p.heritage];
+        return pH.some((h) => userHeritage.includes(h));
+      })
+      .slice(0, 10);
+    const similarInterests = nonConnected
+      .filter((p) => {
+        const shared = (p.interests || []).filter((i) => userInterests.includes(i));
+        return shared.length >= 2;
+      })
+      .slice(0, 10);
+
+    return { sameCity, sameHeritage, similarInterests };
+  }, [people, connections, userProfile, activeTab]);
+
+  // Pending/Sent requests
+  const incomingRequests = useMemo(() => {
+    return people.filter((p) => {
+      const status = connections.get(p.id);
+      const detail = connectionDetails.get(p.id);
+      return status === 'pending' && detail?.initiatedBy && detail.initiatedBy !== user?.uid;
+    });
+  }, [people, connections, connectionDetails, user?.uid]);
+
+  const sentRequests = useMemo(() => {
+    return people.filter((p) => {
+      const status = connections.get(p.id);
+      const detail = connectionDetails.get(p.id);
+      return status === 'pending' && detail?.initiatedBy === user?.uid;
+    });
+  }, [people, connections, connectionDetails, user?.uid]);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-aurora-bg flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-aurora-bg pb-20">
+      {/* Hero Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 sm:py-6 md:py-8">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="mb-4 sm:mb-6">
+            <h1 className="text-2xl sm:text-4xl font-bold mb-2">Discover</h1>
+            <p className="text-blue-100">Expand your network within the South Asian community</p>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+            <button
+              onClick={() => handleTileClick('connections')}
+              className={`rounded-lg p-2 sm:p-4 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
+                activeTile === 'connections' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
+              }`}
+            >
+              <div className="text-xs sm:text-sm text-blue-100 flex items-center gap-1">
+                Connections
+                <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </div>
+              <div className="text-xl sm:text-3xl font-bold">{connectedCount}</div>
+            </button>
+            <button
+              onClick={() => handleTileClick('pending')}
+              className={`rounded-lg p-2 sm:p-4 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left relative ${
+                activeTile === 'pending' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
+              } ${pendingCount > 0 ? 'ring-2 ring-yellow-400/60' : ''}`}
+            >
+              <div className="text-xs sm:text-sm text-blue-100 flex items-center gap-1">
+                Pending
+                <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </div>
+              <div className="text-xl sm:text-3xl font-bold">{pendingCount}</div>
+              {pendingCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
+              )}
+            </button>
+            <button
+              onClick={() => handleTileClick('members')}
+              className={`rounded-lg p-2 sm:p-4 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
+                activeTile === 'members' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
+              }`}
+            >
+              <div className="text-xs sm:text-sm text-blue-100 flex items-center gap-1">
+                Members
+                <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </div>
+              <div className="text-xl sm:text-3xl font-bold">{people.length}</div>
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" aria-hidden="true" />
+            <input
+              type="text"
+              placeholder="Search by name, city, profession, or interests..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              aria-label="Search people by name, city, profession, or interests"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Sticky Tab Navigation */}
+      <div ref={tabSectionRef} className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4">
+          {/* Tabs */}
+          <div className="flex items-center gap-2 py-4 border-b">
+            <button
+              onClick={() => { setActiveTab('discover'); setActiveTile(null); }}
+              className={`px-4 py-2 rounded-full font-medium transition-all ${
+                activeTab === 'discover'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Discover
+            </button>
+            <button
+              onClick={() => { setActiveTab('network'); setActiveTile(null); }}
+              className={`px-4 py-2 rounded-full font-medium transition-all relative ${
+                activeTab === 'network'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              My Network ({connectedCount})
+              {pendingCount > 0 && activeTab !== 'network' && (
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Heritage Filter */}
+          <div className="flex gap-2 py-3 overflow-x-auto pb-3">
+            {['All', ...HERITAGE_OPTIONS].map((heritage) => (
+              <button
+                key={heritage}
+                onClick={() => setSelectedHeritage(heritage)}
+                className={`px-4 py-2 sm:py-1 rounded-full whitespace-nowrap text-sm font-medium transition-all ${
+                  selectedHeritage === heritage
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {heritage}
+              </button>
+            ))}
+          </div>
+
+          {/* Expandable Filters */}
+          <div className="py-3 border-t">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center gap-2 text-gray-700 font-medium hover:text-blue-600 transition-colors"
+              aria-label={showFilters ? 'Hide filters' : 'Show filters'}
+              aria-expanded={showFilters}
+            >
+              <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
+              {showFilters ? 'Hide' : 'Show'} Filters
+              {showFilters ? (
+                <ChevronUp className="w-4 h-4" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="w-4 h-4" aria-hidden="true" />
+              )}
+            </button>
+
+            {showFilters && (
+              <div className="mt-3 p-4 bg-gray-50 rounded-lg">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    View Mode
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
+                        viewMode === 'grid'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300'
+                      }`}
+                    >
+                      Grid
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
+                        viewMode === 'list'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300'
+                      }`}
+                    >
+                      List
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sort By
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSortBy('match')}
+                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
+                        sortBy === 'match'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300'
+                      }`}
+                    >
+                      Best Match
+                    </button>
+                    <button
+                      onClick={() => setSortBy('recent')}
+                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
+                        sortBy === 'recent'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300'
+                      }`}
+                    >
+                      Recently Active
+                    </button>
+                    <button
+                      onClick={() => setSortBy('name')}
+                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
+                        sortBy === 'name'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300'
+                      }`}
+                    >
+                      Name
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6 md:py-8">
+        {/* Error Message */}
+        {fetchError && (
+          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {fetchError}
+          </div>
+        )}
+
+        {/* Results Header */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">
+            {activeTab === 'discover' ? 'Discover People' : 'Your Network'}
+          </h2>
+          <p className="text-gray-600">
+            {loading
+              ? 'Loading...'
+              : activeTab === 'discover'
+                ? `${filteredPeople.length} people match your filters`
+                : selectedHeritage !== 'All'
+                  ? `${filteredPeople.length} of ${connectedCount} connections`
+                  : `${connectedCount} connections`}
+          </p>
+        </div>
+
+        {/* Incoming Requests Section */}
+        {activeTab === 'network' && incomingRequests.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              Pending Requests ({incomingRequests.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {incomingRequests.map((person) => (
+                <div key={person.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                  <div className="h-32 bg-gradient-to-r from-yellow-400 to-orange-400 relative">
+                    <button
+                      onClick={() => setSelectedPerson(person)}
+                      className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                        {renderAvatar(person.avatar, person.name)}
+                      </div>
+                      {isRecentlyActive(person) && (
+                        <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                      )}
+                    </div>
+                    <h3 className="font-bold text-gray-800 mt-2">{person.name}</h3>
+                    <p className="text-sm text-gray-600">{person.profession}</p>
+                    {person.showLocation && (
+                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                        <MapPin className="w-3 h-3" /> {person.city}
+                      </p>
+                    )}
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={() => handleAcceptConnection(person.id)}
+                        disabled={connectingId === person.id}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <Check className="w-4 h-4" /> Accept
+                      </button>
+                      <button
+                        onClick={() => handleDeclineConnection(person.id)}
+                        disabled={connectingId === person.id}
+                        className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <X className="w-4 h-4" /> Decline
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sent Requests Section */}
+        {activeTab === 'network' && sentRequests.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">
+              Sent Requests ({sentRequests.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              {sentRequests.map((person) => (
+                <div key={person.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                  <div className="h-32 bg-gradient-to-r from-purple-400 to-blue-400 relative">
+                    <button
+                      onClick={() => setSelectedPerson(person)}
+                      className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                        {renderAvatar(person.avatar, person.name)}
+                      </div>
+                      {isRecentlyActive(person) && (
+                        <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                      )}
+                    </div>
+                    <h3 className="font-bold text-gray-800 mt-2">{person.name}</h3>
+                    <p className="text-sm text-gray-600">{person.profession}</p>
+                    {person.showLocation && (
+                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                        <MapPin className="w-3 h-3" /> {person.city}
+                      </p>
+                    )}
+                    <div className="mt-4">
+                      <button
+                        onClick={() => handleConnect(person.id)}
+                        disabled={connectingId === person.id}
+                        className="w-full bg-gray-400 hover:bg-gray-500 text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <Clock className="w-4 h-4" /> Pending
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PYMK Carousels */}
+        {activeTab === 'discover' && !loading && (
+          <>
+            {pymkGroups.sameCity.length >= 2 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-xl font-bold text-gray-800">From Your City</h3>
+                </div>
+                <div className="overflow-x-auto pb-4 scrollbar-hide">
+                  <div className="flex gap-4 w-max">
+                    {pymkGroups.sameCity.map((person) => (
+                      <div
+                        key={person.id}
+                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0"
+                      >
+                        <div
+                          className={`h-32 bg-gradient-to-r ${
+                            HERITAGE_COLORS[
+                              Array.isArray(person.heritage)
+                                ? person.heritage[0]
+                                : person.heritage
+                            ] || 'from-gray-300 to-gray-400'
+                          } relative`}
+                        >
+                          <button
+                            onClick={() => setSelectedPerson(person)}
+                            className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
+                          />
+                        </div>
+                        <div className="p-4">
+                          <div className="relative">
+                            <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                              {renderAvatar(person.avatar, person.name)}
+                            </div>
+                            {isRecentlyActive(person) && (
+                              <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                            )}
+                          </div>
+                          <h4 className="font-bold text-gray-800 mt-2">{person.name}</h4>
+                          <p className="text-xs text-gray-600">{person.profession}</p>
+                          {person.showLocation && (
+                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                              <MapPin className="w-3 h-3" /> {person.city}
+                            </p>
+                          )}
+                          {isNewMember(person) && (
+                            <div className="mt-2 inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">
+                              New
+                            </div>
+                          )}
+                          <div className="mt-3">
+                            <button
+                              onClick={() => handleConnect(person.id)}
+                              disabled={connectingId === person.id}
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                            >
+                              Connect
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pymkGroups.sameHeritage.length >= 2 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <Globe className="w-5 h-5 text-orange-600" />
+                  <h3 className="text-xl font-bold text-gray-800">Same Heritage</h3>
+                </div>
+                <div className="overflow-x-auto pb-4 scrollbar-hide">
+                  <div className="flex gap-4 w-max">
+                    {pymkGroups.sameHeritage.map((person) => (
+                      <div
+                        key={person.id}
+                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0"
+                      >
+                        <div
+                          className={`h-32 bg-gradient-to-r ${
+                            HERITAGE_COLORS[
+                              Array.isArray(person.heritage)
+                                ? person.heritage[0]
+                                : person.heritage
+                            ] || 'from-gray-300 to-gray-400'
+                          } relative`}
+                        >
+                          <button
+                            onClick={() => setSelectedPerson(person)}
+                            className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
+                          />
+                        </div>
+                        <div className="p-4">
+                          <div className="relative">
+                            <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                              {renderAvatar(person.avatar, person.name)}
+                            </div>
+                            {isRecentlyActive(person) && (
+                              <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                            )}
+                          </div>
+                          <h4 className="font-bold text-gray-800 mt-2">{person.name}</h4>
+                          <p className="text-xs text-gray-600">{person.profession}</p>
+                          {person.showLocation && (
+                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                              <MapPin className="w-3 h-3" /> {person.city}
+                            </p>
+                          )}
+                          {isNewMember(person) && (
+                            <div className="mt-2 inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">
+                              New
+                            </div>
+                          )}
+                          <div className="mt-3">
+                            <button
+                              onClick={() => handleConnect(person.id)}
+                              disabled={connectingId === person.id}
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                            >
+                              Connect
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pymkGroups.similarInterests.length >= 2 && (
+              <div className="mb-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                  <h3 className="text-xl font-bold text-gray-800">Similar Interests</h3>
+                </div>
+                <div className="overflow-x-auto pb-4 scrollbar-hide">
+                  <div className="flex gap-4 w-max">
+                    {pymkGroups.similarInterests.map((person) => (
+                      <div
+                        key={person.id}
+                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0"
+                      >
+                        <div
+                          className={`h-32 bg-gradient-to-r ${
+                            HERITAGE_COLORS[
+                              Array.isArray(person.heritage)
+                                ? person.heritage[0]
+                                : person.heritage
+                            ] || 'from-gray-300 to-gray-400'
+                          } relative`}
+                        >
+                          <button
+                            onClick={() => setSelectedPerson(person)}
+                            className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
+                          />
+                        </div>
+                        <div className="p-4">
+                          <div className="relative">
+                            <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                              {renderAvatar(person.avatar, person.name)}
+                            </div>
+                            {isRecentlyActive(person) && (
+                              <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                            )}
+                          </div>
+                          <h4 className="font-bold text-gray-800 mt-2">{person.name}</h4>
+                          <p className="text-xs text-gray-600">{person.profession}</p>
+                          {person.showLocation && (
+                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                              <MapPin className="w-3 h-3" /> {person.city}
+                            </p>
+                          )}
+                          {isNewMember(person) && (
+                            <div className="mt-2 inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">
+                              New
+                            </div>
+                          )}
+                          <div className="mt-3">
+                            <button
+                              onClick={() => handleConnect(person.id)}
+                              disabled={connectingId === person.id}
+                              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                            >
+                              Connect
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Main Grid/List View */}
+        {loading ? (
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+            {[...Array(9)].map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : filteredPeople.length === 0 ? (
+          <div className="text-center py-16">
+            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-gray-600 mb-2">
+              {activeTab === 'discover' ? 'No people found' : 'No connections yet'}
+            </h3>
+            <p className="text-gray-500">
+              {activeTab === 'discover'
+                ? 'Try adjusting your filters or search terms'
+                : 'Start connecting with people to build your network'}
+            </p>
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPeople.map((person) => {
+              const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
+              const status = connections.get(person.id);
+              const isHovering = hoveringDisconnect === person.id && status === 'connected';
+
+              return (
+                <div key={person.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                  <div
+                    className={`h-32 bg-gradient-to-r ${
+                      HERITAGE_COLORS[
+                        Array.isArray(person.heritage) ? person.heritage[0] : person.heritage
+                      ] || 'from-gray-300 to-gray-400'
+                    } relative`}
+                  >
+                    <button
+                      onClick={() => setSelectedPerson(person)}
+                      className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
+                    />
+                    <MatchBadge score={score} />
+                  </div>
+                  <div className="p-4">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-12 relative z-10 border-4 border-white">
+                        {renderAvatar(person.avatar, person.name)}
+                      </div>
+                      {isRecentlyActive(person) && (
+                        <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white bottom-0 right-0" />
+                      )}
+                    </div>
+                    <h3 className="font-bold text-gray-800 mt-3">{person.name}</h3>
+                    {isNewMember(person) && (
+                      <div className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded mt-1 mb-2">
+                        New Member
+                      </div>
+                    )}
+                    <p className="text-sm text-gray-600">{person.profession}</p>
+                    {person.showLocation && (
+                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                        <MapPin className="w-3 h-3" /> {person.city}
+                      </p>
+                    )}
+                    {getMutualConnectionCount(person.id) > 0 && (
+                      <p className="text-xs text-blue-600 font-medium mt-2">
+                        {getMutualConnectionCount(person.id)} mutual connections
+                      </p>
+                    )}
+                    <div className="mt-4 flex gap-2">
+                      {status === 'connected' ? (
+                        <>
+                          <button
+                            onClick={() => navigate(`/messages?user=${person.id}`)}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-medium text-sm flex items-center justify-center gap-1"
+                          >
+                            <MessageCircle className="w-4 h-4" /> Message
+                          </button>
+                          <button
+                            onMouseEnter={() => setHoveringDisconnect(person.id)}
+                            onMouseLeave={() => setHoveringDisconnect(null)}
+                            onTouchStart={(e) => {
+                              e.stopPropagation();
+                              if (isHovering) {
+                                // Second touch - execute disconnect
+                                handleConnect(person.id);
+                              } else {
+                                // First touch - show button
+                                setHoveringDisconnect(person.id);
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isHovering) handleConnect(person.id);
+                            }}
+                            disabled={connectingId === person.id}
+                            className={`px-3 py-2 rounded font-medium text-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-1 ${
+                              isHovering
+                                ? 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-300'
+                                : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-300'
+                            }`}
+                            title={isHovering ? 'Tap to disconnect' : 'Tap to show disconnect'}
+                          >
+                            {isHovering ? (
+                              <><UserMinus className="w-4 h-4" /> <span className="hidden sm:inline">Disconnect</span></>
+                            ) : (
+                              <><UserCheck className="w-4 h-4" /> <span className="hidden sm:inline">Connected</span></>
+                            )}
+                          </button>
+                        </>
+                      ) : status === 'pending' ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                          disabled={connectingId === person.id}
+                          className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                          title="Tap to withdraw request"
+                        >
+                          <Clock className="w-4 h-4" /> Pending
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                          disabled={connectingId === person.id}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                          <UserPlus className="w-4 h-4" /> Connect
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredPeople.map((person) => {
+              const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
+              const status = connections.get(person.id);
+              const isHovering = hoveringDisconnect === person.id && status === 'connected';
+
+              return (
+                <div key={person.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow flex flex-col sm:flex-row gap-4">
+                  <div className="relative flex-shrink-0 self-center sm:self-start">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-blue-500 text-white flex items-center justify-center font-bold text-xl sm:text-2xl">
+                      {renderAvatar(person.avatar, person.name)}
+                    </div>
+                    {isRecentlyActive(person) && (
+                      <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white bottom-0 right-0" />
+                    )}
+                  </div>
+
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 className="font-bold text-gray-800">{person.name}</h3>
+                        {isNewMember(person) && (
+                          <span className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded">
+                            New
+                          </span>
+                        )}
+                      </div>
+                      {score >= 40 && (
+                        <div className="text-right">
+                          <div className={`text-lg font-bold ${score >= 75 ? 'text-green-600' : 'text-blue-600'}`}>
+                            {score}%
+                          </div>
+                          <div className="text-xs text-gray-500">Match</div>
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-sm text-gray-600 mb-1">{person.profession}</p>
+                    {person.showLocation && (
+                      <p className="text-sm text-gray-500 flex items-center gap-1 mb-2">
+                        <MapPin className="w-3 h-3" /> {person.city}
+                      </p>
+                    )}
+
+                    {getMutualConnectionCount(person.id) > 0 && (
+                      <p className="text-xs text-blue-600 font-medium mb-2">
+                        {getMutualConnectionCount(person.id)} mutual connections
+                      </p>
+                    )}
+
+                    {person.interests && person.interests.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {person.interests.slice(0, 3).map((interest) => (
+                          <span key={interest} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                            {interest}
+                          </span>
+                        ))}
+                        {person.interests.length > 3 && (
+                          <span className="text-xs text-gray-500">+{person.interests.length - 3} more</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-row sm:flex-col gap-2 flex-shrink-0">
+                    {status === 'connected' ? (
+                      <>
+                        <button
+                          onClick={() => navigate(`/messages?user=${person.id}`)}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium text-sm flex items-center justify-center gap-1 whitespace-nowrap"
+                        >
+                          <MessageCircle className="w-4 h-4" /> Message
+                        </button>
+                        <button
+                          onMouseEnter={() => setHoveringDisconnect(person.id)}
+                          onMouseLeave={() => setHoveringDisconnect(null)}
+                          onTouchStart={(e) => {
+                            e.stopPropagation();
+                            if (isHovering) {
+                              // Second touch - execute disconnect
+                              handleConnect(person.id);
+                            } else {
+                              // First touch - show button
+                              setHoveringDisconnect(person.id);
+                            }
+                          }}
+                          onClick={() => { if (isHovering) handleConnect(person.id); }}
+                          disabled={connectingId === person.id}
+                          className={`px-3 py-2 rounded font-medium text-sm disabled:opacity-50 transition-colors whitespace-nowrap flex items-center justify-center gap-1 ${
+                            isHovering
+                              ? 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-300'
+                              : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-300'
+                          }`}
+                          title={isHovering ? 'Tap to disconnect' : 'Tap to show disconnect'}
+                        >
+                          {isHovering ? (
+                            <><UserMinus className="w-4 h-4" /> Disconnect</>
+                          ) : (
+                            <><UserCheck className="w-4 h-4" /> Connected</>
+                          )}
+                        </button>
+                      </>
+                    ) : status === 'pending' ? (
+                      <button
+                        onClick={() => handleConnect(person.id)}
+                        disabled={connectingId === person.id}
+                        className="bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 px-3 py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1 whitespace-nowrap"
+                        title="Click to withdraw request"
+                      >
+                        <Clock className="w-4 h-4" /> Pending
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleConnect(person.id)}
+                        disabled={connectingId === person.id}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1 whitespace-nowrap"
+                      >
+                        <UserPlus className="w-4 h-4" /> Connect
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Profile Detail Modal */}
+      {selectedPerson && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center sm:justify-center"
+          onClick={() => setSelectedPerson(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Profile details for ${selectedPerson.name}`}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 w-full sm:max-w-md sm:rounded-lg rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={`h-40 bg-gradient-to-r ${
+              HERITAGE_COLORS[
+                Array.isArray(selectedPerson.heritage)
+                  ? selectedPerson.heritage[0]
+                  : selectedPerson.heritage
+              ] || 'from-gray-300 to-gray-400'
+            } relative`}>
+              <button
+                onClick={() => setSelectedPerson(null)}
+                className="absolute top-3 right-3 p-1.5 bg-black/30 hover:bg-black/50 rounded-full transition-colors"
+                aria-label="Close profile"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            <div className="p-6">
+
+              <div className="relative mb-4">
+                <div className="w-24 h-24 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-4xl -mt-16 relative z-10 border-4 border-white mx-auto">
+                  {renderAvatar(selectedPerson.avatar, selectedPerson.name)}
+                </div>
+                {isRecentlyActive(selectedPerson) && (
+                  <div className="absolute w-5 h-5 bg-green-500 rounded-full border-2 border-white bottom-0 right-1/3" />
+                )}
+              </div>
+
+              <h2 className="text-2xl font-bold text-gray-800 text-center mb-1">
+                {selectedPerson.name}
+              </h2>
+
+              {isNewMember(selectedPerson) && (
+                <div className="text-center mb-2">
+                  <span className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded">
+                    New Member
+                  </span>
+                </div>
+              )}
+
+              <p className="text-gray-600 text-center mb-1">{selectedPerson.profession}</p>
+
+              {selectedPerson.showLocation && (
+                <p className="text-gray-500 text-center flex items-center justify-center gap-1 mb-4">
+                  <MapPin className="w-4 h-4" /> {selectedPerson.city}
+                </p>
+              )}
+
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <p className="text-gray-700">{selectedPerson.bio || 'No bio provided'}</p>
+              </div>
+
+              {selectedPerson.interests && selectedPerson.interests.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="font-bold text-gray-800 mb-2 text-sm">Interests</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPerson.interests.map((interest) => (
+                      <span
+                        key={interest}
+                        className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full"
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {getMutualConnectionCount(selectedPerson.id) > 0 && (
+                <div className="mb-4 pb-4 border-b">
+                  <h3 className="font-bold text-gray-800 mb-2 text-sm">
+                    {getMutualConnectionCount(selectedPerson.id)} Mutual Connections
+                  </h3>
+                  <p className="text-xs text-gray-600">You both know these people</p>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                {connections.get(selectedPerson.id) === 'connected' ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        navigate(`/messages?user=${selectedPerson.id}`);
+                        setSelectedPerson(null);
+                      }}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-1"
+                    >
+                      <MessageCircle className="w-4 h-4" /> Message
+                    </button>
+                    <button
+                      onClick={() => handleConnect(selectedPerson.id)}
+                      disabled={connectingId === selectedPerson.id}
+                      className="flex-1 bg-red-100 hover:bg-red-200 text-red-600 border border-red-300 py-2.5 rounded-lg font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      <UserMinus className="w-4 h-4" /> Disconnect
+                    </button>
+                  </>
+                ) : connections.get(selectedPerson.id) === 'pending' ? (
+                  <button
+                    onClick={() => handleConnect(selectedPerson.id)}
+                    disabled={connectingId === selectedPerson.id}
+                    className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-2.5 rounded-lg font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                  >
+                    <Clock className="w-4 h-4" /> Withdraw Request
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleConnect(selectedPerson.id)}
+                    disabled={connectingId === selectedPerson.id}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                  >
+                    <UserPlus className="w-4 h-4" /> Connect
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Disconnect Confirmation Modal */}
+      {showDisconnectConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => { setShowDisconnectConfirm(false); setDisconnectPersonId(null); }}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <UserMinus size={24} className="text-red-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Disconnect?</h3>
+              <p className="text-sm text-gray-500 mb-5">
+                Are you sure you want to disconnect from <strong>{people.find(p => p.id === disconnectPersonId)?.name || 'this person'}</strong>? You'll need to send a new connection request to reconnect.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowDisconnectConfirm(false); setDisconnectPersonId(null); }}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDisconnect}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
+                >
+                  Disconnect
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[70] text-sm font-medium animate-fade-in">
+          {toastMessage}
+        </div>
+      )}
+    </div>
+  );
+}

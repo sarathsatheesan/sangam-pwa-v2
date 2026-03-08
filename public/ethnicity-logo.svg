@@ -1,0 +1,161 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Neon glow filter -->
+    <filter id="neonGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Stronger glow filter for center -->
+    <filter id="strongGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Radial gradient for center glow -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#00e5c8;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#00e5c8;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background glow center -->
+  <circle cx="50" cy="50" r="25" fill="url(#centerGlow)" opacity="0.6"/>
+
+  <!-- Central bright point -->
+  <circle cx="50" cy="50" r="2.5" fill="#ffffff" filter="url(#strongGlow)" opacity="0.9"/>
+  <circle cx="50" cy="50" r="1.5" fill="#00e5c8" filter="url(#strongGlow)"/>
+
+  <!-- Group 1: Teal/Cyan figure (top) -->
+  <g filter="url(#neonGlow)">
+    <!-- Upper curved path -->
+    <path d="M 50 20 Q 35 25 30 35 Q 28 40 32 42 Q 40 38 50 40 Q 60 38 68 42 Q 72 40 70 35 Q 65 25 50 20" 
+          fill="none" stroke="#00e5c8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Left arm curved -->
+    <path d="M 30 40 Q 20 45 15 55 Q 12 62 18 65 Q 28 60 35 55 Q 40 50 38 42" 
+          fill="none" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Right arm curved -->
+    <path d="M 70 40 Q 80 45 85 55 Q 88 62 82 65 Q 72 60 65 55 Q 60 50 62 42" 
+          fill="none" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Connection to center -->
+    <path d="M 40 50 Q 45 48 50 50 Q 55 48 60 50" 
+          fill="none" stroke="#00e5c8" stroke-width="1.2" stroke-linecap="round"/>
+
+    <!-- Decorative circles -->
+    <circle cx="30" cy="42" r="1.2" fill="#00e5c8" opacity="0.9"/>
+    <circle cx="70" cy="42" r="1.2" fill="#00d4aa" opacity="0.9"/>
+    <circle cx="40" cy="50" r="1" fill="#00e5c8" opacity="0.8"/>
+    <circle cx="60" cy="50" r="1" fill="#00d4aa" opacity="0.8"/>
+  </g>
+
+  <!-- Group 2: Orange/Amber figure (right) - rotated 90 degrees -->
+  <g filter="url(#neonGlow)" transform="rotate(90 50 50)">
+    <!-- Upper curved path -->
+    <path d="M 50 20 Q 35 25 30 35 Q 28 40 32 42 Q 40 38 50 40 Q 60 38 68 42 Q 72 40 70 35 Q 65 25 50 20" 
+          fill="none" stroke="#ff8c00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Left arm curved -->
+    <path d="M 30 40 Q 20 45 15 55 Q 12 62 18 65 Q 28 60 35 55 Q 40 50 38 42" 
+          fill="none" stroke="#e8a840" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Right arm curved -->
+    <path d="M 70 40 Q 80 45 85 55 Q 88 62 82 65 Q 72 60 65 55 Q 60 50 62 42" 
+          fill="none" stroke="#e8a840" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Connection to center -->
+    <path d="M 40 50 Q 45 48 50 50 Q 55 48 60 50" 
+          fill="none" stroke="#ff8c00" stroke-width="1.2" stroke-linecap="round"/>
+
+    <!-- Decorative circles -->
+    <circle cx="30" cy="42" r="1.2" fill="#ff8c00" opacity="0.9"/>
+    <circle cx="70" cy="42" r="1.2" fill="#e8a840" opacity="0.9"/>
+    <circle cx="40" cy="50" r="1" fill="#ff8c00" opacity="0.8"/>
+    <circle cx="60" cy="50" r="1" fill="#e8a840" opacity="0.8"/>
+  </g>
+
+  <!-- Group 3: Green figure (bottom) - rotated 180 degrees -->
+  <g filter="url(#neonGlow)" transform="rotate(180 50 50)">
+    <!-- Upper curved path -->
+    <path d="M 50 20 Q 35 25 30 35 Q 28 40 32 42 Q 40 38 50 40 Q 60 38 68 42 Q 72 40 70 35 Q 65 25 50 20" 
+          fill="none" stroke="#44cc88" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Left arm curved -->
+    <path d="M 30 40 Q 20 45 15 55 Q 12 62 18 65 Q 28 60 35 55 Q 40 50 38 42" 
+          fill="none" stroke="#44cc88" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Right arm curved -->
+    <path d="M 70 40 Q 80 45 85 55 Q 88 62 82 65 Q 72 60 65 55 Q 60 50 62 42" 
+          fill="none" stroke="#44cc88" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Connection to center -->
+    <path d="M 40 50 Q 45 48 50 50 Q 55 48 60 50" 
+          fill="none" stroke="#44cc88" stroke-width="1.2" stroke-linecap="round"/>
+
+    <!-- Decorative circles -->
+    <circle cx="30" cy="42" r="1.2" fill="#44cc88" opacity="0.9"/>
+    <circle cx="70" cy="42" r="1.2" fill="#44cc88" opacity="0.9"/>
+    <circle cx="40" cy="50" r="1" fill="#44cc88" opacity="0.8"/>
+    <circle cx="60" cy="50" r="1" fill="#44cc88" opacity="0.8"/>
+  </g>
+
+  <!-- Group 4: Teal/Cyan figure (left) - rotated 270 degrees -->
+  <g filter="url(#neonGlow)" transform="rotate(270 50 50)">
+    <!-- Upper curved path -->
+    <path d="M 50 20 Q 35 25 30 35 Q 28 40 32 42 Q 40 38 50 40 Q 60 38 68 42 Q 72 40 70 35 Q 65 25 50 20" 
+          fill="none" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Left arm curved -->
+    <path d="M 30 40 Q 20 45 15 55 Q 12 62 18 65 Q 28 60 35 55 Q 40 50 38 42" 
+          fill="none" stroke="#00e5c8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Right arm curved -->
+    <path d="M 70 40 Q 80 45 85 55 Q 88 62 82 65 Q 72 60 65 55 Q 60 50 62 42" 
+          fill="none" stroke="#00e5c8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Connection to center -->
+    <path d="M 40 50 Q 45 48 50 50 Q 55 48 60 50" 
+          fill="none" stroke="#00d4aa" stroke-width="1.2" stroke-linecap="round"/>
+
+    <!-- Decorative circles -->
+    <circle cx="30" cy="42" r="1.2" fill="#00d4aa" opacity="0.9"/>
+    <circle cx="70" cy="42" r="1.2" fill="#00e5c8" opacity="0.9"/>
+    <circle cx="40" cy="50" r="1" fill="#00d4aa" opacity="0.8"/>
+    <circle cx="60" cy="50" r="1" fill="#00e5c8" opacity="0.8"/>
+  </g>
+
+  <!-- Outer circular knot connectors -->
+  <g filter="url(#neonGlow)" opacity="0.7">
+    <!-- Connecting curves between figures -->
+    <path d="M 32 30 Q 28 35 25 42 Q 30 48 35 45" 
+          fill="none" stroke="#00e5c8" stroke-width="1" stroke-linecap="round"/>
+    
+    <path d="M 68 30 Q 72 35 75 42 Q 70 48 65 45" 
+          fill="none" stroke="#ff8c00" stroke-width="1" stroke-linecap="round"/>
+    
+    <path d="M 68 70 Q 72 65 75 58 Q 70 52 65 55" 
+          fill="none" stroke="#44cc88" stroke-width="1" stroke-linecap="round"/>
+    
+    <path d="M 32 70 Q 28 65 25 58 Q 30 52 35 55" 
+          fill="none" stroke="#00d4aa" stroke-width="1" stroke-linecap="round"/>
+  </g>
+
+  <!-- Small decorative dots at cardinal points -->
+  <circle cx="50" cy="18" r="0.8" fill="#00e5c8" filter="url(#neonGlow)" opacity="0.8"/>
+  <circle cx="82" cy="50" r="0.8" fill="#ff8c00" filter="url(#neonGlow)" opacity="0.8"/>
+  <circle cx="50" cy="82" r="0.8" fill="#44cc88" filter="url(#neonGlow)" opacity="0.8"/>
+  <circle cx="18" cy="50" r="0.8" fill="#00d4aa" filter="url(#neonGlow)" opacity="0.8"/>
+
+  <!-- Subtle outer ring -->
+  <circle cx="50" cy="50" r="42" fill="none" stroke="#00e5c8" stroke-width="0.5" opacity="0.3" filter="url(#neonGlow)"/>
+  <circle cx="50" cy="50" r="38" fill="none" stroke="#ff8c00" stroke-width="0.5" opacity="0.25" filter="url(#neonGlow)"/>
+</svg>

@@ -1,0 +1,201 @@
+import React, { useRef, useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  Home,
+  Users,
+  Briefcase,
+  Building2,
+  Calendar,
+  Plane,
+  MessageSquare,
+  Mail,
+  UserCircle,
+  Shield,
+  ShoppingBag,
+} from 'lucide-react';
+import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
+import { useAuth } from '../../contexts/AuthContext';
+import clsx from 'clsx';
+
+interface Module {
+  path: string;
+  label: string;
+  icon: React.ReactNode;
+  feature: string;
+}
+
+const modules: Module[] = [
+  {
+    path: '/feed',
+    label: 'Feed',
+    icon: <Home size={20} />,
+    feature: 'modules_feed',
+  },
+  {
+    path: '/discover',
+    label: 'Discover',
+    icon: <Users size={20} />,
+    feature: 'modules_discover',
+  },
+  {
+    path: '/business',
+    label: 'Business',
+    icon: <Briefcase size={20} />,
+    feature: 'modules_business',
+  },
+  {
+    path: '/housing',
+    label: 'Housing',
+    icon: <Building2 size={20} />,
+    feature: 'modules_housing',
+  },
+  {
+    path: '/marketplace',
+    label: 'Marketplace',
+    icon: <ShoppingBag size={20} />,
+    feature: 'modules_marketplace',
+  },
+  {
+    path: '/events',
+    label: 'Events',
+    icon: <Calendar size={20} />,
+    feature: 'modules_events',
+  },
+  {
+    path: '/travel',
+    label: 'Travel',
+    icon: <Plane size={20} />,
+    feature: 'modules_travel',
+  },
+  {
+    path: '/forum',
+    label: 'Forum',
+    icon: <MessageSquare size={20} />,
+    feature: 'modules_forum',
+  },
+  {
+    path: '/messages',
+    label: 'Messages',
+    icon: <Mail size={20} />,
+    feature: 'modules_messages',
+  },
+  {
+    path: '/profile',
+    label: 'Profile',
+    icon: <UserCircle size={20} />,
+    feature: 'always',
+  },
+  {
+    path: '/admin',
+    label: 'Admin',
+    icon: <Shield size={20} />,
+    feature: 'admin_only',
+  },
+];
+
+export const ModuleSelector: React.FC = () => {
+  const location = useLocation();
+  const { isFeatureEnabled } = useFeatureSettings();
+  const { isAdmin } = useAuth();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showLeftScroll, setShowLeftScroll] = useState(false);
+  const [showRightScroll, setShowRightScroll] = useState(false);
+
+  // Filter enabled modules (profile always shows, admin only for admins)
+  const enabledModules = modules.filter((m) => {
+    if (m.feature === 'always') return true;
+    if (m.feature === 'admin_only') return isAdmin;
+    return isFeatureEnabled(m.feature);
+  });
+
+  // Check scroll position
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const checkScroll = () => {
+      setShowLeftScroll(container.scrollLeft > 0);
+      setShowRightScroll(
+        container.scrollLeft < container.scrollWidth - container.clientWidth - 10
+      );
+    };
+
+    checkScroll();
+    container.addEventListener('scroll', checkScroll);
+    window.addEventListener('resize', checkScroll);
+
+    return () => {
+      container.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, []);
+
+  const scroll = (direction: 'left' | 'right') => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const scrollAmount = 200;
+    container.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    });
+  };
+
+  const isActive = (path: string) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
+
+  return (
+    <div className="sticky top-14 z-30 bg-aurora-surface/80 backdrop-blur-md border-b border-aurora-border">
+      <div className="relative px-4 sm:px-6">
+        {/* Left scroll button */}
+        {showLeftScroll && (
+          <button
+            onClick={() => scroll('left')}
+            className="absolute left-0 top-0 bottom-0 z-10 flex items-center justify-center w-8 bg-gradient-to-r from-aurora-surface to-transparent"
+            aria-label="Scroll left"
+          >
+            <span className="text-aurora-text-muted hover:text-aurora-text">←</span>
+          </button>
+        )}
+
+        {/* Scrollable container */}
+        <div
+          ref={scrollContainerRef}
+          className="overflow-x-auto hide-scrollbar flex gap-2 py-2 px-8 sm:px-0"
+          style={{
+            scrollBehavior: 'smooth',
+          }}
+        >
+          {enabledModules.map((module) => (
+            <Link
+              key={module.path}
+              to={module.path}
+              className={clsx(
+                'inline-flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all duration-200',
+                isActive(module.path)
+                  ? 'aurora-gradient text-white shadow-aurora-glow'
+                  : 'text-aurora-text-secondary hover:bg-gray-50 hover:text-aurora-text'
+              )}
+            >
+              {module.icon}
+              <span>{module.label}</span>
+            </Link>
+          ))}
+        </div>
+
+        {/* Right scroll button */}
+        {showRightScroll && (
+          <button
+            onClick={() => scroll('right')}
+            className="absolute right-0 top-0 bottom-0 z-10 flex items-center justify-center w-8 bg-gradient-to-l from-aurora-surface to-transparent"
+            aria-label="Scroll right"
+          >
+            <span className="text-aurora-text-muted hover:text-aurora-text">→</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ModuleSelector;
