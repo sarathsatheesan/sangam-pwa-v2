@@ -175,10 +175,7 @@ export default function DiscoverPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeTile, setActiveTile] = useState<'connections' | 'pending' | 'members' | null>(null);
 
-  // Ref for scrolling to tab section when tiles are clicked
-  const tabSectionRef = useRef<HTMLDivElement>(null);
-
-  // Handle tile click — switch tab, highlight tile, and scroll into view
+  // Handle tile click — switch tab and highlight tile
   const handleTileClick = useCallback((tile: 'connections' | 'pending' | 'members') => {
     setActiveTile(tile);
     if (tile === 'members') {
@@ -186,10 +183,6 @@ export default function DiscoverPage() {
     } else {
       setActiveTab('network');
     }
-    // Scroll the tab section into view smoothly
-    setTimeout(() => {
-      tabSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
   }, []);
 
   // Close heritage dropdown on click outside
@@ -491,7 +484,12 @@ export default function DiscoverPage() {
   const pendingCount = Array.from(connections.entries()).filter(
     ([pid, s]) => s === 'pending' && connectionDetails.get(pid)?.initiatedBy !== user?.uid
   ).length;
-  // sentCount available via sentRequests.length
+  const discoverCount = people.filter((p) => {
+    const status = connections.get(p.id);
+    if (!status) return true;
+    if (status === 'pending' && connectionDetails.get(p.id)?.initiatedBy === user?.uid) return true;
+    return false;
+  }).length;
 
   // Get mutual connection count
   const getMutualConnectionCount = (personId: string): number => {
@@ -653,7 +651,7 @@ export default function DiscoverPage() {
               }`}
             >
               <div className="text-xs text-blue-100">Discover</div>
-              <div className="text-xl sm:text-2xl font-bold">{people.length}</div>
+              <div className="text-xl sm:text-2xl font-bold">{discoverCount}</div>
             </button>
             <button
               onClick={() => handleTileClick('connections')}
@@ -681,7 +679,7 @@ export default function DiscoverPage() {
       </div>
 
       {/* Sticky Tab Navigation + Search */}
-      <div ref={tabSectionRef} className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm">
+      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm">
         <div className="max-w-6xl mx-auto px-4">
           {/* Search + Ethnicity + Tabs row */}
           <div className="flex items-center gap-2 py-3 border-b">
