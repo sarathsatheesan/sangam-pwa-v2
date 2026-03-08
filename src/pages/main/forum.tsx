@@ -1299,37 +1299,43 @@ export default function ForumScreen() {
     return (
       <>{renderOverlays()}
       <div className="bg-[var(--aurora-bg)]">
-        {/* Hero */}
-        <div className="relative bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 overflow-hidden">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 right-0 w-72 h-72 bg-white rounded-full translate-x-1/3 -translate-y-1/3" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full -translate-x-1/4 translate-y-1/4" />
-          </div>
-          <div className="relative max-w-4xl mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                  <MessageSquare size={24} /> Community Forum
-                </h1>
-                <p className="text-white/70 text-sm mt-1">
-                  {totalThreads} discussions across {topics.length} topics
-                </p>
+        {/* Stats Tiles — Discover/Travel style */}
+        <div className="bg-gradient-to-r from-orange-500 via-red-500 to-rose-600 text-white py-3">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+              <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
+                <div className="text-xs text-orange-100">Topics</div>
+                <div className="text-xl sm:text-2xl font-bold">{topics.length}</div>
+              </div>
+              <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
+                <div className="text-xs text-orange-100">Discussions</div>
+                <div className="text-xl sm:text-2xl font-bold">{totalThreads}</div>
+              </div>
+              <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
+                <div className="text-xs text-orange-100">Community</div>
+                <div className="text-xl sm:text-2xl font-bold flex items-center gap-1.5">
+                  <MessageSquare size={18} /> Forum
+                </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Search */}
+        {/* Search Header */}
+        <div className="relative bg-gradient-to-br from-orange-500/8 via-aurora-surface to-rose-500/8 border-b border-aurora-border">
+          <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
             <div className="relative">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-aurora-text-muted" />
               <input
                 type="text"
                 placeholder="Search topics..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-11 pr-10 py-3 rounded-2xl bg-white/95 backdrop-blur-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 shadow-xl text-sm"
+                className="w-full pl-10 pr-10 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  <X size={18} />
+                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text">
+                  <X size={16} />
                 </button>
               )}
             </div>
