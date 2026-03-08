@@ -106,47 +106,63 @@ export const AppHeader: React.FC = () => {
     <>
       <header className="sticky top-0 z-40 glass-strong">
         <div className="flex items-center justify-between h-14 px-4">
-          {/* Left: Logo */}
-          <Link to="/feed" className="flex items-center gap-1.5 shrink-0">
-            <img src="/ethnicity-logo.svg" alt="ethniCity" className="w-7 h-7 sm:w-8 sm:h-8" />
-            <div className="flex flex-col leading-none">
-              <span className="text-lg sm:text-xl font-extrabold tracking-tight">
-                <span style={{ color: '#c96830' }}>ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">City</span>
-              </span>
-              <span className="text-[8px] sm:text-[9px] text-gray-400 tracking-wide hidden sm:block">Our culture, connected.</span>
-            </div>
-          </Link>
+          {/* Left: Logo + Avatar + Greeting */}
+          <div className="flex items-center gap-2 shrink-0 min-w-0">
+            <Link to="/feed" className="flex items-center shrink-0">
+              <img src="/ethnicity-logo.svg" alt="ethniCity" className="w-7 h-7 sm:w-8 sm:h-8" />
+            </Link>
 
-          {/* Center: Location */}
-          <button
-            onClick={() => setLocationPickerOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-aurora-text-secondary hover:bg-gray-50 rounded-full transition-colors border border-aurora-border"
-          >
-            <MapPin size={16} className="text-aurora-mint flex-shrink-0" />
-            <span className="max-w-[120px] sm:max-w-[200px] truncate">{displayLocation}</span>
-          </button>
-
-          {/* Right: Menu button */}
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 text-aurora-text-secondary hover:text-aurora-text hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-2"
-            aria-label="Menu"
-          >
-            {userProfile?.avatar && userProfile.avatar.startsWith('http') ? (
-              <img
-                src={userProfile.avatar}
-                alt={userProfile.name}
-                className="w-8 h-8 rounded-full object-cover ring-2 ring-aurora-indigo/30"
-              />
-            ) : userProfile?.avatar ? (
-              <span className="w-8 h-8 rounded-full bg-aurora-indigo/20 flex items-center justify-center text-lg">
-                {userProfile.avatar}
-              </span>
-            ) : (
-              <User size={22} />
+            {user && (
+              <>
+                {userProfile?.avatar && userProfile.avatar.startsWith('http') ? (
+                  <img
+                    src={userProfile.avatar}
+                    alt={userProfile.name}
+                    className="w-8 h-8 rounded-full object-cover ring-2 ring-aurora-indigo/30 shrink-0"
+                  />
+                ) : userProfile?.avatar ? (
+                  <span className="w-8 h-8 rounded-full bg-aurora-indigo/20 flex items-center justify-center text-lg shrink-0">
+                    {userProfile.avatar}
+                  </span>
+                ) : (
+                  <span className="w-8 h-8 rounded-full bg-aurora-indigo/20 flex items-center justify-center shrink-0">
+                    <User size={18} />
+                  </span>
+                )}
+                <span className="text-sm font-semibold text-[var(--aurora-text)] truncate max-w-[120px] sm:max-w-[200px]">
+                  Welcome, {(userProfile as any)?.preferredName || userProfile?.name?.split(' ')[0] || 'there'}!
+                </span>
+              </>
             )}
-            <Menu size={20} className="text-aurora-text-muted" />
-          </button>
+
+            {!user && (
+              <div className="flex flex-col leading-none ml-1">
+                <span className="text-lg sm:text-xl font-extrabold tracking-tight">
+                  <span style={{ color: '#c96830' }}>ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">City</span>
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Location + Hamburger Menu */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setLocationPickerOpen(true)}
+              className="p-2 text-aurora-text-secondary hover:text-aurora-mint hover:bg-gray-50 rounded-lg transition-colors"
+              aria-label="Location"
+              title={displayLocation}
+            >
+              <MapPin size={20} className="text-aurora-mint" />
+            </button>
+
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="p-2 text-aurora-text-secondary hover:text-aurora-text hover:bg-gray-50 rounded-lg transition-colors"
+              aria-label="Menu"
+            >
+              <Menu size={22} />
+            </button>
+          </div>
         </div>
 
         {/* Menu dropdown */}
