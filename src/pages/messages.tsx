@@ -16,7 +16,7 @@ import {
   Search, X, Send, Smile, MoreVertical,
   Trash2,
   MessageSquare, Edit3, Loader2, ArrowLeft,
-  Mic,
+  Mic, ImagePlus,
   ChevronDown, Type, Bold, Italic, Code,
   Strikethrough, MicOff, Pause, Play, Search as SearchIcon,
   ChevronUp, Palette, Minimize2, Maximize2, AlertCircle, CheckCircle,
@@ -53,6 +53,7 @@ type Message = {
   replyTo?: { id: string; text: string; senderId: string };
   reactions?: Record<string, string[]>;
   voiceMessage?: { duration: number };
+  image?: string;
   read?: boolean;
   readAt?: Timestamp;
 };
@@ -596,6 +597,37 @@ function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void;
 }
 
 /**
+ * Compress an image file to base64 data URL for inline Firestore storage
+ */
+const compressImage = (file: File, maxWidth = 800, quality = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = document.createElement('img');
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = (h * maxWidth) / w;
+          w = maxWidth;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject('Canvas error'); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject('Failed to load image');
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => reject('Failed to read file');
+    reader.readAsDataURL(file);
+  });
+};
+
+/**
  * VoiceRecorder Component
  * Voice message recording UI with timer and waveform animation
  */
@@ -970,6 +1002,11 @@ export default function MessagesPage() {
   const [showDeleteMsgConfirm, setShowDeleteMsgConfirm] = useState(false);
   const [deleteMsgId, setDeleteMsgId] = useState<string | null>(null);
 
+  // Image message state
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [imageCompressing, setImageCompressing] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   // Refs
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1190,7 +1227,7 @@ export default function MessagesPage() {
   };
 
   const sendMessage = async () => {
-    if (!user?.uid || !messageText.trim()) return;
+    if (!user?.uid || (!messageText.trim() && !pendingImage)) return;
     // Determine conversation ID
     let convId: string | null = null;
     const activeConv = selectedConvId ? conversations.find((c) => c.id === selectedConvId) : null;
@@ -1202,32 +1239,42 @@ export default function MessagesPage() {
     }
     if (!convId) return;
 
-    const validation = validateMessage(messageText);
-    if (!validation.valid) {
-      showNotif(validation.error || 'Message validation failed', 'error');
-      return;
+    if (messageText.trim()) {
+      const validation = validateMessage(messageText);
+      if (!validation.valid) {
+        showNotif(validation.error || 'Message validation failed', 'error');
+        return;
+      }
     }
 
     let payload = messageText.trim();
     const shouldEncrypt = !isGroup && encryptionEnabled && selectedUser;
-    if (shouldEncrypt && selectedUser) {
+    if (shouldEncrypt && selectedUser && payload) {
       const convKey = generateConversationKey(user.uid, selectedUser.id);
-      payload = encryptMessage(messageText.trim(), convKey);
+      payload = encryptMessage(payload, convKey);
     }
 
+    const imageToSend = pendingImage;
+
     try {
-      const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), {
-        text: payload,
+      const msgData: Record<string, unknown> = {
+        text: payload || '',
         senderId: user.uid,
         time: formatMessageTime(Timestamp.now()),
         createdAt: serverTimestamp(),
         encrypted: !!shouldEncrypt,
-      });
+      };
+      if (imageToSend) {
+        msgData.image = imageToSend;
+      }
+      const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), msgData);
       setUndoMessageId(msgRef.id);
       setShowUndoToast(true);
       setMessageText('');
+      setPendingImage(null);
+      const lastMsgPreview = imageToSend ? (payload ? `📷 ${messageText.slice(0, 40)}` : '📷 Photo') : messageText.slice(0, 50);
       const convUpdateData: Record<string, unknown> = {
-        lastMessage: messageText.slice(0, 50),
+        lastMessage: lastMsgPreview,
         lastMessageTime: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastMessageSenderId: user.uid,
@@ -1241,6 +1288,29 @@ export default function MessagesPage() {
     } catch (err) {
       console.error('Error sending message:', err);
       showNotif('Failed to send message', 'error');
+    }
+  };
+
+  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showNotif('Please select an image file', 'error');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showNotif('Image must be under 10MB', 'error');
+      return;
+    }
+    setImageCompressing(true);
+    try {
+      const compressed = await compressImage(file, 800, 0.7);
+      setPendingImage(compressed);
+    } catch {
+      showNotif('Failed to process image', 'error');
+    } finally {
+      setImageCompressing(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
 
@@ -2363,21 +2433,34 @@ export default function MessagesPage() {
                         {msg.voiceMessage ? (
                           <VoiceMessageBubble duration={msg.voiceMessage.duration} isMine={isMine} />
                         ) : (
-                          <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? '#4A6E7F' : '#111B21' }}>
-                            {renderFormattedText(msg.text)}
-                            {/* Inline timestamp + read receipt (WhatsApp style) */}
-                            <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
-                              {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: '#667781' }}>edited</span>}
-                              <span className="text-[10.5px]" style={{ color: '#667781' }}>
-                                {formatMessageTime(msg.createdAt)}
+                          <>
+                            {msg.image && (
+                              <div className="-mx-[9px] -mt-[6px] mb-1">
+                                <img
+                                  src={msg.image}
+                                  alt="Shared image"
+                                  className="rounded-t-[7.5px] w-full max-w-[280px] object-cover cursor-pointer"
+                                  style={{ maxHeight: '300px' }}
+                                  onClick={() => window.open(msg.image, '_blank')}
+                                />
+                              </div>
+                            )}
+                            <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? '#4A6E7F' : '#111B21' }}>
+                              {msg.text && renderFormattedText(msg.text)}
+                              {/* Inline timestamp + read receipt (WhatsApp style) */}
+                              <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
+                                {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: '#667781' }}>edited</span>}
+                                <span className="text-[10.5px]" style={{ color: msg.image && !msg.text ? '#FFFFFF' : '#667781' }}>
+                                  {formatMessageTime(msg.createdAt)}
+                                </span>
+                                {isMine && (
+                                  msg.read
+                                    ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
+                                    : <CheckCheck size={14} style={{ color: msg.image && !msg.text ? '#FFFFFF' : '#B0B6B9' }} />
+                                )}
                               </span>
-                              {isMine && (
-                                msg.read
-                                  ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
-                                  : <CheckCheck size={14} style={{ color: '#B0B6B9' }} />
-                              )}
-                            </span>
-                          </div>
+                            </div>
+                          </>
                         )}
                       </div>
                       {/* Reactions */}
@@ -2417,13 +2500,30 @@ export default function MessagesPage() {
           </div>
         )}
         {showFormatting && <FormattingToolbar onFormat={handleFormat} />}
+        {/* Image preview strip */}
+        {pendingImage && (
+          <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }}>
+            <img src={pendingImage} alt="Preview" className="w-14 h-14 rounded-lg object-cover" />
+            <span className="text-sm flex-1" style={{ color: '#075E54' }}>Image attached</span>
+            <button onClick={() => setPendingImage(null)} className="p-1 rounded hover:bg-white/50" aria-label="Remove image">
+              <X size={16} style={{ color: '#075E54' }} />
+            </button>
+          </div>
+        )}
+        {imageCompressing && (
+          <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ backgroundColor: '#FFF3E0', borderColor: '#FFE0B2' }}>
+            <Loader2 size={16} className="animate-spin" style={{ color: '#E65100' }} />
+            <span className="text-sm" style={{ color: '#E65100' }}>Compressing image...</span>
+          </div>
+        )}
+        <input type="file" accept="image/*" ref={imageInputRef} onChange={handleImagePick} className="hidden" />
         <div className="px-2 sm:px-3 py-1.5 flex items-end gap-1.5 sm:gap-2">
           <div className="flex gap-0.5 flex-shrink-0 pb-1">
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Toggle emoji picker">
               <Smile size={22} style={{ color: '#54656F' }} />
             </button>
-            <button onClick={() => setShowFormatting(!showFormatting)} className="hidden sm:block p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Toggle formatting">
-              <Paperclip size={22} style={{ color: '#54656F' }} />
+            <button onClick={() => imageInputRef.current?.click()} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach image">
+              <ImagePlus size={22} style={{ color: '#54656F' }} />
             </button>
           </div>
           <div className="flex-1 rounded-3xl px-3 py-2 flex items-end" style={{ backgroundColor: '#FFFFFF', minHeight: '42px' }}>
@@ -2439,7 +2539,7 @@ export default function MessagesPage() {
             />
           </div>
           <div className="flex-shrink-0 pb-0.5">
-            {messageText.trim() ? (
+            {(messageText.trim() || pendingImage) ? (
               <button
                 onClick={() => {
                   if (editingMessage) {
