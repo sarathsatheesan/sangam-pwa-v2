@@ -199,6 +199,10 @@ const getDateRange = (preset: string): { start: Date; end: Date } | null => {
       endOfWeek.setDate(today.getDate() + (7 - today.getDay()));
       return { start: today, end: endOfWeek };
     }
+    case 'This Month': {
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      return { start: today, end: endOfMonth };
+    }
     default:
       return null;
   }
@@ -1200,6 +1204,7 @@ export default function EventsPage() {
               <option value="Tomorrow">Tomorrow</option>
               <option value="This Weekend">This Weekend</option>
               <option value="This Week">This Week</option>
+              <option value="This Month">This Month</option>
             </select>
 
             {/* Show past toggle */}
