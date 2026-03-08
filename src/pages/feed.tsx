@@ -1047,7 +1047,7 @@ export default function FeedPage() {
   // ─── Render ────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-aurora-bg">
+    <div className="bg-gradient-to-b from-indigo-50/60 via-aurora-bg to-emerald-50/40">
 
       {/* ─── Search & Ethnicity Filter ─── */}
       <div className="relative bg-gradient-to-br from-indigo-600/25 via-indigo-100/40 to-emerald-600/20 border-b border-aurora-border z-10">
