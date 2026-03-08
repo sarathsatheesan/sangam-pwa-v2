@@ -1180,59 +1180,64 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {/* ── Date Carousel — Eventbrite-style quick filters ── */}
+      {/* ── Filter Bar — Time dropdown | Type pills ── */}
       <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex gap-2 py-3 overflow-x-auto scrollbar-hide">
-            {['All', 'Today', 'Tomorrow', 'This Weekend', 'This Week'].map((preset) => (
-              <button
-                key={preset}
-                onClick={() => setSelectedDateFilter(preset)}
-                className={`px-4 py-2 sm:py-1.5 rounded-full whitespace-nowrap text-sm font-medium flex-shrink-0 transition-all flex items-center gap-1.5 ${
-                  selectedDateFilter === preset
-                    ? 'bg-aurora-text text-aurora-surface shadow-sm'
-                    : 'bg-aurora-surface-variant text-aurora-text-secondary hover:text-aurora-text hover:bg-aurora-border/50'
-                }`}
-              >
-                {preset === 'All' && <CalendarDays className="w-3.5 h-3.5" />}
-                {preset === 'Today' && <Clock className="w-3.5 h-3.5" />}
-                {preset === 'Tomorrow' && <Calendar className="w-3.5 h-3.5" />}
-                {preset === 'This Weekend' && <Sparkles className="w-3.5 h-3.5" />}
-                {preset === 'This Week' && <CalendarDays className="w-3.5 h-3.5" />}
-                {preset}
-              </button>
-            ))}
-            <div className="border-l border-aurora-border pl-2 ml-1 flex items-center">
-              <button
-                onClick={() => setShowPast(!showPast)}
-                className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-medium transition-all ${
-                  showPast ? 'bg-aurora-text-muted text-white' : 'bg-aurora-surface-variant text-aurora-text-muted hover:text-aurora-text'
-                }`}
-              >
-                {showPast ? 'Past shown' : 'Show past'}
-              </button>
-            </div>
-          </div>
+        <div className="max-w-6xl mx-auto px-4 py-2.5">
+          <div className="flex items-center gap-1.5">
 
-          {/* Event Type Filter Chips */}
-          <div className="flex gap-1.5 pb-3 overflow-x-auto scrollbar-hide -mt-1">
-            {['All', ...Object.keys(EVENT_TYPES)].map((type) => {
-              const TypeIcon = EVENT_TYPE_ICONS[type];
-              return (
-                <button
-                  key={type}
-                  onClick={() => setSelectedFilter(type)}
-                  className={`flex items-center gap-1 px-3 py-2 sm:py-1 rounded-full whitespace-nowrap text-xs font-medium flex-shrink-0 transition-all ${
-                    selectedFilter === type
-                      ? 'bg-gradient-to-r from-aurora-indigo to-aurora-indigo/90 text-white'
-                      : 'bg-aurora-surface border border-aurora-border text-aurora-text-muted hover:text-aurora-text-secondary hover:border-aurora-text-muted/30'
-                  }`}
-                >
-                  {type !== 'All' && TypeIcon && <TypeIcon className="w-3 h-3" />}
-                  {type !== 'All' ? type : 'All Types'}
-                </button>
-              );
-            })}
+            {/* Time dropdown */}
+            <select
+              value={selectedDateFilter}
+              onChange={(e) => setSelectedDateFilter(e.target.value)}
+              className={`px-3 py-1.5 border rounded-full text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40 shrink-0 appearance-none cursor-pointer ${
+                selectedDateFilter !== 'All'
+                  ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                  : 'bg-aurora-surface border-aurora-border text-aurora-text'
+              }`}
+            >
+              <option value="All">All Dates</option>
+              <option value="Today">Today</option>
+              <option value="Tomorrow">Tomorrow</option>
+              <option value="This Weekend">This Weekend</option>
+              <option value="This Week">This Week</option>
+            </select>
+
+            {/* Show past toggle */}
+            <button
+              onClick={() => setShowPast(!showPast)}
+              className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-semibold transition-all shrink-0 border ${
+                showPast
+                  ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                  : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
+              }`}
+            >
+              {showPast ? 'Past shown' : 'Show past'}
+            </button>
+
+            {/* Separator */}
+            <div className="w-px h-5 bg-aurora-border shrink-0 mx-0.5" />
+
+            {/* Event Type pills — scrollable */}
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
+              {['All', ...Object.keys(EVENT_TYPES)].map((type) => {
+                const TypeIcon = EVENT_TYPE_ICONS[type];
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedFilter(type)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-semibold shrink-0 transition-all ${
+                      selectedFilter === type
+                        ? 'bg-aurora-indigo text-white'
+                        : 'bg-aurora-surface border border-aurora-border text-aurora-text-muted hover:text-aurora-text-secondary hover:border-aurora-text-muted/30'
+                    }`}
+                  >
+                    {type !== 'All' && TypeIcon && <TypeIcon className="w-3 h-3" />}
+                    {type !== 'All' ? type : 'All Types'}
+                  </button>
+                );
+              })}
+            </div>
+
           </div>
         </div>
       </div>
