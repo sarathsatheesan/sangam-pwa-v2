@@ -8,7 +8,7 @@ import {
   X, Plus, Heart, Sparkles, Store, ShoppingBag, Filter, ArrowLeft,
   ExternalLink, Trash2, Edit3, Loader2, Award, TrendingUp, Utensils,
   Scissors, BookOpen, Laptop, Scale, Stethoscope, Plane, Palette,
-  DollarSign, Users, Briefcase, Home, ChevronDown,
+  DollarSign, Users, Briefcase, Home, ChevronDown, Building2, UtensilsCrossed,
   ChevronLeft, Upload, Image as ImageIcon, Camera
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
@@ -95,12 +95,14 @@ const CATEGORIES = [
   'Financial Services',
   'Grocery & Market',
   'Healthcare',
+  'Hotels',
   'Legal & Immigration',
   'Non-Profit',
   'Real Estate',
   'Restaurant & Food',
   'Services',
   'Technology',
+  'Tiffin Services',
   'Travel & Tourism',
 ];
 
@@ -120,9 +122,11 @@ const CATEGORY_EMOJI_MAP: { [key: string]: string } = {
   'Travel & Tourism': '✈️',
   'Arts & Entertainment': '🎭',
   'Financial Services': '💰',
+  'Hotels': '🏨',
   'Non-Profit': '🤝',
   'Services': '💼',
   'Real Estate': '🏠',
+  'Tiffin Services': '🍱',
 };
 
 const CATEGORY_COLORS: { [key: string]: string } = {
@@ -136,9 +140,11 @@ const CATEGORY_COLORS: { [key: string]: string } = {
   'Travel & Tourism': '#0D9488',
   'Arts & Entertainment': '#D97706',
   'Financial Services': '#0369A1',
+  'Hotels': '#8B5CF6',
   'Non-Profit': '#DC2626',
   'Services': '#6D28D9',
   'Real Estate': '#1E40AF',
+  'Tiffin Services': '#F97316',
 };
 
 const CATEGORY_ICONS: { [key: string]: any } = {
@@ -152,9 +158,11 @@ const CATEGORY_ICONS: { [key: string]: any } = {
   'Travel & Tourism': Plane,
   'Arts & Entertainment': Palette,
   'Financial Services': DollarSign,
+  'Hotels': Building2,
   'Non-Profit': Users,
   'Services': Briefcase,
   'Real Estate': Home,
+  'Tiffin Services': UtensilsCrossed,
 };
 
 // ═════════════════════════════════════════════════════════════════════════════════
