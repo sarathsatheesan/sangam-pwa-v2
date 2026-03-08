@@ -470,8 +470,6 @@ export default function HousingPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const priceDropRef = useRef<HTMLDivElement>(null);
-  const bedsDropRef = useRef<HTMLDivElement>(null);
-  const moreDropRef = useRef<HTMLDivElement>(null);
   const [activeListTab, setActiveListTab] = useState<'all' | 'saved' | 'recent'>('all');
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('recentHousing') || '[]'); }
@@ -539,15 +537,7 @@ export default function HousingPage() {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (typeDropdownRef.current && !typeDropdownRef.current.contains(target)) setTypeDropdownOpen(false);
-      if (priceDropRef.current && !priceDropRef.current.contains(target) &&
-          bedsDropRef.current && !bedsDropRef.current.contains(target) &&
-          moreDropRef.current && !moreDropRef.current.contains(target)) {
-        setActiveDropdown(null);
-      } else if (activeDropdown === 'price' && priceDropRef.current && !priceDropRef.current.contains(target)) {
-        setActiveDropdown(null);
-      } else if (activeDropdown === 'beds' && bedsDropRef.current && !bedsDropRef.current.contains(target)) {
-        setActiveDropdown(null);
-      } else if (activeDropdown === 'more' && moreDropRef.current && !moreDropRef.current.contains(target)) {
+      if (activeDropdown === 'filters' && priceDropRef.current && !priceDropRef.current.contains(target)) {
         setActiveDropdown(null);
       }
     };
@@ -1376,107 +1366,98 @@ export default function HousingPage() {
               <option value="popular">Popular</option>
             </select>
 
-            {/* Price pill dropdown */}
+            {/* Combined Filters pill dropdown (Price + Beds + Status) */}
             <div className="relative shrink-0" ref={priceDropRef}>
-              <button
-                onClick={() => setActiveDropdown(activeDropdown === 'price' ? null : 'price')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
-                  priceRange[0] || priceRange[1]
-                    ? 'bg-aurora-indigo text-white border-aurora-indigo'
-                    : activeDropdown === 'price'
-                    ? 'bg-aurora-surface border-aurora-indigo text-aurora-indigo'
-                    : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
-                }`}
-              >
-                {priceRange[0] || priceRange[1]
-                  ? `$${priceRange[0] || '0'} – $${priceRange[1] || '∞'}`
-                  : 'Price'}
-                <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'price' ? 'rotate-180' : ''}`} />
-              </button>
-              {activeDropdown === 'price' && (
-                <div className="absolute top-full left-0 mt-1.5 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Price Range</p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="text-[10px] text-gray-400 font-medium">MIN</label>
-                      <input type="number" placeholder="No min" value={priceRange[0]} onChange={(e) => setPriceRange([e.target.value, priceRange[1]])}
-                        className="w-full mt-0.5 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40" />
-                    </div>
-                    <span className="text-gray-300 mt-4">–</span>
-                    <div className="flex-1">
-                      <label className="text-[10px] text-gray-400 font-medium">MAX</label>
-                      <input type="number" placeholder="No max" value={priceRange[1]} onChange={(e) => setPriceRange([priceRange[0], e.target.value])}
-                        className="w-full mt-0.5 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40" />
+              {(() => {
+                const activeCount = (priceRange[0] || priceRange[1] ? 1 : 0) + (bedsFilter !== 'any' ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0);
+                return (
+                  <button
+                    onClick={() => setActiveDropdown(activeDropdown === 'filters' ? null : 'filters')}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
+                      activeCount > 0
+                        ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                        : activeDropdown === 'filters'
+                        ? 'bg-aurora-surface border-aurora-indigo text-aurora-indigo'
+                        : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
+                    }`}
+                  >
+                    Filters{activeCount > 0 ? ` (${activeCount})` : ''}
+                    <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'filters' ? 'rotate-180' : ''}`} />
+                  </button>
+                );
+              })()}
+              {activeDropdown === 'filters' && (
+                <div className="absolute top-full left-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4 space-y-4">
+                  {/* Price Range */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Price Range</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-400 font-medium">MIN</label>
+                        <input type="number" placeholder="No min" value={priceRange[0]} onChange={(e) => setPriceRange([e.target.value, priceRange[1]])}
+                          className="w-full mt-0.5 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40" />
+                      </div>
+                      <span className="text-gray-300 mt-4">–</span>
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-400 font-medium">MAX</label>
+                        <input type="number" placeholder="No max" value={priceRange[1]} onChange={(e) => setPriceRange([priceRange[0], e.target.value])}
+                          className="w-full mt-0.5 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40" />
+                      </div>
                     </div>
                   </div>
-                  {(priceRange[0] || priceRange[1]) && (
-                    <button onClick={() => { setPriceRange(['', '']); }} className="text-xs text-aurora-indigo font-medium mt-3 hover:underline">Reset</button>
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Beds */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Beds</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[{ val: 'any', label: 'Any' }, { val: '1', label: '1+' }, { val: '2', label: '2+' }, { val: '3', label: '3+' }, { val: '4', label: '4+' }, { val: '5', label: '5+' }].map((opt) => (
+                        <button
+                          key={opt.val}
+                          onClick={() => setBedsFilter(opt.val)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                            bedsFilter === opt.val ? 'bg-aurora-indigo text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-100" />
+
+                  {/* Status */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Status</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[{ val: 'all', label: 'All' }, { val: 'active', label: 'Active' }, { val: 'pending', label: 'Pending' }, { val: 'under_contract', label: 'Under Contract' }, { val: 'sold', label: 'Sold' }, { val: 'rented', label: 'Rented' }].map((opt) => (
+                        <button
+                          key={opt.val}
+                          onClick={() => setStatusFilter(opt.val)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                            statusFilter === opt.val ? 'bg-aurora-indigo text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Reset all */}
+                  {(priceRange[0] || priceRange[1] || bedsFilter !== 'any' || statusFilter !== 'all') && (
+                    <>
+                      <div className="border-t border-gray-100" />
+                      <button
+                        onClick={() => { setPriceRange(['', '']); setBedsFilter('any'); setStatusFilter('all'); }}
+                        className="text-xs text-aurora-indigo font-semibold hover:underline"
+                      >
+                        Reset all filters
+                      </button>
+                    </>
                   )}
-                </div>
-              )}
-            </div>
-
-            {/* Beds pill dropdown */}
-            <div className="relative shrink-0" ref={bedsDropRef}>
-              <button
-                onClick={() => setActiveDropdown(activeDropdown === 'beds' ? null : 'beds')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
-                  bedsFilter !== 'any'
-                    ? 'bg-aurora-indigo text-white border-aurora-indigo'
-                    : activeDropdown === 'beds'
-                    ? 'bg-aurora-surface border-aurora-indigo text-aurora-indigo'
-                    : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
-                }`}
-              >
-                <BedDouble className="w-3.5 h-3.5" />
-                {bedsFilter !== 'any' ? `${bedsFilter}+ Beds` : 'Beds'}
-                <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'beds' ? 'rotate-180' : ''}`} />
-              </button>
-              {activeDropdown === 'beds' && (
-                <div className="absolute top-full left-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1.5">
-                  {[{ val: 'any', label: 'Any' }, { val: '1', label: '1+' }, { val: '2', label: '2+' }, { val: '3', label: '3+' }, { val: '4', label: '4+' }, { val: '5', label: '5+' }].map((opt) => (
-                    <button
-                      key={opt.val}
-                      onClick={() => { setBedsFilter(opt.val); setActiveDropdown(null); }}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                        bedsFilter === opt.val ? 'bg-aurora-indigo/10 text-aurora-indigo font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {opt.label} {opt.val !== 'any' ? 'Beds' : ''}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Status pill dropdown */}
-            <div className="relative shrink-0" ref={moreDropRef}>
-              <button
-                onClick={() => setActiveDropdown(activeDropdown === 'more' ? null : 'more')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
-                  statusFilter !== 'all'
-                    ? 'bg-aurora-indigo text-white border-aurora-indigo'
-                    : activeDropdown === 'more'
-                    ? 'bg-aurora-surface border-aurora-indigo text-aurora-indigo'
-                    : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
-                }`}
-              >
-                {statusFilter !== 'all' ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1).replace('_', ' ') : 'Status'}
-                <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'more' ? 'rotate-180' : ''}`} />
-              </button>
-              {activeDropdown === 'more' && (
-                <div className="absolute top-full left-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1.5">
-                  {[{ val: 'all', label: 'All Status' }, { val: 'active', label: 'Active' }, { val: 'pending', label: 'Pending' }, { val: 'under_contract', label: 'Under Contract' }, { val: 'sold', label: 'Sold' }, { val: 'rented', label: 'Rented' }].map((opt) => (
-                    <button
-                      key={opt.val}
-                      onClick={() => { setStatusFilter(opt.val); setActiveDropdown(null); }}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                        statusFilter === opt.val ? 'bg-aurora-indigo/10 text-aurora-indigo font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
                 </div>
               )}
             </div>
