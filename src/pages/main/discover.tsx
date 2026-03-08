@@ -159,7 +159,7 @@ export default function DiscoverPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedHeritage, setSelectedHeritage] = useState('All');
+  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
   const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
   const heritageRef = useRef<HTMLDivElement>(null);
   const [connections, setConnections] = useState<Map<string, 'pending' | 'connected'>>(new Map());
@@ -537,10 +537,10 @@ export default function DiscoverPage() {
       filtered = filtered.filter((p) => connections.get(p.id) === 'connected');
     }
 
-    if (selectedHeritage !== 'All') {
+    if (selectedHeritage.length > 0) {
       filtered = filtered.filter((person) => {
-        if (Array.isArray(person.heritage)) return person.heritage.includes(selectedHeritage);
-        return person.heritage === selectedHeritage;
+        if (Array.isArray(person.heritage)) return person.heritage.some((h: string) => selectedHeritage.includes(h));
+        return person.heritage ? selectedHeritage.includes(person.heritage) : false;
       });
     }
 
@@ -703,47 +703,67 @@ export default function DiscoverPage() {
               )}
             </div>
 
-            {/* Ethnicity Dropdown */}
+            {/* Ethnicity Dropdown - Multi-select with checkboxes */}
             <div className="relative shrink-0" ref={heritageRef}>
               <button
                 onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
                 className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
-                  selectedHeritage !== 'All'
+                  selectedHeritage.length > 0
                     ? 'bg-amber-50 border-amber-300 text-amber-800'
                     : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
                 <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline">{selectedHeritage !== 'All' ? selectedHeritage : 'Ethnicity'}</span>
+                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {heritageDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1 max-h-72 overflow-y-auto">
+                <div className="absolute top-full right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
                   {(() => {
                     const userHeritage = Array.isArray(userProfile?.heritage)
                       ? userProfile.heritage
                       : userProfile?.heritage ? [userProfile.heritage] : [];
                     const preferred = HERITAGE_OPTIONS.filter((h: string) => userHeritage.includes(h));
                     const rest = HERITAGE_OPTIONS.filter((h: string) => !userHeritage.includes(h));
-                    return ['All', ...preferred, ...rest].map((h: string) => {
-                      const isPreferred = h !== 'All' && userHeritage.includes(h);
+                    const sorted = [...preferred, ...rest];
+                    return sorted.map((h: string) => {
+                      const isPreferred = userHeritage.includes(h);
                       return (
-                        <button
+                        <label
                           key={h}
-                          onClick={() => { setSelectedHeritage(h); setHeritageDropdownOpen(false); }}
-                          className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${
-                            selectedHeritage === h ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700'
-                          } ${isPreferred ? 'bg-amber-50/50' : ''}`}
+                          className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 transition-colors ${
+                            isPreferred ? 'bg-amber-50/50' : ''
+                          }`}
                         >
-                          <span>{h}</span>
+                          <input
+                            type="checkbox"
+                            checked={selectedHeritage.includes(h)}
+                            onChange={() => {
+                              setSelectedHeritage((prev) =>
+                                prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
+                              );
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                          />
+                          <span className="text-sm text-gray-700">{h}</span>
                           {isPreferred && (
                             <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
                           )}
-                        </button>
+                        </label>
                       );
                     });
                   })()}
+                  {selectedHeritage.length > 0 && (
+                    <div className="border-t border-gray-200 mt-1 pt-1 px-4 py-1.5">
+                      <button
+                        onClick={() => setSelectedHeritage([])}
+                        className="text-xs text-blue-600 font-medium hover:text-blue-500"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -885,7 +905,7 @@ export default function DiscoverPage() {
               ? 'Loading...'
               : activeTab === 'discover'
                 ? `${filteredPeople.length} people match your filters`
-                : selectedHeritage !== 'All'
+                : selectedHeritage.length > 0
                   ? `${filteredPeople.length} of ${connectedCount} connections`
                   : `${connectedCount} connections`}
           </p>

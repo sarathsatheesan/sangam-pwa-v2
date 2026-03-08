@@ -71,7 +71,7 @@ export default function TravelPage() {
   const { user, userProfile } = useAuth();
   const [travelPosts, setTravelPosts] = useState<TravelPost[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
-  const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
+  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
   const [travelSearchQuery, setTravelSearchQuery] = useState('');
   const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
   const heritageRef = useRef<HTMLDivElement>(null);
@@ -134,12 +134,12 @@ export default function TravelPage() {
       filtered = filtered.filter((post) => post.mode === filterMode);
     }
 
-    if (selectedHeritage !== 'All') {
+    if (selectedHeritage.length > 0) {
       filtered = filtered.filter((p: any) => {
         if (Array.isArray(p.heritage)) {
-          return p.heritage.includes(selectedHeritage);
+          return p.heritage.some((h: string) => selectedHeritage.includes(h));
         }
-        return p.heritage === selectedHeritage;
+        return p.heritage ? selectedHeritage.includes(p.heritage) : false;
       });
     }
 
@@ -268,47 +268,67 @@ export default function TravelPage() {
               )}
             </div>
 
-            {/* Ethnicity Dropdown */}
+            {/* Ethnicity Dropdown - Multi-select with checkboxes */}
             <div className="relative shrink-0" ref={heritageRef}>
               <button
                 onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
                 className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
-                  selectedHeritage !== 'All'
+                  selectedHeritage.length > 0
                     ? 'bg-amber-50 border-amber-300 text-amber-800'
                     : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted/50'
                 }`}
               >
                 <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline">{selectedHeritage !== 'All' ? selectedHeritage : 'Ethnicity'}</span>
+                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {heritageDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-56 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-1 max-h-72 overflow-y-auto">
+                <div className="absolute top-full right-0 mt-1.5 w-60 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
                   {(() => {
                     const userHeritage = Array.isArray(userProfile?.heritage)
                       ? userProfile.heritage
                       : userProfile?.heritage ? [userProfile.heritage] : [];
                     const preferred = HERITAGE_OPTIONS.filter((h: string) => userHeritage.includes(h));
                     const rest = HERITAGE_OPTIONS.filter((h: string) => !userHeritage.includes(h));
-                    return ['All', ...preferred, ...rest].map((h: string) => {
-                      const isPreferred = h !== 'All' && userHeritage.includes(h);
+                    const sorted = [...preferred, ...rest];
+                    return sorted.map((h: string) => {
+                      const isPreferred = userHeritage.includes(h);
                       return (
-                        <button
+                        <label
                           key={h}
-                          onClick={() => { setSelectedHeritage(h); setHeritageDropdownOpen(false); }}
-                          className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-aurora-surface-variant transition-colors ${
-                            selectedHeritage === h ? 'bg-aurora-indigo/10 text-aurora-indigo font-semibold' : 'text-aurora-text'
-                          } ${isPreferred ? 'bg-amber-50/50' : ''}`}
+                          className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-aurora-surface-variant transition-colors ${
+                            isPreferred ? 'bg-amber-50/50' : ''
+                          }`}
                         >
-                          <span>{h}</span>
+                          <input
+                            type="checkbox"
+                            checked={selectedHeritage.includes(h)}
+                            onChange={() => {
+                              setSelectedHeritage((prev) =>
+                                prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
+                              );
+                            }}
+                            className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                          />
+                          <span className="text-sm text-aurora-text">{h}</span>
                           {isPreferred && (
                             <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
                           )}
-                        </button>
+                        </label>
                       );
                     });
                   })()}
+                  {selectedHeritage.length > 0 && (
+                    <div className="border-t border-aurora-border mt-1 pt-1 px-4 py-1.5">
+                      <button
+                        onClick={() => setSelectedHeritage([])}
+                        className="text-xs text-aurora-indigo font-medium hover:text-aurora-indigo/80"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -189,7 +189,8 @@ export default function FeedPage() {
   const [postContent, setPostContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   // Legacy likedPosts removed — reactions system handles all engagement
-  const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
+  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [feedSearchQuery, setFeedSearchQuery] = useState('');
   const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
   const heritageRef = useRef<HTMLDivElement>(null);
@@ -894,12 +895,17 @@ export default function FeedPage() {
           post.userName?.toLowerCase().includes(q);
         if (!matchesSearch) return false;
       }
-      if (selectedHeritage === 'Saved ★') {
-        return savedPosts.has(post.id);
-      }
-      if (selectedHeritage !== 'All') {
-        if (Array.isArray(post.heritage)) return post.heritage.includes(selectedHeritage);
-        return post.heritage === selectedHeritage;
+      // Saved filter
+      if (showSavedOnly && !savedPosts.has(post.id)) return false;
+      // Heritage filter (multi-select)
+      if (selectedHeritage.length > 0) {
+        if (Array.isArray(post.heritage)) {
+          if (!post.heritage.some((h: string) => selectedHeritage.includes(h))) return false;
+        } else if (post.heritage) {
+          if (!selectedHeritage.includes(post.heritage)) return false;
+        } else {
+          return false;
+        }
       }
       return true;
     });
@@ -931,7 +937,7 @@ export default function FeedPage() {
     }
 
     return result;
-  }, [posts, selectedHeritage, sortMode, savedPosts, feedSearchQuery]);
+  }, [posts, selectedHeritage, sortMode, savedPosts, feedSearchQuery, showSavedOnly]);
 
   // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -1066,9 +1072,9 @@ export default function FeedPage() {
 
             {/* Saved filter */}
             <button
-              onClick={() => setSelectedHeritage(selectedHeritage === 'Saved ★' ? 'All' : 'Saved ★')}
+              onClick={() => setShowSavedOnly(!showSavedOnly)}
               className={`p-2.5 rounded-full border transition-all shrink-0 ${
-                selectedHeritage === 'Saved ★'
+                showSavedOnly
                   ? 'bg-aurora-indigo text-white border-aurora-indigo'
                   : 'bg-aurora-surface border-aurora-border text-aurora-text-muted hover:border-aurora-text-muted/50'
               }`}
@@ -1077,47 +1083,67 @@ export default function FeedPage() {
               <Bookmark className="w-4 h-4" />
             </button>
 
-            {/* Ethnicity Dropdown */}
+            {/* Ethnicity Dropdown - Multi-select with checkboxes */}
             <div className="relative shrink-0" ref={heritageRef}>
               <button
                 onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
                 className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
-                  selectedHeritage !== 'All' && selectedHeritage !== 'Saved ★'
+                  selectedHeritage.length > 0
                     ? 'bg-amber-50 border-amber-300 text-amber-800'
                     : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted/50'
                 }`}
               >
                 <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline">{selectedHeritage !== 'All' && selectedHeritage !== 'Saved ★' ? selectedHeritage : 'Ethnicity'}</span>
+                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {heritageDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-56 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-1 max-h-72 overflow-y-auto">
+                <div className="absolute top-full right-0 mt-1.5 w-60 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
                   {(() => {
                     const userHeritage = Array.isArray(userProfile?.heritage)
                       ? userProfile.heritage
                       : userProfile?.heritage ? [userProfile.heritage] : [];
-                    const preferred = HERITAGE_OPTIONS.filter((h) => userHeritage.includes(h));
-                    const rest = HERITAGE_OPTIONS.filter((h) => !userHeritage.includes(h));
-                    return ['All', ...preferred, ...rest].map((h) => {
-                      const isPreferred = h !== 'All' && userHeritage.includes(h);
+                    const preferred = HERITAGE_OPTIONS.filter((h: string) => userHeritage.includes(h));
+                    const rest = HERITAGE_OPTIONS.filter((h: string) => !userHeritage.includes(h));
+                    const sorted = [...preferred, ...rest];
+                    return sorted.map((h: string) => {
+                      const isPreferred = userHeritage.includes(h);
                       return (
-                        <button
+                        <label
                           key={h}
-                          onClick={() => { setSelectedHeritage(h); setHeritageDropdownOpen(false); }}
-                          className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-aurora-surface-variant transition-colors ${
-                            selectedHeritage === h ? 'bg-aurora-indigo/10 text-aurora-indigo font-semibold' : 'text-aurora-text'
-                          } ${isPreferred ? 'bg-amber-50/50' : ''}`}
+                          className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-aurora-surface-variant transition-colors ${
+                            isPreferred ? 'bg-amber-50/50' : ''
+                          }`}
                         >
-                          <span>{h}</span>
+                          <input
+                            type="checkbox"
+                            checked={selectedHeritage.includes(h)}
+                            onChange={() => {
+                              setSelectedHeritage((prev) =>
+                                prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
+                              );
+                            }}
+                            className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                          />
+                          <span className="text-sm text-aurora-text">{h}</span>
                           {isPreferred && (
                             <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
                           )}
-                        </button>
+                        </label>
                       );
                     });
                   })()}
+                  {selectedHeritage.length > 0 && (
+                    <div className="border-t border-aurora-border mt-1 pt-1 px-4 py-1.5">
+                      <button
+                        onClick={() => setSelectedHeritage([])}
+                        className="text-xs text-aurora-indigo font-medium hover:text-aurora-indigo/80"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1216,12 +1242,12 @@ export default function FeedPage() {
               <MessageCircle size={28} className="text-aurora-text-muted" />
             </div>
             <h3 className="text-lg font-semibold text-aurora-text mb-1">
-              {selectedHeritage !== 'All' || sortMode !== 'recent' ? 'No Posts Found' : 'No Posts Yet'}
+              {selectedHeritage.length > 0 || sortMode !== 'recent' || showSavedOnly ? 'No Posts Found' : 'No Posts Yet'}
             </h3>
             <p className="text-sm text-aurora-text-secondary max-w-xs mx-auto">
-              {selectedHeritage !== 'All' ? `No posts from ${selectedHeritage} yet. ` : ''}
+              {selectedHeritage.length > 0 ? `No posts matching selected ethnicity. ` : ''}
               {sortMode !== 'recent' ? `Try changing the sort mode. ` : ''}
-              {selectedHeritage === 'All' && sortMode === 'recent' ? 'Be the first to share something with the community!' : ''}
+              {selectedHeritage.length === 0 && sortMode === 'recent' && !showSavedOnly ? 'Be the first to share something with the community!' : ''}
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
