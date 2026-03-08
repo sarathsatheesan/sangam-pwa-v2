@@ -31,58 +31,63 @@ export const AVATAR_OPTIONS = [
 ];
 
 // 3-tier ethnicity hierarchy: Region → Sub-region → Specific Ethnicities
+// Ordered by most commonly used / largest diaspora populations first
 export const ETHNICITY_HIERARCHY: { region: string; subregions: { name: string; ethnicities: string[] }[] }[] = [
-  { region: 'African', subregions: [
-    { name: 'African American / Black British', ethnicities: ['African American', 'Black British'] },
-    { name: 'Central African', ethnicities: ['Congolese', 'Angolan', 'Cameroonian', 'Chadian', 'Gabonese'] },
-    { name: 'East African', ethnicities: ['Ethiopian', 'Kenyan', 'Somali', 'Tanzanian', 'Ugandan', 'Rwandan'] },
-    { name: 'North African', ethnicities: ['Egyptian', 'Moroccan', 'Algerian', 'Tunisian', 'Libyan', 'Sudanese'] },
-    { name: 'Southern African', ethnicities: ['South African', 'Zimbabwean', 'Motswana', 'Namibian', 'Mozambican'] },
-    { name: 'West African', ethnicities: ['Nigerian', 'Ghanaian', 'Senegalese', 'Ivorian', 'Malian', 'Sierra Leonean'] },
-  ]},
   { region: 'Asian', subregions: [
-    { name: 'Central Asian', ethnicities: ['Kazakh', 'Uzbek', 'Afghan', 'Tajik', 'Kyrgyz', 'Turkmen'] },
-    { name: 'East Asian', ethnicities: ['Chinese', 'Japanese', 'Korean', 'Mongolian', 'Taiwanese'] },
-    { name: 'South Asian', ethnicities: ['Indian', 'Pakistani', 'Bangladeshi', 'Sri Lankan', 'Nepali', 'Bhutanese', 'Maldivian'] },
-    { name: 'Southeast Asian', ethnicities: ['Vietnamese', 'Filipino', 'Thai', 'Indonesian', 'Malaysian', 'Cambodian', 'Burmese', 'Laotian', 'Singaporean'] },
-  ]},
-  { region: 'European', subregions: [
-    { name: 'Eastern European', ethnicities: ['Russian', 'Polish', 'Ukrainian', 'Romanian', 'Czech', 'Hungarian', 'Bulgarian'] },
-    { name: 'Northern European', ethnicities: ['Swedish', 'Norwegian', 'Finnish', 'Danish', 'Icelandic', 'Estonian', 'Latvian', 'Lithuanian'] },
-    { name: 'Southern European', ethnicities: ['Italian', 'Spanish', 'Greek', 'Portuguese', 'Croatian', 'Serbian', 'Albanian'] },
-    { name: 'Western European', ethnicities: ['English', 'French', 'German', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Irish', 'Scottish', 'Welsh'] },
+    { name: 'South Asian', ethnicities: ['Indian', 'Pakistani', 'Bangladeshi', 'Sri Lankan', 'Nepali', 'Bhutanese', 'Maldivian', 'Afghan'] },
+    { name: 'East Asian', ethnicities: ['Chinese', 'Japanese', 'Korean', 'Taiwanese', 'Mongolian', 'Tibetan', 'Hong Konger'] },
+    { name: 'Southeast Asian', ethnicities: ['Filipino', 'Vietnamese', 'Indonesian', 'Thai', 'Malaysian', 'Burmese', 'Cambodian', 'Laotian', 'Singaporean', 'Hmong'] },
+    { name: 'Central Asian', ethnicities: ['Kazakh', 'Uzbek', 'Tajik', 'Kyrgyz', 'Turkmen'] },
   ]},
   { region: 'Hispanic or Latino', subregions: [
-    { name: 'Caribbean', ethnicities: ['Cuban', 'Puerto Rican', 'Dominican', 'Jamaican', 'Haitian', 'Trinidadian'] },
-    { name: 'Central American', ethnicities: ['Salvadoran', 'Guatemalan', 'Honduran', 'Nicaraguan', 'Costa Rican', 'Panamanian'] },
-    { name: 'Mexican', ethnicities: ['Mexican', 'Chicano'] },
-    { name: 'South American', ethnicities: ['Colombian', 'Peruvian', 'Brazilian', 'Argentine', 'Chilean', 'Venezuelan', 'Ecuadorian', 'Bolivian'] },
+    { name: 'Mexican', ethnicities: ['Mexican', 'Mexican American', 'Chicano'] },
+    { name: 'Caribbean', ethnicities: ['Puerto Rican', 'Cuban', 'Dominican', 'Jamaican', 'Haitian', 'Trinidadian', 'Barbadian', 'Bahamian'] },
+    { name: 'South American', ethnicities: ['Brazilian', 'Colombian', 'Argentine', 'Peruvian', 'Venezuelan', 'Chilean', 'Ecuadorian', 'Bolivian', 'Paraguayan', 'Uruguayan', 'Guyanese', 'Surinamese'] },
+    { name: 'Central American', ethnicities: ['Salvadoran', 'Guatemalan', 'Honduran', 'Nicaraguan', 'Costa Rican', 'Panamanian', 'Belizean'] },
     { name: 'Spanish', ethnicities: ['Spanish (from Spain)'] },
   ]},
-  { region: 'Indigenous & Native People', subregions: [
-    { name: 'Aboriginal / Torres Strait Islander', ethnicities: ['Aboriginal Australian', 'Torres Strait Islander'] },
-    { name: 'First Nations / Inuit / Métis', ethnicities: ['First Nations', 'Inuit', 'Métis'] },
-    { name: 'Maori', ethnicities: ['Maori'] },
-    { name: 'Native American / Alaska Native', ethnicities: ['Native American', 'Alaska Native'] },
+  { region: 'European', subregions: [
+    { name: 'Western European', ethnicities: ['English', 'German', 'French', 'Irish', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Scottish', 'Welsh', 'Luxembourgish'] },
+    { name: 'Southern European', ethnicities: ['Italian', 'Spanish', 'Greek', 'Portuguese', 'Croatian', 'Serbian', 'Albanian', 'Maltese', 'Bosnian', 'Montenegrin', 'Slovenian', 'Macedonian', 'Cypriot'] },
+    { name: 'Eastern European', ethnicities: ['Russian', 'Polish', 'Ukrainian', 'Romanian', 'Czech', 'Hungarian', 'Bulgarian', 'Slovak', 'Belarusian', 'Moldovan', 'Georgian', 'Armenian'] },
+    { name: 'Northern European', ethnicities: ['Swedish', 'Norwegian', 'Danish', 'Finnish', 'Icelandic', 'Estonian', 'Latvian', 'Lithuanian'] },
+  ]},
+  { region: 'African', subregions: [
+    { name: 'African American / Black British', ethnicities: ['African American', 'Black British', 'Afro-Caribbean', 'Afro-Latino'] },
+    { name: 'West African', ethnicities: ['Nigerian', 'Ghanaian', 'Senegalese', 'Ivorian', 'Malian', 'Sierra Leonean', 'Liberian', 'Guinean', 'Togolese', 'Beninese', 'Burkinabe', 'Gambian', 'Cape Verdean'] },
+    { name: 'East African', ethnicities: ['Ethiopian', 'Kenyan', 'Somali', 'Tanzanian', 'Ugandan', 'Rwandan', 'Eritrean', 'Burundian', 'South Sudanese', 'Djiboutian'] },
+    { name: 'North African', ethnicities: ['Egyptian', 'Moroccan', 'Algerian', 'Tunisian', 'Libyan', 'Sudanese'] },
+    { name: 'Southern African', ethnicities: ['South African', 'Zimbabwean', 'Motswana', 'Namibian', 'Mozambican', 'Zambian', 'Malawian', 'Swazi', 'Basotho', 'Malagasy'] },
+    { name: 'Central African', ethnicities: ['Congolese', 'Cameroonian', 'Angolan', 'Chadian', 'Gabonese', 'Central African', 'Equatorial Guinean'] },
   ]},
   { region: 'Middle Eastern', subregions: [
+    { name: 'Levantine', ethnicities: ['Lebanese', 'Syrian', 'Palestinian', 'Jordanian', 'Iraqi'] },
     { name: 'Arabian Peninsula', ethnicities: ['Saudi', 'Emirati', 'Kuwaiti', 'Qatari', 'Bahraini', 'Omani', 'Yemeni'] },
-    { name: 'Levantine', ethnicities: ['Lebanese', 'Syrian', 'Jordanian', 'Palestinian', 'Iraqi'] },
-    { name: 'Persian / Iranian', ethnicities: ['Persian', 'Iranian'] },
+    { name: 'Persian / Iranian', ethnicities: ['Persian', 'Iranian', 'Kurdish'] },
     { name: 'Turkish', ethnicities: ['Turkish'] },
+    { name: 'Israeli / Jewish', ethnicities: ['Israeli', 'Ashkenazi Jewish', 'Sephardic Jewish', 'Mizrahi Jewish'] },
   ]},
   { region: 'Oceanian / Pacific Islander', subregions: [
-    { name: 'Melanesian', ethnicities: ['Fijian', 'Papua New Guinean', 'Solomon Islander', 'Ni-Vanuatu'] },
-    { name: 'Micronesian', ethnicities: ['Guamanian', 'Marshallese', 'Palauan', 'Chamorro'] },
-    { name: 'Polynesian', ethnicities: ['Native Hawaiian', 'Samoan', 'Tongan', 'Maori', 'Tahitian'] },
+    { name: 'Polynesian', ethnicities: ['Native Hawaiian', 'Samoan', 'Tongan', 'Maori', 'Tahitian', 'Cook Islander'] },
+    { name: 'Melanesian', ethnicities: ['Fijian', 'Papua New Guinean', 'Solomon Islander', 'Ni-Vanuatu', 'New Caledonian'] },
+    { name: 'Micronesian', ethnicities: ['Chamorro', 'Guamanian', 'Marshallese', 'Palauan', 'Chuukese', 'Kosraean'] },
+    { name: 'Australian', ethnicities: ['Australian'] },
+    { name: 'New Zealander', ethnicities: ['New Zealander', 'Pakeha'] },
   ]},
-  { region: 'Other', subregions: [
-    { name: 'Multiracial', ethnicities: ['Two or More Races', 'Multiracial'] },
+  { region: 'Indigenous & Native People', subregions: [
+    { name: 'Native American / Alaska Native', ethnicities: ['Native American', 'Alaska Native', 'Cherokee', 'Navajo', 'Sioux', 'Ojibwe', 'Apache'] },
+    { name: 'First Nations / Inuit / Métis', ethnicities: ['First Nations', 'Inuit', 'Métis'] },
+    { name: 'Aboriginal / Torres Strait Islander', ethnicities: ['Aboriginal Australian', 'Torres Strait Islander'] },
+    { name: 'Maori', ethnicities: ['Maori'] },
+    { name: 'Sámi', ethnicities: ['Sámi'] },
+    { name: 'Ainu', ethnicities: ['Ainu'] },
+  ]},
+  { region: 'Multiracial & Other', subregions: [
+    { name: 'Multiracial', ethnicities: ['Two or More Races', 'Multiracial', 'Biracial'] },
     { name: 'Not Listed', ethnicities: ['Other / Ethnicity not listed'] },
   ]},
-  { region: 'Privacy', subregions: [
-    { name: 'Prefer not to say', ethnicities: ['Prefer not to say'] },
-    { name: 'Decline to identify', ethnicities: ['Decline to self-identify'] },
+  { region: 'Prefer Not to Say', subregions: [
+    { name: 'Privacy', ethnicities: ['Prefer not to say', 'Decline to self-identify'] },
   ]},
 ];
 
@@ -93,17 +98,27 @@ export const ETHNICITY_OPTIONS = HERITAGE_OPTIONS;
 // Mapping of common terms to ethnicity suggestions for auto-suggest
 export const ETHNICITY_KEYWORDS: Record<string, string[]> = {
   african: ['African American', 'Ethiopian', 'Nigerian', 'Ghanaian'],
+  black: ['African American', 'Black British', 'Afro-Caribbean'],
   indian: ['Indian'], pakistani: ['Pakistani'], bangladeshi: ['Bangladeshi'],
   chinese: ['Chinese'], japanese: ['Japanese'], korean: ['Korean'],
   vietnamese: ['Vietnamese'], filipino: ['Filipino'], thai: ['Thai'],
-  mexican: ['Mexican'], cuban: ['Cuban'], colombian: ['Colombian'],
+  indonesian: ['Indonesian'], malaysian: ['Malaysian'], hmong: ['Hmong'],
+  mexican: ['Mexican', 'Mexican American'], cuban: ['Cuban'], colombian: ['Colombian'],
+  brazilian: ['Brazilian'], argentine: ['Argentine'], peruvian: ['Peruvian'],
   italian: ['Italian'], german: ['German'], french: ['French'],
+  irish: ['Irish'], english: ['English'], scottish: ['Scottish'],
   russian: ['Russian'], polish: ['Polish'], ukrainian: ['Ukrainian'],
+  armenian: ['Armenian'], georgian: ['Georgian'],
   lebanese: ['Lebanese'], syrian: ['Syrian'], iranian: ['Iranian', 'Persian'],
-  turkish: ['Turkish'], hawaiian: ['Native Hawaiian'], samoan: ['Samoan'],
+  turkish: ['Turkish'], kurdish: ['Kurdish'], israeli: ['Israeli'],
+  jewish: ['Ashkenazi Jewish', 'Sephardic Jewish', 'Mizrahi Jewish'],
+  hawaiian: ['Native Hawaiian'], samoan: ['Samoan'], fijian: ['Fijian'],
   aboriginal: ['Aboriginal Australian'], maori: ['Maori'],
-  nepali: ['Nepali'], afghan: ['Afghan'], brazilian: ['Brazilian'],
+  native: ['Native American', 'Alaska Native', 'Native Hawaiian'],
+  nepali: ['Nepali'], afghan: ['Afghan'],
   sri_lankan: ['Sri Lankan'], bhutanese: ['Bhutanese'], maldivian: ['Maldivian'],
+  eritrean: ['Eritrean'], somali: ['Somali'], ethiopian: ['Ethiopian'],
+  nigerian: ['Nigerian'], ghanaian: ['Ghanaian'],
 };
 
 export const POST_TYPES = ['community', 'question', 'recommendation', 'event', 'news'];
