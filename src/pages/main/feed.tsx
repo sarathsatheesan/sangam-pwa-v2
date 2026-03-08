@@ -1050,7 +1050,7 @@ export default function FeedPage() {
     <div className="bg-aurora-bg">
 
       {/* ─── Search & Ethnicity Filter ─── */}
-      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-10">
+      <div className="relative bg-gradient-to-br from-indigo-600/15 via-aurora-surface to-emerald-600/12 border-b border-aurora-border z-10">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           <div className="flex items-center gap-2">
             {/* Search */}
@@ -1164,7 +1164,7 @@ export default function FeedPage() {
                   onClick={() => setSortMode(mode)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap shrink-0 ${
                     sortMode === mode
-                      ? 'aurora-gradient text-white shadow-aurora-glow'
+                      ? 'bg-gradient-to-r from-indigo-700 via-violet-600 to-emerald-600 text-white shadow-md'
                       : 'bg-aurora-surface border border-aurora-border text-aurora-text-secondary hover:text-aurora-text hover:border-aurora-text-muted/30'
                   }`}
                 >
