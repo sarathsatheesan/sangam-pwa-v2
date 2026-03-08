@@ -1098,7 +1098,7 @@ export default function DiscoverPage() {
 
         {/* Main Grid/List View */}
         {loading ? (
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-4'}>
             {[...Array(9)].map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -1116,61 +1116,59 @@ export default function DiscoverPage() {
             </p>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredPeople.map((person) => {
               const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
               const status = connections.get(person.id);
               const isHovering = hoveringDisconnect === person.id && status === 'connected';
 
               return (
-                <div key={person.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                <div key={person.id} className="group bg-aurora-surface rounded-2xl border border-aurora-border overflow-hidden cursor-pointer hover:shadow-lg hover:border-aurora-border/80 transition-all duration-200">
                   <div
-                    className={`h-32 bg-gradient-to-r ${
+                    className={`h-24 bg-gradient-to-r ${
                       HERITAGE_COLORS[
                         Array.isArray(person.heritage) ? person.heritage[0] : person.heritage
                       ] || 'from-gray-300 to-gray-400'
                     } relative`}
+                    onClick={() => setSelectedPerson(person)}
                   >
-                    <button
-                      onClick={() => setSelectedPerson(person)}
-                      className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
-                    />
                     <MatchBadge score={score} />
+                    {isNewMember(person) && (
+                      <span className="absolute top-2.5 left-2.5 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                        NEW
+                      </span>
+                    )}
                   </div>
-                  <div className="p-4">
-                    <div className="relative">
-                      <div className="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-12 relative z-10 border-4 border-white">
+                  <div className="p-3">
+                    <div className="relative flex items-end gap-3 -mt-8">
+                      <div className="w-14 h-14 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-lg relative z-10 border-3 border-white shrink-0 shadow-sm">
                         {renderAvatar(person.avatar, person.name)}
                       </div>
-                      {isRecentlyActive(person) && (
-                        <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white bottom-0 right-0" />
+                      <div className="min-w-0 pb-1">
+                        <h3 className="font-bold text-[var(--aurora-text)] text-sm truncate leading-tight">{person.name}</h3>
+                        <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>
+                      </div>
+                    </div>
+                    <div className="mt-2 space-y-0.5">
+                      {person.showLocation && (
+                        <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
+                          <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
+                        </p>
+                      )}
+                      {getMutualConnectionCount(person.id) > 0 && (
+                        <p className="text-[11px] text-blue-600 font-medium">
+                          {getMutualConnectionCount(person.id)} mutual connections
+                        </p>
                       )}
                     </div>
-                    <h3 className="font-bold text-gray-800 mt-3">{person.name}</h3>
-                    {isNewMember(person) && (
-                      <div className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded mt-1 mb-2">
-                        New Member
-                      </div>
-                    )}
-                    <p className="text-sm text-gray-600">{person.profession}</p>
-                    {person.showLocation && (
-                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" /> {person.city}
-                      </p>
-                    )}
-                    {getMutualConnectionCount(person.id) > 0 && (
-                      <p className="text-xs text-blue-600 font-medium mt-2">
-                        {getMutualConnectionCount(person.id)} mutual connections
-                      </p>
-                    )}
-                    <div className="mt-4 flex gap-2">
+                    <div className="mt-2.5 flex gap-1.5">
                       {status === 'connected' ? (
                         <>
                           <button
-                            onClick={() => navigate(`/messages?user=${person.id}`)}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-medium text-sm flex items-center justify-center gap-1"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1"
                           >
-                            <MessageCircle className="w-4 h-4" /> Message
+                            <MessageCircle className="w-3.5 h-3.5" /> Message
                           </button>
                           <button
                             onMouseEnter={() => setHoveringDisconnect(person.id)}
@@ -1178,10 +1176,8 @@ export default function DiscoverPage() {
                             onTouchStart={(e) => {
                               e.stopPropagation();
                               if (isHovering) {
-                                // Second touch - execute disconnect
                                 handleConnect(person.id);
                               } else {
-                                // First touch - show button
                                 setHoveringDisconnect(person.id);
                               }
                             }}
@@ -1190,7 +1186,7 @@ export default function DiscoverPage() {
                               if (isHovering) handleConnect(person.id);
                             }}
                             disabled={connectingId === person.id}
-                            className={`px-3 py-2 rounded font-medium text-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-1 ${
+                            className={`px-2.5 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 transition-colors flex items-center justify-center gap-1 ${
                               isHovering
                                 ? 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-300'
                                 : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-300'
@@ -1198,9 +1194,9 @@ export default function DiscoverPage() {
                             title={isHovering ? 'Tap to disconnect' : 'Tap to show disconnect'}
                           >
                             {isHovering ? (
-                              <><UserMinus className="w-4 h-4" /> <span className="hidden sm:inline">Disconnect</span></>
+                              <><UserMinus className="w-3.5 h-3.5" /></>
                             ) : (
-                              <><UserCheck className="w-4 h-4" /> <span className="hidden sm:inline">Connected</span></>
+                              <><UserCheck className="w-3.5 h-3.5" /></>
                             )}
                           </button>
                         </>
@@ -1208,18 +1204,18 @@ export default function DiscoverPage() {
                         <button
                           onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
                           disabled={connectingId === person.id}
-                          className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                          className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
                           title="Tap to withdraw request"
                         >
-                          <Clock className="w-4 h-4" /> Pending
+                          <Clock className="w-3.5 h-3.5" /> Pending
                         </button>
                       ) : (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
                           disabled={connectingId === person.id}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
                         >
-                          <UserPlus className="w-4 h-4" /> Connect
+                          <UserPlus className="w-3.5 h-3.5" /> Connect
                         </button>
                       )}
                     </div>
