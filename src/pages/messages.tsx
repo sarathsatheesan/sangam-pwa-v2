@@ -1583,17 +1583,17 @@ export default function MessagesPage() {
   // === Conversation list panel (reused in both mobile and desktop) ===
   const conversationListPanel = (
     <div className="h-full flex flex-col relative" style={{ backgroundColor: '#FFFFFF' }}>
-      {/* WhatsApp-style header - teal on mobile, white/green on desktop */}
-      <div className="px-4 pt-3 pb-2 sm:bg-white bg-[#075E54]">
+      {/* Header - purple on mobile, light purple on desktop */}
+      <div className="px-4 pt-3 pb-2 sm:bg-gradient-to-r sm:from-purple-50 sm:via-violet-50 sm:to-indigo-50 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-bold tracking-wide sm:text-[#25D366] text-white">Messages</h1>
+          <h1 className="text-xl font-bold tracking-wide sm:text-purple-700 text-white">Messages</h1>
           <div className="relative">
             <button
               onClick={() => setShowPenMenu(!showPenMenu)}
-              className="p-1.5 rounded-full transition-colors sm:hover:bg-gray-100 hover:bg-white/10"
+              className="p-1.5 rounded-full transition-colors sm:hover:bg-purple-100 hover:bg-white/10"
               aria-label="New message or group"
             >
-              <Edit3 size={20} className="sm:text-[#54656F] text-white" />
+              <Edit3 size={20} className="sm:text-purple-600 text-white" />
             </button>
             {/* Pen dropdown menu */}
             {showPenMenu && (
