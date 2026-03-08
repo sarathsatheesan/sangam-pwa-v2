@@ -468,6 +468,10 @@ export default function HousingPage() {
   const [bedsFilter, setBedsFilter] = useState('any');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const priceDropRef = useRef<HTMLDivElement>(null);
+  const bedsDropRef = useRef<HTMLDivElement>(null);
+  const moreDropRef = useRef<HTMLDivElement>(null);
   const [activeListTab, setActiveListTab] = useState<'all' | 'saved' | 'recent'>('all');
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('recentHousing') || '[]'); }
@@ -530,16 +534,26 @@ export default function HousingPage() {
   const inputCls = "w-full px-3.5 py-2.5 border border-[var(--aurora-border)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-aurora-indigo bg-[var(--aurora-surface)] text-[var(--aurora-text)] placeholder-[var(--aurora-text-muted)]";
   const viewedListingsRef = useRef<Set<string>>(new Set());
 
-  /* close type dropdown on click outside */
+  /* close dropdowns on click outside */
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
-        setTypeDropdownOpen(false);
+      const target = event.target as Node;
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(target)) setTypeDropdownOpen(false);
+      if (priceDropRef.current && !priceDropRef.current.contains(target) &&
+          bedsDropRef.current && !bedsDropRef.current.contains(target) &&
+          moreDropRef.current && !moreDropRef.current.contains(target)) {
+        setActiveDropdown(null);
+      } else if (activeDropdown === 'price' && priceDropRef.current && !priceDropRef.current.contains(target)) {
+        setActiveDropdown(null);
+      } else if (activeDropdown === 'beds' && bedsDropRef.current && !bedsDropRef.current.contains(target)) {
+        setActiveDropdown(null);
+      } else if (activeDropdown === 'more' && moreDropRef.current && !moreDropRef.current.contains(target)) {
+        setActiveDropdown(null);
       }
     };
-    if (typeDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    if (typeDropdownOpen || activeDropdown) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [typeDropdownOpen]);
+  }, [typeDropdownOpen, activeDropdown]);
 
   /* toast auto-dismiss */
   useEffect(() => {
@@ -1344,97 +1358,158 @@ export default function HousingPage() {
         </div>
       </div>
 
-      {/* ===== Filter Bar ===== */}
+      {/* ===== Zillow-style Filter Bar ===== */}
       <div className="bg-aurora-surface border-b border-aurora-border sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 py-3">
-          {/* Filter row: Price range + Beds + Sort + Status + results count */}
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-            {/* Price range */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <DollarSign className="w-3.5 h-3.5 text-aurora-text-muted" />
-              <input
-                type="number"
-                placeholder="Min"
-                value={priceRange[0]}
-                onChange={(e) => setPriceRange([e.target.value, priceRange[1]])}
-                className="w-20 px-2.5 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
-              />
-              <span className="text-aurora-text-muted text-xs">–</span>
-              <input
-                type="number"
-                placeholder="Max"
-                value={priceRange[1]}
-                onChange={(e) => setPriceRange([priceRange[0], e.target.value])}
-                className="w-20 px-2.5 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
-              />
+        <div className="max-w-6xl mx-auto px-4 py-2.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+
+            {/* Price pill dropdown */}
+            <div className="relative shrink-0" ref={priceDropRef}>
+              <button
+                onClick={() => setActiveDropdown(activeDropdown === 'price' ? null : 'price')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
+                  priceRange[0] || priceRange[1]
+                    ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                    : activeDropdown === 'price'
+                    ? 'bg-aurora-surface border-aurora-indigo text-aurora-indigo'
+                    : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
+                }`}
+              >
+                {priceRange[0] || priceRange[1]
+                  ? `$${priceRange[0] || '0'} – $${priceRange[1] || '∞'}`
+                  : 'Price'}
+                <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'price' ? 'rotate-180' : ''}`} />
+              </button>
+              {activeDropdown === 'price' && (
+                <div className="absolute top-full left-0 mt-1.5 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-40 p-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Price Range</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-gray-400 font-medium">MIN</label>
+                      <input type="number" placeholder="No min" value={priceRange[0]} onChange={(e) => setPriceRange([e.target.value, priceRange[1]])}
+                        className="w-full mt-0.5 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40" />
+                    </div>
+                    <span className="text-gray-300 mt-4">–</span>
+                    <div className="flex-1">
+                      <label className="text-[10px] text-gray-400 font-medium">MAX</label>
+                      <input type="number" placeholder="No max" value={priceRange[1]} onChange={(e) => setPriceRange([priceRange[0], e.target.value])}
+                        className="w-full mt-0.5 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40" />
+                    </div>
+                  </div>
+                  {(priceRange[0] || priceRange[1]) && (
+                    <button onClick={() => { setPriceRange(['', '']); }} className="text-xs text-aurora-indigo font-medium mt-3 hover:underline">Reset</button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Beds */}
-            <select
-              value={bedsFilter}
-              onChange={(e) => setBedsFilter(e.target.value)}
-              className="px-3 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
-            >
-              <option value="any">Any beds</option>
-              <option value="1">1+ bed</option>
-              <option value="2">2+ beds</option>
-              <option value="3">3+ beds</option>
-              <option value="4">4+ beds</option>
-            </select>
+            {/* Beds & Baths pill dropdown */}
+            <div className="relative shrink-0" ref={bedsDropRef}>
+              <button
+                onClick={() => setActiveDropdown(activeDropdown === 'beds' ? null : 'beds')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
+                  bedsFilter !== 'any'
+                    ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                    : activeDropdown === 'beds'
+                    ? 'bg-aurora-surface border-aurora-indigo text-aurora-indigo'
+                    : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
+                }`}
+              >
+                <BedDouble className="w-3.5 h-3.5" />
+                {bedsFilter !== 'any' ? `${bedsFilter}+ Beds` : 'Beds'}
+                <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'beds' ? 'rotate-180' : ''}`} />
+              </button>
+              {activeDropdown === 'beds' && (
+                <div className="absolute top-full left-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-40 py-1.5">
+                  {[{ val: 'any', label: 'Any' }, { val: '1', label: '1+' }, { val: '2', label: '2+' }, { val: '3', label: '3+' }, { val: '4', label: '4+' }, { val: '5', label: '5+' }].map((opt) => (
+                    <button
+                      key={opt.val}
+                      onClick={() => { setBedsFilter(opt.val); setActiveDropdown(null); }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        bedsFilter === opt.val ? 'bg-aurora-indigo/10 text-aurora-indigo font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label} {opt.val !== 'any' ? 'Beds' : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            {/* Sort */}
+            {/* Sort pill */}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-3 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
+              className="px-3 py-1.5 border border-aurora-border rounded-full text-xs font-semibold bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40 shrink-0 appearance-none cursor-pointer"
             >
               <option value="newest">Newest</option>
-              <option value="price-low">Price: Low → High</option>
-              <option value="price-high">Price: High → Low</option>
+              <option value="price-low">Price ↑</option>
+              <option value="price-high">Price ↓</option>
               <option value="largest">Largest</option>
-              <option value="popular">Most Popular</option>
+              <option value="popular">Popular</option>
             </select>
 
-            {/* Status */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="pending">Pending</option>
-              <option value="under_contract">Under Contract</option>
-              <option value="sold">Sold</option>
-              <option value="rented">Rented</option>
-            </select>
-
-            <span className="text-xs text-aurora-text-muted whitespace-nowrap ml-auto shrink-0">{filteredListings.length} results</span>
-          </div>
-        </div>
-
-        {/* Tab bar for All/Saved/Recent */}
-        <div className="flex items-center gap-1 max-w-6xl mx-auto px-4 py-2 border-t border-aurora-border flex-wrap">
-          {(['all', 'saved', 'recent'] as const).map((tab) => {
-            const isActive = activeListTab === tab;
-            const TabIcon = tab === 'saved' ? Heart : tab === 'recent' ? Clock : Eye;
-            const count = tab === 'saved' ? savedListings.size : tab === 'recent' ? recentlyViewed.length : filteredListings.length;
-            return (
+            {/* More pill dropdown (Status) */}
+            <div className="relative shrink-0" ref={moreDropRef}>
               <button
-                key={tab}
-                onClick={() => setActiveListTab(tab)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-aurora-indigo text-white'
-                    : 'text-aurora-text-muted hover:bg-aurora-surface-variant'
+                onClick={() => setActiveDropdown(activeDropdown === 'more' ? null : 'more')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border whitespace-nowrap ${
+                  statusFilter !== 'all'
+                    ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                    : activeDropdown === 'more'
+                    ? 'bg-aurora-surface border-aurora-indigo text-aurora-indigo'
+                    : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
                 }`}
               >
-                <TabIcon size={14} />
-                {tab === 'all' ? 'All Listings' : tab === 'saved' ? 'My Saved' : 'Recently Viewed'}
-                <span className={`text-xs font-bold ml-0.5 ${isActive ? '' : 'text-aurora-text'}`}>({count})</span>
+                {statusFilter !== 'all' ? statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1).replace('_', ' ') : 'Status'}
+                <ChevronDown className={`w-3 h-3 transition-transform ${activeDropdown === 'more' ? 'rotate-180' : ''}`} />
               </button>
-            );
-          })}
+              {activeDropdown === 'more' && (
+                <div className="absolute top-full right-0 mt-1.5 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-40 py-1.5">
+                  {[{ val: 'all', label: 'All Status' }, { val: 'active', label: 'Active' }, { val: 'pending', label: 'Pending' }, { val: 'under_contract', label: 'Under Contract' }, { val: 'sold', label: 'Sold' }, { val: 'rented', label: 'Rented' }].map((opt) => (
+                    <button
+                      key={opt.val}
+                      onClick={() => { setStatusFilter(opt.val); setActiveDropdown(null); }}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                        statusFilter === opt.val ? 'bg-aurora-indigo/10 text-aurora-indigo font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Separator */}
+            <div className="w-px h-5 bg-aurora-border shrink-0 mx-0.5" />
+
+            {/* All / Saved / Recents tabs inline */}
+            {(['all', 'saved', 'recent'] as const).map((tab) => {
+              const isActive = activeListTab === tab;
+              const label = tab === 'all' ? 'All' : tab === 'saved' ? 'Saved' : 'Recents';
+              const count = tab === 'saved' ? savedListings.size : tab === 'recent' ? recentlyViewed.length : filteredListings.length;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveListTab(tab)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all shrink-0 ${
+                    isActive
+                      ? 'bg-aurora-indigo text-white'
+                      : 'text-aurora-text-muted hover:bg-aurora-surface-variant'
+                  }`}
+                >
+                  {tab === 'saved' && <Heart size={12} className={isActive ? 'fill-white' : ''} />}
+                  {tab === 'recent' && <Clock size={12} />}
+                  {label}
+                  <span className={`text-[10px] ${isActive ? 'text-white/80' : 'text-aurora-text-muted'}`}>{count}</span>
+                </button>
+              );
+            })}
+
+            {/* Results count */}
+            <span className="text-[10px] text-aurora-text-muted whitespace-nowrap ml-auto shrink-0">{filteredListings.length} results</span>
+          </div>
         </div>
       </div>
 
