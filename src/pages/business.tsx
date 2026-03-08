@@ -999,7 +999,7 @@ export default function BusinessPage() {
                   onClick={() => setSelectedCategory('All')}
                   className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all ${
                     selectedCategory === 'All'
-                      ? 'bg-aurora-text text-aurora-surface'
+                      ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-md'
                       : 'text-aurora-text-secondary hover:bg-aurora-surface-variant'
                   }`}
                 >
@@ -1015,7 +1015,7 @@ export default function BusinessPage() {
                       onClick={() => setSelectedCategory(cat)}
                       className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all ${
                         selectedCategory === cat
-                          ? 'bg-aurora-text text-aurora-surface'
+                          ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-md'
                           : 'text-aurora-text-secondary hover:bg-aurora-surface-variant'
                       }`}
                     >
