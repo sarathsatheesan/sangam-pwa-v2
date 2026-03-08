@@ -12,7 +12,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '../../constants/config';
 import {
   Search, X, Heart, MapPin, BedDouble, Bath, Ruler, Home,
   Building2, Users, Key, Plus, ChevronLeft, ChevronRight,
@@ -23,7 +22,7 @@ import {
   Maximize2, Tag, CheckCircle2, Map,
   Wind, Snowflake,
   UtensilsCrossed, Dumbbell, Waves, Package, TreePine,
-  DoorOpen, Flame, Zap, Droplets, Sun, MessageCircle, Star, Globe
+  DoorOpen, Flame, Zap, Droplets, Sun, MessageCircle, Star
 } from 'lucide-react';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
 
@@ -456,23 +455,6 @@ export default function HousingPage() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
-  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
-  const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
-  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
-  const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
-  const heritageRef = useRef<HTMLDivElement>(null);
-
-  // Pre-select user's heritage ethnicities on load
-  useEffect(() => {
-    if (!userProfile?.heritage) return;
-    const raw = Array.isArray(userProfile.heritage)
-      ? userProfile.heritage
-      : [userProfile.heritage];
-    const validSet = new Set(HERITAGE_OPTIONS);
-    const unique = [...new Set(raw.filter((h: string) => validSet.has(h)))];
-    if (unique.length > 0) setSelectedHeritage(unique);
-  }, [userProfile?.heritage]);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -553,14 +535,13 @@ export default function HousingPage() {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (typeDropdownRef.current && !typeDropdownRef.current.contains(target)) setTypeDropdownOpen(false);
-      if (heritageRef.current && !heritageRef.current.contains(target)) setHeritageDropdownOpen(false);
       if (activeDropdown === 'filters' && priceDropRef.current && !priceDropRef.current.contains(target)) {
         setActiveDropdown(null);
       }
     };
-    if (typeDropdownOpen || heritageDropdownOpen || activeDropdown) document.addEventListener('mousedown', handleClickOutside);
+    if (typeDropdownOpen || activeDropdown) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [typeDropdownOpen, heritageDropdownOpen, activeDropdown]);
+  }, [typeDropdownOpen, activeDropdown]);
 
   /* toast auto-dismiss */
   useEffect(() => {
@@ -757,15 +738,6 @@ export default function HousingPage() {
       const priceNum = parseNumericPrice(l.price);
       if (priceRange[0] && priceNum < parseFloat(priceRange[0])) return false;
       if (priceRange[1] && priceNum > parseFloat(priceRange[1])) return false;
-      if (selectedHeritage.length > 0) {
-        if (Array.isArray(l.heritage)) {
-          if (!l.heritage.some((h: string) => selectedHeritage.includes(h))) return false;
-        } else if (l.heritage) {
-          if (!selectedHeritage.includes(l.heritage)) return false;
-        } else {
-          return false;
-        }
-      }
       return true;
     });
 
@@ -783,7 +755,7 @@ export default function HousingPage() {
     });
 
     return result;
-  }, [listings, selectedTypes, searchQuery, bedsFilter, priceRange, sortBy, statusFilter, selectedHeritage, myProperties, user?.uid]);
+  }, [listings, selectedTypes, searchQuery, bedsFilter, priceRange, sortBy, statusFilter, myProperties, user?.uid]);
 
   const similarListings = useMemo(() => {
     if (!selectedListing) return [];
@@ -1375,125 +1347,6 @@ export default function HousingPage() {
               )}
             </div>
 
-            {/* Heritage/Ethnicity Dropdown - Multi-select with checkboxes */}
-            <div className="relative shrink-0" ref={heritageRef}>
-              <button
-                onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
-                  selectedHeritage.length > 0
-                    ? 'bg-amber-50 border-amber-300 text-amber-800'
-                    : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted/50'
-                }`}
-              >
-                <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `ethniCity (${selectedHeritage.length})` : 'ethniCity'}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {heritageDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-72 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
-                  {(() => {
-                    const userHeritage = Array.isArray(userProfile?.heritage)
-                      ? userProfile.heritage
-                      : userProfile?.heritage ? [userProfile.heritage] : [];
-                    return ETHNICITY_HIERARCHY.map((group) => {
-                      const isRegionExpanded = expandedRegions.has(group.region);
-                      const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => selectedHeritage.includes(e)).length, 0);
-                      return (
-                        <div key={group.region} className="border-b border-aurora-border last:border-b-0">
-                          <button
-                            onClick={() => setExpandedRegions((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(group.region)) next.delete(group.region);
-                              else next.add(group.region);
-                              return next;
-                            })}
-                            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
-                          >
-                            <span className="text-xs font-bold text-aurora-text">{group.region}</span>
-                            <div className="flex items-center gap-1.5">
-                              {selectedInRegion > 0 && (
-                                <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInRegion}</span>
-                              )}
-                              <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isRegionExpanded ? 'rotate-180' : ''}`} />
-                            </div>
-                          </button>
-                          {isRegionExpanded && (
-                            <div className="bg-aurora-surface-variant/20">
-                              {group.subregions.map((sub) => {
-                                const isSubExpanded = expandedSubregions.has(sub.name);
-                                const selectedInSub = sub.ethnicities.filter((e) => selectedHeritage.includes(e)).length;
-                                return (
-                                  <div key={sub.name}>
-                                    <button
-                                      onClick={() => setExpandedSubregions((prev) => {
-                                        const next = new Set(prev);
-                                        if (next.has(sub.name)) next.delete(sub.name);
-                                        else next.add(sub.name);
-                                        return next;
-                                      })}
-                                      className="w-full pl-8 pr-4 py-2 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
-                                    >
-                                      <span className="text-xs font-semibold text-aurora-text-secondary">{sub.name}</span>
-                                      <div className="flex items-center gap-1.5">
-                                        {selectedInSub > 0 && (
-                                          <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInSub}</span>
-                                        )}
-                                        <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isSubExpanded ? 'rotate-180' : ''}`} />
-                                      </div>
-                                    </button>
-                                    {isSubExpanded && (
-                                      <div className="bg-aurora-surface-variant/30">
-                                        {sub.ethnicities.map((eth) => {
-                                          const isPreferred = userHeritage.some((h: string) => eth.toLowerCase().includes(h.toLowerCase()));
-                                          return (
-                                            <label
-                                              key={eth}
-                                              className={`flex items-center gap-3 pl-12 pr-4 py-1.5 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm ${
-                                                isPreferred ? 'bg-amber-50/50' : ''
-                                              }`}
-                                            >
-                                              <input
-                                                type="checkbox"
-                                                checked={selectedHeritage.includes(eth)}
-                                                onChange={() => {
-                                                  setSelectedHeritage((prev) =>
-                                                    prev.includes(eth) ? prev.filter((x) => x !== eth) : [...prev, eth]
-                                                  );
-                                                }}
-                                                className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
-                                              />
-                                              <span className="text-aurora-text flex-1">{eth}</span>
-                                              {isPreferred && (
-                                                <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>
-                                              )}
-                                            </label>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    });
-                  })()}
-                  {selectedHeritage.length > 0 && (
-                    <div className="border-t border-aurora-border px-4 py-2 bg-aurora-surface sticky bottom-0">
-                      <button
-                        onClick={() => setSelectedHeritage([])}
-                        className="text-xs text-aurora-indigo font-medium hover:text-aurora-indigo/80"
-                      >
-                        Clear all ({selectedHeritage.length})
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
