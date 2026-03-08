@@ -64,7 +64,8 @@ export default function TravelPage() {
   const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
   const [travelSearchQuery, setTravelSearchQuery] = useState('');
   const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
-  const [expandedEthCategories, setExpandedEthCategories] = useState<Set<string>>(new Set());
+  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+  const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
   const heritageRef = useRef<HTMLDivElement>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -276,59 +277,88 @@ export default function TravelPage() {
               </button>
 
               {heritageDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-80 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
+                <div className="absolute top-full right-0 mt-1.5 w-72 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
                   {(() => {
                     const userHeritage = Array.isArray(userProfile?.heritage)
                       ? userProfile.heritage
                       : userProfile?.heritage ? [userProfile.heritage] : [];
                     return ETHNICITY_HIERARCHY.map((group) => {
-                      const isExpanded = expandedEthCategories.has(group.category);
-                      const selectedInGroup = group.items.filter((item) => selectedHeritage.includes(item)).length;
+                      const isRegionExpanded = expandedRegions.has(group.region);
+                      const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => selectedHeritage.includes(e)).length, 0);
                       return (
-                        <div key={group.category} className="border-b border-aurora-border last:border-b-0">
+                        <div key={group.region} className="border-b border-aurora-border last:border-b-0">
                           <button
-                            onClick={() => setExpandedEthCategories((prev) => {
+                            onClick={() => setExpandedRegions((prev) => {
                               const next = new Set(prev);
-                              if (next.has(group.category)) next.delete(group.category);
-                              else next.add(group.category);
+                              if (next.has(group.region)) next.delete(group.region);
+                              else next.add(group.region);
                               return next;
                             })}
                             className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
                           >
-                            <span className="text-xs font-bold text-aurora-text">{group.category}</span>
+                            <span className="text-xs font-bold text-aurora-text">{group.region}</span>
                             <div className="flex items-center gap-1.5">
-                              {selectedInGroup > 0 && (
-                                <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInGroup}</span>
+                              {selectedInRegion > 0 && (
+                                <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInRegion}</span>
                               )}
-                              <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isRegionExpanded ? 'rotate-180' : ''}`} />
                             </div>
                           </button>
-                          {isExpanded && (
-                            <div className="bg-aurora-surface-variant/30">
-                              {group.items.map((item) => {
-                                const isPreferred = userHeritage.some((h: string) => item.toLowerCase().includes(h.toLowerCase()));
+                          {isRegionExpanded && (
+                            <div className="bg-aurora-surface-variant/20">
+                              {group.subregions.map((sub) => {
+                                const isSubExpanded = expandedSubregions.has(sub.name);
+                                const selectedInSub = sub.ethnicities.filter((e) => selectedHeritage.includes(e)).length;
                                 return (
-                                  <label
-                                    key={item}
-                                    className={`flex items-center gap-3 pl-8 pr-4 py-2 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm ${
-                                      isPreferred ? 'bg-amber-50/50' : ''
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedHeritage.includes(item)}
-                                      onChange={() => {
-                                        setSelectedHeritage((prev) =>
-                                          prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]
-                                        );
-                                      }}
-                                      className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
-                                    />
-                                    <span className="text-aurora-text flex-1">{item}</span>
-                                    {isPreferred && (
-                                      <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>
+                                  <div key={sub.name}>
+                                    <button
+                                      onClick={() => setExpandedSubregions((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(sub.name)) next.delete(sub.name);
+                                        else next.add(sub.name);
+                                        return next;
+                                      })}
+                                      className="w-full pl-8 pr-4 py-2 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
+                                    >
+                                      <span className="text-xs font-semibold text-aurora-text-secondary">{sub.name}</span>
+                                      <div className="flex items-center gap-1.5">
+                                        {selectedInSub > 0 && (
+                                          <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInSub}</span>
+                                        )}
+                                        <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isSubExpanded ? 'rotate-180' : ''}`} />
+                                      </div>
+                                    </button>
+                                    {isSubExpanded && (
+                                      <div className="bg-aurora-surface-variant/30">
+                                        {sub.ethnicities.map((eth) => {
+                                          const isPreferred = userHeritage.some((h: string) => eth.toLowerCase().includes(h.toLowerCase()));
+                                          return (
+                                            <label
+                                              key={eth}
+                                              className={`flex items-center gap-3 pl-12 pr-4 py-1.5 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm ${
+                                                isPreferred ? 'bg-amber-50/50' : ''
+                                              }`}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={selectedHeritage.includes(eth)}
+                                                onChange={() => {
+                                                  setSelectedHeritage((prev) =>
+                                                    prev.includes(eth) ? prev.filter((x) => x !== eth) : [...prev, eth]
+                                                  );
+                                                }}
+                                                className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                                              />
+                                              <span className="text-aurora-text flex-1">{eth}</span>
+                                              {isPreferred && (
+                                                <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>
+                                              )}
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
                                     )}
-                                  </label>
+                                  </div>
                                 );
                               })}
                             </div>

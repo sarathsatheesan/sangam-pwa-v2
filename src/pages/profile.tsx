@@ -620,7 +620,8 @@ export default function ProfilePage() {
     }));
   };
 
-  const [expandedEthCategories, setExpandedEthCategories] = useState<Set<string>>(new Set());
+  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+  const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
 
   const toggleHeritage = (item: string) => {
     setEditForm((prev) => ({
@@ -1582,41 +1583,71 @@ export default function ProfilePage() {
               )}
               <div className="space-y-0 max-h-48 overflow-y-auto border border-[var(--aurora-border)] rounded-xl">
                 {ETHNICITY_HIERARCHY.map((group) => {
-                  const isExpanded = expandedEthCategories.has(group.category);
-                  const selectedInGroup = group.items.filter((item) => editForm.heritage.includes(item)).length;
+                  const isRegionExpanded = expandedRegions.has(group.region);
+                  const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => editForm.heritage.includes(e)).length, 0);
                   return (
-                    <div key={group.category} className="border-b border-[var(--aurora-border)] last:border-b-0">
+                    <div key={group.region} className="border-b border-[var(--aurora-border)] last:border-b-0">
                       <button
                         type="button"
-                        onClick={() => setExpandedEthCategories((prev) => {
+                        onClick={() => setExpandedRegions((prev) => {
                           const next = new Set(prev);
-                          if (next.has(group.category)) next.delete(group.category);
-                          else next.add(group.category);
+                          if (next.has(group.region)) next.delete(group.region);
+                          else next.add(group.region);
                           return next;
                         })}
                         className="w-full px-3 py-2 flex items-center justify-between hover:bg-[var(--aurora-surface-variant)] transition-colors"
                       >
-                        <span className="text-xs font-bold text-[var(--aurora-text)]">{group.category}</span>
+                        <span className="text-xs font-bold text-[var(--aurora-text)]">{group.region}</span>
                         <div className="flex items-center gap-1.5">
-                          {selectedInGroup > 0 && (
-                            <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInGroup}</span>
+                          {selectedInRegion > 0 && (
+                            <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInRegion}</span>
                           )}
-                          <ChevronDown className={`w-3 h-3 text-[var(--aurora-text-muted)] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          <ChevronDown className={`w-3 h-3 text-[var(--aurora-text-muted)] transition-transform ${isRegionExpanded ? 'rotate-180' : ''}`} />
                         </div>
                       </button>
-                      {isExpanded && (
-                        <div className="bg-[var(--aurora-surface-variant)]/30">
-                          {group.items.map((item) => (
-                            <label key={item} className="flex items-center p-2 pl-6 hover:bg-[var(--aurora-surface-variant)] cursor-pointer rounded-lg text-sm">
-                              <input
-                                type="checkbox"
-                                checked={editForm.heritage.includes(item)}
-                                onChange={() => toggleHeritage(item)}
-                                className="w-4 h-4 text-aurora-indigo border-[var(--aurora-border)] rounded mr-3"
-                              />
-                              <span className="text-[var(--aurora-text)]">{item}</span>
-                            </label>
-                          ))}
+                      {isRegionExpanded && (
+                        <div className="bg-[var(--aurora-surface-variant)]/20">
+                          {group.subregions.map((sub) => {
+                            const isSubExpanded = expandedSubregions.has(sub.name);
+                            const selectedInSub = sub.ethnicities.filter((e) => editForm.heritage.includes(e)).length;
+                            return (
+                              <div key={sub.name}>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedSubregions((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(sub.name)) next.delete(sub.name);
+                                    else next.add(sub.name);
+                                    return next;
+                                  })}
+                                  className="w-full pl-6 pr-3 py-2 flex items-center justify-between hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                                >
+                                  <span className="text-xs font-semibold text-[var(--aurora-text-secondary)]">{sub.name}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    {selectedInSub > 0 && (
+                                      <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInSub}</span>
+                                    )}
+                                    <ChevronDown className={`w-3 h-3 text-[var(--aurora-text-muted)] transition-transform ${isSubExpanded ? 'rotate-180' : ''}`} />
+                                  </div>
+                                </button>
+                                {isSubExpanded && (
+                                  <div className="bg-[var(--aurora-surface-variant)]/30">
+                                    {sub.ethnicities.map((eth) => (
+                                      <label key={eth} className="flex items-center p-2 pl-9 hover:bg-[var(--aurora-surface-variant)] cursor-pointer rounded-lg text-sm">
+                                        <input
+                                          type="checkbox"
+                                          checked={editForm.heritage.includes(eth)}
+                                          onChange={() => toggleHeritage(eth)}
+                                          className="w-4 h-4 text-aurora-indigo border-[var(--aurora-border)] rounded mr-3"
+                                        />
+                                        <span className="text-[var(--aurora-text)]">{eth}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
