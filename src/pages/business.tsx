@@ -89,19 +89,19 @@ interface BusinessOrder {
 }
 
 const CATEGORIES = [
-  'Restaurant & Food',
-  'Grocery & Market',
+  'Arts & Entertainment',
   'Beauty & Wellness',
   'Education & Tutoring',
-  'Technology',
-  'Legal & Immigration',
-  'Healthcare',
-  'Travel & Tourism',
-  'Arts & Entertainment',
   'Financial Services',
-  'Non-Profit Organizations',
-  'Professional Services',
+  'Grocery & Market',
+  'Healthcare',
+  'Legal & Immigration',
+  'Non-Profit',
   'Real Estate',
+  'Restaurant & Food',
+  'Services',
+  'Technology',
+  'Travel & Tourism',
 ];
 
 const HERITAGE_OPTIONS = [
@@ -120,8 +120,8 @@ const CATEGORY_EMOJI_MAP: { [key: string]: string } = {
   'Travel & Tourism': '✈️',
   'Arts & Entertainment': '🎭',
   'Financial Services': '💰',
-  'Non-Profit Organizations': '🤝',
-  'Professional Services': '💼',
+  'Non-Profit': '🤝',
+  'Services': '💼',
   'Real Estate': '🏠',
 };
 
@@ -136,8 +136,8 @@ const CATEGORY_COLORS: { [key: string]: string } = {
   'Travel & Tourism': '#0D9488',
   'Arts & Entertainment': '#D97706',
   'Financial Services': '#0369A1',
-  'Non-Profit Organizations': '#DC2626',
-  'Professional Services': '#6D28D9',
+  'Non-Profit': '#DC2626',
+  'Services': '#6D28D9',
   'Real Estate': '#1E40AF',
 };
 
@@ -152,8 +152,8 @@ const CATEGORY_ICONS: { [key: string]: any } = {
   'Travel & Tourism': Plane,
   'Arts & Entertainment': Palette,
   'Financial Services': DollarSign,
-  'Non-Profit Organizations': Users,
-  'Professional Services': Briefcase,
+  'Non-Profit': Users,
+  'Services': Briefcase,
   'Real Estate': Home,
 };
 
