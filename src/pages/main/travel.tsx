@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Search, Globe, ChevronDown, X } from 'lucide-react';
 import {
   collection,
   query,
@@ -10,8 +11,8 @@ import {
   Timestamp,
   onSnapshot,
 } from 'firebase/firestore';
-import { db } from '@/services/firebase';
-import { useAuth } from '@/contexts/AuthContext';
+import { db } from '../../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface TravelPost {
   id: string;
@@ -71,6 +72,9 @@ export default function TravelPage() {
   const [travelPosts, setTravelPosts] = useState<TravelPost[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
+  const [travelSearchQuery, setTravelSearchQuery] = useState('');
+  const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
+  const heritageRef = useRef<HTMLDivElement>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
 
@@ -103,8 +107,28 @@ export default function TravelPage() {
     return unsubscribe;
   }, []);
 
+  // Close heritage dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
+        setHeritageDropdownOpen(false);
+      }
+    };
+    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [heritageDropdownOpen]);
+
   const filteredPosts = useMemo(() => {
     let filtered = travelPosts;
+
+    // Search filter
+    if (travelSearchQuery.trim()) {
+      const q = travelSearchQuery.toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.from?.toLowerCase().includes(q) || p.to?.toLowerCase().includes(q) ||
+        p.desc?.toLowerCase().includes(q) || p.posterName?.toLowerCase().includes(q)
+      );
+    }
 
     if (filterMode !== 'all') {
       filtered = filtered.filter((post) => post.mode === filterMode);
@@ -120,7 +144,7 @@ export default function TravelPage() {
     }
 
     return filtered;
-  }, [travelPosts, filterMode, selectedHeritage]);
+  }, [travelPosts, filterMode, selectedHeritage, travelSearchQuery]);
 
   const stats = {
     total: travelPosts.length,
@@ -223,45 +247,93 @@ export default function TravelPage() {
         </div>
       </div>
 
-      {/* Filter Pills */}
-      <div className="bg-aurora-surface border-b border-aurora-border p-4">
-        <div className="max-w-6xl mx-auto flex gap-3">
-          {(['all', 'assistance', 'offer'] as FilterMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setFilterMode(mode)}
-              className={`px-4 py-2 rounded-full font-medium text-sm transition-colors ${
-                filterMode === mode
-                  ? 'bg-aurora-indigo text-white'
-                  : 'bg-aurora-surface-variant text-aurora-text-secondary hover:bg-gray-100'
-              }`}
-            >
-              {mode === 'all'
-                ? 'All'
-                : mode === 'assistance'
-                ? '🙋 Need Assistance'
-                : '🚗 Offering Ride'}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Search + Ethnicity + Filter Pills */}
+      <div className="bg-aurora-surface border-b border-aurora-border px-4 py-3">
+        <div className="max-w-6xl mx-auto space-y-3">
+          {/* Search + Ethnicity Dropdown */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
+              <input
+                type="text"
+                placeholder="Search trips by route, destination..."
+                value={travelSearchQuery}
+                onChange={(e) => setTravelSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all"
+              />
+              {travelSearchQuery && (
+                <button onClick={() => setTravelSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
 
-      {/* Heritage Filter */}
-      <div className="bg-aurora-surface border-b border-aurora-border overflow-x-auto">
-        <div className="max-w-6xl mx-auto flex gap-2 px-4 py-3 min-w-max">
-          {['All', ...HERITAGE_OPTIONS].map((heritage) => (
-            <button
-              key={heritage}
-              onClick={() => setSelectedHeritage(heritage)}
-              className={`px-3 py-2 rounded-full whitespace-nowrap text-sm font-medium transition-colors ${
-                selectedHeritage === heritage
-                  ? 'bg-aurora-warning text-white'
-                  : 'bg-aurora-surface border border-aurora-border text-aurora-text-secondary'
-              }`}
-            >
-              {heritage}
-            </button>
-          ))}
+            {/* Ethnicity Dropdown */}
+            <div className="relative shrink-0" ref={heritageRef}>
+              <button
+                onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
+                  selectedHeritage !== 'All'
+                    ? 'bg-amber-50 border-amber-300 text-amber-800'
+                    : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted/50'
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                <span className="hidden sm:inline">{selectedHeritage !== 'All' ? selectedHeritage : 'Ethnicity'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {heritageDropdownOpen && (
+                <div className="absolute top-full right-0 mt-1.5 w-56 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-1 max-h-72 overflow-y-auto">
+                  {(() => {
+                    const userHeritage = Array.isArray(userProfile?.heritage)
+                      ? userProfile.heritage
+                      : userProfile?.heritage ? [userProfile.heritage] : [];
+                    const preferred = HERITAGE_OPTIONS.filter((h: string) => userHeritage.includes(h));
+                    const rest = HERITAGE_OPTIONS.filter((h: string) => !userHeritage.includes(h));
+                    return ['All', ...preferred, ...rest].map((h: string) => {
+                      const isPreferred = h !== 'All' && userHeritage.includes(h);
+                      return (
+                        <button
+                          key={h}
+                          onClick={() => { setSelectedHeritage(h); setHeritageDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-aurora-surface-variant transition-colors ${
+                            selectedHeritage === h ? 'bg-aurora-indigo/10 text-aurora-indigo font-semibold' : 'text-aurora-text'
+                          } ${isPreferred ? 'bg-amber-50/50' : ''}`}
+                        >
+                          <span>{h}</span>
+                          {isPreferred && (
+                            <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
+                          )}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex gap-2">
+            {(['all', 'assistance', 'offer'] as FilterMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setFilterMode(mode)}
+                className={`px-4 py-2 rounded-full font-medium text-sm transition-colors ${
+                  filterMode === mode
+                    ? 'bg-aurora-indigo text-white'
+                    : 'bg-aurora-surface-variant text-aurora-text-secondary hover:bg-gray-100'
+                }`}
+              >
+                {mode === 'all'
+                  ? 'All'
+                  : mode === 'assistance'
+                  ? '🙋 Need Assistance'
+                  : '🚗 Offering Ride'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

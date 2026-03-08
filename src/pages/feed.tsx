@@ -37,6 +37,8 @@ import {
   Edit3,
   Camera,
   Image as ImageIcon,
+  Search,
+  ChevronDown,
 } from 'lucide-react';
 
 interface Post {
@@ -188,6 +190,9 @@ export default function FeedPage() {
   const [submitting, setSubmitting] = useState(false);
   // Legacy likedPosts removed — reactions system handles all engagement
   const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
+  const [feedSearchQuery, setFeedSearchQuery] = useState('');
+  const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
+  const heritageRef = useRef<HTMLDivElement>(null);
   // animatingLike removed — reactions system handles animation
 
   // Post detail & comments
@@ -272,6 +277,17 @@ export default function FeedPage() {
     };
     migrate();
   }, []);
+
+  // Close heritage dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
+        setHeritageDropdownOpen(false);
+      }
+    };
+    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [heritageDropdownOpen]);
 
   // Load saved posts from localStorage
   useEffect(() => {
@@ -871,6 +887,13 @@ export default function FeedPage() {
 
   const filteredPosts = useMemo(() => {
     let result = posts.filter((post) => {
+      // Search filter
+      if (feedSearchQuery.trim()) {
+        const q = feedSearchQuery.toLowerCase();
+        const matchesSearch = post.content?.toLowerCase().includes(q) ||
+          post.userName?.toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
       if (selectedHeritage === 'Saved ★') {
         return savedPosts.has(post.id);
       }
@@ -908,7 +931,7 @@ export default function FeedPage() {
     }
 
     return result;
-  }, [posts, selectedHeritage, sortMode, savedPosts]);
+  }, [posts, selectedHeritage, sortMode, savedPosts, feedSearchQuery]);
 
   // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -1020,23 +1043,84 @@ export default function FeedPage() {
   return (
     <div className="bg-aurora-bg">
 
-      {/* ─── Heritage Filter Chips ─── */}
+      {/* ─── Search & Ethnicity Filter ─── */}
       <div className="sticky top-0 bg-aurora-surface/90 backdrop-blur-md border-b border-aurora-border z-10">
-        <div className="max-w-2xl mx-auto overflow-x-auto hide-scrollbar">
-          <div className="flex gap-2 px-4 py-3 min-w-max">
-            {['All', 'Saved ★', ...HERITAGE_OPTIONS].map((heritage) => (
+        <div className="max-w-2xl mx-auto px-4 py-3">
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
+              <input
+                type="text"
+                placeholder="Search posts..."
+                value={feedSearchQuery}
+                onChange={(e) => setFeedSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all"
+              />
+              {feedSearchQuery && (
+                <button onClick={() => setFeedSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Saved filter */}
+            <button
+              onClick={() => setSelectedHeritage(selectedHeritage === 'Saved ★' ? 'All' : 'Saved ★')}
+              className={`p-2.5 rounded-full border transition-all shrink-0 ${
+                selectedHeritage === 'Saved ★'
+                  ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                  : 'bg-aurora-surface border-aurora-border text-aurora-text-muted hover:border-aurora-text-muted/50'
+              }`}
+              title="Saved posts"
+            >
+              <Bookmark className="w-4 h-4" />
+            </button>
+
+            {/* Ethnicity Dropdown */}
+            <div className="relative shrink-0" ref={heritageRef}>
               <button
-                key={heritage}
-                onClick={() => setSelectedHeritage(heritage)}
-                className={`px-4 py-2 rounded-full whitespace-nowrap text-[13px] font-semibold transition-all duration-200 ${
-                  selectedHeritage === heritage
-                    ? 'aurora-gradient text-white shadow-aurora-glow'
-                    : 'bg-aurora-surface-variant text-aurora-text-secondary hover:text-aurora-text border border-aurora-border'
+                onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
+                  selectedHeritage !== 'All' && selectedHeritage !== 'Saved ★'
+                    ? 'bg-amber-50 border-amber-300 text-amber-800'
+                    : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted/50'
                 }`}
               >
-                {heritage}
+                <Globe className="w-4 h-4" />
+                <span className="hidden sm:inline">{selectedHeritage !== 'All' && selectedHeritage !== 'Saved ★' ? selectedHeritage : 'Ethnicity'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-            ))}
+
+              {heritageDropdownOpen && (
+                <div className="absolute top-full right-0 mt-1.5 w-56 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-1 max-h-72 overflow-y-auto">
+                  {(() => {
+                    const userHeritage = Array.isArray(userProfile?.heritage)
+                      ? userProfile.heritage
+                      : userProfile?.heritage ? [userProfile.heritage] : [];
+                    const preferred = HERITAGE_OPTIONS.filter((h) => userHeritage.includes(h));
+                    const rest = HERITAGE_OPTIONS.filter((h) => !userHeritage.includes(h));
+                    return ['All', ...preferred, ...rest].map((h) => {
+                      const isPreferred = h !== 'All' && userHeritage.includes(h);
+                      return (
+                        <button
+                          key={h}
+                          onClick={() => { setSelectedHeritage(h); setHeritageDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-aurora-surface-variant transition-colors ${
+                            selectedHeritage === h ? 'bg-aurora-indigo/10 text-aurora-indigo font-semibold' : 'text-aurora-text'
+                          } ${isPreferred ? 'bg-amber-50/50' : ''}`}
+                        >
+                          <span>{h}</span>
+                          {isPreferred && (
+                            <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
+                          )}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

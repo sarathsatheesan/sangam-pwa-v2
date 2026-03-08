@@ -7,7 +7,7 @@ import {
   Search, MapPin, Users, UserPlus, UserCheck, UserMinus,
   X, ChevronDown, ChevronUp, MessageCircle, Sparkles,
   Globe, Loader2, SlidersHorizontal,
-  Clock, Check,
+  Clock, Check, Bookmark,
 } from 'lucide-react';
 
 // Interfaces
@@ -160,6 +160,8 @@ export default function DiscoverPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedHeritage, setSelectedHeritage] = useState('All');
+  const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
+  const heritageRef = useRef<HTMLDivElement>(null);
   const [connections, setConnections] = useState<Map<string, 'pending' | 'connected'>>(new Map());
   const [connectionDetails, setConnectionDetails] = useState<Map<string, ConnectionDetail>>(new Map());
   const [connectingId, setConnectingId] = useState<string | null>(null);
@@ -190,6 +192,17 @@ export default function DiscoverPage() {
       tabSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   }, []);
+
+  // Close heritage dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
+        setHeritageDropdownOpen(false);
+      }
+    };
+    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [heritageDropdownOpen]);
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -630,80 +643,115 @@ export default function DiscoverPage() {
 
   return (
     <div className="min-h-screen bg-aurora-bg pb-20">
-      {/* Hero Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 sm:py-6 md:py-8">
+      {/* Stats Bar */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="mb-4 sm:mb-6">
-            <h1 className="text-2xl sm:text-4xl font-bold mb-2">Discover</h1>
-            <p className="text-blue-100">Expand your network within the South Asian community</p>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <button
               onClick={() => handleTileClick('connections')}
-              className={`rounded-lg p-2 sm:p-4 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
+              className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
                 activeTile === 'connections' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
               }`}
             >
-              <div className="text-xs sm:text-sm text-blue-100 flex items-center gap-1">
-                Connections
-                <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </div>
-              <div className="text-xl sm:text-3xl font-bold">{connectedCount}</div>
+              <div className="text-xs text-blue-100">Connections</div>
+              <div className="text-xl sm:text-2xl font-bold">{connectedCount}</div>
             </button>
             <button
               onClick={() => handleTileClick('pending')}
-              className={`rounded-lg p-2 sm:p-4 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left relative ${
+              className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left relative ${
                 activeTile === 'pending' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
               } ${pendingCount > 0 ? 'ring-2 ring-yellow-400/60' : ''}`}
             >
-              <div className="text-xs sm:text-sm text-blue-100 flex items-center gap-1">
-                Pending
-                <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </div>
-              <div className="text-xl sm:text-3xl font-bold">{pendingCount}</div>
+              <div className="text-xs text-blue-100">Pending</div>
+              <div className="text-xl sm:text-2xl font-bold">{pendingCount}</div>
               {pendingCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
               )}
             </button>
             <button
               onClick={() => handleTileClick('members')}
-              className={`rounded-lg p-2 sm:p-4 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
+              className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
                 activeTile === 'members' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
               }`}
             >
-              <div className="text-xs sm:text-sm text-blue-100 flex items-center gap-1">
-                Members
-                <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-              </div>
-              <div className="text-xl sm:text-3xl font-bold">{people.length}</div>
+              <div className="text-xs text-blue-100">Members</div>
+              <div className="text-xl sm:text-2xl font-bold">{people.length}</div>
             </button>
-          </div>
-
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" aria-hidden="true" />
-            <input
-              type="text"
-              placeholder="Search by name, city, profession, or interests..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              aria-label="Search people by name, city, profession, or interests"
-            />
           </div>
         </div>
       </div>
 
-      {/* Sticky Tab Navigation */}
+      {/* Sticky Tab Navigation + Search */}
       <div ref={tabSectionRef} className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm">
         <div className="max-w-6xl mx-auto px-4">
-          {/* Tabs */}
-          <div className="flex items-center gap-2 py-4 border-b">
+          {/* Search + Ethnicity + Tabs row */}
+          <div className="flex items-center gap-2 py-3 border-b">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name, city, profession..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Ethnicity Dropdown */}
+            <div className="relative shrink-0" ref={heritageRef}>
+              <button
+                onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
+                  selectedHeritage !== 'All'
+                    ? 'bg-amber-50 border-amber-300 text-amber-800'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                <span className="hidden sm:inline">{selectedHeritage !== 'All' ? selectedHeritage : 'Ethnicity'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {heritageDropdownOpen && (
+                <div className="absolute top-full right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-1 max-h-72 overflow-y-auto">
+                  {(() => {
+                    const userHeritage = Array.isArray(userProfile?.heritage)
+                      ? userProfile.heritage
+                      : userProfile?.heritage ? [userProfile.heritage] : [];
+                    const preferred = HERITAGE_OPTIONS.filter((h: string) => userHeritage.includes(h));
+                    const rest = HERITAGE_OPTIONS.filter((h: string) => !userHeritage.includes(h));
+                    return ['All', ...preferred, ...rest].map((h: string) => {
+                      const isPreferred = h !== 'All' && userHeritage.includes(h);
+                      return (
+                        <button
+                          key={h}
+                          onClick={() => { setSelectedHeritage(h); setHeritageDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${
+                            selectedHeritage === h ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-gray-700'
+                          } ${isPreferred ? 'bg-amber-50/50' : ''}`}
+                        >
+                          <span>{h}</span>
+                          {isPreferred && (
+                            <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
+                          )}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Tab buttons */}
             <button
               onClick={() => { setActiveTab('discover'); setActiveTile(null); }}
-              className={`px-4 py-2 rounded-full font-medium transition-all ${
+              className={`px-3 py-2 rounded-full font-medium text-sm transition-all shrink-0 ${
                 activeTab === 'discover'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -713,36 +761,19 @@ export default function DiscoverPage() {
             </button>
             <button
               onClick={() => { setActiveTab('network'); setActiveTile(null); }}
-              className={`px-4 py-2 rounded-full font-medium transition-all relative ${
+              className={`px-3 py-2 rounded-full font-medium text-sm transition-all relative shrink-0 ${
                 activeTab === 'network'
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              My Network ({connectedCount})
+              Network
               {pendingCount > 0 && activeTab !== 'network' && (
-                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
                   {pendingCount}
                 </span>
               )}
             </button>
-          </div>
-
-          {/* Heritage Filter */}
-          <div className="flex gap-2 py-3 overflow-x-auto pb-3">
-            {['All', ...HERITAGE_OPTIONS].map((heritage) => (
-              <button
-                key={heritage}
-                onClick={() => setSelectedHeritage(heritage)}
-                className={`px-4 py-2 sm:py-1 rounded-full whitespace-nowrap text-sm font-medium transition-all ${
-                  selectedHeritage === heritage
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {heritage}
-              </button>
-            ))}
           </div>
 
           {/* Expandable Filters */}
