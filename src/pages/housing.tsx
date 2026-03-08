@@ -460,7 +460,7 @@ export default function HousingPage() {
   const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [myProperties, setMyProperties] = useState(false);
+  const myProperties = false; // My Properties moved to Profile page
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>({});
   const [saving, setSaving] = useState(false);
@@ -1275,18 +1275,7 @@ export default function HousingPage() {
               </h1>
               <p className="text-white/70 text-sm mt-1">Find your next home in the community</p>
             </div>
-            {user && (
-              <button
-                onClick={() => setMyProperties(!myProperties)}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                  myProperties
-                    ? 'bg-aurora-indigo text-white shadow-sm'
-                    : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
-                }`}
-              >
-                My Properties
-              </button>
-            )}
+            {/* My Properties moved to Profile page */}
           </div>
 
           {/* Search bar */}

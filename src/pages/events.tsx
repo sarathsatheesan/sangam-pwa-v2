@@ -12,7 +12,8 @@ import {
   ExternalLink, Trash2, Loader2, Star, Music, BookOpen, Utensils,
   Trophy, Handshake, Baby, Church, Tag, Share2,
   ChevronLeft, AlertCircle, Download, Send, MessageCircle,
-  Check, ChevronDown, MoreVertical, Upload, Camera, Image as ImageIcon, Edit2
+  Check, ChevronDown, MoreVertical, Upload, Camera, Image as ImageIcon, Edit2,
+  SlidersHorizontal, Globe
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 
@@ -66,6 +67,7 @@ interface Event {
   waitlistEnabled?: boolean;
   photos?: string[];
   coverPhotoIndex?: number;
+  heritage?: string[];
 }
 
 const EVENT_TYPES: { [key: string]: string } = {
@@ -85,6 +87,11 @@ const EVENT_TYPE_ICONS: { [key: string]: any } = {
   Educational: BookOpen, Networking: Handshake, Family: Baby,
   Music: Music, Food: Utensils, Other: Tag,
 };
+
+const HERITAGE_OPTIONS = [
+  'Indian', 'Pakistani', 'Bangladeshi', 'Sri Lankan',
+  'Nepali', 'Bhutanese', 'Maldivian', 'Afghan',
+];
 
 const STATUS_COLORS: { [key: string]: { bg: string; text: string; badge: string } } = {
   active: { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', badge: 'bg-emerald-500 text-white' },
@@ -389,7 +396,7 @@ export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [myEvents, setMyEvents] = useState(false);
+  const myEvents = false; // My Events moved to Profile page
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [detailPhotoIdx, setDetailPhotoIdx] = useState(0);
   const [userRSVPs, setUserRSVPs] = useState<Set<string>>(new Set());
@@ -403,6 +410,9 @@ export default function EventsPage() {
   const [savedEvents, setSavedEvents] = useState<Set<string>>(new Set());
   const [rsvpAnimating, setRsvpAnimating] = useState<string | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
+  const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
+  const heritageRef = useRef<HTMLDivElement>(null);
   const [createStep, setCreateStep] = useState(1);
   const [comments, setComments] = useState<EventComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -449,6 +459,17 @@ export default function EventsPage() {
       return () => clearTimeout(t);
     }
   }, [toastMessage]);
+
+  // Close heritage dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
+        setHeritageDropdownOpen(false);
+      }
+    };
+    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [heritageDropdownOpen]);
 
   // Load saved events from localStorage
   useEffect(() => {
@@ -640,9 +661,12 @@ export default function EventsPage() {
         if (range) matchesDate = isDateInRange(event.fullDate, range);
       }
 
-      return matchesSearch && matchesFilter && matchesDate;
+      // Heritage/Ethnicity filter
+      const matchesHeritage = selectedHeritage.length === 0 || (event.heritage && event.heritage.some((h) => selectedHeritage.includes(h)));
+
+      return matchesSearch && matchesFilter && matchesDate && matchesHeritage;
     });
-  }, [events, searchQuery, selectedFilter, selectedDateFilter, showPast, myEvents, user]);
+  }, [events, searchQuery, selectedFilter, selectedDateFilter, showPast, myEvents, user, selectedHeritage]);
 
   const featuredEvents = events.filter((e) => e.promoted && !isEventPast(e.fullDate));
 
@@ -1063,50 +1087,105 @@ export default function EventsPage() {
       {/* ── Hero Header ── */}
       <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-orange-500/8 border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 pt-5 pb-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold text-aurora-text flex items-center gap-2">
-                <CalendarDays className="w-6 h-6 text-aurora-indigo" />
-                Events
-              </h1>
-              <p className="text-sm text-aurora-text-secondary mt-0.5">
-                Discover & attend community events
-              </p>
+          {/* Row 1: Module Name + Search */}
+          <div className="flex items-center gap-3 mb-3">
+            <h1 className="text-xl font-bold text-aurora-text flex items-center gap-2 shrink-0">
+              <CalendarDays className="w-5 h-5 text-aurora-indigo" />
+              Events
+            </h1>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
+              <input
+                type="text"
+                placeholder="Search events..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                className={`w-full pl-10 pr-10 py-2.5 bg-aurora-surface border rounded-full
+                           text-sm text-aurora-text placeholder:text-aurora-text-muted
+                           focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all
+                           ${searchFocused ? 'border-aurora-indigo shadow-md' : 'border-aurora-border'}`}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
-            {user && (
-              <button
-                onClick={() => setMyEvents(!myEvents)}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                  myEvents
-                    ? 'bg-aurora-indigo text-white shadow-sm'
-                    : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
-                }`}
-              >
-                My Events
-              </button>
-            )}
           </div>
 
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-aurora-text-muted" />
-            <input
-              type="text"
-              placeholder="Search events by name, type, location..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              className={`w-full pl-12 pr-12 py-3 bg-aurora-surface border rounded-full
-                         text-sm text-aurora-text placeholder:text-aurora-text-muted
-                         focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all
-                         ${searchFocused ? 'border-aurora-indigo shadow-md' : 'border-aurora-border'}`}
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text">
-                <X className="w-4 h-4" />
+          {/* Row 2: Ethnicity Filter Dropdown */}
+          <div className="flex items-center gap-2">
+            <div className="relative" ref={heritageRef}>
+              <button
+                onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all border ${
+                  selectedHeritage.length > 0
+                    ? 'bg-amber-50 border-amber-300 text-amber-800'
+                    : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted/50'
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                {selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-            )}
+
+              {heritageDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1.5 w-60 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
+                  {/* Preferred ethnicity first */}
+                  {(() => {
+                    const userHeritage = Array.isArray(userProfile?.heritage)
+                      ? userProfile.heritage
+                      : userProfile?.heritage ? [userProfile.heritage] : [];
+                    const preferred = HERITAGE_OPTIONS.filter((h) => userHeritage.includes(h));
+                    const rest = HERITAGE_OPTIONS.filter((h) => !userHeritage.includes(h));
+                    const sorted = [...preferred, ...rest];
+                    return sorted.map((h) => {
+                      const isPreferred = userHeritage.includes(h);
+                      return (
+                        <label
+                          key={h}
+                          className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-aurora-surface-variant transition-colors ${
+                            isPreferred ? 'bg-amber-50/50' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedHeritage.includes(h)}
+                            onChange={() => {
+                              setSelectedHeritage((prev) =>
+                                prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
+                              );
+                            }}
+                            className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                          />
+                          <span className="text-sm text-aurora-text">{h}</span>
+                          {isPreferred && (
+                            <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                              Preferred
+                            </span>
+                          )}
+                        </label>
+                      );
+                    });
+                  })()}
+                  {selectedHeritage.length > 0 && (
+                    <div className="border-t border-aurora-border mt-1 pt-1 px-4 py-1.5">
+                      <button
+                        onClick={() => setSelectedHeritage([])}
+                        className="text-xs text-aurora-indigo font-medium hover:text-aurora-indigo/80"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-aurora-text-muted hidden sm:block">
+              Discover & attend community events
+            </p>
           </div>
         </div>
       </div>
@@ -1182,9 +1261,9 @@ export default function EventsPage() {
               </>
             )}
           </p>
-          {(selectedFilter !== 'All' || selectedDateFilter !== 'All' || searchQuery) && (
+          {(selectedFilter !== 'All' || selectedDateFilter !== 'All' || searchQuery || selectedHeritage.length > 0) && (
             <button
-              onClick={() => { setSelectedFilter('All'); setSelectedDateFilter('All'); setSearchQuery(''); }}
+              onClick={() => { setSelectedFilter('All'); setSelectedDateFilter('All'); setSearchQuery(''); setSelectedHeritage([]); }}
               className="text-xs text-aurora-indigo font-medium flex items-center gap-1 hover:text-aurora-indigo/80"
             >
               <X className="w-3 h-3" /> Clear filters
@@ -1292,24 +1371,6 @@ export default function EventsPage() {
           </div>
         ) : (
           <>
-            {myEvents && user && (
-              <div className="max-w-6xl mx-auto px-4 pt-4 pb-2">
-                <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4 mb-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-[var(--aurora-text)] flex items-center gap-2">
-                      My Events ({filteredEvents.length})
-                    </h2>
-                    <button
-                      onClick={() => { setCreateStep(1); setShowCreateModal(true); }}
-                      className="bg-aurora-indigo text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:opacity-90 text-sm font-medium"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Create Event
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
             {/* ── Event Cards Grid — Eventbrite-style ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEvents.map((event) => {

@@ -409,7 +409,7 @@ export default function BusinessPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [activeCollection, setActiveCollection] = useState<'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites'>('all');
-  const [merchantView, setMerchantView] = useState(false);
+  const merchantView = false; // My Businesses moved to Profile page
   const [businessReviews, setBusinessReviews] = useState<BusinessReview[]>([]);
   const [newReview, setNewReview] = useState({ rating: 5, text: '' });
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -865,18 +865,7 @@ export default function BusinessPage() {
                   <Store className="w-6 h-6 text-aurora-indigo" />
                   Businesses
                 </h1>
-                {canAddBusiness && (
-                  <button
-                    onClick={() => setMerchantView(!merchantView)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                      merchantView
-                        ? 'bg-aurora-indigo text-white'
-                        : 'bg-aurora-surface-variant text-aurora-text-secondary hover:text-aurora-text'
-                    }`}
-                  >
-                    My Businesses
-                  </button>
-                )}
+                {/* My Businesses moved to Profile page */}
               </div>
               <p className="text-sm text-aurora-text-secondary mt-0.5">
                 {merchantView ? 'Manage your businesses' : 'Discover businesses from our community'}

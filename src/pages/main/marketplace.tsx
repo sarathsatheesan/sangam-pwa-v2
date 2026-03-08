@@ -582,7 +582,7 @@ export default function MarketplacePage() {
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [savedItems, setSavedItems] = useState<string[]>([]);
-  const [myListings, setMyListings] = useState(false);
+  const myListings = false; // My Listings moved to Profile page
   const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
   const [comments, setComments] = useState<{ [key: string]: Comment[] }>({});
   const [newComment, setNewComment] = useState('');
@@ -1168,20 +1168,7 @@ export default function MarketplacePage() {
               <h1 className="text-xl sm:text-3xl font-bold text-[var(--aurora-text)]">Marketplace</h1>
               <p className="text-xs sm:text-sm text-[var(--aurora-text-muted)]">Buy & sell items in your community</p>
             </div>
-            <div className="flex items-center gap-2">
-              {user && (
-                <button
-                  onClick={() => setMyListings(!myListings)}
-                  className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                    myListings
-                      ? 'bg-aurora-indigo text-white shadow-sm'
-                      : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
-                  }`}
-                >
-                  My Listings
-                </button>
-              )}
-            </div>
+            {/* My Listings moved to Profile page */}
           </div>
 
           {/* Search & Filter Controls */}

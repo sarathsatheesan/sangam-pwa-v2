@@ -1,22 +1,23 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useUserSettings } from '@/contexts/UserSettingsContext';
-import { db, auth } from '@/services/firebase';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { useUserSettings } from '../../contexts/UserSettingsContext';
+import { db, auth } from '../../services/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { downloadMyData, deleteMyData } from '@/services/dataPrivacy';
-import { AVATAR_OPTIONS, ETHNICITY_OPTIONS, BUSINESS_TYPES } from '@/constants/config';
-import { validateMerchantTIN } from '@/services/merchantValidation';
+import { downloadMyData, deleteMyData } from '../../services/dataPrivacy';
+import { AVATAR_OPTIONS, ETHNICITY_OPTIONS, BUSINESS_TYPES } from '../../constants/config';
+import { validateMerchantTIN } from '../../services/merchantValidation';
 import {
   Edit3, Settings, Grid3X3, Bookmark, Heart, MessageSquare,
   MapPin, Briefcase, Calendar, Users, ChevronRight, Shield,
   Download, Trash2, LogOut, Lock, Eye, EyeOff, Phone,
   Mail, X, Check, Loader2, MoreHorizontal, Share2,
   Star, TrendingUp, Award, Globe, Hash, Building2,
-  Camera, Link2, ChevronDown, UserPlus, Send, Sparkles
+  Camera, Link2, ChevronDown, UserPlus, Send, Sparkles,
+  Tag, Home, Store, ShoppingBag, CalendarDays, Package
 } from 'lucide-react';
 
 /* ─── constants ─── */
@@ -187,6 +188,8 @@ export default function ProfilePage() {
   const { user, userProfile, setUserProfile } = useAuth();
   const { settings, updateSetting } = useUserSettings();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'listings' ? 'listings' : searchParams.get('tab') === 'saved' ? 'saved' : 'grid';
   const [isLoading, setIsLoading] = useState(false);
   const [postsCount, setPostsCount] = useState(0);
   const [forumCount, setForumCount] = useState(0);
@@ -203,7 +206,8 @@ export default function ProfilePage() {
   const [messagingPrivacy, setMessagingPrivacy] = useState('Everyone');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'grid' | 'saved'>('grid');
+  const [activeTab, setActiveTab] = useState<'grid' | 'saved' | 'listings'>(initialTab as any);
+  const [listingsFilter, setListingsFilter] = useState<'all' | 'business' | 'housing' | 'marketplace' | 'event'>('all');
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [savedLoading, setSavedLoading] = useState(false);
   const [savedFilter, setSavedFilter] = useState<'all' | 'post' | 'business' | 'housing' | 'forum' | 'event'>('all');
@@ -933,6 +937,16 @@ export default function ProfilePage() {
             <Grid3X3 size={22} />
           </button>
           <button
+            onClick={() => setActiveTab('listings')}
+            className={`flex-1 py-3 flex items-center justify-center transition-colors border-b-2 ${
+              activeTab === 'listings'
+                ? 'border-[var(--aurora-text)] text-[var(--aurora-text)]'
+                : 'border-transparent text-[var(--aurora-text-muted)]'
+            }`}
+          >
+            <Tag size={22} />
+          </button>
+          <button
             onClick={() => setActiveTab('saved')}
             className={`flex-1 py-3 flex items-center justify-center transition-colors border-b-2 ${
               activeTab === 'saved'
@@ -946,7 +960,159 @@ export default function ProfilePage() {
 
         {/* ─── Content grid ─── */}
         <div className="p-2">
-          {activeTab === 'grid' ? (
+          {activeTab === 'listings' ? (
+            /* ─── My Listings Tab ─── */
+            <div>
+              <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar">
+                {(['all', 'business', 'housing', 'marketplace', 'event'] as const).map((cat) => {
+                  const config: Record<string, { label: string; icon: React.ReactNode }> = {
+                    all: { label: 'All', icon: <Tag size={14} /> },
+                    business: { label: 'Businesses', icon: <Store size={14} /> },
+                    housing: { label: 'Housing', icon: <Home size={14} /> },
+                    marketplace: { label: 'Marketplace', icon: <ShoppingBag size={14} /> },
+                    event: { label: 'Events', icon: <CalendarDays size={14} /> },
+                  };
+                  const counts: Record<string, number> = {
+                    all: userBusinesses.length + userHousing.length + userMarketplace.length + userEvents.length,
+                    business: userBusinesses.length,
+                    housing: userHousing.length,
+                    marketplace: userMarketplace.length,
+                    event: userEvents.length,
+                  };
+                  if (cat !== 'all' && counts[cat] === 0) return null;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setListingsFilter(cat)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-all ${
+                        listingsFilter === cat
+                          ? 'bg-aurora-indigo text-white shadow-sm'
+                          : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)]'
+                      }`}
+                    >
+                      {config[cat].icon} {config[cat].label} ({counts[cat]})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Listings content */}
+              <div className="space-y-2 px-1">
+                {(listingsFilter === 'all' || listingsFilter === 'business') && userBusinesses.length > 0 && (
+                  <>
+                    {listingsFilter === 'all' && (
+                      <h3 className="text-xs font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider mt-3 mb-2 flex items-center gap-1.5">
+                        <Store size={12} /> Businesses ({userBusinesses.length})
+                      </h3>
+                    )}
+                    {userBusinesses.map((b) => (
+                      <div
+                        key={b.id}
+                        onClick={() => navigate('/business')}
+                        className="flex items-center gap-3 p-3 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl cursor-pointer hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0">
+                          <Store size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[var(--aurora-text)] truncate">{b.name}</p>
+                          <p className="text-xs text-[var(--aurora-text-muted)] truncate">{b.desc || 'Business listing'}</p>
+                        </div>
+                        <ChevronRight size={16} className="text-[var(--aurora-text-muted)] shrink-0" />
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {(listingsFilter === 'all' || listingsFilter === 'housing') && userHousing.length > 0 && (
+                  <>
+                    {listingsFilter === 'all' && (
+                      <h3 className="text-xs font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider mt-3 mb-2 flex items-center gap-1.5">
+                        <Home size={12} /> Housing ({userHousing.length})
+                      </h3>
+                    )}
+                    {userHousing.map((h) => (
+                      <div
+                        key={h.id}
+                        onClick={() => navigate('/housing')}
+                        className="flex items-center gap-3 p-3 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl cursor-pointer hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shrink-0">
+                          <Home size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[var(--aurora-text)] truncate">{h.title}</p>
+                          <p className="text-xs text-[var(--aurora-text-muted)] truncate">{h.price ? `$${h.price.toLocaleString()}` : 'Housing listing'}</p>
+                        </div>
+                        <ChevronRight size={16} className="text-[var(--aurora-text-muted)] shrink-0" />
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {(listingsFilter === 'all' || listingsFilter === 'marketplace') && userMarketplace.length > 0 && (
+                  <>
+                    {listingsFilter === 'all' && (
+                      <h3 className="text-xs font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider mt-3 mb-2 flex items-center gap-1.5">
+                        <ShoppingBag size={12} /> Marketplace ({userMarketplace.length})
+                      </h3>
+                    )}
+                    {userMarketplace.map((m) => (
+                      <div
+                        key={m.id}
+                        onClick={() => navigate('/marketplace')}
+                        className="flex items-center gap-3 p-3 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl cursor-pointer hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shrink-0">
+                          <ShoppingBag size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[var(--aurora-text)] truncate">{m.title}</p>
+                          <p className="text-xs text-[var(--aurora-text-muted)] truncate">{m.price ? `$${m.price.toLocaleString()}` : 'Marketplace listing'}</p>
+                        </div>
+                        <ChevronRight size={16} className="text-[var(--aurora-text-muted)] shrink-0" />
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {(listingsFilter === 'all' || listingsFilter === 'event') && userEvents.length > 0 && (
+                  <>
+                    {listingsFilter === 'all' && (
+                      <h3 className="text-xs font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider mt-3 mb-2 flex items-center gap-1.5">
+                        <CalendarDays size={12} /> Events ({userEvents.length})
+                      </h3>
+                    )}
+                    {userEvents.map((e) => (
+                      <div
+                        key={e.id}
+                        onClick={() => navigate('/events')}
+                        className="flex items-center gap-3 p-3 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl cursor-pointer hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                      >
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white shrink-0">
+                          <CalendarDays size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[var(--aurora-text)] truncate">{e.title}</p>
+                          <p className="text-xs text-[var(--aurora-text-muted)] truncate">{e.desc || 'Event listing'}</p>
+                        </div>
+                        <ChevronRight size={16} className="text-[var(--aurora-text-muted)] shrink-0" />
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {/* Empty state */}
+                {userBusinesses.length + userHousing.length + userMarketplace.length + userEvents.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Package size={40} className="text-[var(--aurora-text-muted)] mb-3" />
+                    <h3 className="text-base font-semibold text-[var(--aurora-text)] mb-1">No listings yet</h3>
+                    <p className="text-sm text-[var(--aurora-text-muted)]">Your business, housing, marketplace, and event listings will appear here.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : activeTab === 'grid' ? (
             <div>
               {/* Activity category filter chips */}
               <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar">

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, MapPin, User, LogOut, Shield, Settings, Mail, Phone, Share2 } from 'lucide-react';
+import { Menu, MapPin, User, LogOut, Shield, Settings, Mail, Phone, Share2, Tag } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from '../../contexts/LocationContext';
 import { signOutUser } from '../../services/auth';
@@ -194,6 +194,18 @@ export const AppHeader: React.FC = () => {
                   >
                     <User size={18} />
                     <span className="text-sm font-medium">Profile</span>
+                  </Link>
+                )}
+
+                {/* My Listings */}
+                {user && (
+                  <Link
+                    to="/profile?tab=listings"
+                    className="px-4 py-2.5 flex items-center gap-3 text-aurora-text-secondary hover:bg-gray-50 transition-colors"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <Tag size={18} className="text-aurora-indigo" />
+                    <span className="text-sm font-medium">My Listings</span>
                   </Link>
                 )}
 
