@@ -230,19 +230,19 @@ export default function TravelPage() {
   return (
     <div className="bg-aurora-bg">
       {/* Stats Tiles — Discover-style */}
-      <div className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white py-3">
+      <div className="bg-gradient-to-r from-emerald-600 via-green-500 to-teal-500 text-white py-3">
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
-              <div className="text-xs text-teal-100">Active Trips</div>
+              <div className="text-xs text-emerald-100">Active Trips</div>
               <div className="text-xl sm:text-2xl font-bold">{stats.total}</div>
             </div>
             <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
-              <div className="text-xs text-teal-100">Need Help</div>
+              <div className="text-xs text-emerald-100">Need Help</div>
               <div className="text-xl sm:text-2xl font-bold">{stats.assistance}</div>
             </div>
             <div className="rounded-lg p-2 sm:p-3 bg-white/20 backdrop-blur text-left">
-              <div className="text-xs text-teal-100">Offering</div>
+              <div className="text-xs text-emerald-100">Offering</div>
               <div className="text-xl sm:text-2xl font-bold">{stats.offering}</div>
             </div>
           </div>
