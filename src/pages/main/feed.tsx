@@ -1047,10 +1047,10 @@ export default function FeedPage() {
   // ─── Render ────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-gradient-to-b from-indigo-50/60 via-aurora-bg to-emerald-50/40">
+    <div className="bg-gradient-to-b from-indigo-100/80 via-indigo-50/50 to-emerald-100/60">
 
       {/* ─── Search & Ethnicity Filter ─── */}
-      <div className="relative bg-gradient-to-br from-indigo-600/25 via-indigo-100/40 to-emerald-600/20 border-b border-aurora-border z-10">
+      <div className="relative bg-gradient-to-br from-indigo-600/35 via-indigo-200/50 to-emerald-600/30 border-b border-aurora-border z-10">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           <div className="flex items-center gap-2">
             {/* Search */}
