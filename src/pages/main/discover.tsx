@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, limit, doc, getDoc, setDoc, deleteDoc, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { ETHNICITY_HIERARCHY } from '../../constants/config';
 import {
   Search, MapPin, Users, UserPlus, UserCheck, UserMinus,
   X, ChevronDown, MessageCircle, Sparkles,
@@ -36,11 +37,6 @@ interface ConnectionDetail {
 }
 
 // Constants
-const HERITAGE_OPTIONS = [
-  'Indian', 'Pakistani', 'Bangladeshi', 'Sri Lankan',
-  'Nepali', 'Bhutanese', 'Maldivian', 'Afghan',
-];
-
 const HERITAGE_COLORS: Record<string, string> = {
   'Indian': 'from-orange-400/20 to-green-400/20',
   'Pakistani': 'from-green-500/20 to-white/10',
@@ -161,6 +157,7 @@ export default function DiscoverPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
   const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
+  const [expandedEthCategories, setExpandedEthCategories] = useState<Set<string>>(new Set());
   const heritageRef = useRef<HTMLDivElement>(null);
   const [connections, setConnections] = useState<Map<string, 'pending' | 'connected'>>(new Map());
   const [connectionDetails, setConnectionDetails] = useState<Map<string, ConnectionDetail>>(new Map());
@@ -716,48 +713,74 @@ export default function DiscoverPage() {
               </button>
 
               {heritageDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
+                <div className="absolute top-full right-0 mt-1.5 w-80 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
                   {(() => {
                     const userHeritage = Array.isArray(userProfile?.heritage)
                       ? userProfile.heritage
                       : userProfile?.heritage ? [userProfile.heritage] : [];
-                    const preferred = HERITAGE_OPTIONS.filter((h: string) => userHeritage.includes(h));
-                    const rest = HERITAGE_OPTIONS.filter((h: string) => !userHeritage.includes(h));
-                    const sorted = [...preferred, ...rest];
-                    return sorted.map((h: string) => {
-                      const isPreferred = userHeritage.includes(h);
+                    return ETHNICITY_HIERARCHY.map((group) => {
+                      const isExpanded = expandedEthCategories.has(group.category);
+                      const selectedInGroup = group.items.filter((item) => selectedHeritage.includes(item)).length;
                       return (
-                        <label
-                          key={h}
-                          className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 transition-colors ${
-                            isPreferred ? 'bg-amber-50/50' : ''
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedHeritage.includes(h)}
-                            onChange={() => {
-                              setSelectedHeritage((prev) =>
-                                prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
-                              );
-                            }}
-                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
-                          />
-                          <span className="text-sm text-gray-700">{h}</span>
-                          {isPreferred && (
-                            <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
+                        <div key={group.category} className="border-b border-aurora-border last:border-b-0">
+                          <button
+                            onClick={() => setExpandedEthCategories((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(group.category)) next.delete(group.category);
+                              else next.add(group.category);
+                              return next;
+                            })}
+                            className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
+                          >
+                            <span className="text-xs font-bold text-aurora-text">{group.category}</span>
+                            <div className="flex items-center gap-1.5">
+                              {selectedInGroup > 0 && (
+                                <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInGroup}</span>
+                              )}
+                              <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+                          </button>
+                          {isExpanded && (
+                            <div className="bg-aurora-surface-variant/30">
+                              {group.items.map((item) => {
+                                const isPreferred = userHeritage.some((h: string) => item.toLowerCase().includes(h.toLowerCase()));
+                                return (
+                                  <label
+                                    key={item}
+                                    className={`flex items-center gap-3 pl-8 pr-4 py-2 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm ${
+                                      isPreferred ? 'bg-amber-50/50' : ''
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedHeritage.includes(item)}
+                                      onChange={() => {
+                                        setSelectedHeritage((prev) =>
+                                          prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]
+                                        );
+                                      }}
+                                      className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                                    />
+                                    <span className="text-aurora-text flex-1">{item}</span>
+                                    {isPreferred && (
+                                      <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
                           )}
-                        </label>
+                        </div>
                       );
                     });
                   })()}
                   {selectedHeritage.length > 0 && (
-                    <div className="border-t border-gray-200 mt-1 pt-1 px-4 py-1.5">
+                    <div className="border-t border-aurora-border px-4 py-2 bg-aurora-surface sticky bottom-0">
                       <button
                         onClick={() => setSelectedHeritage([])}
-                        className="text-xs text-blue-600 font-medium hover:text-blue-500"
+                        className="text-xs text-aurora-indigo font-medium hover:text-aurora-indigo/80"
                       >
-                        Clear all
+                        Clear all ({selectedHeritage.length})
                       </button>
                     </div>
                   )}

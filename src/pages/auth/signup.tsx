@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import type { BusinessExtras, IndividualExtras } from '../../services/auth';
 import { signUpWithEmail } from '../../services/auth';
 import { getFeatureFlag } from '../../services/featureFlags';
-import { AVATAR_OPTIONS, BUSINESS_TYPES, HERITAGE_OPTIONS } from '../../constants/config';
+import { AVATAR_OPTIONS, BUSINESS_TYPES, ETHNICITY_HIERARCHY } from '../../constants/config';
 import { validateMerchantTIN } from '../../services/merchantValidation';
+import { ChevronDown } from 'lucide-react';
 
 type SignupStep = 0 | 1 | 2 | 3;
 
@@ -67,6 +68,7 @@ export const SignupPage: React.FC = () => {
   const [errors, setErrors] = useState<StepErrors>({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const updateFormData = (field: keyof FormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -647,26 +649,54 @@ export const SignupPage: React.FC = () => {
       <div className="mb-8">
         <label className="block text-sm font-semibold text-aurora-text mb-3">Your Heritage</label>
         <p className="text-xs text-aurora-text-secondary mb-3">Select one or more</p>
-        <div className="flex flex-wrap gap-2">
-          {HERITAGE_OPTIONS.map((heritage) => (
-            <button
-              key={heritage}
-              onClick={() =>
-                updateFormData('heritage',
-                  formData.heritage.includes(heritage)
-                    ? formData.heritage.filter((h) => h !== heritage)
-                    : [...formData.heritage, heritage]
-                )
-              }
-              className={`px-4 py-2 rounded-full font-semibold transition border-2 ${
-                formData.heritage.includes(heritage)
-                  ? 'bg-aurora-indigo text-white border-aurora-indigo'
-                  : 'bg-aurora-surface text-aurora-text border-aurora-border hover:border-aurora-indigo'
-              }`}
-            >
-              {heritage}
-            </button>
-          ))}
+        <div className="space-y-1 border border-aurora-border rounded-xl max-h-64 overflow-y-auto">
+          {ETHNICITY_HIERARCHY.map((group) => {
+            const isExpanded = expandedCategories.has(group.category);
+            const selectedInGroup = group.items.filter((item) => formData.heritage.includes(item)).length;
+            return (
+              <div key={group.category} className="border-b border-aurora-border last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => setExpandedCategories((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(group.category)) next.delete(group.category);
+                    else next.add(group.category);
+                    return next;
+                  })}
+                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
+                >
+                  <span className="text-sm font-bold text-aurora-text">{group.category}</span>
+                  <div className="flex items-center gap-1.5">
+                    {selectedInGroup > 0 && (
+                      <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInGroup}</span>
+                    )}
+                    <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="bg-aurora-surface-variant/30 pb-1">
+                    {group.items.map((item) => (
+                      <label key={item} className="flex items-center gap-3 pl-8 pr-4 py-2 cursor-pointer hover:bg-aurora-surface-variant transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={formData.heritage.includes(item)}
+                          onChange={() =>
+                            updateFormData('heritage',
+                              formData.heritage.includes(item)
+                                ? formData.heritage.filter((h) => h !== item)
+                                : [...formData.heritage, item]
+                            )
+                          }
+                          className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                        />
+                        <span className="text-sm text-aurora-text">{item}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         {errors.heritage && <p className="text-aurora-danger text-sm mt-2">{errors.heritage}</p>}
       </div>

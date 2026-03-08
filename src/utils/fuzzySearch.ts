@@ -69,9 +69,9 @@ export function suggestEthnicity(input: string): string[] {
   const suggestions: Set<string> = new Set();
 
   // Check keyword mappings
-  for (const [keyword, options] of Object.entries(ETHNICITY_KEYWORDS)) {
+  for (const [keyword, options] of Object.entries(ETHNICITY_KEYWORDS) as [string, string[]][]) {
     if (keyword.includes(searchStr) || searchStr.includes(keyword)) {
-      options.forEach((opt) => suggestions.add(opt));
+      options.forEach((opt: string) => suggestions.add(opt));
     }
   }
 

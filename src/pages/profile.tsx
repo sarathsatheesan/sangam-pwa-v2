@@ -8,7 +8,7 @@ import { db, auth } from '@/services/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { downloadMyData, deleteMyData } from '@/services/dataPrivacy';
-import { AVATAR_OPTIONS, ETHNICITY_OPTIONS, BUSINESS_TYPES } from '@/constants/config';
+import { AVATAR_OPTIONS, ETHNICITY_HIERARCHY, BUSINESS_TYPES } from '@/constants/config';
 import { validateMerchantTIN } from '@/services/merchantValidation';
 import {
   Edit3, Settings, Grid3X3, Bookmark, Heart, MessageSquare,
@@ -619,6 +619,8 @@ export default function ProfilePage() {
         : [...prev.interests, interest],
     }));
   };
+
+  const [expandedEthCategories, setExpandedEthCategories] = useState<Set<string>>(new Set());
 
   const toggleHeritage = (item: string) => {
     setEditForm((prev) => ({
@@ -1578,18 +1580,48 @@ export default function ProfilePage() {
                   ))}
                 </div>
               )}
-              <div className="space-y-1 max-h-36 overflow-y-auto border border-[var(--aurora-border)] rounded-xl p-2">
-                {ETHNICITY_OPTIONS.slice(0, 20).map((option) => (
-                  <label key={option} className="flex items-center p-2 hover:bg-[var(--aurora-surface-variant)] cursor-pointer rounded-lg text-sm">
-                    <input
-                      type="checkbox"
-                      checked={editForm.heritage.includes(option)}
-                      onChange={() => toggleHeritage(option)}
-                      className="w-4 h-4 text-aurora-indigo border-[var(--aurora-border)] rounded mr-3"
-                    />
-                    <span className="text-[var(--aurora-text)]">{option}</span>
-                  </label>
-                ))}
+              <div className="space-y-0 max-h-48 overflow-y-auto border border-[var(--aurora-border)] rounded-xl">
+                {ETHNICITY_HIERARCHY.map((group) => {
+                  const isExpanded = expandedEthCategories.has(group.category);
+                  const selectedInGroup = group.items.filter((item) => editForm.heritage.includes(item)).length;
+                  return (
+                    <div key={group.category} className="border-b border-[var(--aurora-border)] last:border-b-0">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedEthCategories((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(group.category)) next.delete(group.category);
+                          else next.add(group.category);
+                          return next;
+                        })}
+                        className="w-full px-3 py-2 flex items-center justify-between hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                      >
+                        <span className="text-xs font-bold text-[var(--aurora-text)]">{group.category}</span>
+                        <div className="flex items-center gap-1.5">
+                          {selectedInGroup > 0 && (
+                            <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInGroup}</span>
+                          )}
+                          <ChevronDown className={`w-3 h-3 text-[var(--aurora-text-muted)] transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                        </div>
+                      </button>
+                      {isExpanded && (
+                        <div className="bg-[var(--aurora-surface-variant)]/30">
+                          {group.items.map((item) => (
+                            <label key={item} className="flex items-center p-2 pl-6 hover:bg-[var(--aurora-surface-variant)] cursor-pointer rounded-lg text-sm">
+                              <input
+                                type="checkbox"
+                                checked={editForm.heritage.includes(item)}
+                                onChange={() => toggleHeritage(item)}
+                                className="w-4 h-4 text-aurora-indigo border-[var(--aurora-border)] rounded mr-3"
+                              />
+                              <span className="text-[var(--aurora-text)]">{item}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

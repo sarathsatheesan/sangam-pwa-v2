@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ETHNICITY_OPTIONS } from '../../constants/config';
+import { ETHNICITY_HIERARCHY } from '../../constants/config';
 import { fuzzySearch, suggestEthnicity, formatCustomEthnicity } from '../../utils/fuzzySearch';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
+import { ChevronDown } from 'lucide-react';
 
 interface EthnicityItem {
   id: string;
@@ -17,23 +18,29 @@ export const SelectEthnicityPage: React.FC = () => {
   const [selectedEthnicity, setSelectedEthnicity] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-  const filteredOptions = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return ETHNICITY_OPTIONS.map((item) => ({
-        id: item,
-        label: item,
-        isCustom: false,
-      }));
+  const flatEthnicityList = useMemo(() => {
+    return ETHNICITY_HIERARCHY.flatMap(g => g.items);
+  }, []);
+
+  const filteredGroups = useMemo(() => {
+    const trimmedQuery = searchQuery.trim().toLowerCase();
+
+    if (!trimmedQuery) {
+      return ETHNICITY_HIERARCHY;
     }
 
-    const results = fuzzySearch(searchQuery, ETHNICITY_OPTIONS);
-    return results.map((item) => ({
-      id: item,
-      label: item,
-      isCustom: false,
-    }));
-  }, [searchQuery]);
+    const results = fuzzySearch(trimmedQuery, flatEthnicityList);
+    const resultSet = new Set(results);
+
+    return ETHNICITY_HIERARCHY
+      .map(group => ({
+        ...group,
+        items: group.items.filter(item => resultSet.has(item))
+      }))
+      .filter(group => group.items.length > 0);
+  }, [searchQuery, flatEthnicityList]);
 
   const suggestions = useMemo(() => {
     if (searchQuery.trim().length < 2) {
@@ -46,27 +53,12 @@ export const SelectEthnicityPage: React.FC = () => {
     const trimmedQuery = searchQuery.trim();
     if (trimmedQuery.length < 2) return false;
 
-    const exactMatch = ETHNICITY_OPTIONS.some(
+    const exactMatch = flatEthnicityList.some(
       (item) => item.toLowerCase() === trimmedQuery.toLowerCase()
     );
 
     return !exactMatch;
-  }, [searchQuery]);
-
-  const displayList: EthnicityItem[] = useMemo(() => {
-    const list = [...filteredOptions];
-
-    if (shouldShowCustom) {
-      const customLabel = formatCustomEthnicity(searchQuery);
-      list.push({
-        id: customLabel,
-        label: customLabel,
-        isCustom: true,
-      });
-    }
-
-    return list;
-  }, [filteredOptions, shouldShowCustom, searchQuery]);
+  }, [searchQuery, flatEthnicityList]);
 
   const toggleEthnicity = useCallback((ethnicity: string) => {
     setSelectedEthnicity((prev) =>
@@ -166,28 +158,62 @@ export const SelectEthnicityPage: React.FC = () => {
 
       {/* Ethnicity List */}
       <div className="flex-1 max-w-2xl w-full mx-auto px-6 pb-6 overflow-y-auto">
-        {displayList.length > 0 ? (
-          <div className="space-y-1">
-            {displayList.map((item) => {
-              const isSelected = selectedEthnicity.includes(item.id);
+        {filteredGroups.length > 0 || shouldShowCustom ? (
+          <div className="space-y-1 border border-aurora-border rounded-xl">
+            {filteredGroups.map((group) => {
+              const isExpanded = expandedCategories.has(group.category) || searchQuery.trim().length > 0;
+              const selectedInGroup = group.items.filter((item) => selectedEthnicity.includes(item)).length;
+
               return (
-                <button
-                  key={item.id}
-                  onClick={() => handleSelectEthnicity(item.id)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border-2 transition flex items-center justify-between ${
-                    isSelected
-                      ? 'bg-aurora-indigo/10 border-aurora-indigo text-aurora-indigo font-semibold'
-                      : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-indigo'
-                  } ${item.isCustom ? 'border-dashed border-[#EA580C]' : ''}`}
-                >
-                  <span>
-                    {item.isCustom && '+ Add: '}
-                    {item.label}
-                  </span>
-                  {isSelected && <span className="text-lg font-bold">✓</span>}
-                </button>
+                <div key={group.category} className="border-b border-aurora-border last:border-b-0">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCategories((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(group.category)) next.delete(group.category);
+                      else next.add(group.category);
+                      return next;
+                    })}
+                    className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
+                  >
+                    <span className="text-sm font-bold text-aurora-text">{group.category}</span>
+                    <div className="flex items-center gap-1.5">
+                      {selectedInGroup > 0 && (
+                        <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInGroup}</span>
+                      )}
+                      <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+                  {isExpanded && (
+                    <div className="bg-aurora-surface-variant/30 pb-1">
+                      {group.items.map((item) => {
+                        const isSelected = selectedEthnicity.includes(item);
+                        return (
+                          <label key={item} className="flex items-center gap-3 pl-8 pr-4 py-2 cursor-pointer hover:bg-aurora-surface-variant transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleSelectEthnicity(item)}
+                              className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                            />
+                            <span className="text-sm text-aurora-text">{item}</span>
+                            {isSelected && <span className="ml-auto text-lg font-bold">✓</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
+            {shouldShowCustom && (
+              <button
+                onClick={() => handleSuggestedEthnicity(formatCustomEthnicity(searchQuery))}
+                className="w-full text-left px-4 py-3 rounded-xl border-2 border-dashed border-[#EA580C] bg-aurora-danger/10 text-aurora-warning font-semibold transition hover:bg-aurora-danger/15"
+              >
+                + Add: {formatCustomEthnicity(searchQuery)}
+              </button>
+            )}
           </div>
         ) : (
           <div className="text-center py-12">
