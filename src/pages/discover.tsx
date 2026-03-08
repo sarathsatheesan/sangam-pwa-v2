@@ -5,8 +5,8 @@ import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Search, MapPin, Users, UserPlus, UserCheck, UserMinus,
-  X, ChevronDown, ChevronUp, MessageCircle, Sparkles,
-  Globe, Loader2, SlidersHorizontal,
+  X, ChevronDown, MessageCircle, Sparkles,
+  Globe, Loader2,
   Clock, Check, Bookmark,
 } from 'lucide-react';
 
@@ -166,7 +166,6 @@ export default function DiscoverPage() {
   const [connectionDetails, setConnectionDetails] = useState<Map<string, ConnectionDetail>>(new Map());
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<User | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'match' | 'name' | 'recent'>('match');
   const [hoveringDisconnect, setHoveringDisconnect] = useState<string | null>(null);
@@ -648,12 +647,21 @@ export default function DiscoverPage() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <button
+              onClick={() => handleTileClick('members')}
+              className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
+                activeTile === 'members' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
+              }`}
+            >
+              <div className="text-xs text-blue-100">Discover</div>
+              <div className="text-xl sm:text-2xl font-bold">{people.length}</div>
+            </button>
+            <button
               onClick={() => handleTileClick('connections')}
               className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
                 activeTile === 'connections' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
               }`}
             >
-              <div className="text-xs text-blue-100">Connections</div>
+              <div className="text-xs text-blue-100">Network</div>
               <div className="text-xl sm:text-2xl font-bold">{connectedCount}</div>
             </button>
             <button
@@ -667,15 +675,6 @@ export default function DiscoverPage() {
               {pendingCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
               )}
-            </button>
-            <button
-              onClick={() => handleTileClick('members')}
-              className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
-                activeTile === 'members' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
-              }`}
-            >
-              <div className="text-xs text-blue-100">Members</div>
-              <div className="text-xl sm:text-2xl font-bold">{people.length}</div>
             </button>
           </div>
         </div>
@@ -768,121 +767,8 @@ export default function DiscoverPage() {
               )}
             </div>
 
-            {/* Tab buttons */}
-            <button
-              onClick={() => { setActiveTab('discover'); setActiveTile(null); }}
-              className={`px-3 py-2 rounded-full font-medium text-sm transition-all shrink-0 ${
-                activeTab === 'discover'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Discover
-            </button>
-            <button
-              onClick={() => { setActiveTab('network'); setActiveTile(null); }}
-              className={`px-3 py-2 rounded-full font-medium text-sm transition-all relative shrink-0 ${
-                activeTab === 'network'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Network
-              {pendingCount > 0 && activeTab !== 'network' && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-                  {pendingCount}
-                </span>
-              )}
-            </button>
           </div>
 
-          {/* Expandable Filters */}
-          <div className="py-3 border-t">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 text-gray-700 font-medium hover:text-blue-600 transition-colors"
-              aria-label={showFilters ? 'Hide filters' : 'Show filters'}
-              aria-expanded={showFilters}
-            >
-              <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
-              {showFilters ? 'Hide' : 'Show'} Filters
-              {showFilters ? (
-                <ChevronUp className="w-4 h-4" aria-hidden="true" />
-              ) : (
-                <ChevronDown className="w-4 h-4" aria-hidden="true" />
-              )}
-            </button>
-
-            {showFilters && (
-              <div className="mt-3 p-4 bg-gray-50 rounded-lg">
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    View Mode
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
-                        viewMode === 'grid'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300'
-                      }`}
-                    >
-                      Grid
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
-                        viewMode === 'list'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300'
-                      }`}
-                    >
-                      List
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Sort By
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setSortBy('match')}
-                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
-                        sortBy === 'match'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300'
-                      }`}
-                    >
-                      Best Match
-                    </button>
-                    <button
-                      onClick={() => setSortBy('recent')}
-                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
-                        sortBy === 'recent'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300'
-                      }`}
-                    >
-                      Recently Active
-                    </button>
-                    <button
-                      onClick={() => setSortBy('name')}
-                      className={`px-3 py-2 sm:py-1 rounded text-sm font-medium ${
-                        sortBy === 'name'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300'
-                      }`}
-                    >
-                      Name
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -898,7 +784,7 @@ export default function DiscoverPage() {
         {/* Results Header */}
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-800">
-            {activeTab === 'discover' ? 'Discover People' : 'Your Network'}
+            {activeTab === 'discover' ? 'Discover' : 'Network'}
           </h2>
           <p className="text-gray-600">
             {loading
