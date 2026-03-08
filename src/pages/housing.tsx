@@ -1351,7 +1351,7 @@ export default function HousingPage() {
       {/* ===== Zillow-style Filter Bar ===== */}
       <div className="bg-aurora-surface border-b border-aurora-border sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-1.5 flex-wrap">
 
             {/* Sort pill (leftmost) */}
             <select
