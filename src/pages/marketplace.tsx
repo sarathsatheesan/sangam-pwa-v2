@@ -21,8 +21,8 @@ import {
   Plus,
   ChevronLeft,
   ChevronRight,
-  Grid3x3,
-  List,
+  ChevronDown,
+  Globe,
   Heart,
   Eye,
   Share2,
@@ -577,13 +577,14 @@ export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MarketplaceItem | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [savedItems, setSavedItems] = useState<string[]>([]);
   const myListings = false; // My Listings moved to Profile page
-  const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
+  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
+  const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
+  const heritageRef = useRef<HTMLDivElement>(null);
   const [comments, setComments] = useState<{ [key: string]: Comment[] }>({});
   const [newComment, setNewComment] = useState('');
   const [editingItem, setEditingItem] = useState<MarketplaceItem | null>(null);
@@ -624,6 +625,17 @@ export default function MarketplacePage() {
   const [formPhotos, setFormPhotos] = useState<string[]>([]);
   const [coverPhotoIndex, setCoverPhotoIndex] = useState(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  // Close heritage dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
+        setHeritageDropdownOpen(false);
+      }
+    };
+    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [heritageDropdownOpen]);
 
   // Auto-populate formHeritage from user profile when profile loads
   useEffect(() => {
@@ -787,9 +799,9 @@ export default function MarketplacePage() {
     }
 
     // Filter by heritage
-    if (selectedHeritage !== 'All') {
+    if (selectedHeritage.length > 0) {
       result = result.filter((item) => {
-        if (Array.isArray(item.heritage)) return item.heritage.includes(selectedHeritage);
+        if (Array.isArray(item.heritage)) return item.heritage.some((h: string) => selectedHeritage.includes(h));
         return false;
       });
     }
@@ -1161,25 +1173,33 @@ export default function MarketplacePage() {
   return (
     <div className="min-h-screen bg-[var(--aurora-bg)]">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-[var(--aurora-surface)] border-b border-[var(--aurora-border)] backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
+        <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           {/* Search & Filter Controls */}
-          <div className="flex gap-2 sm:gap-3 flex-wrap items-center">
-            <div className="flex-1 min-w-0 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--aurora-text-muted)]" />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
               <input
                 type="text"
                 placeholder="Search listings..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-lg text-[var(--aurora-text)] placeholder-[var(--aurora-text-muted)] focus:outline-none focus:ring-2 focus:ring-aurora-indigo"
+                className="w-full pl-11 pr-10 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-lg text-[var(--aurora-text)] focus:outline-none focus:ring-2 focus:ring-aurora-indigo"
+              className="px-3 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
             >
               <option value="newest">Newest</option>
               <option value="price-low">Price: Low to High</option>
@@ -1187,36 +1207,77 @@ export default function MarketplacePage() {
               <option value="popular">Most Popular</option>
             </select>
 
-            <div className="flex gap-2">
+            {/* Ethnicity Dropdown - Multi-select with checkboxes */}
+            <div className="relative shrink-0" ref={heritageRef}>
               <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-aurora-indigo text-white'
-                    : 'bg-[var(--aurora-bg)] text-[var(--aurora-text-muted)] border border-[var(--aurora-border)]'
+                onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
+                  selectedHeritage.length > 0
+                    ? 'bg-amber-50 border-amber-300 text-amber-800'
+                    : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted'
                 }`}
               >
-                <Grid3x3 className="w-5 h-5" />
+                <Globe className="w-4 h-4" />
+                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-lg transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-aurora-indigo text-white'
-                    : 'bg-[var(--aurora-bg)] text-[var(--aurora-text-muted)] border border-[var(--aurora-border)]'
-                }`}
-              >
-                <List className="w-5 h-5" />
-              </button>
-            </div>
 
+              {heritageDropdownOpen && (
+                <div className="absolute top-full right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
+                  {(() => {
+                    const userHeritage = Array.isArray(userProfile?.heritage)
+                      ? userProfile.heritage
+                      : userProfile?.heritage ? [userProfile.heritage] : [];
+                    const preferred = HERITAGE_OPTIONS.filter((h: string) => userHeritage.includes(h));
+                    const rest = HERITAGE_OPTIONS.filter((h: string) => !userHeritage.includes(h));
+                    const sorted = [...preferred, ...rest];
+                    return sorted.map((h: string) => {
+                      const isPreferred = userHeritage.includes(h);
+                      return (
+                        <label
+                          key={h}
+                          className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 transition-colors ${
+                            isPreferred ? 'bg-amber-50/50' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedHeritage.includes(h)}
+                            onChange={() => {
+                              setSelectedHeritage((prev) =>
+                                prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
+                              );
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                          />
+                          <span className="text-sm text-gray-700">{h}</span>
+                          {isPreferred && (
+                            <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
+                          )}
+                        </label>
+                      );
+                    });
+                  })()}
+                  {selectedHeritage.length > 0 && (
+                    <div className="border-t border-gray-200 mt-1 pt-1 px-4 py-1.5">
+                      <button
+                        onClick={() => setSelectedHeritage([])}
+                        className="text-xs text-blue-600 font-medium hover:text-blue-500"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Category Pills */}
         {isFeatureEnabled('marketplace_categoryFilter') && (
           <div className="border-t border-[var(--aurora-border)] overflow-x-auto">
-            <div className="max-w-7xl mx-auto px-4 py-3 flex gap-2 flex-nowrap">
+            <div className="max-w-6xl mx-auto px-4 py-3 flex gap-2 flex-nowrap">
               <button
                 onClick={() => setSelectedCategory('all')}
                 className={`px-4 py-1 rounded-full whitespace-nowrap text-sm font-medium transition-colors flex-shrink-0 ${
@@ -1245,30 +1306,11 @@ export default function MarketplacePage() {
           </div>
         )}
 
-        {/* Heritage Filter */}
-        <div className="border-t border-[var(--aurora-border)] overflow-x-auto">
-          <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-2 flex-nowrap">
-            <span className="text-xs font-medium text-[var(--aurora-text-muted)] uppercase tracking-wide flex-shrink-0">Heritage</span>
-            {['All', ...HERITAGE_OPTIONS].map((h) => (
-              <button
-                key={h}
-                onClick={() => setSelectedHeritage(h)}
-                className={`px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all whitespace-nowrap ${
-                  selectedHeritage === h
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
-                }`}
-              >
-                {h}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       {/* Featured Carousel */}
       {isFeatureEnabled('marketplace_featured') && featuredListings.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto px-4 py-8">
           <h2 className="text-xl font-bold text-[var(--aurora-text)] mb-4 flex items-center gap-2">
             <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
             Featured Listings
@@ -1289,7 +1331,7 @@ export default function MarketplacePage() {
 
       {/* My Listings Dashboard */}
       {myListings && user && (
-        <div className="max-w-7xl mx-auto px-4 pt-6 pb-2">
+        <div className="max-w-6xl mx-auto px-4 pt-6 pb-2">
           <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4 mb-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-[var(--aurora-text)] flex items-center gap-2">
@@ -1322,9 +1364,9 @@ export default function MarketplacePage() {
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="max-w-6xl mx-auto px-4 py-4">
         {loading ? (
-          <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1'}`}>
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
             {[...Array(8)].map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -1451,7 +1493,7 @@ export default function MarketplacePage() {
             ))}
           </div>
         ) : (
-          <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' : 'grid-cols-1'}`}>
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
             {filteredListings.map((item) => (
               <MarketplaceCard
                 key={item.id}
@@ -1459,7 +1501,7 @@ export default function MarketplacePage() {
                 onViewDetails={handleViewDetails}
                 isSaved={savedItems.includes(item.id)}
                 onSaveToggle={handleSaveToggle}
-                isListView={viewMode === 'list'}
+                isListView={false}
               />
             ))}
           </div>
