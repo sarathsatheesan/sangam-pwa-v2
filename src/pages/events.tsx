@@ -1300,7 +1300,7 @@ export default function EventsPage() {
                     }`}
                   >
                     {type !== 'All' && TypeIcon && <TypeIcon className="w-3 h-3" />}
-                    {type !== 'All' ? type : 'All Types'}
+                    {type}
                   </button>
                 );
               })}
