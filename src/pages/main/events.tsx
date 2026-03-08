@@ -1340,7 +1340,7 @@ export default function EventsPage() {
         )}
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : filteredEvents.length === 0 ? (
@@ -1362,7 +1362,7 @@ export default function EventsPage() {
         ) : (
           <>
             {/* ── Event Cards Grid — Eventbrite-style ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredEvents.map((event) => {
               const past = isEventPast(event.fullDate);
               const dateParts = getDateParts(event.fullDate);
@@ -1388,7 +1388,7 @@ export default function EventsPage() {
                 >
                   {/* Photo Hero or Top accent line */}
                   {event.photos && event.photos.length > 0 ? (
-                    <div className="relative h-32 overflow-hidden">
+                    <div className="relative h-36 overflow-hidden">
                       <img
                         src={event.photos[event.coverPhotoIndex || 0] || event.photos[0]}
                         alt={event.title}
@@ -1423,14 +1423,14 @@ export default function EventsPage() {
                     </div>
                   )}
 
-                  <div className="p-4">
+                  <div className="p-3">
                     <div className="flex gap-3">
                       {/* Date Badge */}
                       <DateBadge fullDate={event.fullDate} />
 
                       {/* Event Info */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-aurora-text text-[15px] leading-tight line-clamp-2 mb-1 group-hover:text-aurora-indigo transition-colors">
+                        <h3 className="font-semibold text-aurora-text text-sm leading-tight line-clamp-2 mb-1 group-hover:text-aurora-indigo transition-colors">
                           {event.title}
                         </h3>
                         <p className="text-xs text-aurora-text-secondary mb-0.5 flex items-center gap-1">
@@ -1456,7 +1456,7 @@ export default function EventsPage() {
                     </div>
 
                     {/* Footer: type badge, attendance, price, RSVP status */}
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-aurora-border/50">
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-aurora-border/50">
                       <div className="flex items-center gap-2">
                         <span
                           className="text-[10px] font-bold text-white px-2 py-0.5 rounded-md flex items-center gap-0.5"
