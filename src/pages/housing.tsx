@@ -18,7 +18,7 @@ import {
   Share2, Phone, Mail, Calendar, PawPrint, Car,
   Edit3, Trash2, Loader2, Video, ExternalLink,
   ChevronDown,
-  Camera, Upload, Eye, Clock, Shield, Sparkles, DollarSign,
+  Camera, Upload, Eye, Clock, Shield, Sparkles, DollarSign, Award,
   Maximize2, Tag, CheckCircle2, Map,
   Wind, Snowflake,
   UtensilsCrossed, Dumbbell, Waves, Package, TreePine,
@@ -767,6 +767,10 @@ export default function HousingPage() {
   }, [selectedListing, filteredListings]);
 
   /* counts */
+  const featuredListings = useMemo(() => {
+    return filteredListings.filter((l) => l.featured);
+  }, [filteredListings]);
+
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: listings.length };
     listings.forEach((l) => { counts[l.type] = (counts[l.type] || 0) + 1; });
@@ -1514,6 +1518,84 @@ export default function HousingPage() {
             </div>
           </div>
         )}
+        {/* Featured Carousel */}
+        {featuredListings.length > 0 && !searchQuery && activeListTab === 'all' && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-aurora-text flex items-center gap-2">
+                <Award className="w-5 h-5 text-amber-500" />
+                Featured Properties
+              </h2>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+              {featuredListings.map((listing) => {
+                const config = TYPE_CONFIG[listing.type] || TYPE_CONFIG.rent;
+                const isSaved = savedListings.has(listing.id);
+                const hasPhotos = listing.photos && listing.photos.length > 0;
+                return (
+                  <div
+                    key={listing.id}
+                    className="flex-shrink-0 w-80 rounded-2xl overflow-hidden cursor-pointer group
+                               shadow-sm hover:shadow-lg transition-all duration-200 border border-aurora-border"
+                    onClick={() => { setSelectedListing(listing); setIsEditing(false); setDetailTab('overview'); }}
+                  >
+                    {/* Image banner */}
+                    <div
+                      className="relative h-28 flex items-end p-4 overflow-hidden"
+                      style={{
+                        background: hasPhotos ? '#000' : `linear-gradient(135deg, ${config.color}, ${config.color}dd)`,
+                      }}
+                    >
+                      {hasPhotos ? (
+                        <img
+                          src={listing.photos![listing.coverPhotoIndex || 0]}
+                          alt={listing.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      ) : (
+                        <config.icon size={48} className="absolute right-4 bottom-4 text-white/20" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                      <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                        <span
+                          className="text-[10px] font-bold text-white px-2.5 py-1 rounded-full shadow-sm"
+                          style={{ backgroundColor: config.color }}
+                        >
+                          {config.label}
+                        </span>
+                        <span className="px-2.5 py-1 bg-amber-400 text-amber-900 text-[11px] font-bold rounded-lg flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> FEATURED
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleSave(listing.id, e); }}
+                        className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center
+                                   hover:bg-white transition-colors shadow-sm"
+                      >
+                        <Heart className={`w-4 h-4 ${isSaved ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
+                      </button>
+                      <div className="relative">
+                        <p className="text-white font-bold text-lg leading-tight">{listing.price}</p>
+                      </div>
+                    </div>
+                    <div className="bg-aurora-surface p-3">
+                      <h3 className="font-semibold text-[var(--aurora-text)] text-sm truncate">{listing.title}</h3>
+                      <div className="flex items-center gap-3 text-xs text-[var(--aurora-text-secondary)] mt-1.5">
+                        {listing.beds > 0 && <span className="flex items-center gap-1"><BedDouble size={12} /> {listing.beds} bd</span>}
+                        {listing.baths > 0 && <span className="flex items-center gap-1"><Bath size={12} /> {listing.baths} ba</span>}
+                        {listing.sqft > 0 && <span className="flex items-center gap-1"><Ruler size={12} /> {listing.sqft.toLocaleString()}</span>}
+                      </div>
+                      <p className="text-xs text-aurora-text-muted flex items-center gap-1 mt-1.5 truncate">
+                        <MapPin className="w-3 h-3 shrink-0" /> {listing.address || `${listing.locCity}, ${listing.locState}`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className={"grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}>
             {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
