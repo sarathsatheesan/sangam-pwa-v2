@@ -470,7 +470,7 @@ export default function HousingPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const priceDropRef = useRef<HTMLDivElement>(null);
-  const [activeListTab, setActiveListTab] = useState<'all' | 'saved' | 'recent'>('all');
+  const [activeListTab, setActiveListTab] = useState<'all' | 'saved'>('all');
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('recentHousing') || '[]'); }
     catch { return []; }
@@ -1469,11 +1469,11 @@ export default function HousingPage() {
             {/* Separator */}
             <div className="w-px h-5 bg-aurora-border shrink-0 mx-0.5" />
 
-            {/* All / Saved / Recents tabs inline */}
-            {(['all', 'saved', 'recent'] as const).map((tab) => {
+            {/* All / Saved tabs inline */}
+            {(['all', 'saved'] as const).map((tab) => {
               const isActive = activeListTab === tab;
-              const label = tab === 'all' ? 'All' : tab === 'saved' ? 'Saved' : 'Recents';
-              const count = tab === 'saved' ? savedListings.size : tab === 'recent' ? recentlyViewed.length : filteredListings.length;
+              const label = tab === 'all' ? 'All' : 'Saved';
+              const count = tab === 'saved' ? savedListings.size : filteredListings.length;
               return (
                 <button
                   key={tab}
@@ -1485,7 +1485,6 @@ export default function HousingPage() {
                   }`}
                 >
                   {tab === 'saved' && <Heart size={12} className={isActive ? 'fill-white' : ''} />}
-                  {tab === 'recent' && <Clock size={12} />}
                   {label}
                   <span className={`text-[10px] ${isActive ? 'text-white/80' : 'text-aurora-text-muted'}`}>{count}</span>
                 </button>
@@ -1603,8 +1602,6 @@ export default function HousingPage() {
         ) : (() => {
           const displayListings = activeListTab === 'saved'
             ? filteredListings.filter((l) => savedListings.has(l.id))
-            : activeListTab === 'recent'
-            ? filteredListings.filter((l) => recentlyViewed.includes(l.id))
             : filteredListings;
           return displayListings.length === 0 ? (
           <div className="text-center py-20">
@@ -1615,8 +1612,6 @@ export default function HousingPage() {
             <p className="text-[var(--aurora-text-muted)] mt-2 max-w-sm mx-auto text-sm">
               {activeListTab === 'saved'
                 ? 'You have not saved any listings yet. Browse properties and save your favorites!'
-                : activeListTab === 'recent'
-                ? 'No recently viewed listings. Start exploring properties!'
                 : searchQuery
                 ? `No results for "${searchQuery}". Try adjusting your search or filters.`
                 : 'Be the first to list a property!'}
