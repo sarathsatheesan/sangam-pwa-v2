@@ -12,7 +12,7 @@ import {
   ChevronLeft, Upload, Image as ImageIcon, Camera, Gem, Shirt, Flower2
 } from 'lucide-react';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
-import { ETHNICITY_HIERARCHY } from '../../constants/config';
+import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '../../constants/config';
 
 // ═════════════════════════════════════════════════════════════════════════════════
 // INTERFACES
@@ -419,6 +419,18 @@ export default function BusinessPage() {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
   const heritageRef = useRef<HTMLDivElement>(null);
+
+  // Pre-select user's heritage ethnicities on load
+  useEffect(() => {
+    if (!userProfile?.heritage) return;
+    const raw = Array.isArray(userProfile.heritage)
+      ? userProfile.heritage
+      : [userProfile.heritage];
+    const validSet = new Set(HERITAGE_OPTIONS);
+    const unique = [...new Set(raw.filter((h: string) => validSet.has(h)))];
+    if (unique.length > 0) setSelectedHeritage(unique);
+  }, [userProfile?.heritage]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [isEditing, setIsEditing] = useState(false);

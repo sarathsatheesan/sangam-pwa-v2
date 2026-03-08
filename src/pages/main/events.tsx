@@ -16,7 +16,7 @@ import {
   SlidersHorizontal, Globe
 } from 'lucide-react';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
-import { ETHNICITY_HIERARCHY } from '../../constants/config';
+import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '../../constants/config';
 
 interface TicketTier {
   id: string;
@@ -415,6 +415,18 @@ export default function EventsPage() {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
   const heritageRef = useRef<HTMLDivElement>(null);
+
+  // Pre-select user's heritage ethnicities on load
+  useEffect(() => {
+    if (!userProfile?.heritage) return;
+    const raw = Array.isArray(userProfile.heritage)
+      ? userProfile.heritage
+      : [userProfile.heritage];
+    const validSet = new Set(HERITAGE_OPTIONS);
+    const unique = [...new Set(raw.filter((h: string) => validSet.has(h)))];
+    if (unique.length > 0) setSelectedHeritage(unique);
+  }, [userProfile?.heritage]);
+
   const [createStep, setCreateStep] = useState(1);
   const [comments, setComments] = useState<EventComment[]>([]);
   const [newComment, setNewComment] = useState('');

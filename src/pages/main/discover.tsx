@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, limit, doc, getDoc, setDoc, deleteDoc, serverTimestamp, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { ETHNICITY_HIERARCHY } from '../../constants/config';
+import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '../../constants/config';
 import {
   Search, MapPin, Users, UserPlus, UserCheck, UserMinus,
   X, ChevronDown, MessageCircle, Sparkles,
@@ -160,6 +160,18 @@ export default function DiscoverPage() {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
   const heritageRef = useRef<HTMLDivElement>(null);
+
+  // Pre-select user's heritage ethnicities on load
+  useEffect(() => {
+    if (!userProfile?.heritage) return;
+    const raw = Array.isArray(userProfile.heritage)
+      ? userProfile.heritage
+      : [userProfile.heritage];
+    const validSet = new Set(HERITAGE_OPTIONS);
+    const unique = [...new Set(raw.filter((h: string) => validSet.has(h)))];
+    if (unique.length > 0) setSelectedHeritage(unique);
+  }, [userProfile?.heritage]);
+
   const [connections, setConnections] = useState<Map<string, 'pending' | 'connected'>>(new Map());
   const [connectionDetails, setConnectionDetails] = useState<Map<string, ConnectionDetail>>(new Map());
   const [connectingId, setConnectingId] = useState<string | null>(null);
