@@ -290,26 +290,6 @@ export default function TravelPage() {
 
               {heritageDropdownOpen && (
                 <div className="absolute top-full right-0 mt-1.5 w-72 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
-                  {/* Select All / Deselect All */}
-                  <div className="sticky top-0 z-10 bg-aurora-surface border-b border-aurora-border px-4 py-2">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedHeritage.length === HERITAGE_OPTIONS.length}
-                        onChange={() => {
-                          if (selectedHeritage.length === HERITAGE_OPTIONS.length) {
-                            setSelectedHeritage([]);
-                          } else {
-                            setSelectedHeritage([...HERITAGE_OPTIONS]);
-                          }
-                        }}
-                        className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
-                      />
-                      <span className="text-xs font-bold text-aurora-text">
-                        {selectedHeritage.length === HERITAGE_OPTIONS.length ? 'Deselect All' : 'Select All'}
-                      </span>
-                    </label>
-                  </div>
                   {(() => {
                     const userHeritage = Array.isArray(userProfile?.heritage)
                       ? userProfile.heritage
