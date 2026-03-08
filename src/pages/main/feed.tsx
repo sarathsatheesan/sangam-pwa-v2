@@ -1050,7 +1050,7 @@ export default function FeedPage() {
     <div className="bg-aurora-bg">
 
       {/* ─── Search & Ethnicity Filter ─── */}
-      <div className="relative bg-gradient-to-br from-indigo-600/15 via-aurora-surface to-emerald-600/12 border-b border-aurora-border z-10">
+      <div className="relative bg-gradient-to-br from-indigo-600/25 via-indigo-100/40 to-emerald-600/20 border-b border-aurora-border z-10">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           <div className="flex items-center gap-2">
             {/* Search */}
