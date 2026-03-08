@@ -1050,8 +1050,8 @@ export default function FeedPage() {
     <div className="bg-aurora-bg">
 
       {/* ─── Search & Ethnicity Filter ─── */}
-      <div className="sticky top-0 bg-aurora-surface/90 backdrop-blur-md border-b border-aurora-border z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3">
+      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-10">
+        <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           <div className="flex items-center gap-2">
             {/* Search */}
             <div className="relative flex-1">
@@ -1152,25 +1152,27 @@ export default function FeedPage() {
       </div>
 
       {/* ─── Sort Mode Tabs ─── */}
-      <div className="max-w-2xl mx-auto px-4 pt-3 pb-2">
-        <div className="flex gap-2">
-          {(['recent', 'popular', 'trending'] as const).map((mode) => {
-            const icon = mode === 'recent' ? '🕐' : mode === 'popular' ? '🔥' : '⭐';
-            const label = mode.charAt(0).toUpperCase() + mode.slice(1);
-            return (
-              <button
-                key={mode}
-                onClick={() => setSortMode(mode)}
-                className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-all duration-200 ${
-                  sortMode === mode
-                    ? 'aurora-gradient text-white shadow-aurora-glow'
-                    : 'bg-aurora-surface-variant text-aurora-text-secondary hover:text-aurora-text border border-aurora-border'
-                }`}
-              >
-                {icon} {label}
-              </button>
-            );
-          })}
+      <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+        <div className="max-w-6xl mx-auto px-4 py-2.5">
+          <div className="flex items-center gap-1.5">
+            {(['recent', 'popular', 'trending'] as const).map((mode) => {
+              const icon = mode === 'recent' ? '🕐' : mode === 'popular' ? '🔥' : '⭐';
+              const label = mode.charAt(0).toUpperCase() + mode.slice(1);
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setSortMode(mode)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap shrink-0 ${
+                    sortMode === mode
+                      ? 'aurora-gradient text-white shadow-aurora-glow'
+                      : 'bg-aurora-surface border border-aurora-border text-aurora-text-secondary hover:text-aurora-text hover:border-aurora-text-muted/30'
+                  }`}
+                >
+                  {icon} {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
