@@ -8,7 +8,7 @@ import {
   X, Plus, Heart, Sparkles, Store, ShoppingBag, Filter, ArrowLeft,
   ExternalLink, Trash2, Edit3, Loader2, Award, TrendingUp, Utensils,
   Scissors, BookOpen, Laptop, Scale, Stethoscope, Plane, Palette,
-  DollarSign, Users, Briefcase, Home, SlidersHorizontal, ChevronDown,
+  DollarSign, Users, Briefcase, Home, ChevronDown,
   ChevronLeft, Upload, Image as ImageIcon, Camera
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
@@ -398,7 +398,9 @@ export default function BusinessPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showTinVerificationModal, setShowTinVerificationModal] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
+  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
+  const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
+  const heritageRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -406,7 +408,6 @@ export default function BusinessPage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'about' | 'services' | 'reviews'>('about');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [showFilters, setShowFilters] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [activeCollection, setActiveCollection] = useState<'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites'>('all');
   const merchantView = false; // My Businesses moved to Profile page
@@ -526,6 +527,17 @@ export default function BusinessPage() {
     }
   }, [selectedBusiness?.id]);
 
+  // Close heritage dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
+        setHeritageDropdownOpen(false);
+      }
+    };
+    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [heritageDropdownOpen]);
+
   // Auto-dismiss toast
   useEffect(() => {
     if (toastMessage) {
@@ -571,10 +583,10 @@ export default function BusinessPage() {
     if (selectedCategory !== 'All') {
       filtered = filtered.filter((b) => b.category === selectedCategory);
     }
-    if (selectedHeritage !== 'All') {
+    if (selectedHeritage.length > 0) {
       filtered = filtered.filter((b) => {
-        if (Array.isArray(b.heritage)) return b.heritage.includes(selectedHeritage);
-        return b.heritage === selectedHeritage;
+        if (Array.isArray(b.heritage)) return b.heritage.some((h: string) => selectedHeritage.includes(h));
+        return b.heritage ? selectedHeritage.includes(b.heritage) : false;
       });
     }
     if (searchQuery.trim()) {
@@ -611,10 +623,10 @@ export default function BusinessPage() {
     if (selectedCategory !== 'All') {
       featured = featured.filter((b) => b.category === selectedCategory);
     }
-    if (selectedHeritage !== 'All') {
+    if (selectedHeritage.length > 0) {
       featured = featured.filter((b) => {
-        if (Array.isArray(b.heritage)) return b.heritage.includes(selectedHeritage);
-        return b.heritage === selectedHeritage;
+        if (Array.isArray(b.heritage)) return b.heritage.some((h: string) => selectedHeritage.includes(h));
+        return b.heritage ? selectedHeritage.includes(b.heritage) : false;
       });
     }
     return featured;
@@ -874,21 +886,78 @@ export default function BusinessPage() {
                              focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all
                              ${searchFocused ? 'border-aurora-indigo shadow-md' : 'border-aurora-border'}`}
                 />
-                {searchQuery ? (
+                {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text"
                   >
                     <X className="w-4 h-4" />
                   </button>
-                ) : (
-                  <button
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors
-                      ${showFilters ? 'bg-aurora-indigo/10 text-aurora-indigo' : 'text-aurora-text-muted hover:bg-aurora-surface-variant'}`}
-                  >
-                    <SlidersHorizontal className="w-4 h-4" />
-                  </button>
+                )}
+              </div>
+
+              {/* Ethnicity Dropdown - Multi-select with checkboxes */}
+              <div className="relative shrink-0" ref={heritageRef}>
+                <button
+                  onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
+                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
+                    selectedHeritage.length > 0
+                      ? 'bg-amber-50 border-amber-300 text-amber-800'
+                      : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted'
+                  }`}
+                >
+                  <Globe className="w-4 h-4" />
+                  <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `Ethnicity (${selectedHeritage.length})` : 'Ethnicity'}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {heritageDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-1.5 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-2 max-h-72 overflow-y-auto">
+                    {(() => {
+                      const userHeritage = Array.isArray(userProfile?.heritage)
+                        ? userProfile.heritage
+                        : userProfile?.heritage ? [userProfile.heritage] : [];
+                      const preferred = HERITAGE_OPTIONS.filter((h: string) => userHeritage.includes(h));
+                      const rest = HERITAGE_OPTIONS.filter((h: string) => !userHeritage.includes(h));
+                      const sorted = [...preferred, ...rest];
+                      return sorted.map((h: string) => {
+                        const isPreferred = userHeritage.includes(h);
+                        return (
+                          <label
+                            key={h}
+                            className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 transition-colors ${
+                              isPreferred ? 'bg-amber-50/50' : ''
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedHeritage.includes(h)}
+                              onChange={() => {
+                                setSelectedHeritage((prev) =>
+                                  prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h]
+                                );
+                              }}
+                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
+                            />
+                            <span className="text-sm text-gray-700">{h}</span>
+                            {isPreferred && (
+                              <span className="ml-auto text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Preferred</span>
+                            )}
+                          </label>
+                        );
+                      });
+                    })()}
+                    {selectedHeritage.length > 0 && (
+                      <div className="border-t border-gray-200 mt-1 pt-1 px-4 py-1.5">
+                        <button
+                          onClick={() => setSelectedHeritage([])}
+                          className="text-xs text-blue-600 font-medium hover:text-blue-500"
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -938,29 +1007,6 @@ export default function BusinessPage() {
               </div>
             </div>
 
-            {/* Heritage Filter */}
-            {showFilters && (
-              <div className="border-t border-aurora-border bg-aurora-surface">
-                <div className="max-w-6xl mx-auto px-4 py-3">
-                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-                    <span className="text-xs font-medium text-aurora-text-muted uppercase tracking-wide flex-shrink-0">Heritage</span>
-                    {['All', ...HERITAGE_OPTIONS].map((heritage) => (
-                      <button
-                        key={heritage}
-                        onClick={() => setSelectedHeritage(heritage)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all ${
-                          selectedHeritage === heritage
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-aurora-surface-variant text-aurora-text-secondary hover:text-aurora-text'
-                        }`}
-                      >
-                        {heritage}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Smart Discovery Collections */}
             <div className="border-t border-aurora-border bg-aurora-surface">
@@ -1005,13 +1051,13 @@ export default function BusinessPage() {
                     <span className="font-semibold text-aurora-text">{filteredBusinesses.length}</span>
                     {' '}business{filteredBusinesses.length !== 1 ? 'es' : ''}
                     {selectedCategory !== 'All' && <> in <span className="font-medium text-aurora-text">{selectedCategory}</span></>}
-                    {selectedHeritage !== 'All' && <> · {selectedHeritage}</>}
+                    {selectedHeritage.length > 0 && <> · {selectedHeritage.join(', ')}</>}
                   </>
                 )}
               </p>
-              {(selectedCategory !== 'All' || selectedHeritage !== 'All' || searchQuery || activeCollection !== 'all') && (
+              {(selectedCategory !== 'All' || selectedHeritage.length > 0 || searchQuery || activeCollection !== 'all') && (
                 <button
-                  onClick={() => { setSelectedCategory('All'); setSelectedHeritage('All'); setSearchQuery(''); setActiveCollection('all'); }}
+                  onClick={() => { setSelectedCategory('All'); setSelectedHeritage([]); setSearchQuery(''); setActiveCollection('all'); }}
                   className="text-xs text-aurora-indigo font-medium flex items-center gap-1 hover:text-aurora-indigo/80"
                 >
                   <X className="w-3 h-3" /> Clear filters
@@ -1105,8 +1151,8 @@ export default function BusinessPage() {
                 <p className="text-sm text-aurora-text-secondary max-w-xs">
                   {searchQuery
                     ? `No results for "${searchQuery}". Try a different search.`
-                    : selectedHeritage !== 'All'
-                    ? `No businesses under "${selectedHeritage}" heritage yet.`
+                    : selectedHeritage.length > 0
+                    ? `No businesses under "${selectedHeritage.join(', ')}" heritage yet.`
                     : selectedCategory !== 'All'
                     ? `No businesses in "${selectedCategory}" yet.`
                     : 'No businesses listed yet. Be the first!'}
