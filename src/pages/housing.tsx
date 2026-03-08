@@ -17,7 +17,7 @@ import {
   Building2, Users, Key, Plus, ChevronLeft, ChevronRight,
   Share2, Phone, Mail, Calendar, PawPrint, Car,
   Edit3, Trash2, Loader2, Video, ExternalLink,
-  SlidersHorizontal, Grid3X3, List,
+  ChevronDown,
   Camera, Upload, Eye, Clock, Shield, Sparkles, DollarSign,
   Maximize2, Tag, CheckCircle2, Map,
   Wind, Snowflake,
@@ -86,7 +86,6 @@ interface Comment {
 }
 
 type FilterType = 'all' | 'rent' | 'sale' | 'roommate' | 'sublet';
-type ViewMode = 'grid' | 'list';
 type SortOption = 'newest' | 'price-low' | 'price-high' | 'largest' | 'popular';
 
 /* ─── constants ─── */
@@ -455,9 +454,10 @@ export default function HousingPage() {
   /* state */
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<FilterType>('all');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedHeritage, setSelectedHeritage] = useState<string>('All');
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const myProperties = false; // My Properties moved to Profile page
@@ -466,9 +466,7 @@ export default function HousingPage() {
   const [saving, setSaving] = useState(false);
   const [priceRange, setPriceRange] = useState<[string, string]>(['', '']);
   const [bedsFilter, setBedsFilter] = useState('any');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
-  const [showFilters, setShowFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activeListTab, setActiveListTab] = useState<'all' | 'saved' | 'recent'>('all');
   const [recentlyViewed, setRecentlyViewed] = useState<string[]>(() => {
@@ -531,6 +529,17 @@ export default function HousingPage() {
 
   const inputCls = "w-full px-3.5 py-2.5 border border-[var(--aurora-border)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-aurora-indigo bg-[var(--aurora-surface)] text-[var(--aurora-text)] placeholder-[var(--aurora-text-muted)]";
   const viewedListingsRef = useRef<Set<string>>(new Set());
+
+  /* close type dropdown on click outside */
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(event.target as Node)) {
+        setTypeDropdownOpen(false);
+      }
+    };
+    if (typeDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [typeDropdownOpen]);
 
   /* toast auto-dismiss */
   useEffect(() => {
@@ -712,18 +721,13 @@ export default function HousingPage() {
       if (myProperties && user?.uid) {
         if (l.posterId !== user.uid) return false;
       }
-      if (filterType !== 'all' && l.type !== filterType) return false;
+      if (selectedTypes.length > 0 && !selectedTypes.includes(l.type)) return false;
       if (searchQuery.trim()) {
         const match = fuzzyMatch(l.title, searchQuery) ||
           fuzzyMatch(l.address, searchQuery) ||
           fuzzyMatch(l.locCity, searchQuery) ||
           fuzzyMatch(l.desc, searchQuery);
         if (!match) return false;
-      }
-      if (selectedHeritage !== 'All') {
-        if (Array.isArray(l.heritage)) {
-          if (!l.heritage.includes(selectedHeritage)) return false;
-        } else if (l.heritage !== selectedHeritage) return false;
       }
       if (bedsFilter !== 'any') {
         if (l.beds < parseInt(bedsFilter)) return false;
@@ -749,7 +753,7 @@ export default function HousingPage() {
     });
 
     return result;
-  }, [listings, filterType, searchQuery, selectedHeritage, bedsFilter, priceRange, sortBy, statusFilter, myProperties, user?.uid]);
+  }, [listings, selectedTypes, searchQuery, bedsFilter, priceRange, sortBy, statusFilter, myProperties, user?.uid]);
 
   const similarListings = useMemo(() => {
     if (!selectedListing) return [];
@@ -1261,84 +1265,115 @@ export default function HousingPage() {
   return (
     <div className="bg-[var(--aurora-bg)]">
 
-      {/* ===== Hero Header ===== */}
-      <div className="relative bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-64 h-64 bg-white rounded-full translate-x-1/3 translate-y-1/3" />
-        </div>
-        <div className="relative max-w-6xl mx-auto px-4 pt-4 pb-4">
-          {/* Search bar */}
-          <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by address, city, neighborhood..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-10 py-3 rounded-2xl bg-white/95 backdrop-blur-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/50 shadow-xl text-sm"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                <X size={18} />
-              </button>
-            )}
-          </div>
-
-          {/* Quick stats */}
-          <div className="flex gap-4 mt-4 overflow-x-auto pb-1">
-            {(['all', 'rent', 'sale', 'roommate', 'sublet'] as FilterType[]).map((type) => {
-              const config = type !== 'all' ? TYPE_CONFIG[type] : null;
-              const Icon = config?.icon || Home;
-              const isActive = filterType === type;
-              return (
-                <button
-                  key={type}
-                  onClick={() => setFilterType(type)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
-                    isActive
-                      ? 'bg-white text-indigo-700 shadow-lg'
-                      : 'bg-white/15 text-white/90 hover:bg-white/25'
-                  }`}
-                >
-                  <Icon size={16} />
-                  {type === 'all' ? 'All' : TYPE_LABELS[type]}
-                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                    isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-white/20 text-white'
-                  }`}>
-                    {typeCounts[type] || 0}
-                  </span>
+      {/* ===== Search Header ===== */}
+      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
+        <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
+          {/* Search bar + Listing Type dropdown */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
+              <input
+                type="text"
+                placeholder="Search by address, city, neighborhood..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-10 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text">
+                  <X className="w-4 h-4" />
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            {/* Listing Type Dropdown - Multi-select with checkboxes */}
+            <div className="relative shrink-0" ref={typeDropdownRef}>
+              <button
+                onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
+                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
+                  selectedTypes.length > 0
+                    ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
+                    : 'bg-aurora-surface border-aurora-border text-aurora-text-secondary hover:border-aurora-text-muted'
+                }`}
+              >
+                <Home className="w-4 h-4" />
+                <span className="hidden sm:inline">{selectedTypes.length > 0 ? `Type (${selectedTypes.length})` : 'Type'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${typeDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {typeDropdownOpen && (
+                <div className="absolute top-full right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-30 py-2">
+                  {(['rent', 'sale', 'roommate', 'sublet'] as const).map((type) => {
+                    const config = TYPE_CONFIG[type];
+                    const Icon = config.icon;
+                    return (
+                      <label
+                        key={type}
+                        className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedTypes.includes(type)}
+                          onChange={() => {
+                            setSelectedTypes((prev) =>
+                              prev.includes(type) ? prev.filter((x) => x !== type) : [...prev, type]
+                            );
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-400"
+                        />
+                        <Icon className="w-4 h-4" style={{ color: config.color }} />
+                        <span className="text-sm text-gray-700 flex-1">{config.label}</span>
+                        <span className="text-xs text-gray-400">{typeCounts[type] || 0}</span>
+                      </label>
+                    );
+                  })}
+                  {selectedTypes.length > 0 && (
+                    <div className="border-t border-gray-200 mt-1 pt-1 px-4 py-1.5">
+                      <button
+                        onClick={() => setSelectedTypes([])}
+                        className="text-xs text-indigo-600 font-medium hover:text-indigo-500"
+                      >
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* ===== Filter Bar ===== */}
-      <div className="bg-[var(--aurora-surface)] border-b border-[var(--aurora-border)] sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 overflow-x-auto min-w-0 scrollbar-hide">
-            {/* Heritage chips */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all border ${
-                showFilters
-                  ? 'border-aurora-indigo bg-aurora-indigo/10 text-aurora-indigo'
-                  : 'border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface-variant)]'
-              }`}
-            >
-              <SlidersHorizontal size={14} /> Filters
-              {(bedsFilter !== 'any' || priceRange[0] || priceRange[1] || selectedHeritage !== 'All') && (
-                <span className="w-2 h-2 rounded-full bg-aurora-indigo" />
-              )}
-            </button>
+      <div className="bg-aurora-surface border-b border-aurora-border sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          {/* Filter row: Price range + Beds + Sort + Status + results count */}
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            {/* Price range */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <DollarSign className="w-3.5 h-3.5 text-aurora-text-muted" />
+              <input
+                type="number"
+                placeholder="Min"
+                value={priceRange[0]}
+                onChange={(e) => setPriceRange([e.target.value, priceRange[1]])}
+                className="w-20 px-2.5 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
+              />
+              <span className="text-aurora-text-muted text-xs">–</span>
+              <input
+                type="number"
+                placeholder="Max"
+                value={priceRange[1]}
+                onChange={(e) => setPriceRange([priceRange[0], e.target.value])}
+                className="w-20 px-2.5 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
+              />
+            </div>
 
-            {/* Beds quick filter */}
+            {/* Beds */}
             <select
               value={bedsFilter}
               onChange={(e) => setBedsFilter(e.target.value)}
-              className="px-3 py-2 border border-[var(--aurora-border)] rounded-xl text-sm bg-[var(--aurora-surface)] text-[var(--aurora-text)] focus:outline-none focus:ring-1 focus:ring-aurora-indigo"
+              className="px-3 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
             >
               <option value="any">Any beds</option>
               <option value="1">1+ bed</option>
@@ -1351,7 +1386,7 @@ export default function HousingPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-3 py-2 border border-[var(--aurora-border)] rounded-xl text-sm bg-[var(--aurora-surface)] text-[var(--aurora-text)] focus:outline-none focus:ring-1 focus:ring-aurora-indigo"
+              className="px-3 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
             >
               <option value="newest">Newest</option>
               <option value="price-low">Price: Low → High</option>
@@ -1360,11 +1395,11 @@ export default function HousingPage() {
               <option value="popular">Most Popular</option>
             </select>
 
-            {/* Status filter */}
+            {/* Status */}
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-[var(--aurora-border)] rounded-xl text-sm bg-[var(--aurora-surface)] text-[var(--aurora-text)] focus:outline-none focus:ring-1 focus:ring-aurora-indigo"
+              className="px-3 py-2 border border-aurora-border rounded-full text-sm bg-aurora-surface text-aurora-text focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -1373,27 +1408,13 @@ export default function HousingPage() {
               <option value="sold">Sold</option>
               <option value="rented">Rented</option>
             </select>
-          </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-[var(--aurora-text-muted)] mr-1 hidden sm:inline">{filteredListings.length} results</span>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-aurora-indigo text-white' : 'text-[var(--aurora-text-muted)] hover:bg-[var(--aurora-surface-variant)]'}`}
-            >
-              <Grid3X3 size={16} />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-aurora-indigo text-white' : 'text-[var(--aurora-text-muted)] hover:bg-[var(--aurora-surface-variant)]'}`}
-            >
-              <List size={16} />
-            </button>
+            <span className="text-xs text-aurora-text-muted whitespace-nowrap ml-auto shrink-0">{filteredListings.length} results</span>
           </div>
         </div>
 
         {/* Tab bar for All/Saved/Recent */}
-        <div className="flex items-center gap-1 max-w-6xl mx-auto px-4 py-2 border-b border-[var(--aurora-border)] flex-wrap">
+        <div className="flex items-center gap-1 max-w-6xl mx-auto px-4 py-2 border-t border-aurora-border flex-wrap">
           {(['all', 'saved', 'recent'] as const).map((tab) => {
             const isActive = activeListTab === tab;
             const TabIcon = tab === 'saved' ? Heart : tab === 'recent' ? Clock : Eye;
@@ -1405,58 +1426,16 @@ export default function HousingPage() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-aurora-indigo text-white'
-                    : 'text-[var(--aurora-text-muted)] hover:bg-[var(--aurora-surface-variant)]'
+                    : 'text-aurora-text-muted hover:bg-aurora-surface-variant'
                 }`}
               >
                 <TabIcon size={14} />
                 {tab === 'all' ? 'All Listings' : tab === 'saved' ? 'My Saved' : 'Recently Viewed'}
-                <span className={`text-xs font-bold ml-0.5 ${isActive ? '' : 'text-[var(--aurora-text)]'}`}>({count})</span>
+                <span className={`text-xs font-bold ml-0.5 ${isActive ? '' : 'text-aurora-text'}`}>({count})</span>
               </button>
             );
           })}
         </div>
-
-        {/* Expanded filters */}
-        {showFilters && (
-          <div className="max-w-6xl mx-auto px-4 pb-4 space-y-3 border-t border-[var(--aurora-border)] pt-3">
-            {/* Price range */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-[var(--aurora-text-muted)] w-14">Price:</span>
-              <input
-                type="number"
-                placeholder="Min"
-                value={priceRange[0]}
-                onChange={(e) => setPriceRange([e.target.value, priceRange[1]])}
-                className="w-16 sm:w-24 px-3 py-1.5 border border-[var(--aurora-border)] rounded-lg text-sm bg-[var(--aurora-surface)] focus:outline-none focus:ring-1 focus:ring-aurora-indigo"
-              />
-              <span className="text-[var(--aurora-text-muted)]">—</span>
-              <input
-                type="number"
-                placeholder="Max"
-                value={priceRange[1]}
-                onChange={(e) => setPriceRange([priceRange[0], e.target.value])}
-                className="w-16 sm:w-24 px-3 py-1.5 border border-[var(--aurora-border)] rounded-lg text-sm bg-[var(--aurora-surface)] focus:outline-none focus:ring-1 focus:ring-aurora-indigo"
-              />
-            </div>
-            {/* Heritage */}
-            <div className="flex items-center gap-2 overflow-x-auto">
-              <span className="text-xs font-medium text-[var(--aurora-text-muted)] w-14 flex-shrink-0">Heritage:</span>
-              {['All', ...HERITAGE_OPTIONS].map((h) => (
-                <button
-                  key={h}
-                  onClick={() => setSelectedHeritage(h)}
-                  className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-medium transition-colors ${
-                    selectedHeritage === h
-                      ? 'bg-amber-500 text-white'
-                      : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-border)]'
-                  }`}
-                >
-                  {h}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ===== Listings ===== */}
@@ -1480,7 +1459,7 @@ export default function HousingPage() {
           </div>
         )}
         {loading ? (
-          <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+          <div className={"grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}>
             {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
           </div>
         ) : (() => {
@@ -1502,96 +1481,21 @@ export default function HousingPage() {
                 ? 'No recently viewed listings. Start exploring properties!'
                 : searchQuery
                 ? `No results for "${searchQuery}". Try adjusting your search or filters.`
-                : selectedHeritage !== 'All'
-                ? `No listings found for the ${selectedHeritage} community. Try another heritage filter.`
                 : 'Be the first to list a property!'}
             </p>
             <button
-              onClick={() => { setSearchQuery(''); setFilterType('all'); setBedsFilter('any'); setPriceRange(['', '']); setSelectedHeritage('All'); }}
+              onClick={() => { setSearchQuery(''); setSelectedTypes([]); setBedsFilter('any'); setPriceRange(['', '']); setStatusFilter('all'); }}
               className="mt-3 text-sm text-aurora-indigo font-medium hover:underline"
             >
               Clear all filters
             </button>
           </div>
           ) : (
-            <div className={`grid gap-4 ${viewMode === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+            <div className={"grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}>
               {displayListings.map((listing) => {
               const config = TYPE_CONFIG[listing.type] || TYPE_CONFIG.rent;
               const isSaved = savedListings.has(listing.id);
               const hasPhotos = listing.photos && listing.photos.length > 0;
-
-              if (viewMode === 'list') {
-                /* ─── List Card ─── */
-                return (
-                  <div
-                    key={listing.id}
-                    onClick={() => { setSelectedListing(listing); setIsEditing(false); setDetailTab('overview'); }}
-                    className="flex flex-col sm:flex-row bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] overflow-hidden cursor-pointer hover:shadow-lg transition-all group"
-                  >
-                    {/* Image */}
-                    <div className="w-36 sm:w-56 lg:w-72 flex-shrink-0 relative">
-                      {hasPhotos ? (
-                        <img src={listing.photos![listing.coverPhotoIndex || 0]} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className={`w-full h-full bg-gradient-to-br ${config.gradient} flex items-center justify-center min-h-[160px]`}>
-                          <config.icon size={36} className="text-white/30" />
-                        </div>
-                      )}
-                      <button
-                        onClick={(e) => toggleSave(listing.id, e)}
-                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/80 hover:bg-white flex items-center justify-center transition-all shadow-sm"
-                        aria-label={isSaved ? 'Remove from saved' : 'Save listing'}
-                      >
-                        <Heart size={16} className={isSaved ? 'fill-red-500 text-red-500' : 'text-gray-600'} />
-                      </button>
-                      {listing.featured && (
-                        <span className="absolute top-2 left-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <Sparkles size={10} /> FEATURED
-                        </span>
-                      )}
-                      <span
-                        className="absolute bottom-2 left-2 text-[10px] font-bold text-white px-2 py-0.5 rounded-full"
-                        style={{ backgroundColor: config.color }}
-                      >
-                        {config.label}
-                      </span>
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-xl font-bold text-aurora-indigo">{listing.price}</p>
-                          {listing.createdAt && (
-                            <span className="text-[10px] text-[var(--aurora-text-muted)] whitespace-nowrap flex items-center gap-1">
-                              <Clock size={10} /> {getTimeAgo(listing.createdAt)}
-                            </span>
-                          )}
-                        </div>
-                        <h3 className="font-semibold text-[var(--aurora-text)] mt-1 truncate">{listing.title}</h3>
-                        <p className="text-sm text-[var(--aurora-text-muted)] mt-0.5 truncate flex items-center gap-1">
-                          <MapPin size={12} /> {listing.locCity || listing.address}{listing.locState ? `, ${listing.locState}` : ''}
-                        </p>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-4 text-sm text-[var(--aurora-text-secondary)] mt-2">
-                          <span className="flex items-center gap-1"><BedDouble size={14} /> {listing.beds} bd</span>
-                          <span className="flex items-center gap-1"><Bath size={14} /> {listing.baths} ba</span>
-                          {listing.sqft > 0 && <span className="flex items-center gap-1"><Ruler size={14} /> {listing.sqft.toLocaleString()} sqft</span>}
-                        </div>
-                        {listing.tags && listing.tags.length > 0 && (
-                          <div className="flex gap-1 mt-2 flex-wrap">
-                            {listing.tags.slice(0, 4).map((tag) => (
-                              <span key={tag} className="text-[10px] bg-aurora-indigo/10 text-aurora-indigo px-2 py-0.5 rounded-full font-medium">{tag}</span>
-                            ))}
-                            {listing.tags.length > 4 && <span className="text-[10px] text-[var(--aurora-text-muted)]">+{listing.tags.length - 4}</span>}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
 
               /* ─── Grid Card ─── */
               return (
