@@ -446,9 +446,9 @@ const MarketplaceCard: React.FC<{
 
   const cardContent = (
     <>
-      <div className="relative bg-gradient-to-br from-gray-300 to-gray-400 rounded-lg overflow-hidden h-48">
+      <div className="relative h-36 overflow-hidden">
         {coverPhoto ? (
-          <img src={coverPhoto} alt={item.title} className="w-full h-full object-cover" />
+          <img src={coverPhoto} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${categoryGradient} flex items-center justify-center`}>
             {CATEGORY_ICONS[item.category] && (
@@ -461,104 +461,67 @@ const MarketplaceCard: React.FC<{
             <span className="text-white font-bold text-lg">SOLD</span>
           </div>
         )}
-        {item.featured && (
-          <div className="absolute top-2 right-2 bg-yellow-400 text-gray-900 px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-            <Star className="w-3 h-3 fill-current" /> Featured
-          </div>
-        )}
-        <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-semibold">
-          {CONDITION_LABELS[item.condition] || item.condition}
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">
+          <span className="bg-black/70 text-white px-2 py-0.5 rounded-md text-[10px] font-semibold w-fit">
+            {CONDITION_LABELS[item.condition] || item.condition}
+          </span>
+          {item.featured && (
+            <span className="bg-amber-400 text-amber-900 px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-0.5 w-fit">
+              <Star className="w-2.5 h-2.5 fill-current" /> FEATURED
+            </span>
+          )}
         </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onSaveToggle(item.id);
+          }}
+          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-sm"
+        >
+          <Heart className={`w-4 h-4 ${isSaved ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
+        </button>
+        {item.createdAt && (
+          <span className="absolute bottom-2 left-2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+            <Clock className="w-2.5 h-2.5" /> {timeAgo(item.createdAt)}
+          </span>
+        )}
       </div>
 
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <div className="text-xl font-bold text-aurora-indigo">{formatPrice(item.price)}</div>
-          {item.negotiable && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Negotiable</span>}
+      <div className="p-3">
+        <div className="flex justify-between items-start mb-1">
+          <div className="text-base font-bold text-aurora-indigo">{formatPrice(item.price)}</div>
+          {item.negotiable && <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">OBO</span>}
         </div>
 
-        <h3 className="font-semibold text-[var(--aurora-text)] line-clamp-2 mb-1">{item.title}</h3>
+        <h3 className="font-semibold text-[var(--aurora-text)] text-sm line-clamp-1">{item.title}</h3>
 
-        {item.brand && <p className="text-xs text-[var(--aurora-text-muted)] mb-1">{item.brand}</p>}
+        {item.brand && <p className="text-[11px] text-[var(--aurora-text-muted)]">{item.brand}</p>}
 
-        <div className="flex items-center gap-1 text-xs text-[var(--aurora-text-muted)] mb-3">
-          <MapPin className="w-3 h-3" />
-          <span>{item.locCity}, {item.locState}</span>
-        </div>
+        <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1 mt-1.5 truncate">
+          <MapPin className="w-3 h-3 shrink-0" /> {item.locCity}, {item.locState}
+        </p>
 
-        <div className="flex items-center gap-1 text-xs text-[var(--aurora-text-muted)] mb-3">
-          <Clock className="w-3 h-3" />
-          <span>{timeAgo(item.createdAt)}</span>
-        </div>
-
-        <div className="flex justify-between items-center pt-3 border-t border-[var(--aurora-border)]">
-          <div className="flex gap-3 text-sm">
-            <div className="flex items-center gap-1 text-[var(--aurora-text-muted)]">
-              <Eye className="w-4 h-4" />
-              <span>{item.viewCount || 0}</span>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSaveToggle(item.id);
-              }}
-              className="flex items-center gap-1 text-[var(--aurora-text-muted)] hover:text-red-500 transition-colors"
-            >
-              <Heart className={`w-4 h-4 ${isSaved ? 'fill-red-500 text-red-500' : ''}`} />
-              <span>{item.saveCount || 0}</span>
-            </button>
+        <div className="flex justify-between items-center mt-2 pt-2 border-t border-[var(--aurora-border)]">
+          <div className="flex gap-2.5 text-xs">
+            <span className="flex items-center gap-1 text-[var(--aurora-text-muted)]">
+              <Eye className="w-3.5 h-3.5" /> {item.viewCount || 0}
+            </span>
+            <span className="flex items-center gap-1 text-[var(--aurora-text-muted)]">
+              <Heart className={`w-3.5 h-3.5 ${isSaved ? 'fill-red-500 text-red-500' : ''}`} /> {item.saveCount || 0}
+            </span>
           </div>
-          <button className="text-[var(--aurora-text-muted)] hover:text-aurora-indigo transition-colors">
-            <Share2 className="w-4 h-4" />
+          <button onClick={(e) => e.stopPropagation()} className="text-[var(--aurora-text-muted)] hover:text-aurora-indigo transition-colors">
+            <Share2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
     </>
   );
 
-  if (isListView) {
-    return (
-      <div
-        onClick={() => onViewDetails(item)}
-        className="bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex gap-4 p-4"
-      >
-        <div className="w-32 h-32 flex-shrink-0">
-          {coverPhoto ? (
-            <img src={coverPhoto} alt={item.title} className="w-full h-full object-cover rounded" />
-          ) : (
-            <div className={`w-full h-full bg-gradient-to-br ${CATEGORY_COLORS[item.category]} rounded flex items-center justify-center`}>
-              {CATEGORY_ICONS[item.category]}
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <h3 className="font-semibold text-[var(--aurora-text)] line-clamp-1">{item.title}</h3>
-              <p className="text-sm text-[var(--aurora-text-muted)]">{item.brand || item.category}</p>
-            </div>
-            <div className="text-lg font-bold text-aurora-indigo">{formatPrice(item.price)}</div>
-          </div>
-          <p className="text-sm text-[var(--aurora-text)] line-clamp-2 mb-2">{item.description}</p>
-          <div className="flex items-center gap-4 text-xs text-[var(--aurora-text-muted)]">
-            <div className="flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              {item.locCity}, {item.locState}
-            </div>
-            <div className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {timeAgo(item.createdAt)}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       onClick={() => onViewDetails(item)}
-      className="bg-[var(--aurora-surface)] rounded-lg overflow-hidden border border-[var(--aurora-border)] hover:shadow-lg transition-shadow cursor-pointer"
+      className="group bg-aurora-surface rounded-2xl overflow-hidden border border-aurora-border hover:shadow-lg hover:border-aurora-border/80 transition-all duration-200 cursor-pointer"
     >
       {cardContent}
     </div>
@@ -1315,7 +1278,7 @@ export default function MarketplacePage() {
             <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
             Featured Listings
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {featuredListings.map((item) => (
               <MarketplaceCard
                 key={item.id}
@@ -1366,7 +1329,7 @@ export default function MarketplacePage() {
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-4">
         {loading ? (
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {[...Array(8)].map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -1493,7 +1456,7 @@ export default function MarketplacePage() {
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {filteredListings.map((item) => (
               <MarketplaceCard
                 key={item.id}
