@@ -1339,7 +1339,7 @@ export default function FeedPage() {
           <div className="flex items-center gap-3">
             {renderAvatar(userProfile?.avatar || '👤', userProfile?.name || 'You', 'md')}
             <div className="flex-1 px-4 py-2.5 bg-aurora-surface-variant rounded-full text-aurora-text-muted text-sm">
-              {nativeGreeting} Community
+              {nativeGreeting} World
             </div>
           </div>
           <div className="flex items-center gap-1 mt-3 pt-3 border-t border-aurora-border">
@@ -1812,7 +1812,7 @@ export default function FeedPage() {
                 <textarea
                   value={postContent}
                   onChange={(e) => setPostContent(e.target.value)}
-                  placeholder={`${nativeGreeting} Community`}
+                  placeholder={`${nativeGreeting} World`}
                   maxLength={500}
                   disabled={submitting}
                   className="w-full px-4 py-3 bg-transparent text-aurora-text placeholder:text-aurora-text-muted text-[15px] leading-relaxed resize-none focus:outline-none min-h-[120px]"
