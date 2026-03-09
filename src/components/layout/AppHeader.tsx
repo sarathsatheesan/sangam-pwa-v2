@@ -56,6 +56,7 @@ export const AppHeader: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
   const [showMobileAnnouncement, setShowMobileAnnouncement] = useState(false);
+  const [mobileMegaphoneVisible, setMobileMegaphoneVisible] = useState(true);
   const announcementTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch active announcements from Firestore
@@ -77,6 +78,7 @@ export const AppHeader: React.FC = () => {
       setAnnouncements(items.slice(0, 5));
       // Reset dismissal when new announcements arrive
       setAnnouncementDismissed(false);
+      setMobileMegaphoneVisible(true);
     }, (error) => {
       console.error('Error loading announcements:', error);
     });
@@ -226,8 +228,8 @@ export const AppHeader: React.FC = () => {
 
           {/* Right: Megaphone (mobile) + Location + Hamburger Menu */}
           <div className="flex items-center gap-1 shrink-0">
-            {/* Megaphone icon — mobile only */}
-            {hasAnnouncements && (
+            {/* Megaphone icon — mobile only, hides after user closes modal */}
+            {hasAnnouncements && mobileMegaphoneVisible && (
               <button
                 onClick={() => setShowMobileAnnouncement(true)}
                 className="p-2 rounded-lg transition-colors relative sm:hidden"
@@ -440,7 +442,7 @@ export const AppHeader: React.FC = () => {
       {showMobileAnnouncement && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-6 sm:hidden">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileAnnouncement(false)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setShowMobileAnnouncement(false); setMobileMegaphoneVisible(false); }} />
           {/* Modal card */}
           <div className="relative w-full max-w-sm bg-aurora-surface rounded-2xl shadow-aurora-3 border border-aurora-border-glass overflow-hidden animate-popIn">
             {/* Header */}
@@ -455,7 +457,7 @@ export const AppHeader: React.FC = () => {
                 </span>
               </div>
               <button
-                onClick={() => setShowMobileAnnouncement(false)}
+                onClick={() => { setShowMobileAnnouncement(false); setMobileMegaphoneVisible(false); }}
                 className="p-1.5 rounded-full hover:bg-gray-100 transition"
                 aria-label="Close"
               >
