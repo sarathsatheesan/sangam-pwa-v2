@@ -57,7 +57,6 @@ export const AppHeader: React.FC = () => {
   const [announcementDismissed, setAnnouncementDismissed] = useState(false);
   const [showMobileAnnouncement, setShowMobileAnnouncement] = useState(false);
   const announcementTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mobilePopupRef = useRef<HTMLDivElement>(null);
 
   // Fetch active announcements from Firestore
   useEffect(() => {
@@ -95,19 +94,6 @@ export const AppHeader: React.FC = () => {
       };
     }
   }, [announcements, announcementDismissed]);
-
-  // Close mobile popup when clicking outside
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (mobilePopupRef.current && !mobilePopupRef.current.contains(e.target as Node)) {
-        setShowMobileAnnouncement(false);
-      }
-    };
-    if (showMobileAnnouncement) {
-      document.addEventListener('mousedown', handleOutsideClick);
-    }
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [showMobileAnnouncement]);
 
   const handleDismissAnnouncement = () => {
     setAnnouncementDismissed(true);
@@ -242,46 +228,16 @@ export const AppHeader: React.FC = () => {
           <div className="flex items-center gap-1 shrink-0">
             {/* Megaphone icon — mobile only */}
             {hasAnnouncements && (
-              <div className="relative sm:hidden" ref={mobilePopupRef}>
-                <button
-                  onClick={() => setShowMobileAnnouncement(!showMobileAnnouncement)}
-                  className="p-2 rounded-lg transition-colors relative"
-                  aria-label="Announcements"
-                >
-                  <Megaphone size={20} className="text-aurora-indigo" />
-                  {!announcementDismissed && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-aurora-danger rounded-full" />
-                  )}
-                </button>
-
-                {/* Mobile announcement popup */}
-                {showMobileAnnouncement && (
-                  <div className="absolute top-full right-0 mt-1 w-72 bg-aurora-surface rounded-xl border border-aurora-border-glass shadow-aurora-3 z-50 overflow-hidden">
-                    <div className="px-3 py-2.5 flex items-start gap-2">
-                      <div className="w-6 h-6 rounded-full bg-aurora-indigo/15 flex items-center justify-center shrink-0 mt-0.5">
-                        <Megaphone size={12} className="text-aurora-indigo" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        {announcements.map((a, i) => (
-                          <div key={a.id} className={`${i > 0 ? 'mt-2 pt-2 border-t border-aurora-border/50' : ''}`}>
-                            <p className="text-xs font-bold text-[var(--aurora-text)]">{a.title}</p>
-                            {a.message && (
-                              <p className="text-[11px] text-[var(--aurora-text-secondary)] mt-0.5">{a.message}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        onClick={handleDismissAnnouncement}
-                        className="p-0.5 rounded hover:bg-gray-100 transition shrink-0"
-                        aria-label="Dismiss"
-                      >
-                        <X size={12} className="text-aurora-text-muted" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => setShowMobileAnnouncement(true)}
+                className="p-2 rounded-lg transition-colors relative sm:hidden"
+                aria-label="Announcements"
+              >
+                <Megaphone size={20} className="text-aurora-indigo" />
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-aurora-danger text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  {announcements.length}
+                </span>
+              </button>
             )}
 
             <button
@@ -479,6 +435,47 @@ export const AppHeader: React.FC = () => {
           </>
         )}
       </header>
+
+      {/* Mobile Announcement Modal */}
+      {showMobileAnnouncement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6 sm:hidden">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileAnnouncement(false)} />
+          {/* Modal card */}
+          <div className="relative w-full max-w-sm bg-aurora-surface rounded-2xl shadow-aurora-3 border border-aurora-border-glass overflow-hidden animate-popIn">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-aurora-border bg-gradient-to-r from-aurora-indigo/10 via-purple-500/8 to-aurora-indigo/10">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-aurora-indigo/15 flex items-center justify-center">
+                  <Megaphone size={14} className="text-aurora-indigo" />
+                </div>
+                <span className="text-sm font-bold text-[var(--aurora-text)]">Announcements</span>
+                <span className="ml-1 min-w-[20px] h-5 px-1.5 rounded-full bg-aurora-indigo/15 text-aurora-indigo text-[11px] font-bold flex items-center justify-center">
+                  {announcements.length}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowMobileAnnouncement(false)}
+                className="p-1.5 rounded-full hover:bg-gray-100 transition"
+                aria-label="Close"
+              >
+                <X size={16} className="text-aurora-text-muted" />
+              </button>
+            </div>
+            {/* Announcement list */}
+            <div className="px-4 py-3 max-h-[50vh] overflow-y-auto">
+              {announcements.map((a, i) => (
+                <div key={a.id} className={`${i > 0 ? 'mt-3 pt-3 border-t border-aurora-border/50' : ''}`}>
+                  <p className="text-sm font-bold text-[var(--aurora-text)]">{a.title}</p>
+                  {a.message && (
+                    <p className="text-xs text-[var(--aurora-text-secondary)] mt-1 leading-relaxed">{a.message}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Location Picker Modal */}
       <LocationPicker

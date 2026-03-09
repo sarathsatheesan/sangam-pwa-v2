@@ -398,10 +398,10 @@
   animation: reactionPop 0.3s ease-out both;
 }
 
-/* Announcement marquee scroll - right to left, looping */
+/* Announcement marquee scroll - left to right */
 @keyframes marqueeScroll {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 .marquee-scroll {
