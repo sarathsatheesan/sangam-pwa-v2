@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signInWithEmail, sendPhoneOTP, verifyPhoneOTP, resetPassword } from '../../services/auth';
-import { getFeatureFlags } from '../../services/featureFlags';
+import { signInWithEmail, sendPhoneOTP, verifyPhoneOTP, resetPassword } from '../../../services/auth';
+import { getFeatureFlags } from '../../../services/featureFlags';
 import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { db, auth } from '../../services/firebase';
-import { useAuth } from '../../contexts/AuthContext';
+import { db, auth } from '../../../services/firebase';
+import { useAuth } from '../../../contexts/AuthContext';
 
 type LoginStep = 0 | 1 | 2;
 type LoginMethod = 'phone' | 'email';
