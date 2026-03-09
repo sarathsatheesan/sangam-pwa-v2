@@ -1,10 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, MapPin, User, LogOut, Shield, Settings, Mail, Phone, Share2, Tag } from 'lucide-react';
+import { Menu, MapPin, User, LogOut, Shield, Settings, Mail, Phone, Share2, Tag, Megaphone, X } from 'lucide-react';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLocation } from '../../contexts/LocationContext';
 import { signOutUser } from '../../services/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import { LocationPicker } from '../shared/LocationPicker';
+
+// Announcement type
+interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  active: boolean;
+  createdAt?: any;
+}
 
 // Social media SVG icons for hamburger menu
 const InstagramIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
@@ -40,6 +51,72 @@ export const AppHeader: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Announcement state
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementDismissed, setAnnouncementDismissed] = useState(false);
+  const [showMobileAnnouncement, setShowMobileAnnouncement] = useState(false);
+  const announcementTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mobilePopupRef = useRef<HTMLDivElement>(null);
+
+  // Fetch active announcements from Firestore
+  useEffect(() => {
+    const q = query(collection(db, 'announcements'), where('active', '==', true));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items: Announcement[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        title: d.data().title || '',
+        message: d.data().message || '',
+        active: d.data().active,
+        createdAt: d.data().createdAt,
+      }));
+      items.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+        const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+        return bTime - aTime;
+      });
+      setAnnouncements(items.slice(0, 5));
+      // Reset dismissal when new announcements arrive
+      setAnnouncementDismissed(false);
+    }, (error) => {
+      console.error('Error loading announcements:', error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Auto-dismiss marquee after 30 seconds
+  useEffect(() => {
+    if (announcements.length > 0 && !announcementDismissed) {
+      announcementTimerRef.current = setTimeout(() => {
+        setAnnouncementDismissed(true);
+      }, 30000);
+      return () => {
+        if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
+      };
+    }
+  }, [announcements, announcementDismissed]);
+
+  // Close mobile popup when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (mobilePopupRef.current && !mobilePopupRef.current.contains(e.target as Node)) {
+        setShowMobileAnnouncement(false);
+      }
+    };
+    if (showMobileAnnouncement) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showMobileAnnouncement]);
+
+  const handleDismissAnnouncement = () => {
+    setAnnouncementDismissed(true);
+    setShowMobileAnnouncement(false);
+    if (announcementTimerRef.current) clearTimeout(announcementTimerRef.current);
+  };
+
+  const announcementText = announcements.map((a) => `${a.title}${a.message ? ' — ' + a.message : ''}`).join('  •  ');
+  const hasAnnouncements = announcements.length > 0;
 
   // Placeholder links — will be updated with real URLs later
   const socialLinks = {
@@ -140,8 +217,73 @@ export const AppHeader: React.FC = () => {
             )}
           </div>
 
-          {/* Right: Location + Hamburger Menu */}
+          {/* Center: Announcement Marquee (Desktop only, sm+) */}
+          {hasAnnouncements && !announcementDismissed && (
+            <div className="hidden sm:flex flex-1 items-center mx-3 min-w-0 overflow-hidden">
+              <div className="flex-1 overflow-hidden rounded-full bg-aurora-indigo/8 relative h-7 flex items-center">
+                <div className="marquee-scroll whitespace-nowrap text-xs font-medium text-aurora-indigo px-4">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Megaphone size={12} className="text-aurora-indigo shrink-0" />
+                    {announcementText}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleDismissAnnouncement}
+                className="ml-1 p-1 rounded-full hover:bg-gray-100 transition-colors shrink-0"
+                aria-label="Dismiss announcement"
+              >
+                <X size={14} className="text-aurora-text-muted" />
+              </button>
+            </div>
+          )}
+
+          {/* Right: Megaphone (mobile) + Location + Hamburger Menu */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Megaphone icon — mobile only */}
+            {hasAnnouncements && (
+              <div className="relative sm:hidden" ref={mobilePopupRef}>
+                <button
+                  onClick={() => setShowMobileAnnouncement(!showMobileAnnouncement)}
+                  className="p-2 rounded-lg transition-colors relative"
+                  aria-label="Announcements"
+                >
+                  <Megaphone size={20} className="text-aurora-indigo" />
+                  {!announcementDismissed && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-aurora-danger rounded-full" />
+                  )}
+                </button>
+
+                {/* Mobile announcement popup */}
+                {showMobileAnnouncement && (
+                  <div className="absolute top-full right-0 mt-1 w-72 bg-aurora-surface rounded-xl border border-aurora-border-glass shadow-aurora-3 z-50 overflow-hidden">
+                    <div className="px-3 py-2.5 flex items-start gap-2">
+                      <div className="w-6 h-6 rounded-full bg-aurora-indigo/15 flex items-center justify-center shrink-0 mt-0.5">
+                        <Megaphone size={12} className="text-aurora-indigo" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {announcements.map((a, i) => (
+                          <div key={a.id} className={`${i > 0 ? 'mt-2 pt-2 border-t border-aurora-border/50' : ''}`}>
+                            <p className="text-xs font-bold text-[var(--aurora-text)]">{a.title}</p>
+                            {a.message && (
+                              <p className="text-[11px] text-[var(--aurora-text-secondary)] mt-0.5">{a.message}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={handleDismissAnnouncement}
+                        className="p-0.5 rounded hover:bg-gray-100 transition shrink-0"
+                        aria-label="Dismiss"
+                      >
+                        <X size={12} className="text-aurora-text-muted" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
               onClick={() => setLocationPickerOpen(true)}
               className="p-2 text-aurora-text-secondary hover:text-aurora-mint hover:bg-gray-50 rounded-lg transition-colors"

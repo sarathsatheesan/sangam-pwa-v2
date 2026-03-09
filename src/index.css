@@ -398,6 +398,21 @@
   animation: reactionPop 0.3s ease-out both;
 }
 
+/* Announcement marquee scroll - right to left, looping */
+@keyframes marqueeScroll {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.marquee-scroll {
+  display: inline-block;
+  animation: marqueeScroll 18s linear infinite;
+}
+
+.marquee-scroll:hover {
+  animation-play-state: paused;
+}
+
 .overflow-wrap-anywhere {
   overflow-wrap: anywhere;
   word-break: break-word;
