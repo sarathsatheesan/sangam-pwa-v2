@@ -94,6 +94,83 @@ const FEELINGS = [
   { emoji: '❤️', label: 'loved' },
 ];
 
+// Native-language "Hello" greetings mapped by ethnicity
+const NATIVE_HELLO: Record<string, string> = {
+  // South Asian
+  'Indian': 'Namaste', 'Pakistani': 'Assalam o Alaikum', 'Bangladeshi': 'Assalamu Alaikum',
+  'Sri Lankan': 'Ayubowan', 'Nepali': 'Namaste', 'Bhutanese': 'Kuzu Zangpo',
+  'Maldivian': 'Assalaam Alaikum', 'Afghan': 'Salaam',
+  // East Asian
+  'Chinese': '你好', 'Japanese': 'こんにちは', 'Korean': '안녕하세요',
+  'Taiwanese': '你好', 'Mongolian': 'Сайн байна уу', 'Tibetan': 'Tashi Delek',
+  'Hong Konger': '你好',
+  // Southeast Asian
+  'Filipino': 'Kumusta', 'Vietnamese': 'Xin chào', 'Indonesian': 'Halo',
+  'Thai': 'สวัสดี', 'Malaysian': 'Selamat', 'Burmese': 'Mingalarbar',
+  'Cambodian': 'សួស្តី', 'Laotian': 'ສະບາຍດີ', 'Singaporean': 'Hello',
+  'Hmong': 'Nyob zoo',
+  // Central Asian
+  'Kazakh': 'Сәлем', 'Uzbek': 'Salom', 'Tajik': 'Салом', 'Kyrgyz': 'Салам', 'Turkmen': 'Salam',
+  // Hispanic / Latino
+  'Mexican': 'Hola', 'Mexican American': 'Hola', 'Chicano': 'Hola',
+  'Puerto Rican': 'Hola', 'Cuban': 'Hola', 'Dominican': 'Hola',
+  'Jamaican': 'Wah Gwaan', 'Haitian': 'Bonjou', 'Trinidadian': 'Hello',
+  'Barbadian': 'Hello', 'Bahamian': 'Hello',
+  'Brazilian': 'Olá', 'Colombian': 'Hola', 'Argentine': 'Hola',
+  'Peruvian': 'Hola', 'Venezuelan': 'Hola', 'Chilean': 'Hola',
+  'Ecuadorian': 'Hola', 'Bolivian': 'Hola', 'Paraguayan': 'Hola',
+  'Uruguayan': 'Hola', 'Guyanese': 'Hello', 'Surinamese': 'Hallo',
+  'Salvadoran': 'Hola', 'Guatemalan': 'Hola', 'Honduran': 'Hola',
+  'Nicaraguan': 'Hola', 'Costa Rican': 'Hola', 'Panamanian': 'Hola',
+  'Belizean': 'Hello', 'Spanish (from Spain)': 'Hola',
+  // European
+  'English': 'Hello', 'German': 'Hallo', 'French': 'Bonjour', 'Irish': 'Dia duit',
+  'Dutch': 'Hallo', 'Belgian': 'Hallo', 'Swiss': 'Grüezi', 'Austrian': 'Servus',
+  'Scottish': 'Hello', 'Welsh': 'Shwmae', 'Luxembourgish': 'Moien',
+  'Italian': 'Ciao', 'Spanish': 'Hola', 'Greek': 'Γεια σου', 'Portuguese': 'Olá',
+  'Croatian': 'Bok', 'Serbian': 'Здраво', 'Albanian': 'Përshëndetje',
+  'Maltese': 'Bonġu', 'Bosnian': 'Zdravo', 'Montenegrin': 'Zdravo',
+  'Slovenian': 'Živjo', 'Macedonian': 'Здраво', 'Cypriot': 'Γεια σου',
+  'Russian': 'Привет', 'Polish': 'Cześć', 'Ukrainian': 'Привіт',
+  'Romanian': 'Salut', 'Czech': 'Ahoj', 'Hungarian': 'Szia',
+  'Bulgarian': 'Здравей', 'Slovak': 'Ahoj', 'Belarusian': 'Прывітанне',
+  'Moldovan': 'Salut', 'Georgian': 'გამარჯობა', 'Armenian': 'Բարև',
+  'Swedish': 'Hej', 'Norwegian': 'Hei', 'Danish': 'Hej', 'Finnish': 'Hei',
+  'Icelandic': 'Halló', 'Estonian': 'Tere', 'Latvian': 'Sveiki', 'Lithuanian': 'Labas',
+  // African
+  'African American': 'Hello', 'Black British': 'Hello', 'Afro-Caribbean': 'Hello',
+  'Afro-Latino': 'Hola',
+  'Nigerian': 'Bawo ni', 'Ghanaian': 'Akwaaba', 'Senegalese': 'Nanga def',
+  'Ivorian': 'Bonjour', 'Malian': 'I ni ce',
+  'Ethiopian': 'ሰላም', 'Kenyan': 'Habari', 'Somali': 'Salaan',
+  'Tanzanian': 'Habari', 'Ugandan': 'Habari',
+  'Egyptian': 'مرحبا', 'Moroccan': 'مرحبا', 'Algerian': 'مرحبا',
+  'Tunisian': 'مرحبا', 'Sudanese': 'مرحبا',
+  'South African': 'Sawubona', 'Zimbabwean': 'Mhoro',
+  'Congolese': 'Mbote', 'Cameroonian': 'Bonjour',
+  // Middle Eastern
+  'Lebanese': 'Marhaba', 'Syrian': 'Marhaba', 'Palestinian': 'Marhaba',
+  'Jordanian': 'Marhaba', 'Iraqi': 'Marhaba',
+  'Saudi': 'مرحبا', 'Emirati': 'مرحبا', 'Kuwaiti': 'مرحبا',
+  'Qatari': 'مرحبا', 'Bahraini': 'مرحبا', 'Omani': 'مرحبا', 'Yemeni': 'مرحبا',
+  'Persian': 'سلام', 'Iranian': 'سلام', 'Kurdish': 'Silav',
+  'Turkish': 'Merhaba',
+  'Israeli': 'שלום', 'Ashkenazi Jewish': 'Shalom', 'Sephardic Jewish': 'Shalom', 'Mizrahi Jewish': 'Shalom',
+  // Oceanian / Pacific Islander
+  'Native Hawaiian': 'Aloha', 'Samoan': 'Talofa', 'Tongan': 'Mālō e lelei',
+  'Maori': 'Kia ora', 'Tahitian': 'Ia orana', 'Cook Islander': 'Kia orana',
+  'Fijian': 'Bula', 'Papua New Guinean': 'Hello',
+  'Chamorro': 'Håfa Adai', 'Guamanian': 'Håfa Adai',
+  'Australian': "G'day", 'New Zealander': 'Kia ora', 'Pakeha': 'Hello',
+  // Indigenous
+  'Native American': 'Yá\'át\'ééh', 'Alaska Native': 'Hello',
+  'Cherokee': 'Osiyo', 'Navajo': 'Yá\'át\'ééh', 'Sioux': 'Háu',
+  'Ojibwe': 'Boozhoo', 'Apache': 'Dagotʼee',
+  'First Nations': 'Tansi', 'Inuit': 'Ai', 'Métis': 'Tansi',
+  'Aboriginal Australian': 'Hello', 'Torres Strait Islander': 'Hello',
+  'Sámi': 'Bures', 'Ainu': 'Irankarapte',
+};
+
 const timeAgo = (timestamp: any): string => {
   if (!timestamp) return 'Just now';
   const now = new Date();
@@ -266,6 +343,16 @@ export default function FeedPage() {
 
   // Enhancement 6: Sorting
   const [sortMode, setSortMode] = useState<'recent' | 'popular' | 'trending'>('recent');
+
+  // Native-language greeting based on user's ethnicity
+  const nativeGreeting = useMemo(() => {
+    if (!userProfile?.heritage) return 'Hello';
+    const heritages = Array.isArray(userProfile.heritage) ? userProfile.heritage : [userProfile.heritage];
+    for (const h of heritages) {
+      if (NATIVE_HELLO[h]) return NATIVE_HELLO[h];
+    }
+    return 'Hello';
+  }, [userProfile?.heritage]);
 
   // One-time migration: rename 'social' → 'community' in Firestore posts
   useEffect(() => {
@@ -1252,7 +1339,7 @@ export default function FeedPage() {
           <div className="flex items-center gap-3">
             {renderAvatar(userProfile?.avatar || '👤', userProfile?.name || 'You', 'md')}
             <div className="flex-1 px-4 py-2.5 bg-aurora-surface-variant rounded-full text-aurora-text-muted text-sm">
-              What's on your mind?
+              {nativeGreeting} Community
             </div>
           </div>
           <div className="flex items-center gap-1 mt-3 pt-3 border-t border-aurora-border">
@@ -1269,6 +1356,13 @@ export default function FeedPage() {
             >
               <Calendar size={18} className="text-amber-500" />
               <span className="hidden sm:inline">Event</span>
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowCreateModal(true); setTimeout(() => postImageInputRef.current?.click(), 300); }}
+              className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+            >
+              <ImageIcon size={18} className="text-rose-500" />
+              <span className="hidden sm:inline">Image</span>
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setShowFeelingPicker(true); setShowCreateModal(true); }}
@@ -1718,7 +1812,7 @@ export default function FeedPage() {
                 <textarea
                   value={postContent}
                   onChange={(e) => setPostContent(e.target.value)}
-                  placeholder="What's on your mind?"
+                  placeholder={`${nativeGreeting} Community`}
                   maxLength={500}
                   disabled={submitting}
                   className="w-full px-4 py-3 bg-transparent text-aurora-text placeholder:text-aurora-text-muted text-[15px] leading-relaxed resize-none focus:outline-none min-h-[120px]"
