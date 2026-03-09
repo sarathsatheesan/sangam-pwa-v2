@@ -787,7 +787,7 @@ export const LoginPage: React.FC = () => {
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(to bottom, rgba(13,79,90,0.85) 0%, rgba(13,79,90,0.5) 35%, rgba(0,0,0,0.15) 60%, rgba(13,79,90,0.7) 100%)',
+            background: 'linear-gradient(to bottom, rgba(13,79,90,0.92) 0%, rgba(13,79,90,0.82) 30%, rgba(13,79,90,0.75) 55%, rgba(13,79,90,0.85) 100%)',
           }}
         />
         {/* Branding text overlay */}
