@@ -793,7 +793,7 @@ export const LoginPage: React.FC = () => {
         {/* Branding text overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center px-4">
           <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-            <img src="/ethnicity-logo.svg" alt="" className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 drop-shadow-lg" />
+            <img src="/ethnicity-logo.svg" alt="" className="hidden sm:block w-10 h-10 md:w-12 md:h-12 drop-shadow-lg" />
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight drop-shadow-lg" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
               <span style={{ color: '#f4a261' }}>ethni</span><span className="font-black" style={{ color: '#ffffff' }}>City</span>
             </h1>
@@ -816,7 +816,7 @@ export const LoginPage: React.FC = () => {
               </h3>
               <div className="w-12 h-0.5 bg-white/30 rounded-full mb-3" />
               <p className="text-white/80 text-sm text-center px-4 leading-relaxed">
-                Connect, grow, and belong in a community that celebrates every culture.
+                Our Culture, Connected.
               </p>
             </div>
           </div>
