@@ -1551,7 +1551,7 @@ export default function FeedPage() {
                           alt=""
                           className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
                           style={post.images!.length === 1 ? { maxHeight: '320px' } : { aspectRatio: post.images!.length === 3 && idx === 0 ? '1/2' : '1/1' }}
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={() => openPostDetail(post)}
                         />
                       </div>
                     ))}
