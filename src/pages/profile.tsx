@@ -199,7 +199,7 @@ export default function ProfilePage() {
   const [userHousing, setUserHousing] = useState<{ id: string; title: string; desc: string; price: number; createdAt: any }[]>([]);
   const [userMarketplace, setUserMarketplace] = useState<{ id: string; title: string; description: string; price: number; createdAt: any }[]>([]);
   const [userEvents, setUserEvents] = useState<{ id: string; title: string; desc: string; createdAt: any }[]>([]);
-  const [activityFilter, setActivityFilter] = useState<'all' | 'post' | 'forum' | 'business' | 'housing' | 'marketplace' | 'event'>('all');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'post' | 'forum'>('all');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -548,8 +548,8 @@ export default function ProfilePage() {
       createdAt: e.createdAt, gradient: nextGradient(), icon: '📅',
     }));
 
-    // Merge and sort by createdAt descending
-    return [...postItems, ...threadItems, ...bizItems, ...housingItems, ...mktItems, ...evtItems].sort((a, b) => {
+    // Tab 1 (Grid) only shows posts + forums
+    return [...postItems, ...threadItems].sort((a, b) => {
       const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
       const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
       return bTime - aTime;
@@ -1119,7 +1119,7 @@ export default function ProfilePage() {
             <div>
               {/* Activity category filter chips */}
               <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar">
-                {(['all', 'post', 'forum', 'business', 'housing', 'marketplace', 'event'] as const).map((cat) => {
+                {(['all', 'post', 'forum'] as const).map((cat) => {
                   const config = cat === 'all' ? { label: 'All', icon: '📋' } : ACTIVITY_CATEGORY_CONFIG[cat];
                   const count = cat === 'all' ? activityGrid.length : activityGrid.filter((i) => i.type === cat).length;
                   if (cat !== 'all' && count === 0) return null;
