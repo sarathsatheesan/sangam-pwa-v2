@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useClickOutside } from '@/hooks/useClickOutside';
 import {
   collection, query, where, orderBy, getDocs, addDoc, deleteDoc,
   doc, updateDoc, Timestamp, limit, arrayUnion, arrayRemove, onSnapshot,
@@ -415,6 +416,7 @@ export default function EventsPage() {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
   const heritageRef = useRef<HTMLDivElement>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
 
   // Pre-select user's heritage ethnicities on load
   useEffect(() => {
@@ -475,15 +477,10 @@ export default function EventsPage() {
   }, [toastMessage]);
 
   // Close heritage dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
-        setHeritageDropdownOpen(false);
-      }
-    };
-    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [heritageDropdownOpen]);
+  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
+
+  // Close status dropdown on click outside
+  useClickOutside([statusDropdownRef], !!statusDropdown, () => setStatusDropdown(null));
 
   // Load saved events from localStorage
   useEffect(() => {
@@ -1891,7 +1888,7 @@ export default function EventsPage() {
             <div className="border-t border-aurora-border p-4 space-y-2 bg-aurora-surface sm:rounded-b-2xl">
               {/* Add to Calendar */}
               {!isEventPast(selectedEvent.fullDate) && (
-                <div className="relative group">
+                <div className="relative group" ref={statusDropdownRef}>
                   <button
                     onClick={() => setStatusDropdown(statusDropdown === 'calendar' ? null : 'calendar')}
                     className="w-full py-2 rounded-lg font-medium text-sm border border-aurora-border text-aurora-text hover:bg-aurora-surface-variant transition-colors flex items-center justify-center gap-2"

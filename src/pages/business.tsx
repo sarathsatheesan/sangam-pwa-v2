@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '@/constants/config';
+import { useClickOutside } from '@/hooks/useClickOutside';
 
 // ═════════════════════════════════════════════════════════════════════════════════
 // INTERFACES
@@ -547,15 +548,7 @@ export default function BusinessPage() {
   }, [selectedBusiness?.id]);
 
   // Close heritage dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
-        setHeritageDropdownOpen(false);
-      }
-    };
-    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [heritageDropdownOpen]);
+  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
 
   // Auto-dismiss toast
   useEffect(() => {

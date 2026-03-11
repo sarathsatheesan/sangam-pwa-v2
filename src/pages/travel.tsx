@@ -14,6 +14,7 @@ import {
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '@/constants/config';
+import { useClickOutside } from '@/hooks/useClickOutside';
 
 interface TravelPost {
   id: string;
@@ -112,15 +113,7 @@ export default function TravelPage() {
   }, []);
 
   // Close heritage dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
-        setHeritageDropdownOpen(false);
-      }
-    };
-    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [heritageDropdownOpen]);
+  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
 
   const filteredPosts = useMemo(() => {
     let filtered = travelPosts;

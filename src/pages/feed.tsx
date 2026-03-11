@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useClickOutside } from '@/hooks/useClickOutside';
 import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '@/constants/config';
 import {
   MessageCircle,
@@ -376,16 +377,8 @@ export default function FeedPage() {
     migrate();
   }, []);
 
-  // Close heritage dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
-        setHeritageDropdownOpen(false);
-      }
-    };
-    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [heritageDropdownOpen]);
+  // Close heritage dropdown on outside click
+  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
 
   // Load saved posts from localStorage
   useEffect(() => {
@@ -461,27 +454,13 @@ export default function FeedPage() {
   }, [hasMore, loadingMore, lastDoc]);
 
   // Close menu on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuPostId(null);
-      }
-      if (reactionBarRef.current && !reactionBarRef.current.contains(e.target as Node)) {
-        setShowReactionBar(null);
-      }
-      if (detailReactionBarRef.current && !detailReactionBarRef.current.contains(e.target as Node)) {
-        setShowDetailReactionBar(false);
-      }
-    };
-    if (menuPostId || showReactionBar || showDetailReactionBar) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [menuPostId, showReactionBar, showDetailReactionBar]);
+  useClickOutside([menuRef], !!menuPostId, () => setMenuPostId(null));
+
+  // Close reaction bar on outside click
+  useClickOutside([reactionBarRef], !!showReactionBar, () => setShowReactionBar(null));
+
+  // Close detail reaction bar on outside click
+  useClickOutside([detailReactionBarRef], showDetailReactionBar, () => setShowDetailReactionBar(false));
 
   // Auto-dismiss toast
   useEffect(() => {

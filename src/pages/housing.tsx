@@ -25,6 +25,7 @@ import {
   DoorOpen, Flame, Zap, Droplets, Sun, MessageCircle, Star
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
+import { useClickOutside } from '@/hooks/useClickOutside';
 
 /* ─── types ─── */
 interface Listing {
@@ -531,17 +532,8 @@ export default function HousingPage() {
   const viewedListingsRef = useRef<Set<string>>(new Set());
 
   /* close dropdowns on click outside */
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (typeDropdownRef.current && !typeDropdownRef.current.contains(target)) setTypeDropdownOpen(false);
-      if (activeDropdown === 'filters' && priceDropRef.current && !priceDropRef.current.contains(target)) {
-        setActiveDropdown(null);
-      }
-    };
-    if (typeDropdownOpen || activeDropdown) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [typeDropdownOpen, activeDropdown]);
+  useClickOutside([typeDropdownRef], typeDropdownOpen, () => setTypeDropdownOpen(false));
+  useClickOutside([priceDropRef], !!activeDropdown, () => setActiveDropdown(null));
 
   /* toast auto-dismiss */
   useEffect(() => {

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useClickOutside } from '@/hooks/useClickOutside';
 import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
   onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc,
@@ -969,6 +970,7 @@ export default function MessagesPage() {
   const [editGroupNameValue, setEditGroupNameValue] = useState('');
   const [showAddMemberPicker, setShowAddMemberPicker] = useState(false);
   const [addMemberSearchTerm, setAddMemberSearchTerm] = useState('');
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -987,6 +989,8 @@ export default function MessagesPage() {
   const [selectedWallpaper, setSelectedWallpaper] = useState<string>('default');
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   const [showChatMenu, setShowChatMenu] = useState(false);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
+  useClickOutside([chatMenuRef], showChatMenu, () => setShowChatMenu(false));
   const [compactMode, setCompactMode] = useState(false);
 
   // Notification State
@@ -2075,7 +2079,7 @@ export default function MessagesPage() {
           >
             <SearchIcon size={18} className="text-white" />
           </button>
-          <div className="relative">
+          <div className="relative" ref={chatMenuRef}>
             <button
               onClick={() => setShowChatMenu(!showChatMenu)}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
@@ -2084,7 +2088,6 @@ export default function MessagesPage() {
             </button>
             {showChatMenu && (
               <>
-              <div className="fixed inset-0 z-30" onClick={() => setShowChatMenu(false)} />
               <div className="absolute top-10 right-0 bg-white rounded-lg shadow-xl z-40 min-w-[180px] py-1 overflow-hidden">
                 {activeGroupConv && (
                   <button

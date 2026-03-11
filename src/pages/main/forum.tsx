@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   collection,
@@ -26,6 +26,7 @@ import type { ForumTopic } from '../../constants/config';
 import { moderateContent, smartFilter } from '../../utils/contentModeration';
 import type { ModerationResult } from '../../utils/contentModeration';
 import { sanitizeText, sanitizeURL } from '../../utils/sanitize';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import {
   MessageSquare, Heart, Share2, Bookmark,
   MoreHorizontal, ChevronLeft, ChevronDown, ChevronUp, Plus, X,
@@ -376,6 +377,7 @@ export default function ForumScreen() {
     contentType: 'thread' | 'reply';
   } | null>(null);
   const [showMoreMenu, setShowMoreMenu] = useState<string | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   /* form state */
   const [threadTitle, setThreadTitle] = useState('');
@@ -418,6 +420,8 @@ export default function ForumScreen() {
   useEffect(() => {
     localStorage.setItem('savedForumThreads', JSON.stringify([...savedThreads]));
   }, [savedThreads]);
+
+  useClickOutside([moreMenuRef], !!showMoreMenu, () => setShowMoreMenu(null));
 
   const toggleSaveThread = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1598,7 +1602,7 @@ export default function ForumScreen() {
                     <div className="flex-1" />
 
                     {/* More menu */}
-                    <div className="relative">
+                    <div className="relative" ref={moreMenuRef}>
                       <button
                         onClick={(e) => { e.stopPropagation(); setShowMoreMenu(showMoreMenu === thread.id ? null : thread.id); }}
                         className="p-1.5 rounded-lg text-[var(--aurora-text-muted)] hover:bg-[var(--aurora-surface-variant)] transition-colors"
@@ -1719,10 +1723,6 @@ export default function ForumScreen() {
           </div>
         )}
 
-        {/* Click outside to close more menu */}
-        {showMoreMenu && (
-          <div className="fixed inset-0 z-10" onClick={() => setShowMoreMenu(null)} />
-        )}
       </div>
       </>
     );

@@ -15,6 +15,7 @@ import {
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
+import { useClickOutside } from '../../hooks/useClickOutside';
 import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '../../constants/config';
 import {
   Search,
@@ -589,15 +590,7 @@ export default function MarketplacePage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Close heritage dropdown on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (heritageRef.current && !heritageRef.current.contains(event.target as Node)) {
-        setHeritageDropdownOpen(false);
-      }
-    };
-    if (heritageDropdownOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [heritageDropdownOpen]);
+  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
 
   // Auto-populate formHeritage from user profile when profile loads
   useEffect(() => {
