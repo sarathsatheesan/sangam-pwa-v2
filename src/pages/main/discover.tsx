@@ -256,7 +256,7 @@ export default function DiscoverPage() {
             avatar: data.avatar || '👤',
             heritage: data.heritage || 'Other',
             city: data.city || 'Earth',
-            profession: data.profession || 'Community Member',
+            profession: (data.profession && data.profession !== 'N/A' && data.profession !== 'n/a') ? data.profession : '',
             bio: data.bio || '',
             interests: Array.isArray(data.interests) ? data.interests : [],
             email: data.email || '',
@@ -899,7 +899,7 @@ export default function DiscoverPage() {
                       )}
                     </div>
                     <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>
+                    {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>}
                     {person.showLocation && (
                       <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                         <MapPin className="w-3 h-3" /> {person.city}
@@ -953,7 +953,7 @@ export default function DiscoverPage() {
                       )}
                     </div>
                     <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>
+                    {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>}
                     {person.showLocation && (
                       <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                         <MapPin className="w-3 h-3" /> {person.city}
@@ -1015,7 +1015,7 @@ export default function DiscoverPage() {
                             )}
                           </div>
                           <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>
+                          {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
                           {person.showLocation && (
                             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
@@ -1080,7 +1080,7 @@ export default function DiscoverPage() {
                             )}
                           </div>
                           <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>
+                          {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
                           {person.showLocation && (
                             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
@@ -1145,7 +1145,7 @@ export default function DiscoverPage() {
                             )}
                           </div>
                           <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
-                          <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>
+                          {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
                           {person.showLocation && (
                             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
@@ -1231,7 +1231,7 @@ export default function DiscoverPage() {
                       </div>
                       <div className="min-w-0 pb-1">
                         <h3 className="font-bold text-[var(--aurora-text)] text-sm truncate leading-tight">{person.name}</h3>
-                        <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>
+                        {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
                       </div>
                     </div>
                     <div className="mt-2 space-y-0.5">
@@ -1347,7 +1347,7 @@ export default function DiscoverPage() {
                       )}
                     </div>
 
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">{person.profession}</p>
+                    {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">{person.profession}</p>}
                     {person.showLocation && (
                       <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-2">
                         <MapPin className="w-3 h-3" /> {person.city}
@@ -1490,7 +1490,7 @@ export default function DiscoverPage() {
                 </div>
               )}
 
-              <p className="text-gray-600 dark:text-gray-300 text-center mb-1">{selectedPerson.profession}</p>
+              {selectedPerson.profession && <p className="text-gray-600 dark:text-gray-300 text-center mb-1">{selectedPerson.profession}</p>}
 
               {selectedPerson.showLocation && (
                 <p className="text-gray-500 dark:text-gray-400 text-center flex items-center justify-center gap-1 mb-4">
