@@ -983,7 +983,7 @@ export default function DiscoverPage() {
                     {pymkGroups.sameCity.map((person) => (
                       <div
                         key={person.id}
-                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0"
+                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
                       >
                         <div
                           className={`h-32 bg-gradient-to-r ${
@@ -999,7 +999,7 @@ export default function DiscoverPage() {
                             className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
                           />
                         </div>
-                        <div className="p-4">
+                        <div className="p-4 flex-1 flex flex-col">
                           <div className="relative">
                             <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
                               {renderAvatar(person.avatar, person.name)}
@@ -1020,7 +1020,7 @@ export default function DiscoverPage() {
                               New
                             </div>
                           )}
-                          <div className="mt-3">
+                          <div className="mt-auto pt-3">
                             <button
                               onClick={() => handleConnect(person.id)}
                               disabled={connectingId === person.id}
@@ -1048,7 +1048,7 @@ export default function DiscoverPage() {
                     {pymkGroups.sameHeritage.map((person) => (
                       <div
                         key={person.id}
-                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0"
+                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
                       >
                         <div
                           className={`h-32 bg-gradient-to-r ${
@@ -1064,7 +1064,7 @@ export default function DiscoverPage() {
                             className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
                           />
                         </div>
-                        <div className="p-4">
+                        <div className="p-4 flex-1 flex flex-col">
                           <div className="relative">
                             <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
                               {renderAvatar(person.avatar, person.name)}
@@ -1085,7 +1085,7 @@ export default function DiscoverPage() {
                               New
                             </div>
                           )}
-                          <div className="mt-3">
+                          <div className="mt-auto pt-3">
                             <button
                               onClick={() => handleConnect(person.id)}
                               disabled={connectingId === person.id}
@@ -1113,7 +1113,7 @@ export default function DiscoverPage() {
                     {pymkGroups.similarInterests.map((person) => (
                       <div
                         key={person.id}
-                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0"
+                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
                       >
                         <div
                           className={`h-32 bg-gradient-to-r ${
@@ -1129,7 +1129,7 @@ export default function DiscoverPage() {
                             className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
                           />
                         </div>
-                        <div className="p-4">
+                        <div className="p-4 flex-1 flex flex-col">
                           <div className="relative">
                             <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
                               {renderAvatar(person.avatar, person.name)}
@@ -1150,7 +1150,7 @@ export default function DiscoverPage() {
                               New
                             </div>
                           )}
-                          <div className="mt-3">
+                          <div className="mt-auto pt-3">
                             <button
                               onClick={() => handleConnect(person.id)}
                               disabled={connectingId === person.id}
