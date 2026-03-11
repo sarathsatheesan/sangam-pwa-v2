@@ -1176,6 +1176,12 @@ export default function DiscoverPage() {
         )}
 
         {/* Main Grid/List View */}
+        {!loading && filteredPeople.length > 0 && (
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-green-600" />
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white">My Connects</h3>
+          </div>
+        )}
         {loading ? (
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-4'}>
             {[...Array(9)].map((_, i) => (
