@@ -654,7 +654,7 @@ export default function DiscoverPage() {
       <div className="min-h-screen bg-aurora-bg flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
-          <p className="text-gray-600">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
       </div>
     );
@@ -713,10 +713,10 @@ export default function DiscoverPage() {
                 placeholder="Search by name, city, profession..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-200 rounded-full text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-300">
                   <X className="w-4 h-4" />
                 </button>
               )}
@@ -729,7 +729,7 @@ export default function DiscoverPage() {
                 className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
                   selectedHeritage.length > 0
                     ? 'bg-amber-50 border-amber-300 text-amber-800'
-                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >
                 <Globe className="w-4 h-4" />
@@ -860,10 +860,10 @@ export default function DiscoverPage() {
 
         {/* Results Header */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
             {activeTab === 'discover' ? 'Discover' : 'Network'}
           </h2>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-300">
             {loading
               ? 'Loading...'
               : activeTab === 'discover'
@@ -877,12 +877,12 @@ export default function DiscoverPage() {
         {/* Incoming Requests Section */}
         {activeTab === 'network' && incomingRequests.length > 0 && (
           <div className="mb-8">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
               Pending Requests ({incomingRequests.length})
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {incomingRequests.map((person) => (
-                <div key={person.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div key={person.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                   <div className="h-32 bg-gradient-to-r from-yellow-400 to-orange-400 relative">
                     <button
                       onClick={() => setSelectedPerson(person)}
@@ -898,10 +898,10 @@ export default function DiscoverPage() {
                         <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
                       )}
                     </div>
-                    <h3 className="font-bold text-gray-800 mt-2">{person.name}</h3>
-                    <p className="text-sm text-gray-600">{person.profession}</p>
+                    <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>
                     {person.showLocation && (
-                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                         <MapPin className="w-3 h-3" /> {person.city}
                       </p>
                     )}
@@ -916,7 +916,7 @@ export default function DiscoverPage() {
                       <button
                         onClick={() => handleDeclineConnection(person.id)}
                         disabled={connectingId === person.id}
-                        className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                        className="flex-1 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-white dark:text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
                       >
                         <X className="w-4 h-4" /> Decline
                       </button>
@@ -931,12 +931,12 @@ export default function DiscoverPage() {
         {/* Sent Requests Section */}
         {activeTab === 'network' && sentRequests.length > 0 && (
           <div className="mb-8">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">
+            <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
               Sent Requests ({sentRequests.length})
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {sentRequests.map((person) => (
-                <div key={person.id} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div key={person.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
                   <div className="h-32 bg-gradient-to-r from-purple-400 to-blue-400 relative">
                     <button
                       onClick={() => setSelectedPerson(person)}
@@ -952,10 +952,10 @@ export default function DiscoverPage() {
                         <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
                       )}
                     </div>
-                    <h3 className="font-bold text-gray-800 mt-2">{person.name}</h3>
-                    <p className="text-sm text-gray-600">{person.profession}</p>
+                    <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>
                     {person.showLocation && (
-                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                         <MapPin className="w-3 h-3" /> {person.city}
                       </p>
                     )}
@@ -982,7 +982,7 @@ export default function DiscoverPage() {
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <MapPin className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-xl font-bold text-gray-800">From Your City</h3>
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">From Your City</h3>
                 </div>
                 <div className="overflow-x-auto pb-4 scrollbar-hide">
                   <div className="flex gap-4 w-max">
@@ -1014,15 +1014,15 @@ export default function DiscoverPage() {
                               <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
                             )}
                           </div>
-                          <h4 className="font-bold text-gray-800 mt-2">{person.name}</h4>
-                          <p className="text-xs text-gray-600">{person.profession}</p>
+                          <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>
                           {person.showLocation && (
-                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
                             </p>
                           )}
                           {isNewMember(person) && (
-                            <div className="mt-2 inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">
+                            <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-1 rounded">
                               New
                             </div>
                           )}
@@ -1047,7 +1047,7 @@ export default function DiscoverPage() {
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <Globe className="w-5 h-5 text-orange-600" />
-                  <h3 className="text-xl font-bold text-gray-800">Same Heritage</h3>
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">Same Heritage</h3>
                 </div>
                 <div className="overflow-x-auto pb-4 scrollbar-hide">
                   <div className="flex gap-4 w-max">
@@ -1079,15 +1079,15 @@ export default function DiscoverPage() {
                               <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
                             )}
                           </div>
-                          <h4 className="font-bold text-gray-800 mt-2">{person.name}</h4>
-                          <p className="text-xs text-gray-600">{person.profession}</p>
+                          <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>
                           {person.showLocation && (
-                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
                             </p>
                           )}
                           {isNewMember(person) && (
-                            <div className="mt-2 inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">
+                            <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-1 rounded">
                               New
                             </div>
                           )}
@@ -1112,7 +1112,7 @@ export default function DiscoverPage() {
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-5 h-5 text-purple-600" />
-                  <h3 className="text-xl font-bold text-gray-800">Similar Interests</h3>
+                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">Similar Interests</h3>
                 </div>
                 <div className="overflow-x-auto pb-4 scrollbar-hide">
                   <div className="flex gap-4 w-max">
@@ -1144,15 +1144,15 @@ export default function DiscoverPage() {
                               <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
                             )}
                           </div>
-                          <h4 className="font-bold text-gray-800 mt-2">{person.name}</h4>
-                          <p className="text-xs text-gray-600">{person.profession}</p>
+                          <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>
                           {person.showLocation && (
-                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
                             </p>
                           )}
                           {isNewMember(person) && (
-                            <div className="mt-2 inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">
+                            <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-1 rounded">
                               New
                             </div>
                           )}
@@ -1185,10 +1185,10 @@ export default function DiscoverPage() {
         ) : filteredPeople.length === 0 ? (
           <div className="text-center py-16">
             <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-600 mb-2">
+            <h3 className="text-xl font-bold text-gray-600 dark:text-gray-300 mb-2">
               {activeTab === 'discover' ? 'No people found' : 'No connections yet'}
             </h3>
-            <p className="text-gray-500">
+            <p className="text-gray-500 dark:text-gray-400">
               {activeTab === 'discover'
                 ? 'Try adjusting your filters or search terms'
                 : 'Start connecting with people to build your network'}
@@ -1268,7 +1268,7 @@ export default function DiscoverPage() {
                             className={`px-2.5 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 transition-colors flex items-center justify-center gap-1 ${
                               isHovering
                                 ? 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-300'
-                                : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-300'
+                                : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
                             }`}
                             title={isHovering ? 'Tap to disconnect' : 'Tap to show disconnect'}
                           >
@@ -1324,9 +1324,9 @@ export default function DiscoverPage() {
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h3 className="font-bold text-gray-800">{person.name}</h3>
+                        <h3 className="font-bold text-gray-800 dark:text-white">{person.name}</h3>
                         {isNewMember(person) && (
-                          <span className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded">
+                          <span className="inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-0.5 rounded">
                             New
                           </span>
                         )}
@@ -1336,14 +1336,14 @@ export default function DiscoverPage() {
                           <div className={`text-lg font-bold ${score >= 75 ? 'text-green-600' : 'text-blue-600'}`}>
                             {score}%
                           </div>
-                          <div className="text-xs text-gray-500">Match</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Match</div>
                         </div>
                       )}
                     </div>
 
-                    <p className="text-sm text-gray-600 mb-1">{person.profession}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">{person.profession}</p>
                     {person.showLocation && (
-                      <p className="text-sm text-gray-500 flex items-center gap-1 mb-2">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-2">
                         <MapPin className="w-3 h-3" /> {person.city}
                       </p>
                     )}
@@ -1357,12 +1357,12 @@ export default function DiscoverPage() {
                     {person.interests && person.interests.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-3">
                         {person.interests.slice(0, 3).map((interest) => (
-                          <span key={interest} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                          <span key={interest} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 dark:text-gray-200 px-2 py-1 rounded">
                             {interest}
                           </span>
                         ))}
                         {person.interests.length > 3 && (
-                          <span className="text-xs text-gray-500">+{person.interests.length - 3} more</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">+{person.interests.length - 3} more</span>
                         )}
                       </div>
                     )}
@@ -1395,7 +1395,7 @@ export default function DiscoverPage() {
                           className={`px-3 py-2 rounded font-medium text-sm disabled:opacity-50 transition-colors whitespace-nowrap flex items-center justify-center gap-1 ${
                             isHovering
                               ? 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-300'
-                              : 'bg-gray-100 hover:bg-gray-200 text-gray-600 border border-gray-300'
+                              : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
                           }`}
                           title={isHovering ? 'Tap to disconnect' : 'Tap to show disconnect'}
                         >
@@ -1472,38 +1472,38 @@ export default function DiscoverPage() {
                 )}
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-800 text-center mb-1">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white text-center mb-1">
                 {selectedPerson.name}
               </h2>
 
               {isNewMember(selectedPerson) && (
                 <div className="text-center mb-2">
-                  <span className="inline-block bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded">
+                  <span className="inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded">
                     New Member
                   </span>
                 </div>
               )}
 
-              <p className="text-gray-600 text-center mb-1">{selectedPerson.profession}</p>
+              <p className="text-gray-600 dark:text-gray-300 text-center mb-1">{selectedPerson.profession}</p>
 
               {selectedPerson.showLocation && (
-                <p className="text-gray-500 text-center flex items-center justify-center gap-1 mb-4">
+                <p className="text-gray-500 dark:text-gray-400 text-center flex items-center justify-center gap-1 mb-4">
                   <MapPin className="w-4 h-4" /> {selectedPerson.city}
                 </p>
               )}
 
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <p className="text-gray-700">{selectedPerson.bio || 'No bio provided'}</p>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+                <p className="text-gray-700 dark:text-gray-200">{selectedPerson.bio || 'No bio provided'}</p>
               </div>
 
               {selectedPerson.interests && selectedPerson.interests.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="font-bold text-gray-800 mb-2 text-sm">Interests</h3>
+                  <h3 className="font-bold text-gray-800 dark:text-white mb-2 text-sm">Interests</h3>
                   <div className="flex flex-wrap gap-2">
                     {selectedPerson.interests.map((interest) => (
                       <span
                         key={interest}
-                        className="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full"
+                        className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full"
                       >
                         {interest}
                       </span>
@@ -1514,10 +1514,10 @@ export default function DiscoverPage() {
 
               {getMutualConnectionCount(selectedPerson.id) > 0 && (
                 <div className="mb-4 pb-4 border-b">
-                  <h3 className="font-bold text-gray-800 mb-2 text-sm">
+                  <h3 className="font-bold text-gray-800 dark:text-white mb-2 text-sm">
                     {getMutualConnectionCount(selectedPerson.id)} Mutual Connections
                   </h3>
-                  <p className="text-xs text-gray-600">You both know these people</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-300">You both know these people</p>
                 </div>
               )}
 
@@ -1567,19 +1567,19 @@ export default function DiscoverPage() {
       {/* Disconnect Confirmation Modal */}
       {showDisconnectConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => { setShowDisconnectConfirm(false); setDisconnectPersonId(null); }}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-center">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <UserMinus size={24} className="text-red-500" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Disconnect?</h3>
-              <p className="text-sm text-gray-500 mb-5">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Disconnect?</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
                 Are you sure you want to disconnect from <strong>{people.find(p => p.id === disconnectPersonId)?.name || 'this person'}</strong>? You'll need to send a new connection request to reconnect.
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => { setShowDisconnectConfirm(false); setDisconnectPersonId(null); }}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
