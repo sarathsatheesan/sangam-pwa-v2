@@ -287,8 +287,8 @@ const PhotoCarousel: React.FC<{
 
   if (!photos.length) {
     return (
-      <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center rounded-lg">
-        <Image className="w-12 h-12 text-gray-600" />
+      <div className="w-full h-full bg-gradient-to-br from-[var(--aurora-surface-variant)] to-[var(--aurora-border)] flex items-center justify-center rounded-lg">
+        <Image className="w-12 h-12 text-aurora-text-muted" />
       </div>
     );
   }
@@ -472,9 +472,9 @@ const MarketplaceCard: React.FC<{
             e.stopPropagation();
             onSaveToggle(item.id);
           }}
-          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center hover:bg-white transition-colors shadow-sm"
+          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-[var(--aurora-surface)]/90 flex items-center justify-center hover:bg-[var(--aurora-surface)] transition-colors shadow-sm"
         >
-          <Heart className={`w-4 h-4 ${isSaved ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
+          <Heart className={`w-4 h-4 ${isSaved ? 'fill-red-500 text-red-500' : 'text-aurora-text-muted'}`} />
         </button>
         {item.createdAt && (
           <span className="absolute bottom-2 left-2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -1436,7 +1436,7 @@ export default function MarketplacePage() {
                     {item.photos?.[0] ? (
                       <img src={item.photos[0]} alt={item.title} className="w-full h-full object-cover" />
                     ) : (
-                      <div className={`w-full h-full bg-gradient-to-br ${CATEGORY_COLORS[item.category] || 'from-gray-400 to-gray-600'} flex items-center justify-center text-white`}>
+                      <div className={`w-full h-full bg-gradient-to-br ${CATEGORY_COLORS[item.category] || 'from-gray-600 to-gray-800'} flex items-center justify-center text-white`}>
                         {CATEGORY_ICONS[item.category] || <Package className="w-6 h-6" />}
                       </div>
                     )}

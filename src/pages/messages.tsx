@@ -1652,7 +1652,7 @@ export default function MessagesPage() {
 
   // === Conversation list panel (reused in both mobile and desktop) ===
   const conversationListPanel = (
-    <div className="h-full flex flex-col relative" style={{ backgroundColor: '#FFFFFF' }}>
+    <div className="h-full flex flex-col relative" style={{ backgroundColor: 'var(--aurora-surface)' }}>
       {/* Header - purple on mobile, light purple on desktop */}
       <div className="px-4 pt-3 pb-2 sm:bg-gradient-to-r sm:from-purple-50 sm:via-violet-50 sm:to-indigo-50 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
         <div className="flex items-center justify-between mb-3">
@@ -1671,7 +1671,7 @@ export default function MessagesPage() {
                 <div className="fixed inset-0 z-40" onClick={() => setShowPenMenu(false)} />
                 <div
                   className="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-lg overflow-hidden z-50"
-                  style={{ backgroundColor: '#FFFFFF', border: '1px solid #E8E8E8' }}
+                  style={{ backgroundColor: 'var(--aurora-surface)', border: '1px solid var(--aurora-border)' }}
                 >
                   <button
                     onClick={(e) => { e.stopPropagation(); setShowPenMenu(false); setShowNewMsgPicker(true); }}
@@ -1755,7 +1755,7 @@ export default function MessagesPage() {
                   }}
                   className="w-full text-left transition-colors"
                   style={{ backgroundColor: isSelected ? '#F0F2F5' : undefined }}
-                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#F5F6F6'; }}
+                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--aurora-surface-variant)'; }}
                   onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = ''; }}
                 >
                   <div className="flex items-center gap-3 px-4 py-2.5">
@@ -1857,7 +1857,7 @@ export default function MessagesPage() {
 
       {/* New Message picker modal */}
       {showNewMsgPicker && (
-        <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: '#FFFFFF' }}>
+        <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -1867,7 +1867,7 @@ export default function MessagesPage() {
                 <h2 className="text-lg font-bold" style={{ color: '#111B21' }}>New Message</h2>
               </div>
             </div>
-            <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: '#F0F2F5' }}>
+            <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
               <Search size={16} style={{ color: '#667781' }} className="flex-shrink-0" />
               <input
                 type="text"
@@ -1917,7 +1917,7 @@ export default function MessagesPage() {
 
       {/* Group Creator overlay */}
       {showGroupCreator && (
-        <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: '#FFFFFF' }}>
+        <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center gap-3 mb-3">
               <button onClick={() => { setShowGroupCreator(false); setGroupName(''); setSelectedGroupMembers([]); setGroupSearchTerm(''); }} className="p-1">
@@ -1926,7 +1926,7 @@ export default function MessagesPage() {
               <h2 className="text-lg font-bold" style={{ color: '#111B21' }}>Create Group</h2>
             </div>
             {/* Group name input */}
-            <div className="flex items-center gap-2 rounded-lg px-3 py-2 mb-2" style={{ backgroundColor: '#F0F2F5' }}>
+            <div className="flex items-center gap-2 rounded-lg px-3 py-2 mb-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
               <Users size={16} style={{ color: '#667781' }} className="flex-shrink-0" />
               <input
                 type="text"
@@ -1956,7 +1956,7 @@ export default function MessagesPage() {
               </div>
             )}
             {/* Search members */}
-            <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: '#F0F2F5' }}>
+            <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
               <Search size={16} style={{ color: '#667781' }} className="flex-shrink-0" />
               <input
                 type="text"
@@ -2020,7 +2020,7 @@ export default function MessagesPage() {
   const chatRoomPanel = (selectedUser || activeGroupConv) ? (
     <div
       className="h-full flex flex-col"
-      style={{ backgroundColor: '#ECE5DD' }}
+      style={{ backgroundColor: 'var(--aurora-surface-variant)' }}
     >
       {/* WhatsApp-style chat header */}
       <div className="px-2 py-2 flex items-center gap-2" style={{ backgroundColor: '#075E54' }}>
@@ -2150,7 +2150,7 @@ export default function MessagesPage() {
         );
 
         return (
-          <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: '#FFFFFF' }}>
+          <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
             {/* Header */}
             <div className="px-4 pt-3 pb-3 flex items-center gap-3" style={{ backgroundColor: '#075E54' }}>
               <button
@@ -2177,7 +2177,7 @@ export default function MessagesPage() {
                       value={editGroupNameValue}
                       onChange={(e) => setEditGroupNameValue(e.target.value)}
                       className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
-                      style={{ backgroundColor: '#F0F2F5', color: '#111B21' }}
+                      style={{ backgroundColor: 'var(--aurora-surface-variant)', color: 'var(--aurora-text)' }}
                       autoFocus
                       onKeyDown={(e) => { if (e.key === 'Enter') updateGroupName(editGroupNameValue); }}
                     />
@@ -2191,7 +2191,7 @@ export default function MessagesPage() {
                     <button
                       onClick={() => setEditingGroupName(false)}
                       className="p-2 rounded-full"
-                      style={{ backgroundColor: '#F0F2F5' }}
+                      style={{ backgroundColor: 'var(--aurora-surface-variant)' }}
                     >
                       <X size={16} style={{ color: '#667781' }} />
                     </button>
@@ -2237,7 +2237,7 @@ export default function MessagesPage() {
                 {/* Add Member Picker */}
                 {showAddMemberPicker && amAdmin && (
                   <div className="mb-3 rounded-lg overflow-hidden" style={{ border: '1px solid #E8E8E8' }}>
-                    <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: '#F0F2F5' }}>
+                    <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
                       <Search size={16} style={{ color: '#667781' }} />
                       <input
                         type="text"
@@ -2385,7 +2385,7 @@ export default function MessagesPage() {
                 <div key={msg.id}>
                   {showDateLabel && (
                     <div className="flex justify-center my-3">
-                      <span className="text-[11px] font-medium px-3 py-1 rounded-lg shadow-sm" style={{ backgroundColor: '#E1F2FB', color: '#4A6E7F' }}>
+                      <span className="text-[11px] font-medium px-3 py-1 rounded-lg shadow-sm" style={{ backgroundColor: 'var(--aurora-surface-variant)', color: 'var(--aurora-text-muted)' }}>
                         {getDateLabel(msg.createdAt)}
                       </span>
                     </div>
@@ -2402,7 +2402,7 @@ export default function MessagesPage() {
                             [isMine ? 'right' : 'left']: '-6px',
                             width: 0,
                             height: 0,
-                            borderTop: `8px solid ${isMine ? '#DCF8C6' : '#FFFFFF'}`,
+                            borderTop: `8px solid ${isMine ? '#DCF8C6' : 'var(--aurora-surface)'}`,
                             [isMine ? 'borderLeft' : 'borderRight']: '8px solid transparent',
                           }}
                         />
@@ -2410,7 +2410,7 @@ export default function MessagesPage() {
                       <div
                         className={`px-2.5 pt-1.5 pb-1 ${isFirstInGroup ? (isMine ? 'rounded-tl-lg rounded-tr-sm' : 'rounded-tr-lg rounded-tl-sm') : 'rounded-t-lg'} rounded-b-lg shadow-sm cursor-pointer select-none`}
                         style={{
-                          backgroundColor: msg.senderId === 'system' ? '#E1F2FB' : isMine ? '#DCF8C6' : '#FFFFFF',
+                          backgroundColor: msg.senderId === 'system' ? 'var(--aurora-surface-variant)' : isMine ? '#DCF8C6' : 'var(--aurora-surface)',
                           boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)',
                         }}
                         onContextMenu={(e) => { e.preventDefault(); setContextMenuMsg(msg); }}
@@ -2488,7 +2488,7 @@ export default function MessagesPage() {
       </div>
 
       {/* WhatsApp-style input area */}
-      <div style={{ backgroundColor: '#F0F2F5' }}>
+      <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
         {editingMessage && (
           <div className="px-4 py-2 flex items-center justify-between border-b" style={{ backgroundColor: '#E8F5E9', borderColor: '#C8E6C9' }}>
             <div className="text-sm" style={{ color: '#075E54' }}>
@@ -2526,7 +2526,7 @@ export default function MessagesPage() {
               <ImagePlus size={22} style={{ color: '#54656F' }} />
             </button>
           </div>
-          <div className="flex-1 rounded-3xl px-3 py-2 flex items-end" style={{ backgroundColor: '#FFFFFF', minHeight: '42px' }}>
+          <div className="flex-1 rounded-3xl px-3 py-2 flex items-end" style={{ backgroundColor: 'var(--aurora-surface)', minHeight: '42px' }}>
             <textarea
               ref={textareaRef}
               value={messageText}
@@ -2575,7 +2575,7 @@ export default function MessagesPage() {
 
   // === Empty chat placeholder for desktop when no conversation selected ===
   const emptyRightPanel = (
-    <div className="h-full flex flex-col items-center justify-center" style={{ backgroundColor: '#F0F2F5' }}>
+    <div className="h-full flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
       <div className="text-center">
         <div className="w-[200px] h-[200px] mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#E8F5E9' }}>
           <MessageSquare size={80} style={{ color: '#25D366' }} />
