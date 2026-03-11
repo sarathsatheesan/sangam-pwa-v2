@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useClickOutside } from '@/hooks/useClickOutside';
+import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
   onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc,
@@ -990,7 +990,7 @@ export default function MessagesPage() {
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const chatMenuRef = useRef<HTMLDivElement>(null);
-  useClickOutside([chatMenuRef], showChatMenu, () => setShowChatMenu(false));
+  // useClickOutside hook replaced with ClickOutsideOverlay component in JSX
   const [compactMode, setCompactMode] = useState(false);
 
   // Notification State
@@ -2086,9 +2086,10 @@ export default function MessagesPage() {
             >
               <MoreVertical size={18} className="text-white" />
             </button>
+            <ClickOutsideOverlay isOpen={showChatMenu} onClose={() => setShowChatMenu(false)} />
             {showChatMenu && (
               <>
-              <div className="absolute top-10 right-0 bg-white rounded-lg shadow-xl z-40 min-w-[180px] py-1 overflow-hidden">
+              <div className="absolute top-10 right-0 bg-white rounded-lg shadow-xl z-50 min-w-[180px] py-1 overflow-hidden">
                 {activeGroupConv && (
                   <button
                     onClick={() => {

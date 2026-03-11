@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useClickOutside } from '@/hooks/useClickOutside';
+import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
   collection, query, where, orderBy, getDocs, addDoc, deleteDoc,
   doc, updateDoc, Timestamp, limit, arrayUnion, arrayRemove, onSnapshot,
@@ -476,11 +476,7 @@ export default function EventsPage() {
     }
   }, [toastMessage]);
 
-  // Close heritage dropdown on click outside
-  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
-
-  // Close status dropdown on click outside
-  useClickOutside([statusDropdownRef], !!statusDropdown, () => setStatusDropdown(null));
+  // Click outside handling is now managed by ClickOutsideOverlay component
 
   // Load saved events from localStorage
   useEffect(() => {
@@ -1136,6 +1132,7 @@ export default function EventsPage() {
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
+              <ClickOutsideOverlay isOpen={heritageDropdownOpen} onClose={() => setHeritageDropdownOpen(false)} />
               {heritageDropdownOpen && (
   <div className="absolute top-full right-0 mt-1.5 w-72 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
     {(() => {
@@ -1895,8 +1892,9 @@ export default function EventsPage() {
                   >
                     <Calendar className="w-4 h-4" /> Add to Calendar <ChevronDown className="w-3 h-3" />
                   </button>
+                  <ClickOutsideOverlay isOpen={statusDropdown === 'calendar'} onClose={() => setStatusDropdown(null)} />
                   {statusDropdown === 'calendar' && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-aurora-surface border border-aurora-border rounded-lg shadow-lg overflow-hidden z-10">
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-aurora-surface border border-aurora-border rounded-lg shadow-lg overflow-hidden z-50">
                       <button
                         onClick={() => window.open(getGoogleCalendarUrl(selectedEvent), '_blank')}
                         className="w-full px-4 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant flex items-center gap-2"
@@ -1954,8 +1952,9 @@ export default function EventsPage() {
                   >
                     <MoreVertical className="w-4 h-4" /> Event Status <ChevronDown className="w-3 h-3" />
                   </button>
+                  <ClickOutsideOverlay isOpen={statusDropdown === 'status'} onClose={() => setStatusDropdown(null)} />
                   {statusDropdown === 'status' && (
-                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-aurora-surface border border-aurora-border rounded-lg shadow-lg overflow-hidden z-10">
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-aurora-surface border border-aurora-border rounded-lg shadow-lg overflow-hidden z-50">
                       {['active', 'coming_soon', 'sold_out', 'postponed', 'canceled'].map((status) => (
                         <button
                           key={status}

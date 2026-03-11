@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '@/constants/config';
-import { useClickOutside } from '@/hooks/useClickOutside';
+import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 
 // ═════════════════════════════════════════════════════════════════════════════════
 // INTERFACES
@@ -547,8 +547,7 @@ export default function BusinessPage() {
     }
   }, [selectedBusiness?.id]);
 
-  // Close heritage dropdown on click outside
-  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
+  // Close heritage dropdown on click outside - handled by ClickOutsideOverlay component
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -923,6 +922,7 @@ export default function BusinessPage() {
                   <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
+                <ClickOutsideOverlay isOpen={heritageDropdownOpen} onClose={() => setHeritageDropdownOpen(false)} />
                 {heritageDropdownOpen && (
   <div className="absolute top-full right-0 mt-1.5 w-72 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
     {(() => {

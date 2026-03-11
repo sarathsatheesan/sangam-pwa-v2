@@ -14,7 +14,7 @@ import {
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '@/constants/config';
-import { useClickOutside } from '@/hooks/useClickOutside';
+import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 
 interface TravelPost {
   id: string;
@@ -112,8 +112,7 @@ export default function TravelPage() {
     return unsubscribe;
   }, []);
 
-  // Close heritage dropdown on click outside
-  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
+  // Click outside handling is now managed by ClickOutsideOverlay component
 
   const filteredPosts = useMemo(() => {
     let filtered = travelPosts;
@@ -280,6 +279,8 @@ export default function TravelPage() {
                 <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `ethniCity (${selectedHeritage.length})` : 'ethniCity'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
+
+              <ClickOutsideOverlay isOpen={heritageDropdownOpen} onClose={() => setHeritageDropdownOpen(false)} />
 
               {heritageDropdownOpen && (
                 <div className="absolute top-full right-0 mt-1.5 w-72 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">

@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
-import { useClickOutside } from '@/hooks/useClickOutside';
+import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '@/constants/config';
 import {
   MessageCircle,
@@ -378,7 +378,7 @@ export default function FeedPage() {
   }, []);
 
   // Close heritage dropdown on outside click
-  useClickOutside([heritageRef], heritageDropdownOpen, () => setHeritageDropdownOpen(false));
+  // ClickOutsideOverlay rendered in JSX instead of useClickOutside hook
 
   // Load saved posts from localStorage
   useEffect(() => {
@@ -454,13 +454,13 @@ export default function FeedPage() {
   }, [hasMore, loadingMore, lastDoc]);
 
   // Close menu on outside click
-  useClickOutside([menuRef], !!menuPostId, () => setMenuPostId(null));
+  // menu overlay rendered in JSX
 
   // Close reaction bar on outside click
-  useClickOutside([reactionBarRef], !!showReactionBar, () => setShowReactionBar(null));
+  // reaction bar overlay rendered in JSX
 
   // Close detail reaction bar on outside click
-  useClickOutside([detailReactionBarRef], showDetailReactionBar, () => setShowDetailReactionBar(false));
+  // detail reaction bar overlay rendered in JSX
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -1174,6 +1174,7 @@ export default function FeedPage() {
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
+              <ClickOutsideOverlay isOpen={heritageDropdownOpen} onClose={() => setHeritageDropdownOpen(false)} />
               {heritageDropdownOpen && (
                 <div className="absolute top-full right-0 mt-1.5 w-72 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
                   {(() => {
@@ -1450,8 +1451,9 @@ export default function FeedPage() {
                     >
                       <MoreHorizontal size={20} />
                     </button>
+                    <ClickOutsideOverlay isOpen={menuPostId === post.id} onClose={() => setMenuPostId(null)} />
                     {menuPostId === post.id && (
-                      <div className="absolute right-0 top-10 bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-20 min-w-[180px]">
+                      <div className="absolute right-0 top-10 bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-50 min-w-[180px]">
                         {(post.userId === user?.uid || userRole === 'admin') && (
                           <>
                             <button
@@ -1575,10 +1577,11 @@ export default function FeedPage() {
                 <div className="mx-4 border-t border-aurora-border">
                   <div className="flex items-center relative">
                     {/* Reaction Bar (Floating) */}
+                    <ClickOutsideOverlay isOpen={showReactionBar === post.id} onClose={() => setShowReactionBar(null)} />
                     {showReactionBar === post.id && (
                       <div
                         ref={reactionBarRef}
-                        className="absolute bottom-14 left-0 right-0 sm:right-auto bg-aurora-surface border border-aurora-border rounded-full shadow-aurora-3 px-2 sm:px-3 py-2 flex justify-center sm:justify-start gap-1 sm:gap-2 z-20 animate-reactionPop"
+                        className="absolute bottom-14 left-0 right-0 sm:right-auto bg-aurora-surface border border-aurora-border rounded-full shadow-aurora-3 px-2 sm:px-3 py-2 flex justify-center sm:justify-start gap-1 sm:gap-2 z-50 animate-reactionPop"
                         onMouseLeave={() => setShowReactionBar(null)}
                       >
                         {REACTIONS.map((r) => (
@@ -1997,10 +2000,11 @@ export default function FeedPage() {
                 {/* Action bar in detail */}
                 <div className="flex items-center relative pt-2 mt-2 border-t border-aurora-border">
                   {/* Floating Reaction Bar */}
+                  <ClickOutsideOverlay isOpen={showDetailReactionBar} onClose={() => setShowDetailReactionBar(false)} />
                   {showDetailReactionBar && (
                     <div
                       ref={detailReactionBarRef}
-                      className="absolute bottom-14 left-0 right-0 sm:right-auto bg-aurora-surface border border-aurora-border rounded-full shadow-aurora-3 px-2 sm:px-3 py-2 flex justify-center sm:justify-start gap-1 sm:gap-2 z-20 animate-reactionPop"
+                      className="absolute bottom-14 left-0 right-0 sm:right-auto bg-aurora-surface border border-aurora-border rounded-full shadow-aurora-3 px-2 sm:px-3 py-2 flex justify-center sm:justify-start gap-1 sm:gap-2 z-50 animate-reactionPop"
                       onMouseLeave={() => setShowDetailReactionBar(false)}
                     >
                       {REACTIONS.map((r) => (

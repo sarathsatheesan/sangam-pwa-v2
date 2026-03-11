@@ -26,7 +26,7 @@ import type { ForumTopic } from '../../constants/config';
 import { moderateContent, smartFilter } from '../../utils/contentModeration';
 import type { ModerationResult } from '../../utils/contentModeration';
 import { sanitizeText, sanitizeURL } from '../../utils/sanitize';
-import { useClickOutside } from '../../hooks/useClickOutside';
+import { ClickOutsideOverlay } from '../../components/ClickOutsideOverlay';
 import {
   MessageSquare, Heart, Share2, Bookmark,
   MoreHorizontal, ChevronLeft, ChevronDown, ChevronUp, Plus, X,
@@ -421,7 +421,7 @@ export default function ForumScreen() {
     localStorage.setItem('savedForumThreads', JSON.stringify([...savedThreads]));
   }, [savedThreads]);
 
-  useClickOutside([moreMenuRef], !!showMoreMenu, () => setShowMoreMenu(null));
+  // useClickOutside hook replaced with ClickOutsideOverlay component in JSX
 
   const toggleSaveThread = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1609,8 +1609,9 @@ export default function ForumScreen() {
                       >
                         <MoreHorizontal size={16} />
                       </button>
+                      <ClickOutsideOverlay isOpen={!!showMoreMenu} onClose={() => setShowMoreMenu(null)} />
                       {showMoreMenu === thread.id && (
-                        <div className="absolute right-0 bottom-full mb-1 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl shadow-xl py-1 w-40 z-20">
+                        <div className="absolute right-0 bottom-full mb-1 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl shadow-xl py-1 w-40 z-50">
                           <button
                             onClick={(e) => { e.stopPropagation(); setReportingContent({ contentId: thread.id, contentType: 'thread' }); setShowReport(true); setShowMoreMenu(null); }}
                             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface-variant)]"

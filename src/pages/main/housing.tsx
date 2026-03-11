@@ -25,7 +25,7 @@ import {
   DoorOpen, Flame, Zap, Droplets, Sun, MessageCircle, Star
 } from 'lucide-react';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
-import { useClickOutside } from '../../hooks/useClickOutside';
+import { ClickOutsideOverlay } from '../../components/ClickOutsideOverlay';
 
 /* ─── types ─── */
 interface Listing {
@@ -531,9 +531,7 @@ export default function HousingPage() {
   const inputCls = "w-full px-3.5 py-2.5 border border-[var(--aurora-border)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-aurora-indigo bg-[var(--aurora-surface)] text-[var(--aurora-text)] placeholder-[var(--aurora-text-muted)]";
   const viewedListingsRef = useRef<Set<string>>(new Set());
 
-  /* close dropdowns on click outside */
-  useClickOutside([typeDropdownRef], typeDropdownOpen, () => setTypeDropdownOpen(false));
-  useClickOutside([priceDropRef], !!activeDropdown, () => setActiveDropdown(null));
+  /* close dropdowns on click outside - handled by ClickOutsideOverlay component */
 
   /* toast auto-dismiss */
   useEffect(() => {
@@ -1299,6 +1297,7 @@ export default function HousingPage() {
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${typeDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
+              <ClickOutsideOverlay isOpen={typeDropdownOpen} onClose={() => setTypeDropdownOpen(false)} />
               {typeDropdownOpen && (
                 <div className="absolute top-full right-0 mt-1.5 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-2">
                   {(['rent', 'sale', 'roommate', 'sublet'] as const).map((type) => {
@@ -1381,6 +1380,7 @@ export default function HousingPage() {
                   </button>
                 );
               })()}
+              <ClickOutsideOverlay isOpen={activeDropdown === 'filters'} onClose={() => setActiveDropdown(null)} />
               {activeDropdown === 'filters' && (
                 <div className="absolute top-full left-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4 space-y-4">
                   {/* Price Range */}
