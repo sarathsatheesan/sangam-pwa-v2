@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* ── Modern Aurora Color System ── */
   /* These are the DEFAULT (light) values. Dark mode overrides via CSS variables below. */
@@ -157,22 +159,28 @@
     background: var(--aurora-scrollbar-thumb-hover);
   }
 
-  /* Dark mode: invert gray Tailwind utilities for common patterns */
-  .dark .bg-white { background-color: var(--aurora-surface); }
-  .dark .bg-gray-50 { background-color: var(--aurora-surface-variant); }
-  .dark .bg-gray-100 { background-color: var(--aurora-surface-variant); }
-  .dark .bg-gray-200 { background-color: rgba(255, 255, 255, 0.08); }
-  .dark .bg-gray-300 { background-color: rgba(255, 255, 255, 0.12); }
-  .dark .text-gray-900, .dark .text-gray-800 { color: var(--aurora-text); }
-  .dark .text-gray-700, .dark .text-gray-600 { color: var(--aurora-text-secondary); }
-  .dark .text-gray-500, .dark .text-gray-400 { color: var(--aurora-text-muted); }
-  .dark .border-gray-100, .dark .border-gray-200, .dark .border-gray-300 { border-color: var(--aurora-border); }
-  .dark .border-white { border-color: var(--aurora-surface); }
-  .dark .divide-gray-100 > :not(:first-child), .dark .divide-gray-200 > :not(:first-child) { border-color: var(--aurora-border); }
-  .dark .hover\:bg-gray-50:hover { background-color: rgba(255, 255, 255, 0.04); }
-  .dark .hover\:bg-gray-100:hover { background-color: rgba(255, 255, 255, 0.06); }
-  .dark .hover\:bg-gray-200:hover { background-color: rgba(255, 255, 255, 0.08); }
 }
+
+/* ═══════════════════════════════════════════════
+   DARK MODE OVERRIDES — Unlayered so they beat
+   Tailwind v4 @layer utilities specificity
+   ═══════════════════════════════════════════════ */
+.dark .bg-white { background-color: var(--aurora-surface) !important; }
+.dark .bg-gray-50 { background-color: var(--aurora-surface-variant) !important; }
+.dark .bg-gray-100 { background-color: var(--aurora-surface-variant) !important; }
+.dark .bg-gray-200 { background-color: rgba(255, 255, 255, 0.08) !important; }
+.dark .bg-gray-300 { background-color: rgba(255, 255, 255, 0.12) !important; }
+.dark .text-gray-900, .dark .text-gray-800 { color: var(--aurora-text) !important; }
+.dark .text-gray-700, .dark .text-gray-600 { color: var(--aurora-text-secondary) !important; }
+.dark .text-gray-500, .dark .text-gray-400 { color: var(--aurora-text-muted) !important; }
+.dark .border-gray-100, .dark .border-gray-200, .dark .border-gray-300 { border-color: var(--aurora-border) !important; }
+.dark .border-white { border-color: var(--aurora-surface) !important; }
+.dark .divide-gray-100 > :not(:first-child), .dark .divide-gray-200 > :not(:first-child) { border-color: var(--aurora-border) !important; }
+.dark .hover\:bg-gray-50:hover { background-color: rgba(255, 255, 255, 0.04) !important; }
+.dark .hover\:bg-gray-100:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+.dark .hover\:bg-gray-200:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+.dark .text-white { color: #FFFFFF !important; }
+.dark .ring-white { --tw-ring-color: var(--aurora-surface) !important; }
 
 @layer utilities {
   /* ── Aurora Backgrounds ── */
