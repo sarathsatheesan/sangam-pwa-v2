@@ -205,7 +205,7 @@ const getFullDateTime = (timestamp: any): string => {
 const getTypeConfig = (type: string) => {
   switch (type) {
     case 'community':
-      return { color: '#10B981', bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', icon: <Globe size={12} />, label: 'Community' };
+      return { color: '#10B981', bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-400', icon: <Globe size={12} />, label: 'Connect' };
     case 'professional':
       return { color: '#6366F1', bg: 'bg-indigo-50 dark:bg-indigo-500/10', text: 'text-indigo-700 dark:text-indigo-400', icon: <Users size={12} />, label: 'Professional' };
     case 'event':
@@ -1328,14 +1328,7 @@ export default function FeedPage() {
               className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
             >
               <Globe size={18} className="text-emerald-500" />
-              <span className="hidden sm:inline">Community</span>
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); setSelectedType('event'); setShowCreateModal(true); }}
-              className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
-            >
-              <Calendar size={18} className="text-amber-500" />
-              <span className="hidden sm:inline">Event</span>
+              <span className="hidden sm:inline">Connect</span>
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setShowCreateModal(true); setTimeout(() => postImageInputRef.current?.click(), 300); }}
@@ -1345,11 +1338,11 @@ export default function FeedPage() {
               <span className="hidden sm:inline">Image</span>
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); setShowFeelingPicker(true); setShowCreateModal(true); }}
+              onClick={(e) => { e.stopPropagation(); setSelectedType('event'); setShowCreateModal(true); }}
               className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-medium text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
             >
-              <Smile size={18} className="text-aurora-indigo" />
-              <span className="hidden sm:inline">Feeling</span>
+              <Calendar size={18} className="text-amber-500" />
+              <span className="hidden sm:inline">Event</span>
             </button>
           </div>
         </div>
@@ -1766,7 +1759,7 @@ export default function FeedPage() {
               <div>
                 <label className="block text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Post Type</label>
                 <div className="flex gap-2">
-                  {(['community', 'professional', 'event'] as const).map((type) => {
+                  {(['community', 'event'] as const).map((type) => {
                     const cfg = getTypeConfig(type);
                     const isActive = selectedType === type;
                     return (
