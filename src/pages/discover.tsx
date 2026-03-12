@@ -161,6 +161,22 @@ export default function DiscoverPage() {
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
   const [expandedEthnicities, setExpandedEthnicities] = useState<Set<string>>(new Set());
+  const heritageDisplayCount = useMemo(() => {
+    const counted = new Set<string>();
+    let count = 0;
+    for (const item of selectedHeritage) {
+      let isChild = false;
+      for (const [parent, children] of Object.entries(ETHNICITY_CHILDREN)) {
+        if (children.includes(item)) {
+          if (!counted.has(parent)) { counted.add(parent); count++; }
+          isChild = true;
+          break;
+        }
+      }
+      if (!isChild) count++;
+    }
+    return count;
+  }, [selectedHeritage]);
   const heritageRef = useRef<HTMLDivElement>(null);
 
   // Pre-select user's heritage ethnicities on load
@@ -742,13 +758,13 @@ export default function DiscoverPage() {
               <button
                 onClick={() => setHeritageDropdownOpen(!heritageDropdownOpen)}
                 className={`flex items-center gap-1.5 px-3 py-2.5 rounded-full text-sm font-medium transition-all border ${
-                  selectedHeritage.length > 0
+                  heritageDisplayCount > 0
                     ? 'bg-amber-50 border-amber-300 text-amber-800'
                     : 'bg-gray-50 border-gray-200 text-gray-600 dark:text-gray-300 hover:border-gray-300'
                 }`}
               >
                 <Globe className="w-4 h-4" />
-                <span className="hidden sm:inline">{selectedHeritage.length > 0 ? `ethniCity (${selectedHeritage.length})` : 'ethniCity'}</span>
+                <span className="hidden sm:inline">{heritageDisplayCount > 0 ? `ethniCity (${heritageDisplayCount})` : 'ethniCity'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${heritageDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
@@ -762,8 +778,8 @@ export default function DiscoverPage() {
                       : userProfile?.heritage ? [userProfile.heritage] : [];
                     return ETHNICITY_HIERARCHY.map((group) => {
                       const isRegionExpanded = expandedRegions.has(group.region);
-                      const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.reduce((s, e) => { const ch = ETHNICITY_CHILDREN[e]; return s + (ch ? ch.filter((c) => selectedHeritage.includes(c)).length : (selectedHeritage.includes(e) ? 1 : 0)); }, 0), 0);
-                      const totalInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.reduce((s, e) => { const ch = ETHNICITY_CHILDREN[e]; return s + (ch ? ch.length : 1); }, 0), 0);
+                      const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => { const ch = ETHNICITY_CHILDREN[e]; return ch ? ch.some((c) => selectedHeritage.includes(c)) : selectedHeritage.includes(e); }).length, 0);
+                      const totalInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.length, 0);
                       return (
                         <div key={group.region} className="border-b border-aurora-border last:border-b-0">
                           {/* Level 1: Region */}
@@ -805,8 +821,8 @@ export default function DiscoverPage() {
                               {group.subregions.map((sub) => {
                                 const isSubExpanded = expandedSubregions.has(sub.name);
                                 const allSubItems = sub.ethnicities.flatMap((e) => ETHNICITY_CHILDREN[e] || [e]);
-                                const selectedInSub = allSubItems.filter((e) => selectedHeritage.includes(e)).length;
-                                const totalInSub = allSubItems.length;
+                                const selectedInSub = sub.ethnicities.filter((e) => { const ch = ETHNICITY_CHILDREN[e]; return ch ? ch.some((c) => selectedHeritage.includes(c)) : selectedHeritage.includes(e); }).length;
+                                const totalInSub = sub.ethnicities.length;
                                 return (
                                   <div key={sub.name}>
                                     {/* Level 2: Sub-region */}
@@ -947,13 +963,13 @@ export default function DiscoverPage() {
                       );
                     });
                   })()}
-                  {selectedHeritage.length > 0 && (
+                  {heritageDisplayCount > 0 && (
                     <div className="border-t border-aurora-border px-4 py-2 bg-aurora-surface sticky bottom-0">
                       <button
                         onClick={() => setSelectedHeritage([])}
                         className="text-xs text-aurora-indigo font-medium hover:text-aurora-indigo/80"
                       >
-                        Clear all ({selectedHeritage.length})
+                        Clear all ({heritageDisplayCount})
                       </button>
                     </div>
                   )}
