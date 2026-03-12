@@ -8,7 +8,7 @@ import { db, auth } from '@/services/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { downloadMyData, deleteMyData } from '@/services/dataPrivacy';
-import { AVATAR_OPTIONS, ETHNICITY_HIERARCHY, BUSINESS_TYPES } from '@/constants/config';
+import { AVATAR_OPTIONS, ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, BUSINESS_TYPES } from '@/constants/config';
 import { validateMerchantTIN } from '@/services/merchantValidation';
 import {
   Edit3, Settings, Grid3X3, Bookmark, Heart, MessageSquare,
@@ -622,6 +622,7 @@ export default function ProfilePage() {
 
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
+  const [expandedEthnicities, setExpandedEthnicities] = useState<Set<string>>(new Set());
 
   const toggleHeritage = (item: string) => {
     setEditForm((prev) => ({
@@ -1632,17 +1633,78 @@ export default function ProfilePage() {
                                 </button>
                                 {isSubExpanded && (
                                   <div className="bg-[var(--aurora-surface-variant)]/30">
-                                    {sub.ethnicities.map((eth) => (
-                                      <label key={eth} className="flex items-center p-2 pl-9 hover:bg-[var(--aurora-surface-variant)] cursor-pointer rounded-lg text-sm">
-                                        <input
-                                          type="checkbox"
-                                          checked={editForm.heritage.includes(eth)}
-                                          onChange={() => toggleHeritage(eth)}
-                                          className="w-4 h-4 text-aurora-indigo border-[var(--aurora-border)] rounded mr-3"
-                                        />
-                                        <span className="text-[var(--aurora-text)]">{eth}</span>
-                                      </label>
-                                    ))}
+                                    {sub.ethnicities.map((eth) => {
+                                      const children = ETHNICITY_CHILDREN[eth];
+                                      if (children) {
+                                        const selectedChildren = children.filter((c) => editForm.heritage.includes(c));
+                                        const isEthExpanded = expandedEthnicities.has(eth);
+                                        return (
+                                          <div key={eth}>
+                                            <div className="flex items-center gap-2 p-2 pl-9 hover:bg-[var(--aurora-surface-variant)] transition-colors text-sm">
+                                              <input
+                                                type="checkbox"
+                                                ref={(el) => { if (el) el.indeterminate = selectedChildren.length > 0 && selectedChildren.length < children.length; }}
+                                                checked={selectedChildren.length === children.length}
+                                                onChange={() => {
+                                                  if (selectedChildren.length === children.length) {
+                                                    const newHeritage = editForm.heritage.filter((x: string) => !children.includes(x));
+                                                    setEditForm((prev: any) => ({ ...prev, heritage: newHeritage }));
+                                                  } else {
+                                                    const toAdd = children.filter((c) => !editForm.heritage.includes(c));
+                                                    setEditForm((prev: any) => ({ ...prev, heritage: [...prev.heritage, ...toAdd] }));
+                                                  }
+                                                }}
+                                                className="w-4 h-4 text-aurora-indigo border-[var(--aurora-border)] rounded"
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={() => setExpandedEthnicities((prev) => {
+                                                  const next = new Set(prev);
+                                                  if (next.has(eth)) next.delete(eth);
+                                                  else next.add(eth);
+                                                  return next;
+                                                })}
+                                                className="flex-1 flex items-center justify-between"
+                                              >
+                                                <span className="text-[var(--aurora-text)]">{eth}</span>
+                                                <div className="flex items-center gap-1.5">
+                                                  {selectedChildren.length > 0 && (
+                                                    <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedChildren.length}</span>
+                                                  )}
+                                                  <ChevronDown className={`w-3 h-3 text-[var(--aurora-text-muted)] transition-transform ${isEthExpanded ? 'rotate-180' : ''}`} />
+                                                </div>
+                                              </button>
+                                            </div>
+                                            {isEthExpanded && (
+                                              <div className="bg-[var(--aurora-surface-variant)]/40">
+                                                {children.map((child) => (
+                                                  <label key={child} className="flex items-center p-2 pl-12 hover:bg-[var(--aurora-surface-variant)] cursor-pointer rounded-lg text-sm">
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={editForm.heritage.includes(child)}
+                                                      onChange={() => toggleHeritage(child)}
+                                                      className="w-4 h-4 text-aurora-indigo border-[var(--aurora-border)] rounded mr-3"
+                                                    />
+                                                    <span className="text-[var(--aurora-text)]">{child}</span>
+                                                  </label>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      }
+                                      return (
+                                        <label key={eth} className="flex items-center p-2 pl-9 hover:bg-[var(--aurora-surface-variant)] cursor-pointer rounded-lg text-sm">
+                                          <input
+                                            type="checkbox"
+                                            checked={editForm.heritage.includes(eth)}
+                                            onChange={() => toggleHeritage(eth)}
+                                            className="w-4 h-4 text-aurora-indigo border-[var(--aurora-border)] rounded mr-3"
+                                          />
+                                          <span className="text-[var(--aurora-text)]">{eth}</span>
+                                        </label>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>

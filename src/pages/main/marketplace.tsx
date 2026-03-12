@@ -16,7 +16,7 @@ import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
 import { ClickOutsideOverlay } from '../../components/ClickOutsideOverlay';
-import { ETHNICITY_HIERARCHY, HERITAGE_OPTIONS } from '../../constants/config';
+import { ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, HERITAGE_OPTIONS } from '../../constants/config';
 import {
   Search,
   X,
@@ -546,6 +546,7 @@ export default function MarketplacePage() {
   const [heritageDropdownOpen, setHeritageDropdownOpen] = useState(false);
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
+  const [expandedEthnicities, setExpandedEthnicities] = useState<Set<string>>(new Set());
   const heritageRef = useRef<HTMLDivElement>(null);
 
   const [comments, setComments] = useState<{ [key: string]: Comment[] }>({});
@@ -1175,8 +1176,8 @@ export default function MarketplacePage() {
         : userProfile?.heritage ? [userProfile.heritage] : [];
       return ETHNICITY_HIERARCHY.map((group) => {
         const isRegionExpanded = expandedRegions.has(group.region);
-        const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => selectedHeritage.includes(e)).length, 0);
-        const totalInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.length, 0);
+        const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.reduce((s, e) => { const ch = ETHNICITY_CHILDREN[e]; return s + (ch ? ch.filter((c) => selectedHeritage.includes(c)).length : (selectedHeritage.includes(e) ? 1 : 0)); }, 0), 0);
+        const totalInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.reduce((s, e) => { const ch = ETHNICITY_CHILDREN[e]; return s + (ch ? ch.length : 1); }, 0), 0);
         return (
           <div key={group.region} className="border-b border-aurora-border last:border-b-0">
             {/* Level 1: Region */}
@@ -1186,11 +1187,11 @@ export default function MarketplacePage() {
                 ref={(el) => { if (el) el.indeterminate = selectedInRegion > 0 && selectedInRegion < totalInRegion; }}
                 checked={selectedInRegion === totalInRegion && totalInRegion > 0}
                 onChange={() => {
-                  const allEths = group.subregions.flatMap((s) => s.ethnicities);
+                  const allItems = group.subregions.flatMap((s) => s.ethnicities.flatMap((e) => ETHNICITY_CHILDREN[e] || [e]));
                   if (selectedInRegion === totalInRegion) {
-                    setSelectedHeritage((prev) => prev.filter((x) => !allEths.includes(x)));
+                    setSelectedHeritage((prev) => prev.filter((x) => !allItems.includes(x)));
                   } else {
-                    setSelectedHeritage((prev) => [...prev, ...allEths.filter((e) => !prev.includes(e))]);
+                    setSelectedHeritage((prev) => [...prev, ...allItems.filter((e) => !prev.includes(e))]);
                   }
                 }}
                 className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0"
@@ -1217,20 +1218,22 @@ export default function MarketplacePage() {
               <div className="bg-aurora-surface-variant/20">
                 {group.subregions.map((sub) => {
                   const isSubExpanded = expandedSubregions.has(sub.name);
-                  const selectedInSub = sub.ethnicities.filter((e) => selectedHeritage.includes(e)).length;
+                  const allSubItems = sub.ethnicities.flatMap((e) => ETHNICITY_CHILDREN[e] || [e]);
+                  const selectedInSub = allSubItems.filter((e) => selectedHeritage.includes(e)).length;
+                  const totalInSub = allSubItems.length;
                   return (
                     <div key={sub.name}>
                       {/* Level 2: Sub-region */}
                       <div className="w-full pl-8 pr-4 py-2 flex items-center gap-2 hover:bg-aurora-surface-variant transition-colors">
                         <input
                           type="checkbox"
-                          ref={(el) => { if (el) el.indeterminate = selectedInSub > 0 && selectedInSub < sub.ethnicities.length; }}
-                          checked={selectedInSub === sub.ethnicities.length && sub.ethnicities.length > 0}
+                          ref={(el) => { if (el) el.indeterminate = selectedInSub > 0 && selectedInSub < totalInSub; }}
+                          checked={selectedInSub === totalInSub && totalInSub > 0}
                           onChange={() => {
-                            if (selectedInSub === sub.ethnicities.length) {
-                              setSelectedHeritage((prev) => prev.filter((x) => !sub.ethnicities.includes(x)));
+                            if (selectedInSub === totalInSub) {
+                              setSelectedHeritage((prev) => prev.filter((x) => !allSubItems.includes(x)));
                             } else {
-                              setSelectedHeritage((prev) => [...prev, ...sub.ethnicities.filter((e) => !prev.includes(e))]);
+                              setSelectedHeritage((prev) => [...prev, ...allSubItems.filter((e) => !prev.includes(e))]);
                             }
                           }}
                           className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0"
@@ -1257,6 +1260,72 @@ export default function MarketplacePage() {
                         <div className="bg-aurora-surface-variant/30">
                           {sub.ethnicities.map((eth) => {
                             const isPreferred = userHeritage.some((h: string) => eth.toLowerCase().includes(h.toLowerCase()));
+                            const children = ETHNICITY_CHILDREN[eth];
+                            if (children) {
+                              const selectedChildren = children.filter((c) => selectedHeritage.includes(c));
+                              const isEthExpanded = expandedEthnicities.has(eth);
+                              return (
+                                <div key={eth}>
+                                  <div className={`flex items-center gap-2 pl-12 pr-4 py-1.5 hover:bg-aurora-surface-variant transition-colors text-sm ${isPreferred ? 'bg-amber-50/50' : ''}`}>
+                                    <input
+                                      type="checkbox"
+                                      ref={(el) => { if (el) el.indeterminate = selectedChildren.length > 0 && selectedChildren.length < children.length; }}
+                                      checked={selectedChildren.length === children.length}
+                                      onChange={() => {
+                                        if (selectedChildren.length === children.length) {
+                                          setSelectedHeritage((prev) => prev.filter((x) => !children.includes(x)));
+                                        } else {
+                                          setSelectedHeritage((prev) => [...prev, ...children.filter((c) => !prev.includes(c))]);
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0"
+                                    />
+                                    <button
+                                      onClick={() => setExpandedEthnicities((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(eth)) next.delete(eth);
+                                        else next.add(eth);
+                                        return next;
+                                      })}
+                                      className="flex-1 flex items-center justify-between"
+                                    >
+                                      <span className="text-aurora-text">{eth}</span>
+                                      <div className="flex items-center gap-1.5">
+                                        {isPreferred && (
+                                          <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>
+                                        )}
+                                        {selectedChildren.length > 0 && (
+                                          <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedChildren.length}</span>
+                                        )}
+                                        <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isEthExpanded ? 'rotate-180' : ''}`} />
+                                      </div>
+                                    </button>
+                                  </div>
+                                  {isEthExpanded && (
+                                    <div className="bg-aurora-surface-variant/40">
+                                      {children.map((child) => (
+                                        <label
+                                          key={child}
+                                          className="flex items-center gap-3 pl-16 pr-4 py-1.5 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedHeritage.includes(child)}
+                                            onChange={() => {
+                                              setSelectedHeritage((prev) =>
+                                                prev.includes(child) ? prev.filter((x) => x !== child) : [...prev, child]
+                                              );
+                                            }}
+                                            className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                                          />
+                                          <span className="text-aurora-text flex-1">{child}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
                             return (
                               <label
                                 key={eth}

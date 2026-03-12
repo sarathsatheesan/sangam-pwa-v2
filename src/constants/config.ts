@@ -91,8 +91,23 @@ export const ETHNICITY_HIERARCHY: { region: string; subregions: { name: string; 
   ]},
 ];
 
+// Sub-items under specific ethnicities (e.g., Indian states)
+export const ETHNICITY_CHILDREN: Record<string, string[]> = {
+  'Indian': [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+    'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+    'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+    'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+    'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  ],
+};
+
 // Flat lists derived from hierarchy (backward-compatible exports)
-export const HERITAGE_OPTIONS = ETHNICITY_HIERARCHY.flatMap(r => r.subregions.flatMap(s => s.ethnicities));
+export const HERITAGE_OPTIONS = [
+  ...ETHNICITY_HIERARCHY.flatMap(r => r.subregions.flatMap(s => s.ethnicities)),
+  ...Object.values(ETHNICITY_CHILDREN).flat(),
+];
 export const ETHNICITY_OPTIONS = HERITAGE_OPTIONS;
 
 // Mapping of common terms to ethnicity suggestions for auto-suggest

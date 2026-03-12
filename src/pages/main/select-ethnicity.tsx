@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ETHNICITY_HIERARCHY } from '../../constants/config';
+import { ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN } from '../../constants/config';
 import { fuzzySearch, suggestEthnicity, formatCustomEthnicity } from '../../utils/fuzzySearch';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../services/firebase';
@@ -20,6 +20,7 @@ export const SelectEthnicityPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
   const [expandedSubregions, setExpandedSubregions] = useState<Set<string>>(new Set());
+  const [expandedEthnicities, setExpandedEthnicities] = useState<Set<string>>(new Set());
 
   const flatEthnicityList = useMemo(() => {
     return ETHNICITY_HIERARCHY.flatMap(g => g.subregions.flatMap(s => s.ethnicities));
@@ -219,6 +220,67 @@ export const SelectEthnicityPage: React.FC = () => {
                               <div className="bg-aurora-surface-variant/30">
                                 {sub.ethnicities.map((eth) => {
                                   const isSelected = selectedEthnicity.includes(eth);
+                                  const children = ETHNICITY_CHILDREN[eth];
+                                  if (children) {
+                                    const selectedChildren = children.filter((c) => selectedEthnicity.includes(c));
+                                    const isEthExpanded = expandedEthnicities.has(eth);
+                                    return (
+                                      <div key={eth}>
+                                        <div className="flex items-center gap-2 pl-12 pr-4 py-1.5 hover:bg-aurora-surface-variant transition-colors text-sm">
+                                          <input
+                                            type="checkbox"
+                                            ref={(el) => { if (el) el.indeterminate = selectedChildren.length > 0 && selectedChildren.length < children.length; }}
+                                            checked={selectedChildren.length === children.length}
+                                            onChange={() => {
+                                              if (selectedChildren.length === children.length) {
+                                                setSelectedEthnicity((prev) => prev.filter((x) => !children.includes(x)));
+                                              } else {
+                                                setSelectedEthnicity((prev) => [...prev, ...children.filter((c) => !prev.includes(c))]);
+                                              }
+                                            }}
+                                            className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => setExpandedEthnicities((prev) => {
+                                              const next = new Set(prev);
+                                              if (next.has(eth)) next.delete(eth);
+                                              else next.add(eth);
+                                              return next;
+                                            })}
+                                            className="flex-1 flex items-center justify-between"
+                                          >
+                                            <span className="text-aurora-text">{eth}</span>
+                                            <div className="flex items-center gap-1.5">
+                                              {selectedChildren.length > 0 && (
+                                                <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedChildren.length}</span>
+                                              )}
+                                              <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isEthExpanded ? 'rotate-180' : ''}`} />
+                                            </div>
+                                          </button>
+                                        </div>
+                                        {isEthExpanded && (
+                                          <div className="bg-aurora-surface-variant/40">
+                                            {children.map((child) => {
+                                              const isChildSelected = selectedEthnicity.includes(child);
+                                              return (
+                                                <label key={child} className="flex items-center gap-3 pl-16 pr-4 py-1.5 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={isChildSelected}
+                                                    onChange={() => handleSelectEthnicity(child)}
+                                                    className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40"
+                                                  />
+                                                  <span className="text-aurora-text">{child}</span>
+                                                  {isChildSelected && <span className="ml-auto text-lg font-bold">✓</span>}
+                                                </label>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  }
                                   return (
                                     <label key={eth} className="flex items-center gap-3 pl-12 pr-4 py-1.5 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm">
                                       <input
