@@ -17,7 +17,7 @@ import {
   SlidersHorizontal, Globe
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
-import { ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, HERITAGE_OPTIONS } from '@/constants/config';
+import { ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, HERITAGE_OPTIONS, PRIORITY_ETHNICITIES } from '@/constants/config';
 
 interface TicketTier {
   id: string;
@@ -1162,7 +1162,150 @@ export default function EventsPage() {
       const userHeritage = Array.isArray(userProfile?.heritage)
         ? userProfile.heritage
         : userProfile?.heritage ? [userProfile.heritage] : [];
-      return ETHNICITY_HIERARCHY.map((group) => {
+      return (
+        <>
+          {/* Priority Quick Select Section */}
+          <div className="px-4 py-1.5 bg-gradient-to-r from-amber-50/80 to-orange-50/30 border-b border-amber-200/60">
+            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">★ Quick Select</span>
+          </div>
+          {PRIORITY_ETHNICITIES.map((priorityItem) => {
+            // Case 1: Region-level priority
+            const pRegion = ETHNICITY_HIERARCHY.find(r => r.region === priorityItem);
+            if (pRegion) {
+              const isPRegExp = expandedRegions.has(pRegion.region);
+              const selPReg = pRegion.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => { const ch = ETHNICITY_CHILDREN[e]; return ch ? ch.some((c) => selectedHeritage.includes(c)) : selectedHeritage.includes(e); }).length, 0);
+              const totPReg = pRegion.subregions.reduce((sum, sub) => sum + sub.ethnicities.length, 0);
+              return (
+                <div key={`pq-${priorityItem}`} className="border-b border-aurora-border/50">
+                  <div className="w-full px-4 py-2 flex items-center gap-2 hover:bg-aurora-surface-variant transition-colors">
+                    <input type="checkbox" ref={(el) => { if (el) el.indeterminate = selPReg > 0 && selPReg < totPReg; }} checked={selPReg === totPReg && totPReg > 0} onChange={() => { const allItems = pRegion.subregions.flatMap((s) => s.ethnicities.flatMap((e) => ETHNICITY_CHILDREN[e] || [e])); if (selPReg === totPReg) { setSelectedHeritage((prev) => prev.filter((x) => !allItems.includes(x))); } else { setSelectedHeritage((prev) => [...prev, ...allItems.filter((e) => !prev.includes(e))]); } }} className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0" />
+                    <button onClick={() => setExpandedRegions((prev) => { const next = new Set(prev); if (next.has(pRegion.region)) next.delete(pRegion.region); else next.add(pRegion.region); return next; })} className="flex-1 flex items-center justify-between">
+                      <span className="text-xs font-bold text-aurora-text">{pRegion.region}</span>
+                      <div className="flex items-center gap-1.5">
+                        {selPReg > 0 && <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selPReg}</span>}
+                        <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isPRegExp ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                  </div>
+                  {isPRegExp && (
+                    <div className="bg-aurora-surface-variant/20">
+                      {pRegion.subregions.map((sub) => {
+                        const isSubExp = expandedSubregions.has(sub.name);
+                        const allSubItems = sub.ethnicities.flatMap((e) => ETHNICITY_CHILDREN[e] || [e]);
+                        const selSub = sub.ethnicities.filter((e) => { const ch = ETHNICITY_CHILDREN[e]; return ch ? ch.some((c) => selectedHeritage.includes(c)) : selectedHeritage.includes(e); }).length;
+                        const totSub = sub.ethnicities.length;
+                        return (
+                          <div key={sub.name}>
+                            <div className="w-full pl-8 pr-4 py-1.5 flex items-center gap-2 hover:bg-aurora-surface-variant transition-colors">
+                              <input type="checkbox" ref={(el) => { if (el) el.indeterminate = selSub > 0 && selSub < totSub; }} checked={selSub === totSub && totSub > 0} onChange={() => { if (selSub === totSub) { setSelectedHeritage((prev) => prev.filter((x) => !allSubItems.includes(x))); } else { setSelectedHeritage((prev) => [...prev, ...allSubItems.filter((e) => !prev.includes(e))]); } }} className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0" />
+                              <button onClick={() => setExpandedSubregions((prev) => { const next = new Set(prev); if (next.has(sub.name)) next.delete(sub.name); else next.add(sub.name); return next; })} className="flex-1 flex items-center justify-between">
+                                <span className="text-xs font-semibold text-aurora-text-secondary">{sub.name}</span>
+                                <div className="flex items-center gap-1.5">
+                                  {selSub > 0 && <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selSub}</span>}
+                                  <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isSubExp ? 'rotate-180' : ''}`} />
+                                </div>
+                              </button>
+                            </div>
+                            {isSubExp && (
+                              <div className="bg-aurora-surface-variant/30">
+                                {sub.ethnicities.map((eth) => {
+                                  const isPref = userHeritage.some((h: string) => eth.toLowerCase().includes(h.toLowerCase()));
+                                  const ch = ETHNICITY_CHILDREN[eth];
+                                  if (ch) {
+                                    const selCh = ch.filter((c) => selectedHeritage.includes(c));
+                                    const isEthExp = expandedEthnicities.has(eth);
+                                    return (
+                                      <div key={eth}>
+                                        <div className={`flex items-center gap-2 pl-12 pr-4 py-1.5 hover:bg-aurora-surface-variant transition-colors text-sm ${isPref ? 'bg-amber-50/50' : ''}`}>
+                                          <input type="checkbox" ref={(el) => { if (el) el.indeterminate = selCh.length > 0 && selCh.length < ch.length; }} checked={selCh.length === ch.length} onChange={() => { if (selCh.length === ch.length) { setSelectedHeritage((prev) => prev.filter((x) => !ch.includes(x))); } else { setSelectedHeritage((prev) => [...prev, ...ch.filter((c) => !prev.includes(c))]); } }} className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0" />
+                                          <button onClick={() => setExpandedEthnicities((prev) => { const next = new Set(prev); if (next.has(eth)) next.delete(eth); else next.add(eth); return next; })} className="flex-1 flex items-center justify-between">
+                                            <span className="text-aurora-text">{eth}</span>
+                                            <div className="flex items-center gap-1.5">
+                                              {isPref && <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>}
+                                              {selCh.length > 0 && <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selCh.length}</span>}
+                                              <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isEthExp ? 'rotate-180' : ''}`} />
+                                            </div>
+                                          </button>
+                                        </div>
+                                        {isEthExp && (
+                                          <div className="bg-aurora-surface-variant/40">
+                                            {ch.map((child) => (
+                                              <label key={child} className="flex items-center gap-3 pl-16 pr-4 py-1.5 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm">
+                                                <input type="checkbox" checked={selectedHeritage.includes(child)} onChange={() => setSelectedHeritage((prev) => prev.includes(child) ? prev.filter((x) => x !== child) : [...prev, child])} className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40" />
+                                                <span className="text-aurora-text flex-1">{child}</span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <label key={eth} className={`flex items-center gap-3 pl-12 pr-4 py-1.5 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm ${isPref ? 'bg-amber-50/50' : ''}`}>
+                                      <input type="checkbox" checked={selectedHeritage.includes(eth)} onChange={() => setSelectedHeritage((prev) => prev.includes(eth) ? prev.filter((x) => x !== eth) : [...prev, eth])} className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40" />
+                                      <span className="text-aurora-text flex-1">{eth}</span>
+                                      {isPref && <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            // Case 2: Ethnicity with children (e.g., Indian)
+            const pChildren = ETHNICITY_CHILDREN[priorityItem];
+            if (pChildren) {
+              const selCh = pChildren.filter((c) => selectedHeritage.includes(c));
+              const isEthExp = expandedEthnicities.has(priorityItem);
+              const isPref = userHeritage.some((h: string) => priorityItem.toLowerCase().includes(h.toLowerCase()));
+              return (
+                <div key={`pq-${priorityItem}`} className="border-b border-aurora-border/50">
+                  <div className={`flex items-center gap-2 px-4 py-2 hover:bg-aurora-surface-variant transition-colors text-sm ${isPref ? 'bg-amber-50/50' : ''}`}>
+                    <input type="checkbox" ref={(el) => { if (el) el.indeterminate = selCh.length > 0 && selCh.length < pChildren.length; }} checked={selCh.length === pChildren.length} onChange={() => { if (selCh.length === pChildren.length) { setSelectedHeritage((prev) => prev.filter((x) => !pChildren.includes(x))); } else { setSelectedHeritage((prev) => [...prev, ...pChildren.filter((c) => !prev.includes(c))]); } }} className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0" />
+                    <button onClick={() => setExpandedEthnicities((prev) => { const next = new Set(prev); if (next.has(priorityItem)) next.delete(priorityItem); else next.add(priorityItem); return next; })} className="flex-1 flex items-center justify-between">
+                      <span className="text-xs font-bold text-aurora-text">{priorityItem}</span>
+                      <div className="flex items-center gap-1.5">
+                        {isPref && <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>}
+                        {selCh.length > 0 && <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selCh.length}</span>}
+                        <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isEthExp ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+                  </div>
+                  {isEthExp && (
+                    <div className="bg-aurora-surface-variant/40">
+                      {pChildren.map((child) => (
+                        <label key={child} className="flex items-center gap-3 pl-8 pr-4 py-1.5 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm">
+                          <input type="checkbox" checked={selectedHeritage.includes(child)} onChange={() => setSelectedHeritage((prev) => prev.includes(child) ? prev.filter((x) => x !== child) : [...prev, child])} className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40" />
+                          <span className="text-aurora-text flex-1">{child}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            // Case 3: Simple ethnicity (e.g., Chinese, French)
+            const isPref = userHeritage.some((h: string) => priorityItem.toLowerCase().includes(h.toLowerCase()));
+            return (
+              <label key={`pq-${priorityItem}`} className={`flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-aurora-surface-variant transition-colors text-sm border-b border-aurora-border/50 ${isPref ? 'bg-amber-50/50' : ''}`}>
+                <input type="checkbox" checked={selectedHeritage.includes(priorityItem)} onChange={() => setSelectedHeritage((prev) => prev.includes(priorityItem) ? prev.filter((x) => x !== priorityItem) : [...prev, priorityItem])} className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40" />
+                <span className="text-aurora-text flex-1">{priorityItem}</span>
+                {isPref && <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">Preferred</span>}
+              </label>
+            );
+          })}
+          {/* Visual Divider */}
+          <div className="flex items-center gap-2 px-4 py-1.5 border-y-2 border-dashed border-aurora-border/60 bg-gray-50/50 dark:bg-gray-800/50">
+            <span className="text-[10px] font-bold text-aurora-text-muted uppercase tracking-wider">All Ethnicities</span>
+          </div>
+          {/* Full Hierarchy */}
+              {ETHNICITY_HIERARCHY.map((group) => {
         const isRegionExpanded = expandedRegions.has(group.region);
         const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => { const ch = ETHNICITY_CHILDREN[e]; return ch ? ch.some((c) => selectedHeritage.includes(c)) : selectedHeritage.includes(e); }).length, 0);
         const totalInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.length, 0);
@@ -1347,7 +1490,9 @@ export default function EventsPage() {
             )}
           </div>
         );
-      });
+      })}
+        </>
+      );
     })()}
     {heritageDisplayCount > 0 && (
       <div className="border-t border-aurora-border px-4 py-2 bg-aurora-surface sticky bottom-0">

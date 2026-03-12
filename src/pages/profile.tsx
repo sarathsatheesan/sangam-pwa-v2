@@ -8,7 +8,7 @@ import { db, auth } from '@/services/firebase';
 import { doc, updateDoc, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { downloadMyData, deleteMyData } from '@/services/dataPrivacy';
-import { AVATAR_OPTIONS, ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, BUSINESS_TYPES } from '@/constants/config';
+import { AVATAR_OPTIONS, ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, BUSINESS_TYPES, PRIORITY_ETHNICITIES } from '@/constants/config';
 import { validateMerchantTIN } from '@/services/merchantValidation';
 import {
   Edit3, Settings, Grid3X3, Bookmark, Heart, MessageSquare,
@@ -1582,8 +1582,254 @@ export default function ProfilePage() {
                   ))}
                 </div>
               )}
-              <div className="space-y-0 max-h-48 overflow-y-auto border border-[var(--aurora-border)] rounded-xl">
-                {ETHNICITY_HIERARCHY.map((group) => {
+              <>
+                {/* Priority Quick Select */}
+                <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-3 mb-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-amber-600 dark:text-amber-400 text-lg">★</span>
+                    <h3 className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">Quick Select</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {PRIORITY_ETHNICITIES.map((priorityItem) => {
+                      const regionMatch = ETHNICITY_HIERARCHY.find((r) => r.region === priorityItem);
+                      const isInChildren = priorityItem in ETHNICITY_CHILDREN;
+
+                      if (regionMatch) {
+                        // It's a region - render as expandable region
+                        const isExpanded = expandedRegions.has(priorityItem);
+                        const selectedInRegion = regionMatch.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => editForm.heritage.includes(e)).length, 0);
+                        return (
+                          <div key={`pq-${priorityItem}`}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRegions((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(priorityItem)) next.delete(priorityItem);
+                                else next.add(priorityItem);
+                                return next;
+                              })}
+                              className="w-full px-2 py-1.5 flex items-center justify-between hover:bg-amber-100/50 dark:hover:bg-amber-500/20 rounded-lg transition-colors text-xs"
+                            >
+                              <span className="font-semibold text-amber-900 dark:text-amber-200">{priorityItem}</span>
+                              <div className="flex items-center gap-1">
+                                {selectedInRegion > 0 && (
+                                  <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-200/50 dark:bg-amber-500/30 px-1.5 py-0.5 rounded-full">{selectedInRegion}</span>
+                                )}
+                                <ChevronDown className={`w-3 h-3 text-amber-600 dark:text-amber-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div className="ml-2 mt-1 space-y-1 bg-amber-100/30 dark:bg-amber-500/10 rounded-lg p-2">
+                                {regionMatch.subregions.map((sub) => {
+                                  const isSubExpanded = expandedSubregions.has(`pq-${priorityItem}-${sub.name}`);
+                                  const selectedInSub = sub.ethnicities.filter((e) => editForm.heritage.includes(e)).length;
+                                  return (
+                                    <div key={`pq-${priorityItem}-${sub.name}`}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setExpandedSubregions((prev) => {
+                                          const next = new Set(prev);
+                                          const key = `pq-${priorityItem}-${sub.name}`;
+                                          if (next.has(key)) next.delete(key);
+                                          else next.add(key);
+                                          return next;
+                                        })}
+                                        className="w-full px-2 py-1 flex items-center justify-between hover:bg-amber-100/50 dark:hover:bg-amber-500/20 rounded text-xs transition-colors"
+                                      >
+                                        <span className="text-amber-800 dark:text-amber-300 font-medium">{sub.name}</span>
+                                        <div className="flex items-center gap-1">
+                                          {selectedInSub > 0 && (
+                                            <span className="text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-200/50 dark:bg-amber-500/30 px-1 py-0.5 rounded-full">{selectedInSub}</span>
+                                          )}
+                                          <ChevronDown className={`w-2 h-2 text-amber-600 dark:text-amber-400 transition-transform ${isSubExpanded ? 'rotate-180' : ''}`} />
+                                        </div>
+                                      </button>
+                                      {isSubExpanded && (
+                                        <div className="ml-2 mt-1 space-y-1">
+                                          {sub.ethnicities.map((eth) => {
+                                            const children = ETHNICITY_CHILDREN[eth];
+                                            if (children) {
+                                              const selectedChildren = children.filter((c) => editForm.heritage.includes(c));
+                                              const isEthExpanded = expandedEthnicities.has(`pq-${eth}`);
+                                              return (
+                                                <div key={`pq-${eth}`}>
+                                                  <div className="flex items-center gap-2 py-0.5 px-1">
+                                                    <input
+                                                      type="checkbox"
+                                                      ref={(el) => { if (el) el.indeterminate = selectedChildren.length > 0 && selectedChildren.length < children.length; }}
+                                                      checked={selectedChildren.length === children.length}
+                                                      onChange={() => {
+                                                        if (selectedChildren.length === children.length) {
+                                                          const newHeritage = editForm.heritage.filter((x: string) => !children.includes(x));
+                                                          setEditForm((prev: any) => ({ ...prev, heritage: newHeritage }));
+                                                        } else {
+                                                          const toAdd = children.filter((c) => !editForm.heritage.includes(c));
+                                                          setEditForm((prev: any) => ({ ...prev, heritage: [...prev.heritage, ...toAdd] }));
+                                                        }
+                                                      }}
+                                                      className="w-3 h-3 text-amber-600 border-amber-300 rounded"
+                                                    />
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => setExpandedEthnicities((prev) => {
+                                                        const next = new Set(prev);
+                                                        const key = `pq-${eth}`;
+                                                        if (next.has(key)) next.delete(key);
+                                                        else next.add(key);
+                                                        return next;
+                                                      })}
+                                                      className="flex-1 flex items-center justify-between text-xs"
+                                                    >
+                                                      <span className="text-amber-800 dark:text-amber-200">{eth}</span>
+                                                      <ChevronDown className={`w-2 h-2 text-amber-600 dark:text-amber-400 transition-transform ${isEthExpanded ? 'rotate-180' : ''}`} />
+                                                    </button>
+                                                  </div>
+                                                  {isEthExpanded && (
+                                                    <div className="ml-3 mt-0.5 space-y-0.5 text-xs">
+                                                      {children.map((child) => (
+                                                        <label key={`pq-${child}`} className="flex items-center gap-2 py-0.5 px-1 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-500/20 rounded">
+                                                          <input
+                                                            type="checkbox"
+                                                            checked={editForm.heritage.includes(child)}
+                                                            onChange={() => setEditForm((prev: any) => ({
+                                                              ...prev,
+                                                              heritage: prev.heritage.includes(child)
+                                                                ? prev.heritage.filter((x: string) => x !== child)
+                                                                : [...prev.heritage, child]
+                                                            }))}
+                                                            className="w-3 h-3 text-amber-600 border-amber-300 rounded"
+                                                          />
+                                                          <span className="text-amber-800 dark:text-amber-300">{child}</span>
+                                                        </label>
+                                                      ))}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              );
+                                            }
+                                            return (
+                                              <label key={`pq-${eth}`} className="flex items-center gap-2 py-0.5 px-1 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-500/20 rounded text-xs">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={editForm.heritage.includes(eth)}
+                                                  onChange={() => setEditForm((prev: any) => ({
+                                                    ...prev,
+                                                    heritage: prev.heritage.includes(eth)
+                                                      ? prev.heritage.filter((x: string) => x !== eth)
+                                                      : [...prev.heritage, eth]
+                                                  }))}
+                                                  className="w-3 h-3 text-amber-600 border-amber-300 rounded"
+                                                />
+                                                <span className="text-amber-800 dark:text-amber-300">{eth}</span>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      } else if (isInChildren) {
+                        // It's an ethnicity with children
+                        const children = ETHNICITY_CHILDREN[priorityItem];
+                        const selectedChildren = children.filter((c) => editForm.heritage.includes(c));
+                        const isExpanded = expandedEthnicities.has(`pq-${priorityItem}`);
+                        return (
+                          <div key={`pq-${priorityItem}`}>
+                            <div className="flex items-center gap-2 py-1.5 px-2 hover:bg-amber-100/50 dark:hover:bg-amber-500/20 rounded-lg transition-colors">
+                              <input
+                                type="checkbox"
+                                ref={(el) => { if (el) el.indeterminate = selectedChildren.length > 0 && selectedChildren.length < children.length; }}
+                                checked={selectedChildren.length === children.length}
+                                onChange={() => {
+                                  if (selectedChildren.length === children.length) {
+                                    const newHeritage = editForm.heritage.filter((x: string) => !children.includes(x));
+                                    setEditForm((prev: any) => ({ ...prev, heritage: newHeritage }));
+                                  } else {
+                                    const toAdd = children.filter((c) => !editForm.heritage.includes(c));
+                                    setEditForm((prev: any) => ({ ...prev, heritage: [...prev.heritage, ...toAdd] }));
+                                  }
+                                }}
+                                className="w-4 h-4 text-amber-600 border-amber-300 rounded"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setExpandedEthnicities((prev) => {
+                                  const next = new Set(prev);
+                                  const key = `pq-${priorityItem}`;
+                                  if (next.has(key)) next.delete(key);
+                                  else next.add(key);
+                                  return next;
+                                })}
+                                className="flex-1 flex items-center justify-between text-xs"
+                              >
+                                <span className="font-semibold text-amber-900 dark:text-amber-200">{priorityItem}</span>
+                                <div className="flex items-center gap-1">
+                                  {selectedChildren.length > 0 && (
+                                    <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-200/50 dark:bg-amber-500/30 px-1.5 py-0.5 rounded-full">{selectedChildren.length}</span>
+                                  )}
+                                  <ChevronDown className={`w-3 h-3 text-amber-600 dark:text-amber-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </div>
+                              </button>
+                            </div>
+                            {isExpanded && (
+                              <div className="ml-2 mt-1 space-y-1 bg-amber-100/30 dark:bg-amber-500/10 rounded-lg p-2">
+                                {children.map((child) => (
+                                  <label key={`pq-${child}`} className="flex items-center gap-2 py-0.5 px-1 cursor-pointer hover:bg-amber-100/50 dark:hover:bg-amber-500/20 rounded text-xs">
+                                    <input
+                                      type="checkbox"
+                                      checked={editForm.heritage.includes(child)}
+                                      onChange={() => setEditForm((prev: any) => ({
+                                        ...prev,
+                                        heritage: prev.heritage.includes(child)
+                                          ? prev.heritage.filter((x: string) => x !== child)
+                                          : [...prev.heritage, child]
+                                      }))}
+                                      className="w-3 h-3 text-amber-600 border-amber-300 rounded"
+                                    />
+                                    <span className="text-amber-800 dark:text-amber-300">{child}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      } else {
+                        // It's a simple ethnicity - render as simple checkbox
+                        return (
+                          <label key={`pq-${priorityItem}`} className="flex items-center gap-2 py-1.5 px-2 hover:bg-amber-100/50 dark:hover:bg-amber-500/20 rounded-lg cursor-pointer transition-colors text-xs">
+                            <input
+                              type="checkbox"
+                              checked={editForm.heritage.includes(priorityItem)}
+                              onChange={() => setEditForm((prev: any) => ({
+                                ...prev,
+                                heritage: prev.heritage.includes(priorityItem)
+                                  ? prev.heritage.filter((x: string) => x !== priorityItem)
+                                  : [...prev.heritage, priorityItem]
+                              }))}
+                              className="w-4 h-4 text-amber-600 border-amber-300 rounded"
+                            />
+                            <span className="font-semibold text-amber-900 dark:text-amber-200">{priorityItem}</span>
+                          </label>
+                        );
+                      }
+                    })}
+                  </div>
+                </div>
+
+                {/* All Ethnicities Divider */}
+                <div className="flex items-center gap-2 my-3 px-3">
+                  <div className="flex-1 border-t border-dashed border-[var(--aurora-border)]"></div>
+                  <span className="text-[10px] font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider">All Ethnicities</span>
+                  <div className="flex-1 border-t border-dashed border-[var(--aurora-border)]"></div>
+                </div>
+
+                <div className="space-y-0 max-h-48 overflow-y-auto border border-[var(--aurora-border)] rounded-xl">
+                  {ETHNICITY_HIERARCHY.map((group) => {
                   const isRegionExpanded = expandedRegions.has(group.region);
                   const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => editForm.heritage.includes(e)).length, 0);
                   return (
@@ -1716,6 +1962,7 @@ export default function ProfilePage() {
                   );
                 })}
               </div>
+              </>
             </div>
 
             {/* Interests */}

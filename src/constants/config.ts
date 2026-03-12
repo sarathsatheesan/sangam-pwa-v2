@@ -103,6 +103,16 @@ export const ETHNICITY_CHILDREN: Record<string, string[]> = {
   ],
 };
 
+// Priority ethnicities shown at top of dropdown for quick access
+// Can be region names, subregion names, or ethnicity names from the hierarchy
+export const PRIORITY_ETHNICITIES: string[] = [
+  'Indian',
+  'Hispanic or Latino',
+  'Chinese',
+  'French',
+  'Oceanian / Pacific Islander',
+];
+
 // Flat lists derived from hierarchy (backward-compatible exports)
 export const HERITAGE_OPTIONS = [
   ...ETHNICITY_HIERARCHY.flatMap(r => r.subregions.flatMap(s => s.ethnicities)),
