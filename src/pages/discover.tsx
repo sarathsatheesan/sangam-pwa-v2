@@ -594,35 +594,45 @@ export default function DiscoverPage() {
     if (activeTab !== 'discover' || !userProfile)
       return { sameCity: [], sameHeritage: [], similarInterests: [] };
 
-    const nonConnected = people.filter((p) => !connections.has(p.id));
+    // Include unconnected users AND pending requests sent by current user
+    // (mirrors the Discover tab filter so sections don't disappear after sending requests)
+    const discoverable = people.filter((p) => {
+      const status = connections.get(p.id);
+      if (!status) return true; // not connected at all
+      if (status === 'pending') {
+        return connectionDetails.get(p.id)?.initiatedBy === user?.uid; // sent by me
+      }
+      return false; // exclude fully connected
+    });
 
     const userCity = userProfile.city || '';
-    const userHeritage = Array.isArray(userProfile.heritage)
+    const userHeritage = (Array.isArray(userProfile.heritage)
       ? userProfile.heritage
-      : [userProfile.heritage].filter(Boolean);
+      : [userProfile.heritage].filter(Boolean)
+    ).map((h: string) => h.toLowerCase());
     const userInterests: string[] = userProfile.interests || [];
 
-    const sameCity = nonConnected
+    const sameCity = discoverable
       .filter(
         (p) =>
           p.city && userCity && p.city.toLowerCase() === userCity.toLowerCase()
       )
       .slice(0, 10);
-    const sameHeritage = nonConnected
+    const sameHeritage = discoverable
       .filter((p) => {
-        const pH = Array.isArray(p.heritage) ? p.heritage : [p.heritage];
-        return pH.some((h) => userHeritage.includes(h));
+        const pH = (Array.isArray(p.heritage) ? p.heritage : [p.heritage]).filter(Boolean);
+        return pH.some((h: string) => userHeritage.includes(h.toLowerCase()));
       })
       .slice(0, 10);
-    const similarInterests = nonConnected
+    const similarInterests = discoverable
       .filter((p) => {
-        const shared = (p.interests || []).filter((i) => userInterests.includes(i));
+        const shared = (p.interests || []).filter((i: string) => userInterests.includes(i));
         return shared.length >= 2;
       })
       .slice(0, 10);
 
     return { sameCity, sameHeritage, similarInterests };
-  }, [people, connections, userProfile, activeTab]);
+  }, [people, connections, connectionDetails, userProfile, activeTab, user?.uid]);
 
   // Pending/Sent requests
   const incomingRequests = useMemo(() => {
@@ -972,7 +982,7 @@ export default function DiscoverPage() {
         {/* PYMK Carousels */}
         {activeTab === 'discover' && !loading && (
           <>
-            {pymkGroups.sameCity.length >= 2 && (
+            {pymkGroups.sameCity.length >= 1 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <MapPin className="w-5 h-5 text-blue-600" />
@@ -1021,13 +1031,22 @@ export default function DiscoverPage() {
                             </div>
                           )}
                           <div className="mt-auto pt-3">
-                            <button
-                              onClick={() => handleConnect(person.id)}
-                              disabled={connectingId === person.id}
-                              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
-                            >
-                              Connect
-                            </button>
+                            {connections.get(person.id) === 'pending' ? (
+                              <button
+                                disabled
+                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-2 rounded font-medium text-sm flex items-center justify-center gap-1.5"
+                              >
+                                <Clock className="w-3.5 h-3.5" /> Pending
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleConnect(person.id)}
+                                disabled={connectingId === person.id}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                              >
+                                Connect
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1037,7 +1056,7 @@ export default function DiscoverPage() {
               </div>
             )}
 
-            {pymkGroups.sameHeritage.length >= 2 && (
+            {pymkGroups.sameHeritage.length >= 1 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <Globe className="w-5 h-5 text-orange-600" />
@@ -1086,13 +1105,22 @@ export default function DiscoverPage() {
                             </div>
                           )}
                           <div className="mt-auto pt-3">
-                            <button
-                              onClick={() => handleConnect(person.id)}
-                              disabled={connectingId === person.id}
-                              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
-                            >
-                              Connect
-                            </button>
+                            {connections.get(person.id) === 'pending' ? (
+                              <button
+                                disabled
+                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-2 rounded font-medium text-sm flex items-center justify-center gap-1.5"
+                              >
+                                <Clock className="w-3.5 h-3.5" /> Pending
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleConnect(person.id)}
+                                disabled={connectingId === person.id}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                              >
+                                Connect
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1102,7 +1130,7 @@ export default function DiscoverPage() {
               </div>
             )}
 
-            {pymkGroups.similarInterests.length >= 2 && (
+            {pymkGroups.similarInterests.length >= 1 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
                   <Sparkles className="w-5 h-5 text-purple-600" />
@@ -1151,13 +1179,22 @@ export default function DiscoverPage() {
                             </div>
                           )}
                           <div className="mt-auto pt-3">
-                            <button
-                              onClick={() => handleConnect(person.id)}
-                              disabled={connectingId === person.id}
-                              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
-                            >
-                              Connect
-                            </button>
+                            {connections.get(person.id) === 'pending' ? (
+                              <button
+                                disabled
+                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-2 rounded font-medium text-sm flex items-center justify-center gap-1.5"
+                              >
+                                <Clock className="w-3.5 h-3.5" /> Pending
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleConnect(person.id)}
+                                disabled={connectingId === person.id}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                              >
+                                Connect
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
