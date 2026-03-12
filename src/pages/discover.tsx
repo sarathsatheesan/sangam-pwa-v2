@@ -506,6 +506,18 @@ export default function DiscoverPage() {
   }).length;
 
   // Get mutual connection count
+  // Helper: render heritage badge(s) for a person, hidden if "Prefer Not to Say"
+  const renderHeritage = (person: User, size: 'xs' | 'sm' = 'xs') => {
+    const raw = Array.isArray(person.heritage) ? person.heritage : [person.heritage];
+    const display = raw.filter((h) => h && h !== 'Prefer Not to Say' && h !== 'Other');
+    if (display.length === 0) return null;
+    return (
+      <p className={`text-${size} text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5`}>
+        <Globe className="w-3 h-3 shrink-0" /> <span className="truncate">{display.join(', ')}</span>
+      </p>
+    );
+  };
+
   const getMutualConnectionCount = (personId: string): number => {
     let count = 0;
     const targetPerson = people.find((p) => p.id === personId);
@@ -904,6 +916,7 @@ export default function DiscoverPage() {
                     </div>
                     <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
                     {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>}
+                    {renderHeritage(person, 'sm')}
                     {person.showLocation && (
                       <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                         <MapPin className="w-3 h-3" /> {person.city}
@@ -958,6 +971,7 @@ export default function DiscoverPage() {
                     </div>
                     <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
                     {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>}
+                    {renderHeritage(person, 'sm')}
                     {person.showLocation && (
                       <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                         <MapPin className="w-3 h-3" /> {person.city}
@@ -1020,6 +1034,7 @@ export default function DiscoverPage() {
                           </div>
                           <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
                           {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
+                          {renderHeritage(person)}
                           {person.showLocation && (
                             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
@@ -1094,6 +1109,7 @@ export default function DiscoverPage() {
                           </div>
                           <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
                           {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
+                          {renderHeritage(person)}
                           {person.showLocation && (
                             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
@@ -1168,6 +1184,7 @@ export default function DiscoverPage() {
                           </div>
                           <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
                           {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
+                          {renderHeritage(person)}
                           {person.showLocation && (
                             <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
                               <MapPin className="w-3 h-3" /> {person.city}
@@ -1266,6 +1283,7 @@ export default function DiscoverPage() {
                       </div>
                     </div>
                     <div className="mt-2 space-y-0.5">
+                      {renderHeritage(person)}
                       {person.showLocation && (
                         <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
                           <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
@@ -1379,6 +1397,7 @@ export default function DiscoverPage() {
                     </div>
 
                     {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">{person.profession}</p>}
+                    {renderHeritage(person, 'sm')}
                     {person.showLocation && (
                       <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-2">
                         <MapPin className="w-3 h-3" /> {person.city}
