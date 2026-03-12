@@ -432,7 +432,13 @@ export default function BusinessPage() {
           break;
         }
       }
-      if (!isChild) count++;
+      if (!isChild) {
+        if (ETHNICITY_CHILDREN[item]) {
+          if (!counted.has(item)) { counted.add(item); count++; }
+        } else {
+          count++;
+        }
+      }
     }
     return count;
   }, [selectedHeritage]);
