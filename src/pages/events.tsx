@@ -1142,25 +1142,43 @@ export default function EventsPage() {
       return ETHNICITY_HIERARCHY.map((group) => {
         const isRegionExpanded = expandedRegions.has(group.region);
         const selectedInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.filter((e) => selectedHeritage.includes(e)).length, 0);
+        const totalInRegion = group.subregions.reduce((sum, sub) => sum + sub.ethnicities.length, 0);
         return (
           <div key={group.region} className="border-b border-aurora-border last:border-b-0">
-            <button
-              onClick={() => setExpandedRegions((prev) => {
-                const next = new Set(prev);
-                if (next.has(group.region)) next.delete(group.region);
-                else next.add(group.region);
-                return next;
-              })}
-              className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
-            >
-              <span className="text-xs font-bold text-aurora-text">{group.region}</span>
-              <div className="flex items-center gap-1.5">
-                {selectedInRegion > 0 && (
-                  <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInRegion}</span>
-                )}
-                <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isRegionExpanded ? 'rotate-180' : ''}`} />
-              </div>
-            </button>
+            {/* Level 1: Region */}
+            <div className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-aurora-surface-variant transition-colors">
+              <input
+                type="checkbox"
+                ref={(el) => { if (el) el.indeterminate = selectedInRegion > 0 && selectedInRegion < totalInRegion; }}
+                checked={selectedInRegion === totalInRegion && totalInRegion > 0}
+                onChange={() => {
+                  const allEths = group.subregions.flatMap((s) => s.ethnicities);
+                  if (selectedInRegion === totalInRegion) {
+                    setSelectedHeritage((prev) => prev.filter((x) => !allEths.includes(x)));
+                  } else {
+                    setSelectedHeritage((prev) => [...prev, ...allEths.filter((e) => !prev.includes(e))]);
+                  }
+                }}
+                className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0"
+              />
+              <button
+                onClick={() => setExpandedRegions((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(group.region)) next.delete(group.region);
+                  else next.add(group.region);
+                  return next;
+                })}
+                className="flex-1 flex items-center justify-between"
+              >
+                <span className="text-xs font-bold text-aurora-text">{group.region}</span>
+                <div className="flex items-center gap-1.5">
+                  {selectedInRegion > 0 && (
+                    <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInRegion}</span>
+                  )}
+                  <ChevronDown className={`w-3.5 h-3.5 text-aurora-text-muted transition-transform ${isRegionExpanded ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+            </div>
             {isRegionExpanded && (
               <div className="bg-aurora-surface-variant/20">
                 {group.subregions.map((sub) => {
@@ -1168,23 +1186,39 @@ export default function EventsPage() {
                   const selectedInSub = sub.ethnicities.filter((e) => selectedHeritage.includes(e)).length;
                   return (
                     <div key={sub.name}>
-                      <button
-                        onClick={() => setExpandedSubregions((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(sub.name)) next.delete(sub.name);
-                          else next.add(sub.name);
-                          return next;
-                        })}
-                        className="w-full pl-8 pr-4 py-2 flex items-center justify-between hover:bg-aurora-surface-variant transition-colors"
-                      >
-                        <span className="text-xs font-semibold text-aurora-text-secondary">{sub.name}</span>
-                        <div className="flex items-center gap-1.5">
-                          {selectedInSub > 0 && (
-                            <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInSub}</span>
-                          )}
-                          <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isSubExpanded ? 'rotate-180' : ''}`} />
-                        </div>
-                      </button>
+                      {/* Level 2: Sub-region */}
+                      <div className="w-full pl-8 pr-4 py-2 flex items-center gap-2 hover:bg-aurora-surface-variant transition-colors">
+                        <input
+                          type="checkbox"
+                          ref={(el) => { if (el) el.indeterminate = selectedInSub > 0 && selectedInSub < sub.ethnicities.length; }}
+                          checked={selectedInSub === sub.ethnicities.length && sub.ethnicities.length > 0}
+                          onChange={() => {
+                            if (selectedInSub === sub.ethnicities.length) {
+                              setSelectedHeritage((prev) => prev.filter((x) => !sub.ethnicities.includes(x)));
+                            } else {
+                              setSelectedHeritage((prev) => [...prev, ...sub.ethnicities.filter((e) => !prev.includes(e))]);
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-aurora-border text-aurora-indigo focus:ring-aurora-indigo/40 shrink-0"
+                        />
+                        <button
+                          onClick={() => setExpandedSubregions((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(sub.name)) next.delete(sub.name);
+                            else next.add(sub.name);
+                            return next;
+                          })}
+                          className="flex-1 flex items-center justify-between"
+                        >
+                          <span className="text-xs font-semibold text-aurora-text-secondary">{sub.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            {selectedInSub > 0 && (
+                              <span className="text-[10px] font-semibold text-aurora-indigo bg-aurora-indigo/10 px-1.5 py-0.5 rounded-full">{selectedInSub}</span>
+                            )}
+                            <ChevronDown className={`w-3 h-3 text-aurora-text-muted transition-transform ${isSubExpanded ? 'rotate-180' : ''}`} />
+                          </div>
+                        </button>
+                      </div>
                       {isSubExpanded && (
                         <div className="bg-aurora-surface-variant/30">
                           {sub.ethnicities.map((eth) => {
