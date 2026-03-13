@@ -1556,7 +1556,9 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* ─── Sort Mode Tabs ─── */}
+      </div>{/* end sticky header wrapper */}
+
+      {/* ─── Sort Mode Tabs (scrolls with content) ─── */}
       <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
@@ -1580,8 +1582,6 @@ export default function FeedPage() {
           </div>
         </div>
       </div>
-
-      </div>{/* end sticky header wrapper */}
 
       {/* ─── Create Post Composer Card ─── */}
       <div className="max-w-2xl mx-auto px-4 pt-3">
