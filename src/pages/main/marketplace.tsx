@@ -1150,7 +1150,7 @@ export default function MarketplacePage() {
   return (
     <div className="min-h-screen bg-[var(--aurora-bg)]">
       {/* ─── Sticky Header: Search + Filter ─── */}
-      <div className="sticky top-0 z-20">
+      <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
 
       {/* Header */}
       <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-30">

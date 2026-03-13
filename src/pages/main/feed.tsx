@@ -1149,7 +1149,7 @@ export default function FeedPage() {
     <div className="bg-gradient-to-b from-indigo-100/50 via-indigo-50/30 to-emerald-100/40">
 
       {/* ─── Sticky Search + Sort Header ─── */}
-      <div className="sticky top-0 z-20">
+      <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
 
       {/* ─── Search & Ethnicity Filter ─── */}
       <div className="relative bg-gradient-to-br from-indigo-400/25 via-indigo-100/40 to-emerald-400/20 border-b border-aurora-border z-30">

@@ -902,7 +902,7 @@ export default function BusinessPage() {
   return (
     <div className="bg-aurora-bg">
       {/* ─── Sticky Header: Search + Category ─── */}
-      <div className="sticky top-0 z-20">
+      <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
       {/* ── Search & Filter Bar ── */}
       <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">

@@ -269,7 +269,7 @@ export default function TravelPage() {
       </div>
 
       {/* ─── Sticky Header: Search + Filter ─── */}
-      <div className="sticky top-0 z-20">
+      <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
 
       {/* Search + Ethnicity Header */}
       <div className="relative bg-gradient-to-br from-teal-500/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-30">
