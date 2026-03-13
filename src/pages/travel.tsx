@@ -660,8 +660,9 @@ export default function TravelPage() {
           </div>
         </div>
       </div>
+      </div>{/* end sticky header wrapper */}
 
-      {/* Filter Pills */}
+      {/* Filter Pills (scrolls with content) */}
       <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
@@ -685,8 +686,6 @@ export default function TravelPage() {
           </div>
         </div>
       </div>
-
-      </div>{/* end sticky header wrapper */}
 
       {/* Posts */}
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
