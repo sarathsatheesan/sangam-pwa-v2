@@ -407,10 +407,11 @@ export default function AdminPage() {
     }
   }, [selectedSection, isAdmin]);
 
-  // ─── Load moderation queue ─────────────────────
+  // ─── Load moderation queue & hidden posts ─────────────────────
   useEffect(() => {
     if (selectedSection === 'moderation' && isAdmin) {
       loadModerationQueue();
+      loadHiddenPosts();
     }
   }, [selectedSection, isAdmin]);
 
@@ -1215,6 +1216,51 @@ export default function AdminPage() {
     }
   }
 
+  // ─── Hidden Posts ────────────────────────────────
+  const [modTab, setModTab] = useState<'reports' | 'hidden'>('reports');
+  const [hiddenPosts, setHiddenPosts] = useState<any[]>([]);
+  const [loadingHidden, setLoadingHidden] = useState(false);
+
+  async function loadHiddenPosts() {
+    try {
+      setLoadingHidden(true);
+      const q = query(collection(db, 'posts'), where('isHidden', '==', true));
+      const snap = await getDocs(q);
+      setHiddenPosts(
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }))
+      );
+    } catch (error) {
+      console.error('Error loading hidden posts:', error);
+    } finally {
+      setLoadingHidden(false);
+    }
+  }
+
+  async function unhidePost(postId: string) {
+    try {
+      await updateDoc(doc(db, 'posts', postId), { isHidden: false, hiddenAt: null, hiddenReason: null });
+      setHiddenPosts((prev) => prev.filter((p) => p.id !== postId));
+      setToastMessage('Post restored and visible to public.');
+    } catch (error) {
+      console.error('Error unhiding post:', error);
+      setToastMessage('Failed to restore post.');
+    }
+  }
+
+  async function permanentlyDeletePost(postId: string) {
+    try {
+      await deleteDoc(doc(db, 'posts', postId));
+      setHiddenPosts((prev) => prev.filter((p) => p.id !== postId));
+      setToastMessage('Post permanently deleted.');
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      setToastMessage('Failed to delete post.');
+    }
+  }
+
   // ══════════════════════════════════════════════════
   // NAVIGATION CONFIG
   // ══════════════════════════════════════════════════
@@ -2014,14 +2060,158 @@ export default function AdminPage() {
             {/* ══════════ MODERATION ══════════ */}
             {selectedSection === 'moderation' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Moderation Queue</h2>
-                    <p className="text-sm text-[var(--aurora-text-secondary)]">
-                      {modQueue.length} report{modQueue.length !== 1 ? 's' : ''} pending review
-                    </p>
-                  </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Moderation</h2>
+                  <p className="text-sm text-[var(--aurora-text-secondary)]">Review reports and manage hidden content</p>
                 </div>
+
+                {/* Tab Toggle: Reports vs Hidden Posts */}
+                <div className="flex gap-1 p-1 bg-[var(--aurora-surface-variant)] rounded-xl w-fit">
+                  <button
+                    onClick={() => setModTab('reports')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                      modTab === 'reports'
+                        ? 'bg-[var(--aurora-surface)] shadow-sm text-[var(--aurora-text)]'
+                        : 'text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
+                    }`}
+                  >
+                    <Flag size={14} />
+                    Reports
+                    {modQueue.length > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+                        {modQueue.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setModTab('hidden')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+                      modTab === 'hidden'
+                        ? 'bg-[var(--aurora-surface)] shadow-sm text-[var(--aurora-text)]'
+                        : 'text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
+                    }`}
+                  >
+                    <EyeOff size={14} />
+                    Hidden Posts
+                    {hiddenPosts.length > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+                        {hiddenPosts.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* ─── Hidden Posts Tab ─── */}
+                {modTab === 'hidden' && (
+                  <div className="space-y-4">
+                    {loadingHidden ? (
+                      <div className="space-y-3">
+                        {[...Array(2)].map((_, i) => <SkeletonRow key={i} />)}
+                      </div>
+                    ) : hiddenPosts.length === 0 ? (
+                      <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16">
+                        <Eye size={48} className="mx-auto mb-3 text-emerald-400" />
+                        <p className="font-semibold text-[var(--aurora-text)]">No hidden posts</p>
+                        <p className="text-sm text-[var(--aurora-text-secondary)]">All posts are currently visible to the public</p>
+                      </div>
+                    ) : (
+                      hiddenPosts.map((post) => (
+                        <div
+                          key={post.id}
+                          className="bg-[var(--aurora-surface)] rounded-2xl border border-orange-200 dark:border-orange-800/30 overflow-hidden"
+                        >
+                          {/* Header */}
+                          <div className="px-5 pt-4 pb-2 border-b border-[var(--aurora-border)]/50">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 uppercase flex items-center gap-1">
+                                <EyeOff size={10} /> Hidden
+                              </span>
+                              {post.hiddenReason && (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                  {post.hiddenReason}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-[var(--aurora-text-secondary)] ml-auto">
+                                Hidden: {post.hiddenAt ? new Date(post.hiddenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Content */}
+                          <div className="px-5 py-3">
+                            <p className="text-sm text-[var(--aurora-text)] whitespace-pre-wrap leading-relaxed">
+                              &ldquo;{(post.content || '').length > 400 ? (post.content || '').slice(0, 400) + '...' : (post.content || '')}&rdquo;
+                            </p>
+                            {post.images && post.images.length > 0 && (
+                              <div className="flex gap-2 mt-2 overflow-x-auto">
+                                {post.images.slice(0, 4).map((img: string, idx: number) => (
+                                  <img key={idx} src={img} alt={`Image ${idx + 1}`} className="w-16 h-16 rounded-lg object-cover border border-[var(--aurora-border)]" />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Author */}
+                          <div className="px-5 py-2 bg-[var(--aurora-surface-variant)]/30 border-t border-[var(--aurora-border)]/50">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-[var(--aurora-surface-variant)] flex items-center justify-center text-sm">
+                                {post.userAvatar || '👤'}
+                              </div>
+                              <p className="text-xs text-[var(--aurora-text-secondary)]">
+                                By <span className="font-semibold text-[var(--aurora-text)]">{post.userName || 'Unknown'}</span>
+                                {post.createdAt && (
+                                  <span className="ml-1 opacity-60">
+                                    · Posted {post.createdAt?.toDate?.()?.toLocaleDateString?.('en-US', { month: 'short', day: 'numeric' }) || ''}
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="px-5 py-3 border-t border-[var(--aurora-border)]/50 flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setConfirmModal({
+                                  title: 'Restore Post?',
+                                  message: 'Make this post visible to the public again?',
+                                  confirmLabel: 'Restore',
+                                  onConfirm: async () => {
+                                    setConfirmModal(null);
+                                    await unhidePost(post.id);
+                                  }
+                                });
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 transition"
+                            >
+                              <Eye size={12} /> Restore / Unhide
+                            </button>
+                            <button
+                              onClick={() => {
+                                setConfirmModal({
+                                  title: 'Permanently Delete?',
+                                  message: 'This will permanently remove the post. This cannot be undone.',
+                                  confirmLabel: 'Delete Forever',
+                                  onConfirm: async () => {
+                                    setConfirmModal(null);
+                                    await permanentlyDeletePost(post.id);
+                                  }
+                                });
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 transition"
+                            >
+                              <Trash2 size={12} /> Delete Permanently
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* ─── Reports Tab ─── */}
+                {modTab === 'reports' && (<>
+
 
                 {/* Filter & Sort Bar */}
                 {modQueue.length > 0 && (
@@ -2213,6 +2403,7 @@ export default function AdminPage() {
                                     }
                                     await dismissModItem(item.id);
                                     setToastMessage('Content hidden from public view.');
+                                    loadHiddenPosts(); // Refresh hidden posts list
                                   } catch (error) {
                                     console.error('Error hiding content:', error);
                                     setToastMessage('Failed to hide content.');
@@ -2301,6 +2492,7 @@ export default function AdminPage() {
                     ))}
                   </div>
                 )}
+                </>)}
               </div>
             )}
 
