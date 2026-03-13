@@ -5,6 +5,7 @@ import { FeatureSettingsProvider } from './contexts/FeatureSettingsContext';
 import { LocationProvider } from './contexts/LocationContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
+import { CulturalThemeProvider } from './contexts/CulturalThemeContext';
 import { PrivateRoute } from './components/shared/PrivateRoute';
 import './index.css';
 
@@ -65,6 +66,7 @@ function App() {
       <AuthProvider>
         <UserSettingsProvider>
         <FeatureSettingsProvider>
+          <CulturalThemeProvider>
           <LocationProvider>
             <ToastProvider>
               <Routes>
@@ -98,6 +100,7 @@ function App() {
               </Routes>
             </ToastProvider>
           </LocationProvider>
+          </CulturalThemeProvider>
         </FeatureSettingsProvider>
         </UserSettingsProvider>
       </AuthProvider>

@@ -20,6 +20,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCulturalTheme } from '../../contexts/CulturalThemeContext';
+import { CulturalPatternOverlay } from '../../components/CulturalPatterns';
 import { ClickOutsideOverlay } from '../../components/ClickOutsideOverlay';
 import { ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, HERITAGE_OPTIONS, PRIORITY_ETHNICITIES } from '../../constants/config';
 import {
@@ -256,6 +258,7 @@ const REPORT_REASONS = [
 
 export default function FeedPage() {
   const { user, userProfile, userRole } = useAuth();
+  const { theme, isNeutral } = useCulturalTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1146,13 +1149,29 @@ export default function FeedPage() {
   // ─── Render ────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-gradient-to-b from-indigo-100/50 via-indigo-50/30 to-emerald-100/40">
+    <div
+      className="relative"
+      style={{
+        background: isNeutral
+          ? 'linear-gradient(to bottom, rgba(199,210,254,0.5), rgba(224,231,255,0.3), rgba(167,243,208,0.4))'
+          : `linear-gradient(to bottom, ${theme.colors.gradientFrom}12, ${theme.colors.gradientVia}08, ${theme.colors.gradientTo}10)`,
+      }}
+    >
+      {/* Cultural Pattern Overlay */}
+      {!isNeutral && <CulturalPatternOverlay theme={theme} />}
 
       {/* ─── Sticky Search + Sort Header ─── */}
       <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
 
       {/* ─── Search & Ethnicity Filter ─── */}
-      <div className="relative bg-gradient-to-br from-indigo-400/25 via-indigo-100/40 to-emerald-400/20 border-b border-aurora-border z-30">
+      <div
+        className="relative border-b border-aurora-border z-30"
+        style={{
+          background: isNeutral
+            ? 'linear-gradient(to bottom right, rgba(129,140,248,0.25), rgba(199,210,254,0.4), rgba(110,231,183,0.2))'
+            : `linear-gradient(to bottom right, ${theme.colors.primary}20, ${theme.colors.secondary}15, ${theme.colors.accent}12)`,
+        }}
+      >
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           <div className="flex items-center gap-2">
             {/* Search */}
@@ -1177,9 +1196,13 @@ export default function FeedPage() {
               onClick={() => setShowSavedOnly(!showSavedOnly)}
               className={`p-2.5 rounded-full border transition-all shrink-0 ${
                 showSavedOnly
-                  ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                  ? `text-white ${isNeutral ? 'bg-aurora-indigo border-aurora-indigo' : ''}`
                   : 'bg-aurora-surface border-aurora-border text-aurora-text-muted hover:border-aurora-text-muted/50'
               }`}
+              style={showSavedOnly && !isNeutral ? {
+                backgroundColor: theme.colors.primary,
+                borderColor: theme.colors.primary,
+              } : undefined}
               title="Saved posts"
             >
               <Bookmark className="w-4 h-4" />
@@ -1558,6 +1581,19 @@ export default function FeedPage() {
 
       </div>{/* end sticky header wrapper */}
 
+      {/* ─── Cultural Theme Indicator ─── */}
+      {!isNeutral && (
+        <div
+          className="text-center py-1.5 text-[11px] font-semibold tracking-wider uppercase"
+          style={{
+            background: `linear-gradient(to right, ${theme.colors.primary}15, ${theme.colors.accent}10)`,
+            color: theme.colors.primary,
+          }}
+        >
+          {theme.name} Theme
+        </div>
+      )}
+
       {/* ─── Sort Mode Tabs (scrolls with content) ─── */}
       <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
@@ -1571,9 +1607,12 @@ export default function FeedPage() {
                   onClick={() => setSortMode(mode)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 whitespace-nowrap shrink-0 ${
                     sortMode === mode
-                      ? 'bg-gradient-to-r from-indigo-500 via-violet-400 to-emerald-500 text-white shadow-md'
+                      ? `text-white shadow-md ${isNeutral ? 'bg-gradient-to-r from-indigo-500 via-violet-400 to-emerald-500' : ''}`
                       : 'bg-aurora-surface border border-aurora-border text-aurora-text-secondary hover:text-aurora-text hover:border-aurora-text-muted/30'
                   }`}
+                  style={sortMode === mode && !isNeutral ? {
+                    background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.secondary}, ${theme.colors.accent})`,
+                  } : undefined}
                 >
                   {icon} {label}
                 </button>
@@ -1586,12 +1625,22 @@ export default function FeedPage() {
       {/* ─── Create Post Composer Card ─── */}
       <div className="max-w-2xl mx-auto px-4 pt-3">
         <div
-          className="bg-aurora-surface rounded-2xl border border-aurora-border shadow-aurora-1 p-4 cursor-pointer hover:shadow-aurora-2 transition-all"
+          className={`rounded-2xl border shadow-aurora-1 p-4 cursor-pointer hover:shadow-aurora-2 transition-all ${isNeutral ? 'bg-aurora-surface border-aurora-border' : 'backdrop-blur-md'}`}
+          style={!isNeutral ? {
+            backgroundColor: theme.colors.cardBg,
+            borderColor: `${theme.colors.cardBorder}30`,
+          } : undefined}
           onClick={() => setShowCreateModal(true)}
         >
           <div className="flex items-center gap-3">
             {renderAvatar(userProfile?.avatar || '👤', userProfile?.name || 'You', 'md')}
-            <div className="flex-1 px-4 py-2.5 bg-aurora-surface-variant rounded-full text-aurora-text-muted text-sm">
+            <div
+              className={`flex-1 px-4 py-2.5 rounded-full text-sm ${isNeutral ? 'bg-aurora-surface-variant text-aurora-text-muted' : ''}`}
+              style={!isNeutral ? {
+                backgroundColor: `${theme.colors.primary}10`,
+                color: theme.colors.textSecondary,
+              } : undefined}
+            >
               {nativeGreeting} World
             </div>
           </div>
@@ -1627,7 +1676,8 @@ export default function FeedPage() {
           // Skeleton loaders
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-aurora-surface rounded-2xl border border-aurora-border p-4 animate-pulse">
+              <div key={i} className={`rounded-2xl border p-4 animate-pulse ${isNeutral ? 'bg-aurora-surface border-aurora-border' : 'backdrop-blur-md'}`}
+                style={!isNeutral ? { backgroundColor: theme.colors.cardBg, borderColor: `${theme.colors.cardBorder}30` } : undefined}>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full shimmer ring-2 ring-aurora-border/30" />
                   <div className="flex-1 space-y-2">
@@ -1660,7 +1710,10 @@ export default function FeedPage() {
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="mt-4 px-6 py-2.5 aurora-gradient text-white rounded-full text-sm font-semibold shadow-aurora-glow hover:shadow-aurora-glow-lg transition-all btn-press"
+              className={`mt-4 px-6 py-2.5 text-white rounded-full text-sm font-semibold shadow-aurora-glow hover:shadow-aurora-glow-lg transition-all btn-press ${isNeutral ? 'aurora-gradient' : ''}`}
+              style={!isNeutral ? {
+                background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.secondary})`,
+              } : undefined}
             >
               Create a Post
             </button>
@@ -1678,8 +1731,14 @@ export default function FeedPage() {
             return (
               <div
                 key={post.id}
-                className={`bg-aurora-surface rounded-2xl border border-aurora-border shadow-aurora-1 hover:shadow-aurora-2 transition-all duration-200 cursor-pointer ${menuPostId === post.id ? 'relative z-30' : 'relative z-0'}`}
-                style={{ animationDelay: `${index * 50}ms` }}
+                className={`rounded-2xl border shadow-aurora-1 hover:shadow-aurora-2 transition-all duration-200 cursor-pointer ${menuPostId === post.id ? 'relative z-30' : 'relative z-0'} ${isNeutral ? 'bg-aurora-surface border-aurora-border' : 'backdrop-blur-md'}`}
+                style={{
+                  animationDelay: `${index * 50}ms`,
+                  ...(!isNeutral ? {
+                    backgroundColor: `${theme.colors.cardBg}`,
+                    borderColor: `${theme.colors.cardBorder}30`,
+                  } : {}),
+                }}
                 onClick={() => openPostDetail(post)}
               >
                 {/* ── Post Header ── */}
