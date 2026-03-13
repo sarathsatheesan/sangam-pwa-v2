@@ -17,6 +17,8 @@ import {
   arrayRemove,
   limit,
   startAfter,
+  where,
+  getDoc,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,6 +45,7 @@ import {
   Image as ImageIcon,
   Search,
   ChevronDown,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface Post {
@@ -328,7 +331,58 @@ export default function FeedPage() {
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [reportedPosts, setReportedPosts] = useState<Set<string>>(new Set());
+  const [mutedPosts, setMutedPosts] = useState<Set<string>>(new Set());
   const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  // Load user's muted posts on mount
+  useEffect(() => {
+    if (!user) return;
+    const loadMutedPosts = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().mutedPosts) {
+          setMutedPosts(new Set(userDoc.data().mutedPosts));
+        }
+      } catch (e) {
+        console.error('Error loading muted posts:', e);
+      }
+    };
+    loadMutedPosts();
+  }, [user]);
+
+  // Moderation notifications
+  const [moderationNotifs, setModerationNotifs] = useState<Array<{ id: string; message: string; reason: string; postId: string; createdAt: any; read: boolean }>>([]);
+  const [showNotifBanner, setShowNotifBanner] = useState(true);
+
+  // Load moderation notifications for the current user
+  useEffect(() => {
+    if (!user) return;
+    const loadNotifs = async () => {
+      try {
+        const q = query(
+          collection(db, 'notifications'),
+          where('recipientId', '==', user.uid),
+          where('type', '==', 'content_hidden'),
+          orderBy('createdAt', 'desc'),
+          limit(10)
+        );
+        const snap = await getDocs(q);
+        setModerationNotifs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
+      } catch (e) {
+        console.error('Error loading notifications:', e);
+      }
+    };
+    loadNotifs();
+  }, [user]);
+
+  const dismissNotification = async (notifId: string) => {
+    try {
+      await updateDoc(doc(db, 'notifications', notifId), { read: true });
+      setModerationNotifs((prev) => prev.filter((n) => n.id !== notifId));
+    } catch (e) {
+      console.error('Error dismissing notification:', e);
+    }
+  };
 
   // Edit post
   const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -961,7 +1015,7 @@ export default function FeedPage() {
       const reportedPost = posts.find((p) => p.id === reportPostId);
       const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
 
-      // Write to reports collection for record-keeping
+      // Write to reports collection for record-keeping (stealth: no author notification)
       await addDoc(collection(db, 'reports'), {
         postId: reportPostId,
         reportedBy: user.uid,
@@ -974,39 +1028,95 @@ export default function FeedPage() {
         status: 'pending',
       });
 
-      // Write to moderationQueue so it appears in Admin panel
-      await addDoc(collection(db, 'moderationQueue'), {
-        type: 'post',
-        content: reportedPost?.content || '',
-        contentId: reportPostId,
-        collection: 'posts',
-        authorId: reportedPost?.userId || '',
-        authorName: reportedPost?.userName || 'Unknown',
-        authorAvatar: reportedPost?.userAvatar || '',
-        images: reportedPost?.images || [],
-        category: reportReason,
-        categoryLabel: categoryObj?.label || reportReason,
-        reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
-        reportedBy: user.uid,
-        reporterName: userProfile?.name || user.displayName || 'Anonymous',
-        reporterAvatar: userProfile?.avatar || '',
-        reportCount: 1,
-        reporters: [{
-          uid: user.uid,
-          name: userProfile?.name || user.displayName || 'Anonymous',
-          avatar: userProfile?.avatar || '',
+      // Check if moderationQueue entry already exists for this post (crowdsourced aggregation)
+      const modQueueQuery = query(
+        collection(db, 'moderationQueue'),
+        where('contentId', '==', reportPostId)
+      );
+      const existingMods = await getDocs(modQueueQuery);
+
+      let totalReportCount = 1;
+
+      if (existingMods.docs.length > 0) {
+        // Aggregate into existing moderation queue item
+        const existingDoc = existingMods.docs[0];
+        const existingData = existingDoc.data();
+        totalReportCount = (existingData.reportCount || 1) + 1;
+        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
+          reportCount: totalReportCount,
+          reporters: arrayUnion({
+            uid: user.uid,
+            name: userProfile?.name || user.displayName || 'Anonymous',
+            avatar: userProfile?.avatar || '',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }),
+        });
+      } else {
+        // Create new moderationQueue entry
+        await addDoc(collection(db, 'moderationQueue'), {
+          type: 'post',
+          content: reportedPost?.content || '',
+          contentId: reportPostId,
+          collection: 'posts',
+          authorId: reportedPost?.userId || '',
+          authorName: reportedPost?.userName || 'Unknown',
+          authorAvatar: reportedPost?.userAvatar || '',
+          images: reportedPost?.images || [],
           category: reportReason,
-          details: reportDetails.trim() || '',
-          createdAt: new Date().toISOString(),
-        }],
-        createdAt: serverTimestamp(),
+          categoryLabel: categoryObj?.label || reportReason,
+          reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
+          reportedBy: user.uid,
+          reporterName: userProfile?.name || user.displayName || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          reportCount: 1,
+          reporters: [{
+            uid: user.uid,
+            name: userProfile?.name || user.displayName || 'Anonymous',
+            avatar: userProfile?.avatar || '',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }],
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      // 3-strike auto-hide: if 3+ reports, auto-hide the post globally
+      if (totalReportCount >= 3) {
+        await updateDoc(doc(db, 'posts', reportPostId), {
+          isHidden: true,
+          hiddenAt: new Date().toISOString(),
+          hiddenReason: 'Auto-hidden: reached 3 community reports',
+        });
+        // Notify post author about auto-hide with appeal instructions
+        if (reportedPost?.userId) {
+          await addDoc(collection(db, 'notifications'), {
+            type: 'content_hidden',
+            recipientId: reportedPost.userId,
+            recipientName: reportedPost.userName || '',
+            postId: reportPostId,
+            reason: 'Your post received multiple community reports and has been temporarily hidden for review.',
+            message: 'Your post has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
+            actionUrl: '/feed',
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+
+      // Mute-on-report: hide this post from the reporter's feed permanently
+      await updateDoc(doc(db, 'users', user.uid), {
+        mutedPosts: arrayUnion(reportPostId),
       });
+      setMutedPosts((prev) => new Set(prev).add(reportPostId));
 
       setReportedPosts((prev) => new Set(prev).add(reportPostId));
       setShowReportModal(false);
       setReportReason('');
       setReportDetails('');
-      alert('Report submitted. Thank you for helping keep the community safe.');
+      alert('Report submitted. The post has been hidden from your feed. Thank you for helping keep the community safe.');
     } catch (error) {
       console.error('Error submitting report:', error);
       alert('Failed to submit report.');
@@ -1019,6 +1129,8 @@ export default function FeedPage() {
 
   const filteredPosts = useMemo(() => {
     let result = posts.filter((post) => {
+      // Mute-on-report: hide posts the user has reported
+      if (mutedPosts.has(post.id)) return false;
       // Search filter
       if (feedSearchQuery.trim()) {
         const q = feedSearchQuery.toLowerCase();
@@ -1068,7 +1180,7 @@ export default function FeedPage() {
     }
 
     return result;
-  }, [posts, selectedHeritage, sortMode, savedPosts, feedSearchQuery, showSavedOnly]);
+  }, [posts, selectedHeritage, sortMode, savedPosts, feedSearchQuery, showSavedOnly, mutedPosts]);
 
   // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -1637,6 +1749,35 @@ export default function FeedPage() {
           </div>
         </div>
       </div>
+
+      {/* ─── Moderation Notification Banners ─── */}
+      {showNotifBanner && moderationNotifs.filter((n) => !n.read).length > 0 && (
+        <div className="max-w-2xl mx-auto px-4 pt-3 space-y-2">
+          {moderationNotifs.filter((n) => !n.read).map((notif) => (
+            <div key={notif.id} className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-4 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-800/40 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Moderation Notice</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">{notif.message}</p>
+                  {notif.reason && (
+                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-1"><span className="font-medium">Reason:</span> {notif.reason}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => dismissNotification(notif.id)}
+                  className="p-1 rounded-full hover:bg-amber-200 dark:hover:bg-amber-800/40 transition-colors shrink-0"
+                  aria-label="Dismiss notification"
+                >
+                  <X size={14} className="text-amber-600" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ─── Create Post Composer Card ─── */}
       <div className="max-w-2xl mx-auto px-4 pt-3">

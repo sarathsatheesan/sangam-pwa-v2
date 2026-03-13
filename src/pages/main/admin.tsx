@@ -2401,9 +2401,23 @@ export default function AdminPage() {
                                     if (item.contentId && item.collection) {
                                       await updateDoc(doc(db, item.collection, item.contentId), { isHidden: true, hiddenAt: new Date().toISOString(), hiddenReason: item.categoryLabel || item.reason || '' });
                                     }
+                                    // Standardized appeals notification to post author
+                                    if (item.authorId) {
+                                      await addDoc(collection(db, 'notifications'), {
+                                        type: 'content_hidden',
+                                        recipientId: item.authorId,
+                                        recipientName: item.authorName || '',
+                                        postId: item.contentId || '',
+                                        reason: item.categoryLabel || item.reason || 'Community guideline violation',
+                                        message: 'Your post has been hidden by a moderator for violating community guidelines. If you believe this was a mistake, you can submit an appeal by contacting support.',
+                                        actionUrl: '/feed',
+                                        read: false,
+                                        createdAt: serverTimestamp(),
+                                      });
+                                    }
                                     await dismissModItem(item.id);
-                                    setToastMessage('Content hidden from public view.');
-                                    loadHiddenPosts(); // Refresh hidden posts list
+                                    setToastMessage('Content hidden. Author has been notified with appeal instructions.');
+                                    loadHiddenPosts();
                                   } catch (error) {
                                     console.error('Error hiding content:', error);
                                     setToastMessage('Failed to hide content.');
