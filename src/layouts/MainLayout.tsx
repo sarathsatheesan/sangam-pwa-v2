@@ -16,9 +16,7 @@ export const MainLayout: React.FC = () => {
 
       {/* Main content area — scrolls between header/module-selector and footer */}
       <main className="flex-1 overflow-y-auto min-h-0">
-        <div className="w-full h-full">
-          <Outlet />
-        </div>
+        <Outlet />
       </main>
 
       {/* Footer — fixed at bottom */}
