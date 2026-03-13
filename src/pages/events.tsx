@@ -1518,10 +1518,19 @@ export default function EventsPage() {
 
             {/* Time dropdown */}
             <select
-              value={selectedDateFilter}
-              onChange={(e) => setSelectedDateFilter(e.target.value)}
+              value={showPast ? 'Past' : selectedDateFilter}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === 'Past') {
+                  setShowPast(true);
+                  setSelectedDateFilter('All');
+                } else {
+                  setShowPast(false);
+                  setSelectedDateFilter(val);
+                }
+              }}
               className={`px-3 py-1.5 border rounded-full text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40 shrink-0 appearance-none cursor-pointer ${
-                selectedDateFilter !== 'All'
+                (selectedDateFilter !== 'All' || showPast)
                   ? 'bg-aurora-indigo text-white border-aurora-indigo'
                   : 'bg-aurora-surface border-aurora-border text-aurora-text'
               }`}
@@ -1532,19 +1541,8 @@ export default function EventsPage() {
               <option value="This Weekend">This Weekend</option>
               <option value="This Week">This Week</option>
               <option value="This Month">This Month</option>
+              <option value="Past">Show Past</option>
             </select>
-
-            {/* Show past toggle */}
-            <button
-              onClick={() => setShowPast(!showPast)}
-              className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-semibold transition-all shrink-0 border ${
-                showPast
-                  ? 'bg-aurora-indigo text-white border-aurora-indigo'
-                  : 'bg-aurora-surface border-aurora-border text-aurora-text hover:border-aurora-text-muted'
-              }`}
-            >
-              {showPast ? 'Past shown' : 'Show past'}
-            </button>
 
             {/* Separator */}
             <div className="w-px h-5 bg-aurora-border shrink-0 mx-0.5" />
