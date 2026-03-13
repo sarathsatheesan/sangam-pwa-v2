@@ -58,6 +58,7 @@ import {
   Power,
   ToggleLeft,
   ToggleRight,
+  Sparkles,
 } from 'lucide-react';
 
 // ─── Interfaces ──────────────────────────────────────────
@@ -100,6 +101,21 @@ interface ModerationItem {
   authorName?: string;
   type: string;
   reason?: string;
+  createdAt?: any;
+}
+
+interface EventRecord {
+  id: string;
+  title: string;
+  type: string;
+  fullDate: string;
+  posterName: string;
+  posterId: string;
+  promoted: boolean;
+  isDisabled?: boolean;
+  location?: string;
+  ticket?: string;
+  price?: string;
   createdAt?: any;
 }
 
@@ -266,6 +282,11 @@ export default function AdminPage() {
   const [listingSearch, setListingSearch] = useState('');
   const [listingFilter, setListingFilter] = useState<'all' | 'business' | 'housing' | 'travel' | 'disabled'>('all');
 
+  // ─── Events state ─────────────────────────────
+  const [adminEvents, setAdminEvents] = useState<EventRecord[]>([]);
+  const [eventSearch, setEventSearch] = useState('');
+  const [eventFilter, setEventFilter] = useState<'all' | 'promoted' | 'disabled' | 'past'>('all');
+
   // ─── Announcements state ───────────────────────
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [announcementTitle, setAnnouncementTitle] = useState('');
@@ -342,6 +363,13 @@ export default function AdminPage() {
     }
   }, [selectedSection, isAdmin]);
 
+  // ─── Load events ──────────────────────────────
+  useEffect(() => {
+    if (selectedSection === 'events' && isAdmin) {
+      loadEvents();
+    }
+  }, [selectedSection, isAdmin]);
+
   // ─── Load announcements ────────────────────────
   useEffect(() => {
     if (selectedSection === 'announcements' && isAdmin) {
@@ -395,6 +423,30 @@ export default function AdminPage() {
     }
     return filtered;
   }, [listings, listingFilter, listingSearch]);
+
+  const filteredAdminEvents = useMemo(() => {
+    let filtered = adminEvents;
+    const now = new Date();
+    if (eventFilter === 'promoted') {
+      filtered = filtered.filter((e) => e.promoted);
+    } else if (eventFilter === 'disabled') {
+      filtered = filtered.filter((e) => e.isDisabled);
+    } else if (eventFilter === 'past') {
+      filtered = filtered.filter((e) => {
+        try {
+          const d = new Date(e.fullDate);
+          return d < now;
+        } catch { return false; }
+      });
+    }
+    if (eventSearch.trim()) {
+      const s = eventSearch.toLowerCase();
+      filtered = filtered.filter(
+        (e) => e.title.toLowerCase().includes(s) || e.posterName.toLowerCase().includes(s) || e.type.toLowerCase().includes(s)
+      );
+    }
+    return filtered;
+  }, [adminEvents, eventFilter, eventSearch]);
 
   // ══════════════════════════════════════════════════
   // ACCESS DENIED — after all hooks
@@ -808,6 +860,100 @@ export default function AdminPage() {
     });
   }
 
+  // ─── Events ───────────────────────────────────
+  async function loadEvents() {
+    try {
+      setLoading(true);
+      const snap = await getDocs(collection(db, 'events'));
+      const evts: EventRecord[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          title: data.title || 'Untitled Event',
+          type: data.type || 'Other',
+          fullDate: data.fullDate || '',
+          posterName: data.posterName || 'Unknown',
+          posterId: data.posterId || '',
+          promoted: data.promoted || false,
+          isDisabled: data.disabled || data.isDisabled || false,
+          location: data.location || '',
+          ticket: data.ticket || 'free',
+          price: data.price || '',
+          createdAt: data.createdAt,
+        };
+      });
+      evts.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+        const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+        return bTime - aTime;
+      });
+      setAdminEvents(evts);
+    } catch (error) {
+      console.error('Error loading events:', error);
+      setToastMessage('Failed to load events');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function togglePromoteEvent(evt: EventRecord) {
+    const newState = !evt.promoted;
+    setConfirmModal({
+      title: newState ? 'Promote Event?' : 'Remove Promotion?',
+      message: `${newState ? 'Promote' : 'Demote'} "${evt.title}"?${newState ? ' It will appear in the Featured Events carousel.' : ''}`,
+      confirmLabel: newState ? 'Promote' : 'Demote',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await updateDoc(doc(db, 'events', evt.id), { promoted: newState });
+          setAdminEvents((prev) => prev.map((e) => e.id === evt.id ? { ...e, promoted: newState } : e));
+          setToastMessage(`Event "${evt.title}" ${newState ? 'promoted' : 'demoted'}`);
+        } catch (error) {
+          console.error('Error updating event:', error);
+          setToastMessage('Failed to update event');
+        }
+      }
+    });
+  }
+
+  async function toggleDisableEvent(evt: EventRecord) {
+    const newState = !evt.isDisabled;
+    setConfirmModal({
+      title: newState ? 'Disable Event?' : 'Re-enable Event?',
+      message: `${newState ? 'Disable' : 'Re-enable'} "${evt.title}"?${newState ? ' It will be hidden from users.' : ''}`,
+      confirmLabel: newState ? 'Disable' : 'Enable',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await updateDoc(doc(db, 'events', evt.id), { disabled: newState });
+          setAdminEvents((prev) => prev.map((e) => e.id === evt.id ? { ...e, isDisabled: newState } : e));
+        } catch (error) {
+          console.error('Error updating event:', error);
+          setToastMessage('Failed to update event');
+        }
+      }
+    });
+  }
+
+  async function deleteEvent(evt: EventRecord) {
+    setConfirmModal({
+      title: 'Delete Event?',
+      message: `Delete "${evt.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        try {
+          await deleteDoc(doc(db, 'events', evt.id));
+          setAdminEvents((prev) => prev.filter((e) => e.id !== evt.id));
+          setToastMessage(`Event "${evt.title}" deleted`);
+        } catch (error) {
+          console.error('Error deleting event:', error);
+          setToastMessage('Failed to delete event');
+        }
+      }
+    });
+  }
+
   // ─── Announcements ─────────────────────────────
   async function loadAnnouncements() {
     try {
@@ -982,6 +1128,7 @@ export default function AdminPage() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'listings', label: 'Listings', icon: ClipboardList },
+    { id: 'events', label: 'Events', icon: Calendar },
     { id: 'features', label: 'Features', icon: Settings },
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
     { id: 'moderation', label: 'Moderation', icon: Flag },
@@ -1493,6 +1640,122 @@ export default function AdminPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ══════════ EVENTS ══════════ */}
+            {selectedSection === 'events' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Events</h2>
+                  <p className="text-sm text-[var(--aurora-text-secondary)]">Manage events, promotions, and visibility</p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--aurora-text-secondary)]" />
+                    <input
+                      type="text"
+                      placeholder="Search events..."
+                      value={eventSearch}
+                      onChange={(e) => setEventSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008]"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    {(['all', 'promoted', 'disabled', 'past'] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setEventFilter(f)}
+                        className={`px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition ${
+                          eventFilter === f
+                            ? 'bg-[#FF3008] text-white shadow-md'
+                            : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)] hover:bg-[var(--aurora-surface-variant)]'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] divide-y divide-[var(--aurora-border)]">
+                    {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
+                  </div>
+                ) : filteredAdminEvents.length === 0 ? (
+                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16 text-[var(--aurora-text-secondary)]">
+                    <Calendar size={40} className="mx-auto mb-3 opacity-30" />
+                    <p>No events found</p>
+                  </div>
+                ) : (
+                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] divide-y divide-[var(--aurora-border)] overflow-hidden">
+                    {filteredAdminEvents.map((evt) => {
+                      const isPast = (() => { try { return new Date(evt.fullDate) < new Date(); } catch { return false; } })();
+                      return (
+                        <div key={evt.id} className={`flex items-center gap-4 p-4 hover:bg-[var(--aurora-surface-variant)]/50 transition ${evt.isDisabled ? 'opacity-60' : ''}`}>
+                          <div className="w-10 h-10 rounded-xl bg-[var(--aurora-surface-variant)] flex items-center justify-center flex-shrink-0 relative">
+                            <Calendar size={16} className="text-orange-500" />
+                            {evt.isDisabled && (
+                              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
+                                <EyeOff size={10} className="text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className={`font-semibold text-sm truncate ${evt.isDisabled ? 'text-[var(--aurora-text-secondary)] line-through' : 'text-[var(--aurora-text)]'}`}>{evt.title}</p>
+                              {evt.promoted && (
+                                <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 flex items-center gap-0.5">
+                                  <Sparkles size={8} /> Featured
+                                </span>
+                              )}
+                              {evt.isDisabled && (
+                                <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                                  Disabled
+                                </span>
+                              )}
+                              {isPast && (
+                                <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-500/20 dark:text-gray-400">
+                                  Past
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-[var(--aurora-text-secondary)]">
+                              By {evt.posterName} · {evt.type} · {evt.fullDate}{evt.location ? ` · ${evt.location}` : ''}
+                            </p>
+                          </div>
+                          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)]">
+                            {evt.ticket === 'free' ? 'Free' : `$${evt.price}`}
+                          </span>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => togglePromoteEvent(evt)}
+                              className={`p-2 rounded-lg transition ${evt.promoted ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900/20'}`}
+                              title={evt.promoted ? 'Remove from Featured' : 'Promote to Featured'}
+                            >
+                              <Sparkles size={16} />
+                            </button>
+                            <button
+                              onClick={() => toggleDisableEvent(evt)}
+                              className={`p-2 rounded-lg transition ${evt.isDisabled ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
+                              title={evt.isDisabled ? 'Enable event' : 'Disable event'}
+                            >
+                              {evt.isDisabled ? <Eye size={16} /> : <EyeOff size={16} />}
+                            </button>
+                            <button
+                              onClick={() => deleteEvent(evt)}
+                              className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
+                              title="Delete event"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
