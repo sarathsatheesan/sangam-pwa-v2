@@ -1303,6 +1303,7 @@ export default function BusinessPage() {
           )}
         </div>
       </div>
+      </div>{/* end sticky header wrapper */}
 
       {!merchantView && (
           <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
@@ -1378,7 +1379,6 @@ export default function BusinessPage() {
             </div>
           </div>
       )}
-      </div>{/* end sticky header wrapper */}
 
       {!merchantView && (
         <>
