@@ -1305,7 +1305,7 @@ export default function BusinessPage() {
       {!merchantView && (
         <>
           {/* ── Category Navigation ── */}
-          <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+          <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
             <div className="max-w-6xl mx-auto px-4">
               <div
                 ref={categoryScrollRef}
