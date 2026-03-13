@@ -1596,12 +1596,12 @@ export default function EventsPage() {
           )}
         </div>
 
-        {/* Featured Events Carousel */}
+        {/* Featured Carousel */}
         {featuredEvents.length > 0 && selectedFilter === 'All' && selectedDateFilter === 'All' && !searchQuery && (
           <div className="mb-6">
             <h2 className="text-lg font-bold text-aurora-text flex items-center gap-2 mb-3">
               <Sparkles className="w-5 h-5 text-amber-500" />
-              Featured Events
+              Featured
             </h2>
             <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
               {featuredEvents.map((event) => {

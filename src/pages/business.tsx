@@ -1408,7 +1408,7 @@ export default function BusinessPage() {
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-bold text-aurora-text flex items-center gap-2">
                     <Award className="w-5 h-5 text-amber-500" />
-                    Featured Businesses
+                    Featured
                   </h2>
                 </div>
                 <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
