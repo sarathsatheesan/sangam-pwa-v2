@@ -59,6 +59,9 @@ import {
   ToggleLeft,
   ToggleRight,
   Sparkles,
+  Filter,
+  AlertOctagon,
+  MessageCircle,
 } from 'lucide-react';
 
 // ─── Interfaces ──────────────────────────────────────────
@@ -94,13 +97,33 @@ interface Announcement {
   createdAt?: any;
 }
 
+interface ModerationReporter {
+  uid: string;
+  name: string;
+  avatar: string;
+  category: string;
+  details: string;
+  createdAt: string;
+}
+
 interface ModerationItem {
   id: string;
   content: string;
+  contentId?: string;
+  collection?: string;
   authorId: string;
   authorName?: string;
+  authorAvatar?: string;
+  images?: string[];
   type: string;
+  category?: string;
+  categoryLabel?: string;
   reason?: string;
+  reportedBy?: string;
+  reporterName?: string;
+  reporterAvatar?: string;
+  reportCount?: number;
+  reporters?: ModerationReporter[];
   createdAt?: any;
 }
 
@@ -1089,20 +1112,37 @@ export default function AdminPage() {
   }
 
   // ─── Moderation ────────────────────────────────
+  const [modFilterCategory, setModFilterCategory] = useState<string>('all');
+  const [modSortBy, setModSortBy] = useState<'recent' | 'frequency'>('recent');
+
   async function loadModerationQueue() {
     try {
       setLoading(true);
       const snap = await getDocs(collection(db, 'moderationQueue'));
       setModQueue(
-        snap.docs.map((d) => ({
-          id: d.id,
-          content: d.data().content || d.data().text || '',
-          authorId: d.data().authorId || '',
-          authorName: d.data().authorName || 'Unknown',
-          type: d.data().type || 'post',
-          reason: d.data().reason || d.data().flagReason || '',
-          createdAt: d.data().createdAt,
-        }))
+        snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            content: data.content || data.text || '',
+            contentId: data.contentId || '',
+            collection: data.collection || '',
+            authorId: data.authorId || '',
+            authorName: data.authorName || 'Unknown',
+            authorAvatar: data.authorAvatar || '',
+            images: data.images || [],
+            type: data.type || 'post',
+            category: data.category || '',
+            categoryLabel: data.categoryLabel || '',
+            reason: data.reason || data.flagReason || '',
+            reportedBy: data.reportedBy || '',
+            reporterName: data.reporterName || 'Unknown',
+            reporterAvatar: data.reporterAvatar || '',
+            reportCount: data.reportCount || 1,
+            reporters: data.reporters || [],
+            createdAt: data.createdAt,
+          };
+        })
       );
     } catch (error) {
       console.error('Error loading moderation queue:', error);
@@ -1111,6 +1151,32 @@ export default function AdminPage() {
     }
   }
 
+  const filteredModQueue = useMemo(() => {
+    let items = [...modQueue];
+    if (modFilterCategory !== 'all') {
+      items = items.filter((m) => m.category === modFilterCategory);
+    }
+    if (modSortBy === 'frequency') {
+      items.sort((a, b) => (b.reportCount || 1) - (a.reportCount || 1));
+    } else {
+      items.sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.()?.getTime?.() || 0;
+        const bTime = b.createdAt?.toDate?.()?.getTime?.() || 0;
+        return bTime - aTime;
+      });
+    }
+    return items;
+  }, [modQueue, modFilterCategory, modSortBy]);
+
+  const modCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    modQueue.forEach((m) => {
+      const cat = m.category || 'uncategorized';
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    return counts;
+  }, [modQueue]);
+
   async function dismissModItem(id: string) {
     try {
       await deleteDoc(doc(db, 'moderationQueue', id));
@@ -1118,6 +1184,34 @@ export default function AdminPage() {
       setDashStats((prev) => ({ ...prev, modQueueCount: Math.max(0, prev.modQueueCount - 1) }));
     } catch (error) {
       console.error('Error dismissing mod item:', error);
+    }
+  }
+
+  async function warnUser(item: ModerationItem) {
+    if (!item.authorId) return;
+    try {
+      const userRef = doc(db, 'users', item.authorId);
+      const userSnap = await getDoc(userRef);
+      const currentWarnings = userSnap.exists() ? (userSnap.data().warnings || 0) : 0;
+      await updateDoc(userRef, {
+        warnings: currentWarnings + 1,
+        lastWarningAt: new Date().toISOString(),
+        lastWarningReason: item.categoryLabel || item.reason || 'Community guideline violation',
+      });
+      // Add to a warnings log collection
+      await addDoc(collection(db, 'userWarnings'), {
+        userId: item.authorId,
+        userName: item.authorName,
+        reason: item.categoryLabel || item.reason || 'Community guideline violation',
+        moderationItemId: item.id,
+        contentPreview: item.content?.slice(0, 200) || '',
+        issuedAt: serverTimestamp(),
+      });
+      await dismissModItem(item.id);
+      setToastMessage(`Warning issued to "${item.authorName}". Total warnings: ${currentWarnings + 1}`);
+    } catch (error) {
+      console.error('Error warning user:', error);
+      setToastMessage('Failed to warn user');
     }
   }
 
@@ -1920,51 +2014,185 @@ export default function AdminPage() {
             {/* ══════════ MODERATION ══════════ */}
             {selectedSection === 'moderation' && (
               <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Moderation Queue</h2>
-                  <p className="text-sm text-[var(--aurora-text-secondary)]">Review flagged content</p>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Moderation Queue</h2>
+                    <p className="text-sm text-[var(--aurora-text-secondary)]">
+                      {modQueue.length} report{modQueue.length !== 1 ? 's' : ''} pending review
+                    </p>
+                  </div>
                 </div>
+
+                {/* Filter & Sort Bar */}
+                {modQueue.length > 0 && (
+                  <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--aurora-text-secondary)]">
+                        <Filter size={14} /> Filter:
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          onClick={() => setModFilterCategory('all')}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition ${
+                            modFilterCategory === 'all'
+                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+                              : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-border)]'
+                          }`}
+                        >
+                          All ({modQueue.length})
+                        </button>
+                        {Object.entries(modCategoryCounts).map(([cat, count]) => (
+                          <button
+                            key={cat}
+                            onClick={() => setModFilterCategory(cat)}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition capitalize ${
+                              modFilterCategory === cat
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-border)]'
+                            }`}
+                          >
+                            {cat.replace(/_/g, ' ')} ({count})
+                          </button>
+                        ))}
+                      </div>
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <span className="text-[11px] text-[var(--aurora-text-secondary)]">Sort:</span>
+                        <button
+                          onClick={() => setModSortBy('recent')}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition ${
+                            modSortBy === 'recent' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30' : 'text-[var(--aurora-text-secondary)]'
+                          }`}
+                        >
+                          Recent
+                        </button>
+                        <button
+                          onClick={() => setModSortBy('frequency')}
+                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition ${
+                            modSortBy === 'frequency' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30' : 'text-[var(--aurora-text-secondary)]'
+                          }`}
+                        >
+                          Most Reported
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {loading ? (
                   <div className="space-y-3">
                     {[...Array(3)].map((_, i) => <SkeletonRow key={i} />)}
                   </div>
-                ) : modQueue.length === 0 ? (
+                ) : filteredModQueue.length === 0 ? (
                   <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16">
                     <CheckCircle2 size={48} className="mx-auto mb-3 text-emerald-400" />
                     <p className="font-semibold text-[var(--aurora-text)]">All clear!</p>
-                    <p className="text-sm text-[var(--aurora-text-secondary)]">No flagged content to review</p>
+                    <p className="text-sm text-[var(--aurora-text-secondary)]">
+                      {modFilterCategory !== 'all' ? 'No reports in this category' : 'No flagged content to review'}
+                    </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {modQueue.map((item) => (
+                  <div className="space-y-4">
+                    {filteredModQueue.map((item) => (
                       <div
                         key={item.id}
-                        className="bg-[var(--aurora-surface)] rounded-2xl border border-red-200 dark:border-red-800/30 p-5"
+                        className="bg-[var(--aurora-surface)] rounded-2xl border border-red-200 dark:border-red-800/30 overflow-hidden"
                       >
-                        <div className="flex-1 mb-3">
-                          <div className="flex items-center gap-2 mb-2">
+                        {/* Report Header with Category & Frequency Badge */}
+                        <div className="px-5 pt-4 pb-3 border-b border-[var(--aurora-border)]/50">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 uppercase">
                               {item.type}
                             </span>
-                            {item.reason && (
-                              <span className="text-[10px] text-[var(--aurora-text-secondary)]">
-                                Reason: {item.reason}
+                            {item.categoryLabel && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                {item.categoryLabel}
+                              </span>
+                            )}
+                            {(item.reportCount || 1) > 1 && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 flex items-center gap-1">
+                                <AlertOctagon size={10} /> {item.reportCount} reports
                               </span>
                             )}
                             <span className="text-[10px] text-[var(--aurora-text-secondary)] ml-auto">
-                              {item.createdAt?.toDate?.()?.toLocaleDateString?.() || ''}
+                              {item.createdAt?.toDate?.()?.toLocaleDateString?.('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || ''}
                             </span>
                           </div>
-                          <p className="text-sm text-[var(--aurora-text)] mb-1 whitespace-pre-wrap">
-                            &ldquo;{item.content.length > 300 ? item.content.slice(0, 300) + '...' : item.content}&rdquo;
-                          </p>
-                          <p className="text-xs text-[var(--aurora-text-secondary)]">
-                            By <span className="font-semibold">{item.authorName || 'Unknown'}</span>
-                            {item.authorId && <span className="opacity-50"> ({item.authorId.slice(0, 8)}...)</span>}
-                          </p>
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap">
+
+                        {/* Flagged Content Preview */}
+                        <div className="px-5 py-3">
+                          <p className="text-sm text-[var(--aurora-text)] mb-2 whitespace-pre-wrap leading-relaxed">
+                            &ldquo;{item.content.length > 400 ? item.content.slice(0, 400) + '...' : item.content}&rdquo;
+                          </p>
+                          {/* Image thumbnails if present */}
+                          {item.images && item.images.length > 0 && (
+                            <div className="flex gap-2 mt-2 mb-2 overflow-x-auto">
+                              {item.images.slice(0, 3).map((img, idx) => (
+                                <img key={idx} src={img} alt={`Attached ${idx + 1}`} className="w-16 h-16 rounded-lg object-cover border border-[var(--aurora-border)]" />
+                              ))}
+                              {item.images.length > 3 && (
+                                <div className="w-16 h-16 rounded-lg bg-[var(--aurora-surface-variant)] flex items-center justify-center text-xs font-semibold text-[var(--aurora-text-secondary)]">
+                                  +{item.images.length - 3}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Author & Reporter Info */}
+                        <div className="px-5 py-3 bg-[var(--aurora-surface-variant)]/30 border-t border-[var(--aurora-border)]/50">
+                          <div className="flex items-center justify-between flex-wrap gap-3">
+                            {/* Author (who wrote the post) */}
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-sm shrink-0">
+                                {item.authorAvatar || '👤'}
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-[var(--aurora-text)]">
+                                  Author: {item.authorName || 'Unknown'}
+                                </p>
+                                {item.authorId && (
+                                  <p className="text-[10px] text-[var(--aurora-text-secondary)] opacity-60">{item.authorId.slice(0, 12)}...</p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Reporter (who filed the report) */}
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-sm shrink-0">
+                                {item.reporterAvatar || '🛡️'}
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-[var(--aurora-text)]">
+                                  Reported by: {item.reporterName || 'Unknown'}
+                                </p>
+                                {item.reportedBy && (
+                                  <p className="text-[10px] text-[var(--aurora-text-secondary)] opacity-60">{item.reportedBy.slice(0, 12)}...</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Multiple reporters list */}
+                          {item.reporters && item.reporters.length > 1 && (
+                            <div className="mt-2 pt-2 border-t border-[var(--aurora-border)]/30">
+                              <p className="text-[10px] font-semibold text-[var(--aurora-text-secondary)] mb-1.5 uppercase tracking-wider">All Reporters ({item.reporters.length})</p>
+                              <div className="space-y-1">
+                                {item.reporters.map((r, idx) => (
+                                  <div key={idx} className="flex items-center gap-2 text-[11px]">
+                                    <span>{r.avatar || '👤'}</span>
+                                    <span className="font-medium text-[var(--aurora-text)]">{r.name}</span>
+                                    <span className="text-[var(--aurora-text-secondary)] capitalize">— {r.category?.replace(/_/g, ' ')}</span>
+                                    {r.details && <span className="text-[var(--aurora-text-secondary)] italic truncate max-w-[150px]">"{r.details}"</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="px-5 py-3 border-t border-[var(--aurora-border)]/50 flex items-center gap-2 flex-wrap">
                           <button
                             onClick={() => dismissModItem(item.id)}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 transition"
@@ -1980,11 +2208,11 @@ export default function AdminPage() {
                                 onConfirm: async () => {
                                   setConfirmModal(null);
                                   try {
-                                    // Delete the source content if contentId exists
-                                    if ((item as any).contentId && (item as any).collection) {
-                                      await deleteDoc(doc(db, (item as any).collection, (item as any).contentId));
+                                    if (item.contentId && item.collection) {
+                                      await deleteDoc(doc(db, item.collection, item.contentId));
                                     }
                                     await dismissModItem(item.id);
+                                    setToastMessage('Content deleted successfully.');
                                   } catch (error) {
                                     console.error('Error deleting flagged content:', error);
                                     setToastMessage('Failed to delete content. Item dismissed from queue.');
@@ -1995,32 +2223,53 @@ export default function AdminPage() {
                             }}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 transition"
                           >
-                            <Trash2 size={12} /> Delete Content
+                            <Trash2 size={12} /> Delete/Hide
                           </button>
                           {item.authorId && (
-                            <button
-                              onClick={() => {
-                                setConfirmModal({
-                                  title: 'Ban User?',
-                                  message: `Ban user "${item.authorName}" and delete this flagged content?`,
-                                  confirmLabel: 'Ban User',
-                                  onConfirm: async () => {
-                                    setConfirmModal(null);
-                                    try {
-                                      await updateDoc(doc(db, 'users', item.authorId), { isBanned: true, bannedAt: new Date().toISOString() });
-                                      await dismissModItem(item.id);
-                                      setToastMessage(`User "${item.authorName}" has been banned.`);
-                                    } catch (error) {
-                                      console.error('Error banning user:', error);
-                                      setToastMessage('Failed to ban user');
+                            <>
+                              <button
+                                onClick={() => {
+                                  setConfirmModal({
+                                    title: 'Warn User?',
+                                    message: `Issue a warning to "${item.authorName}" for "${item.categoryLabel || item.reason}"? This will increment their warning count.`,
+                                    confirmLabel: 'Warn User',
+                                    onConfirm: async () => {
+                                      setConfirmModal(null);
+                                      await warnUser(item);
                                     }
-                                  }
-                                });
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 transition"
-                            >
-                              <Ban size={12} /> Ban User
-                            </button>
+                                  });
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 transition"
+                              >
+                                <AlertTriangle size={12} /> Warn User
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setConfirmModal({
+                                    title: 'Ban User?',
+                                    message: `Ban user "${item.authorName}" permanently? This will prevent them from accessing the app.`,
+                                    confirmLabel: 'Ban User',
+                                    onConfirm: async () => {
+                                      setConfirmModal(null);
+                                      try {
+                                        await updateDoc(doc(db, 'users', item.authorId), { isBanned: true, bannedAt: new Date().toISOString() });
+                                        if (item.contentId && item.collection) {
+                                          try { await deleteDoc(doc(db, item.collection, item.contentId)); } catch {}
+                                        }
+                                        await dismissModItem(item.id);
+                                        setToastMessage(`User "${item.authorName}" has been banned.`);
+                                      } catch (error) {
+                                        console.error('Error banning user:', error);
+                                        setToastMessage('Failed to ban user');
+                                      }
+                                    }
+                                  });
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition"
+                              >
+                                <Ban size={12} /> Ban User
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>

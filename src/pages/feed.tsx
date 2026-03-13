@@ -247,13 +247,14 @@ const compressImage = (file: File, maxWidth = 800, quality = 0.7): Promise<strin
 };
 
 
-const REPORT_REASONS = [
-  'Spam or misleading',
-  'Harassment or hate speech',
-  'Violence or dangerous content',
-  'Inappropriate or adult content',
-  'False information',
-  'Other',
+const REPORT_CATEGORIES = [
+  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
+  { id: 'hate_speech', label: 'Hate Speech or Bullying', icon: '🛑', description: 'Content targeting race, ethnicity, religion, gender, or personal attacks' },
+  { id: 'inappropriate', label: 'Inappropriate Content', icon: '⚠️', description: 'Sexual, violent, or graphic content not suitable for the community' },
+  { id: 'ip_violation', label: 'Intellectual Property Violation', icon: '©️', description: 'Unauthorized use of copyrighted material or trademarks' },
+  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
+  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
+  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
 ];
 
 export default function FeedPage() {
@@ -325,6 +326,7 @@ export default function FeedPage() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportPostId, setReportPostId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
   const [reportedPosts, setReportedPosts] = useState<Set<string>>(new Set());
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
@@ -944,6 +946,7 @@ export default function FeedPage() {
     setMenuPostId(null);
     setReportPostId(postId);
     setReportReason('');
+    setReportDetails('');
     setShowReportModal(true);
   };
 
@@ -952,12 +955,17 @@ export default function FeedPage() {
     try {
       setReportSubmitting(true);
       const reportedPost = posts.find((p) => p.id === reportPostId);
+      const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
 
       // Write to reports collection for record-keeping
       await addDoc(collection(db, 'reports'), {
         postId: reportPostId,
         reportedBy: user.uid,
-        reason: reportReason,
+        reporterName: userProfile?.name || user.displayName || 'Anonymous',
+        reporterAvatar: userProfile?.avatar || '',
+        category: reportReason,
+        categoryLabel: categoryObj?.label || reportReason,
+        details: reportDetails.trim() || '',
         createdAt: serverTimestamp(),
         status: 'pending',
       });
@@ -970,13 +978,30 @@ export default function FeedPage() {
         collection: 'posts',
         authorId: reportedPost?.userId || '',
         authorName: reportedPost?.userName || 'Unknown',
-        reason: reportReason,
+        authorAvatar: reportedPost?.userAvatar || '',
+        images: reportedPost?.images || [],
+        category: reportReason,
+        categoryLabel: categoryObj?.label || reportReason,
+        reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
         reportedBy: user.uid,
+        reporterName: userProfile?.name || user.displayName || 'Anonymous',
+        reporterAvatar: userProfile?.avatar || '',
+        reportCount: 1,
+        reporters: [{
+          uid: user.uid,
+          name: userProfile?.name || user.displayName || 'Anonymous',
+          avatar: userProfile?.avatar || '',
+          category: reportReason,
+          details: reportDetails.trim() || '',
+          createdAt: new Date().toISOString(),
+        }],
         createdAt: serverTimestamp(),
       });
 
       setReportedPosts((prev) => new Set(prev).add(reportPostId));
       setShowReportModal(false);
+      setReportReason('');
+      setReportDetails('');
       alert('Report submitted. Thank you for helping keep the community safe.');
     } catch (error) {
       console.error('Error submitting report:', error);
@@ -2569,29 +2594,73 @@ export default function FeedPage() {
           ═══════════════════════════════════════════════════════════════════ */}
       {showReportModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-aurora-surface rounded-2xl shadow-aurora-4 w-full max-w-sm border border-aurora-border overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
-            <div className="px-5 py-4 border-b border-aurora-border">
-              <h3 id="report-modal-title" className="text-lg font-bold text-aurora-text">Report Post</h3>
-              <p className="text-sm text-aurora-text-muted mt-1">Why are you reporting this post?</p>
+          <div className="bg-aurora-surface rounded-2xl shadow-aurora-4 w-full max-w-md border border-aurora-border overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-aurora-border bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 id="report-modal-title" className="text-lg font-bold text-aurora-text flex items-center gap-2">
+                    <Flag size={18} className="text-red-500" />
+                    Report Post
+                  </h3>
+                  <p className="text-sm text-aurora-text-muted mt-0.5">Select a category that best describes the issue</p>
+                </div>
+                <button onClick={() => setShowReportModal(false)} className="p-1.5 rounded-full hover:bg-aurora-surface-variant transition-colors">
+                  <X size={18} className="text-aurora-text-muted" />
+                </button>
+              </div>
             </div>
-            <div className="px-5 py-3 space-y-2 max-h-[50vh] overflow-y-auto">
-              {REPORT_REASONS.map((reason) => (
+
+            {/* Categories */}
+            <div className="px-5 py-3 space-y-2 max-h-[40vh] overflow-y-auto">
+              {REPORT_CATEGORIES.map((cat) => (
                 <button
-                  key={reason}
-                  onClick={() => setReportReason(reason)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-all duration-200 ${
-                    reportReason === reason
-                      ? 'border-aurora-indigo bg-aurora-indigo/10 text-aurora-indigo font-medium'
-                      : 'border-aurora-border text-aurora-text-secondary hover:border-aurora-border-glass hover:bg-aurora-surface-variant'
+                  key={cat.id}
+                  onClick={() => setReportReason(cat.id)}
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 ${
+                    reportReason === cat.id
+                      ? 'border-red-400 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-300'
+                      : 'border-aurora-border hover:border-aurora-border-glass hover:bg-aurora-surface-variant'
                   }`}
                 >
-                  {reason}
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg shrink-0">{cat.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${reportReason === cat.id ? 'text-red-700 dark:text-red-400' : 'text-aurora-text'}`}>
+                        {cat.label}
+                      </p>
+                      <p className="text-xs text-aurora-text-muted mt-0.5 leading-relaxed">{cat.description}</p>
+                    </div>
+                    {reportReason === cat.id && (
+                      <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center shrink-0">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
+
+            {/* Optional Details */}
+            {reportReason && (
+              <div className="px-5 py-3 border-t border-aurora-border/50">
+                <label className="text-xs font-semibold text-aurora-text-secondary uppercase tracking-wider">Additional Details (Optional)</label>
+                <textarea
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="Provide more context about why you're reporting this post..."
+                  maxLength={500}
+                  rows={3}
+                  className="mt-1.5 w-full px-3 py-2.5 bg-aurora-surface-variant border border-aurora-border rounded-xl text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-red-300/50 resize-none"
+                />
+                <p className="text-[10px] text-aurora-text-muted text-right mt-1">{reportDetails.length}/500</p>
+              </div>
+            )}
+
+            {/* Actions */}
             <div className="px-5 py-4 border-t border-aurora-border flex gap-3">
               <button
-                onClick={() => setShowReportModal(false)}
+                onClick={() => { setShowReportModal(false); setReportReason(''); setReportDetails(''); }}
                 className="flex-1 py-2.5 rounded-xl border border-aurora-border text-aurora-text-secondary font-medium hover:bg-aurora-surface-variant transition-colors"
               >
                 Cancel
@@ -2599,9 +2668,13 @@ export default function FeedPage() {
               <button
                 onClick={handleSubmitReport}
                 disabled={!reportReason || reportSubmitting}
-                className="flex-1 py-2.5 rounded-xl bg-aurora-danger text-white font-medium hover:bg-red-500 disabled:opacity-50 transition-colors btn-press"
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 disabled:opacity-50 transition-colors btn-press flex items-center justify-center gap-2"
               >
-                {reportSubmitting ? 'Submitting...' : 'Report'}
+                {reportSubmitting ? (
+                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting...</>
+                ) : (
+                  <><Flag size={14} /> Submit Report</>
+                )}
               </button>
             </div>
           </div>
