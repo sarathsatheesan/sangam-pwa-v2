@@ -1656,7 +1656,7 @@ export default function MessagesPage() {
 
   // === Conversation list panel (reused in both mobile and desktop) ===
   const conversationListPanel = (
-    <div className="h-full flex flex-col relative" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+    <div className="h-full flex flex-col relative overflow-hidden" style={{ backgroundColor: 'var(--aurora-surface)' }}>
       {/* Header - purple on mobile, light purple on desktop */}
       <div className="px-4 pt-3 pb-2 sm:bg-gradient-to-r sm:from-purple-50 sm:via-violet-50 sm:to-indigo-50 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
         <div className="flex items-center justify-between mb-3">
@@ -1861,7 +1861,7 @@ export default function MessagesPage() {
 
       {/* New Message picker modal */}
       {showNewMsgPicker && (
-        <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+        <div className="fixed inset-0 z-[100] flex flex-col md:absolute md:z-50" style={{ backgroundColor: 'var(--aurora-surface)' }}>
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -1921,7 +1921,7 @@ export default function MessagesPage() {
 
       {/* Group Creator overlay */}
       {showGroupCreator && (
-        <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+        <div className="fixed inset-0 z-[100] flex flex-col md:absolute md:z-50" style={{ backgroundColor: 'var(--aurora-surface)' }}>
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center gap-3 mb-3">
               <button onClick={() => { setShowGroupCreator(false); setGroupName(''); setSelectedGroupMembers([]); setGroupSearchTerm(''); }} className="p-1">
