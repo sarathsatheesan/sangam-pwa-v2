@@ -1554,7 +1554,7 @@ export default function FeedPage() {
       </div>
 
       {/* ─── Sort Mode Tabs ─── */}
-      <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+      <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
             {(['recent', 'popular', 'trending'] as const).map((mode) => {

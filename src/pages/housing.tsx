@@ -1343,7 +1343,7 @@ export default function HousingPage() {
       </div>
 
       {/* ===== Zillow-style Filter Bar ===== */}
-      <div className="bg-aurora-surface border-b border-aurora-border sticky top-0 z-30">
+      <div className="bg-aurora-surface border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5 flex-wrap">
 

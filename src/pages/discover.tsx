@@ -738,7 +738,7 @@ export default function DiscoverPage() {
       </div>
 
       {/* Sticky Tab Navigation + Search */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm">
+      <div className="bg-white dark:bg-gray-900 shadow-sm">
         <div className="max-w-6xl mx-auto px-4">
           {/* Search + Ethnicity + Tabs row */}
           <div className="flex items-center gap-2 py-3 border-b border-aurora-border">
