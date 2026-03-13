@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Globe, ChevronDown, X } from 'lucide-react';
+import { Search, Globe, ChevronDown, X, Plus } from 'lucide-react';
 import {
   collection,
   query,
@@ -790,9 +790,9 @@ export default function TravelPage() {
       {/* Floating Action Button */}
       <button
         onClick={() => setShowCreateModal(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-aurora-indigo text-white rounded-full shadow-aurora-3 flex items-center justify-center text-2xl font-bold hover:bg-blue-800 transition-colors"
+        className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 w-14 h-14 aurora-gradient text-white rounded-full shadow-aurora-glow-lg flex items-center justify-center hover:shadow-aurora-4 transition-all z-10 btn-press"
       >
-        +
+        <Plus className="w-6 h-6" />
       </button>
 
       {/* Create Modal */}
