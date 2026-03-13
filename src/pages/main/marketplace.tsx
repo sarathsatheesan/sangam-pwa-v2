@@ -1149,8 +1149,11 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-[var(--aurora-bg)]">
+      {/* ─── Sticky Header: Search + Filter ─── */}
+      <div className="sticky top-0 z-20">
+
       {/* Header */}
-      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
+      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           {/* Search & Filter Controls */}
           <div className="flex items-center gap-2">
@@ -1547,7 +1550,7 @@ export default function MarketplacePage() {
       </div>
 
       {/* ── Filter Bar — Sort dropdown | Category pills ── */}
-      <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+      <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
 
@@ -1599,6 +1602,8 @@ export default function MarketplacePage() {
           </div>
         </div>
       </div>
+
+      </div>{/* end sticky header wrapper */}
 
       {/* Featured Carousel */}
       {isFeatureEnabled('marketplace_featured') && featuredListings.length > 0 && (

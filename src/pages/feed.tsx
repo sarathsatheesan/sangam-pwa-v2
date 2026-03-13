@@ -1148,6 +1148,9 @@ export default function FeedPage() {
   return (
     <div className="bg-gradient-to-b from-indigo-100/50 via-indigo-50/30 to-emerald-100/40">
 
+      {/* ─── Sticky Search + Sort Header ─── */}
+      <div className="sticky top-0 z-20">
+
       {/* ─── Search & Ethnicity Filter ─── */}
       <div className="relative bg-gradient-to-br from-indigo-400/25 via-indigo-100/40 to-emerald-400/20 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
@@ -1554,7 +1557,7 @@ export default function FeedPage() {
       </div>
 
       {/* ─── Sort Mode Tabs ─── */}
-      <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+      <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
             {(['recent', 'popular', 'trending'] as const).map((mode) => {
@@ -1577,6 +1580,8 @@ export default function FeedPage() {
           </div>
         </div>
       </div>
+
+      </div>{/* end sticky header wrapper */}
 
       {/* ─── Create Post Composer Card ─── */}
       <div className="max-w-2xl mx-auto px-4 pt-3">

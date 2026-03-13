@@ -268,8 +268,11 @@ export default function TravelPage() {
         </div>
       </div>
 
+      {/* ─── Sticky Header: Search + Filter ─── */}
+      <div className="sticky top-0 z-20">
+
       {/* Search + Ethnicity Header */}
-      <div className="relative bg-gradient-to-br from-teal-500/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
+      <div className="relative bg-gradient-to-br from-teal-500/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 py-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -658,8 +661,8 @@ export default function TravelPage() {
         </div>
       </div>
 
-      {/* Filter Pills — Sticky bar */}
-      <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+      {/* Filter Pills */}
+      <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
             {(['all', 'assistance', 'offer'] as FilterMode[]).map((mode) => (
@@ -682,6 +685,8 @@ export default function TravelPage() {
           </div>
         </div>
       </div>
+
+      </div>{/* end sticky header wrapper */}
 
       {/* Posts */}
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">

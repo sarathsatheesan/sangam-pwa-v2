@@ -1261,8 +1261,11 @@ export default function HousingPage() {
   return (
     <div className="bg-[var(--aurora-bg)]">
 
+      {/* ─── Sticky Header: Search + Filter ─── */}
+      <div className="sticky top-0 z-20">
+
       {/* ===== Search Header ===== */}
-      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-40">
+      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           {/* Search bar + Listing Type dropdown */}
           <div className="flex items-center gap-2">
@@ -1343,7 +1346,7 @@ export default function HousingPage() {
       </div>
 
       {/* ===== Zillow-style Filter Bar ===== */}
-      <div className="sticky top-0 z-20 bg-aurora-surface border-b border-aurora-border">
+      <div className="bg-aurora-surface border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5 flex-wrap">
 
@@ -1487,6 +1490,8 @@ export default function HousingPage() {
           </div>
         </div>
       </div>
+
+      </div>{/* end sticky header wrapper */}
 
       {/* ===== Listings ===== */}
       <div className="max-w-6xl mx-auto px-4 py-5 pb-24">

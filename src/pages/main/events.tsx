@@ -1114,8 +1114,11 @@ export default function EventsPage() {
 
   return (
     <div className="bg-aurora-bg">
+      {/* ─── Sticky Header: Search + Filter ─── */}
+      <div className="sticky top-0 z-20">
+
       {/* ── Search & Filter Bar ── */}
-      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-orange-500/8 border-b border-aurora-border">
+      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-orange-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           {/* Search + Ethnicity Filter on same row */}
           <div className="flex items-center gap-2">
@@ -1512,7 +1515,7 @@ export default function EventsPage() {
       </div>
 
       {/* ── Filter Bar — Time dropdown | Type pills ── */}
-      <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+      <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
 
@@ -1571,6 +1574,8 @@ export default function EventsPage() {
           </div>
         </div>
       </div>
+
+      </div>{/* end sticky header wrapper */}
 
       {/* ── Content ── */}
       <div className="max-w-6xl mx-auto px-4 py-5 pb-24">

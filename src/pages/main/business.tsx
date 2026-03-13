@@ -901,8 +901,10 @@ export default function BusinessPage() {
 
   return (
     <div className="bg-aurora-bg">
+      {/* ─── Sticky Header: Search + Category ─── */}
+      <div className="sticky top-0 z-20">
       {/* ── Search & Filter Bar ── */}
-      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border">
+      <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
           {!merchantView && (
             <div className="relative flex items-center gap-2">
@@ -1303,9 +1305,7 @@ export default function BusinessPage() {
       </div>
 
       {!merchantView && (
-        <>
-          {/* ── Category Navigation ── */}
-          <div className="sticky top-0 z-20 bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
+          <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
             <div className="max-w-6xl mx-auto px-4">
               <div
                 ref={categoryScrollRef}
@@ -1377,7 +1377,11 @@ export default function BusinessPage() {
               </div>
             </div>
           </div>
+      )}
+      </div>{/* end sticky header wrapper */}
 
+      {!merchantView && (
+        <>
           {/* ── Content ── */}
           <div className="max-w-6xl mx-auto px-4 py-5 pb-24">
             {/* Results Header */}
