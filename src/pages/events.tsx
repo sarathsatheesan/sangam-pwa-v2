@@ -1691,12 +1691,6 @@ export default function EventsPage() {
             <p className="text-sm text-aurora-text-secondary max-w-xs">
               {searchQuery ? `No results for "${searchQuery}".` : 'No upcoming events match your filters.'}
             </p>
-            <button
-              onClick={() => { setCreateStep(1); setShowCreateModal(true); }}
-              className="mt-4 px-5 py-2 bg-aurora-indigo text-white rounded-xl font-medium text-sm hover:bg-aurora-indigo/90 shadow-sm flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" /> Create Event
-            </button>
           </div>
         ) : (
           <>
