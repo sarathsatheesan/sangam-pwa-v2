@@ -1,4 +1,4 @@
-import { ETHNICITY_HIERARCHY } from './config';
+import { ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN } from './config';
 
 export interface CulturalTheme {
   id: string;
@@ -392,10 +392,16 @@ const THEME_DEFINITIONS: Record<string, CulturalTheme> = {
 
 /**
  * Resolves the appropriate cultural theme based on user's heritage selection.
- * Returns neutral theme if:
- * - Heritage is empty/null
- * - Heritage has 2 or more items (multiracial)
- * Otherwise finds the single heritage, determines its region/subregion, and returns matching theme.
+ *
+ * Logic:
+ * - Empty/null heritage → neutral
+ * - Resolves each heritage item to its theme (checking both ethnicities AND
+ *   ETHNICITY_CHILDREN like Indian states)
+ * - If ALL items resolve to the SAME theme → apply that theme
+ * - If items resolve to DIFFERENT themes → neutral (multicultural)
+ *
+ * This means ['Kerala', 'Tamil Nadu'] → both under Indian → south_asian (same theme).
+ * But ['Kerala', 'Chinese'] → south_asian + east_asian → neutral (different themes).
  */
 export function resolveThemeForUser(heritage: string | string[] | null | undefined): CulturalTheme {
   // Handle empty/null heritage
@@ -406,30 +412,59 @@ export function resolveThemeForUser(heritage: string | string[] | null | undefin
   // Normalize to array
   const heritageArray = Array.isArray(heritage) ? heritage : [heritage];
 
-  // If 2+ heritages selected, use neutral
-  if (heritageArray.length > 1) {
+  if (heritageArray.length === 0 || !heritageArray[0]) {
     return THEME_DEFINITIONS.neutral;
   }
 
-  const selectedHeritage = heritageArray[0];
-  if (!selectedHeritage) {
-    return THEME_DEFINITIONS.neutral;
+  // Resolve each heritage item to a theme ID
+  const themeIds = new Set<string>();
+
+  for (const item of heritageArray) {
+    const themeId = resolveHeritageItemToThemeId(item);
+    if (themeId) {
+      themeIds.add(themeId);
+    }
   }
 
-  // Find which region and subregion this heritage belongs to
+  // If all items resolve to the same single theme, use it
+  if (themeIds.size === 1) {
+    const id = [...themeIds][0];
+    return THEME_DEFINITIONS[id] || THEME_DEFINITIONS.neutral;
+  }
+
+  // Multiple different themes or no match → neutral
+  return THEME_DEFINITIONS.neutral;
+}
+
+/**
+ * Resolves a single heritage item (ethnicity name OR child like a state name)
+ * to a theme ID string.
+ */
+function resolveHeritageItemToThemeId(item: string): string | null {
+  // First: check if it's directly in a subregion's ethnicities
   for (const region of ETHNICITY_HIERARCHY) {
     for (const subregion of region.subregions) {
-      // Check if the selected heritage is in this subregion's ethnicities
-      if (subregion.ethnicities.includes(selectedHeritage)) {
-        // Map subregion to theme ID
-        const themeId = mapSubregionToThemeId(region.region, subregion.name);
-        return THEME_DEFINITIONS[themeId] || THEME_DEFINITIONS.neutral;
+      if (subregion.ethnicities.includes(item)) {
+        return mapSubregionToThemeId(region.region, subregion.name);
       }
     }
   }
 
-  // If not found, default to neutral
-  return THEME_DEFINITIONS.neutral;
+  // Second: check if it's a child value (e.g., 'Kerala' under 'Indian')
+  for (const [parentEthnicity, children] of Object.entries(ETHNICITY_CHILDREN)) {
+    if (children.includes(item)) {
+      // Find which subregion the parent belongs to
+      for (const region of ETHNICITY_HIERARCHY) {
+        for (const subregion of region.subregions) {
+          if (subregion.ethnicities.includes(parentEthnicity)) {
+            return mapSubregionToThemeId(region.region, subregion.name);
+          }
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
