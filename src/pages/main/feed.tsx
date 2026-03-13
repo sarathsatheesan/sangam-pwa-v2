@@ -428,7 +428,9 @@ export default function FeedPage() {
       const postsData: Post[] = [];
       const reactionsMap = new Map<string, string>();
       snapshot.forEach((docSnapshot) => {
-        const post = { id: docSnapshot.id, ...docSnapshot.data() } as Post;
+        const data = docSnapshot.data();
+        if (data.isHidden) return; // Skip hidden posts
+        const post = { id: docSnapshot.id, ...data } as Post;
         postsData.push(post);
         // Scan reactions to find current user's reaction
         if (user && post.reactions) {
@@ -540,7 +542,9 @@ export default function FeedPage() {
         const newPosts: Post[] = [];
         const reactionsMap = new Map<string, string>();
         snapshot.forEach((docSnapshot) => {
-          const post = { id: docSnapshot.id, ...docSnapshot.data() } as Post;
+          const data = docSnapshot.data();
+          if (data.isHidden) return; // Skip hidden posts
+          const post = { id: docSnapshot.id, ...data } as Post;
           newPosts.push(post);
           if (user && post.reactions) {
             for (const [emoji, users] of Object.entries(post.reactions)) {

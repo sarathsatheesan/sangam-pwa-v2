@@ -2202,8 +2202,33 @@ export default function AdminPage() {
                           <button
                             onClick={() => {
                               setConfirmModal({
-                                title: 'Delete Content?',
-                                message: `Delete this ${item.type} and remove from queue?`,
+                                title: 'Hide Content?',
+                                message: `Hide this ${item.type} from public view? It can be restored later.`,
+                                confirmLabel: 'Hide',
+                                onConfirm: async () => {
+                                  setConfirmModal(null);
+                                  try {
+                                    if (item.contentId && item.collection) {
+                                      await updateDoc(doc(db, item.collection, item.contentId), { isHidden: true, hiddenAt: new Date().toISOString(), hiddenReason: item.categoryLabel || item.reason || '' });
+                                    }
+                                    await dismissModItem(item.id);
+                                    setToastMessage('Content hidden from public view.');
+                                  } catch (error) {
+                                    console.error('Error hiding content:', error);
+                                    setToastMessage('Failed to hide content.');
+                                  }
+                                }
+                              });
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 transition"
+                          >
+                            <EyeOff size={12} /> Hide
+                          </button>
+                          <button
+                            onClick={() => {
+                              setConfirmModal({
+                                title: 'Permanently Delete?',
+                                message: `Permanently delete this ${item.type}? This cannot be undone.`,
                                 confirmLabel: 'Delete',
                                 onConfirm: async () => {
                                   setConfirmModal(null);
@@ -2212,10 +2237,10 @@ export default function AdminPage() {
                                       await deleteDoc(doc(db, item.collection, item.contentId));
                                     }
                                     await dismissModItem(item.id);
-                                    setToastMessage('Content deleted successfully.');
+                                    setToastMessage('Content permanently deleted.');
                                   } catch (error) {
                                     console.error('Error deleting flagged content:', error);
-                                    setToastMessage('Failed to delete content. Item dismissed from queue.');
+                                    setToastMessage('Failed to delete content.');
                                     await dismissModItem(item.id);
                                   }
                                 }
@@ -2223,7 +2248,7 @@ export default function AdminPage() {
                             }}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 transition"
                           >
-                            <Trash2 size={12} /> Delete/Hide
+                            <Trash2 size={12} /> Delete
                           </button>
                           {item.authorId && (
                             <>
