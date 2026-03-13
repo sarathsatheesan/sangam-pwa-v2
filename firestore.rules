@@ -263,11 +263,25 @@ service cloud.firestore {
     match /moderationQueue/{itemId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
+      allow update: if request.auth != null;
       allow delete: if request.auth != null;
     }
 
     // ─── Reports ──────────────────────────────────────
     match /reports/{reportId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+
+    // ─── Notifications (moderation appeals, etc.) ────
+    match /notifications/{notifId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && request.auth.uid == resource.data.recipientId;
+    }
+
+    // ─── User warnings ─────────────────────────────────
+    match /userWarnings/{warningId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
     }
