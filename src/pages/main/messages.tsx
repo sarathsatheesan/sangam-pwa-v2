@@ -883,7 +883,7 @@ function MessageSearchBar({
           setQuery(e.target.value);
           setCurrentMatch(0);
         }}
-        className="flex-1 bg-transparent text-sm outline-none"
+        className="flex-1 bg-transparent text-base outline-none"
       />
       {matches.length > 0 && (
         <span className="text-xs text-aurora-text/70">
@@ -1708,7 +1708,7 @@ export default function MessagesPage() {
             placeholder="Search or start new chat"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all"
+            className="w-full pl-10 pr-10 py-2.5 bg-aurora-surface border border-aurora-border rounded-full text-base text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all"
           />
           {searchTerm && (
             <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text">
@@ -1878,7 +1878,7 @@ export default function MessagesPage() {
                 placeholder="Search people"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 py-1 bg-transparent outline-none text-sm placeholder-gray-400"
+                className="flex-1 py-1 bg-transparent outline-none text-base placeholder-gray-400"
                 style={{ color: '#111B21' }}
                 autoFocus
               />
@@ -1937,7 +1937,7 @@ export default function MessagesPage() {
                 placeholder="Group name"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                className="flex-1 py-1 bg-transparent outline-none text-sm placeholder-gray-400"
+                className="flex-1 py-1 bg-transparent outline-none text-base placeholder-gray-400"
                 style={{ color: '#111B21' }}
                 autoFocus
               />
@@ -1967,7 +1967,7 @@ export default function MessagesPage() {
                 placeholder="Search people to add"
                 value={groupSearchTerm}
                 onChange={(e) => setGroupSearchTerm(e.target.value)}
-                className="flex-1 py-1 bg-transparent outline-none text-sm placeholder-gray-400"
+                className="flex-1 py-1 bg-transparent outline-none text-base placeholder-gray-400"
                 style={{ color: '#111B21' }}
               />
             </div>
@@ -2180,7 +2180,7 @@ export default function MessagesPage() {
                       type="text"
                       value={editGroupNameValue}
                       onChange={(e) => setEditGroupNameValue(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+                      className="flex-1 px-3 py-2 rounded-lg text-base outline-none"
                       style={{ backgroundColor: 'var(--aurora-surface-variant)', color: 'var(--aurora-text)' }}
                       autoFocus
                       onKeyDown={(e) => { if (e.key === 'Enter') updateGroupName(editGroupNameValue); }}
@@ -2248,7 +2248,7 @@ export default function MessagesPage() {
                         placeholder="Search people to add..."
                         value={addMemberSearchTerm}
                         onChange={(e) => setAddMemberSearchTerm(e.target.value)}
-                        className="flex-1 py-1 bg-transparent outline-none text-sm placeholder-gray-400"
+                        className="flex-1 py-1 bg-transparent outline-none text-base placeholder-gray-400"
                         style={{ color: '#111B21' }}
                         autoFocus
                       />
@@ -2536,7 +2536,7 @@ export default function MessagesPage() {
               value={messageText}
               onChange={handleMessageInput}
               placeholder="Type a message"
-              className="flex-1 bg-transparent outline-none text-[15px] resize-none leading-[20px] placeholder-gray-400"
+              className="flex-1 bg-transparent outline-none text-base resize-none leading-[20px] placeholder-gray-400"
               style={{ color: '#111B21', maxHeight: '100px' }}
               rows={1}
               maxLength={MESSAGE_CONFIG.MAX_MESSAGE_LENGTH}
