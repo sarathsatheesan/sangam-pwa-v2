@@ -1513,8 +1513,9 @@ export default function EventsPage() {
           </div>
         </div>
       </div>
+      </div>{/* end sticky header wrapper */}
 
-      {/* ── Filter Bar — Time dropdown | Type pills ── */}
+      {/* ── Filter Bar — Time dropdown | Type pills (scrolls with content) ── */}
       <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
@@ -1574,8 +1575,6 @@ export default function EventsPage() {
           </div>
         </div>
       </div>
-
-      </div>{/* end sticky header wrapper */}
 
       {/* ── Content ── */}
       <div className="max-w-6xl mx-auto px-4 py-5 pb-24">

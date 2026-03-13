@@ -1344,8 +1344,9 @@ export default function HousingPage() {
           </div>
         </div>
       </div>
+      </div>{/* end sticky header wrapper */}
 
-      {/* ===== Zillow-style Filter Bar ===== */}
+      {/* ===== Zillow-style Filter Bar (scrolls with content) ===== */}
       <div className="bg-aurora-surface border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1490,8 +1491,6 @@ export default function HousingPage() {
           </div>
         </div>
       </div>
-
-      </div>{/* end sticky header wrapper */}
 
       {/* ===== Listings ===== */}
       <div className="max-w-6xl mx-auto px-4 py-5 pb-24">

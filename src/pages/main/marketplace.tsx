@@ -1548,8 +1548,9 @@ export default function MarketplacePage() {
         </div>
 
       </div>
+      </div>{/* end sticky header wrapper */}
 
-      {/* ── Filter Bar — Sort dropdown | Category pills ── */}
+      {/* ── Filter Bar — Sort dropdown | Category pills (scrolls with content) ── */}
       <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
           <div className="flex items-center gap-1.5">
@@ -1602,8 +1603,6 @@ export default function MarketplacePage() {
           </div>
         </div>
       </div>
-
-      </div>{/* end sticky header wrapper */}
 
       {/* Featured Carousel */}
       {isFeatureEnabled('marketplace_featured') && featuredListings.length > 0 && (
