@@ -2003,7 +2003,7 @@ export default function MessagesPage() {
             })}
           </div>
           {/* Create button */}
-          <div className="px-4 py-3" style={{ borderTop: '1px solid #F0F2F5' }}>
+          <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] mb-12 sm:mb-0" style={{ borderTop: '1px solid #F0F2F5' }}>
             <button
               onClick={createGroup}
               disabled={!groupName.trim() || selectedGroupMembers.length === 0}
