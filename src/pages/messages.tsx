@@ -1861,7 +1861,7 @@ export default function MessagesPage() {
 
       {/* New Message picker modal */}
       {showNewMsgPicker && (
-        <div className="fixed inset-0 z-[100] flex flex-col md:absolute md:z-50" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+        <div className="absolute inset-0 z-50 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--aurora-surface)' }}>
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
@@ -1921,7 +1921,7 @@ export default function MessagesPage() {
 
       {/* Group Creator overlay */}
       {showGroupCreator && (
-        <div className="fixed inset-0 z-[100] flex flex-col md:absolute md:z-50" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+        <div className="absolute inset-0 z-50 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--aurora-surface)' }}>
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center gap-3 mb-3">
               <button onClick={() => { setShowGroupCreator(false); setGroupName(''); setSelectedGroupMembers([]); setGroupSearchTerm(''); }} className="p-1">
@@ -2003,7 +2003,7 @@ export default function MessagesPage() {
             })}
           </div>
           {/* Create button */}
-          <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] mb-12 sm:mb-0" style={{ borderTop: '1px solid #F0F2F5' }}>
+          <div className="px-4 py-3 flex-shrink-0" style={{ borderTop: '1px solid #F0F2F5' }}>
             <button
               onClick={createGroup}
               disabled={!groupName.trim() || selectedGroupMembers.length === 0}
@@ -2154,7 +2154,7 @@ export default function MessagesPage() {
         );
 
         return (
-          <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+          <div className="absolute inset-0 z-50 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--aurora-surface)' }}>
             {/* Header */}
             <div className="px-4 pt-3 pb-3 flex items-center gap-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
               <button
@@ -2595,7 +2595,7 @@ export default function MessagesPage() {
   // === MOBILE LAYOUT: single panel switching ===
   // === DESKTOP LAYOUT (md+): side-by-side panels like WhatsApp Web ===
   return (
-    <div className="h-full flex">
+    <div className="h-full flex overflow-hidden">
       {/* Left panel - conversation list */}
       {/* On mobile: show only when viewState is 'list' */}
       {/* On desktop: always show */}
