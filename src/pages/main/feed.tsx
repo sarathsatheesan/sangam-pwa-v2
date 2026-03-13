@@ -1581,19 +1581,6 @@ export default function FeedPage() {
 
       </div>{/* end sticky header wrapper */}
 
-      {/* ─── Cultural Theme Indicator ─── */}
-      {!isNeutral && (
-        <div
-          className="text-center py-1.5 text-[11px] font-semibold tracking-wider uppercase"
-          style={{
-            background: `linear-gradient(to right, ${theme.colors.primary}15, ${theme.colors.accent}10)`,
-            color: theme.colors.primary,
-          }}
-        >
-          {theme.name} Theme
-        </div>
-      )}
-
       {/* ─── Sort Mode Tabs (scrolls with content) ─── */}
       <div className="bg-aurora-surface/95 backdrop-blur-md border-b border-aurora-border">
         <div className="max-w-6xl mx-auto px-4 py-2.5">
