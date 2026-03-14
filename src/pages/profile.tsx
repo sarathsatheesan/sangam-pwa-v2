@@ -873,17 +873,9 @@ export default function ProfilePage() {
         <h1 className="text-lg font-bold text-[var(--aurora-text)]">
           {userProfile?.name || 'Profile'}
         </h1>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className="w-9 h-9 rounded-full hover:bg-[var(--aurora-surface-variant)] flex items-center justify-center transition-colors"
-          >
-            <Settings size={20} className="text-[var(--aurora-text)]" />
-          </button>
-          <button className="w-9 h-9 rounded-full hover:bg-[var(--aurora-surface-variant)] flex items-center justify-center transition-colors">
-            <MoreHorizontal size={20} className="text-[var(--aurora-text)]" />
-          </button>
-        </div>
+        <button className="w-9 h-9 rounded-full hover:bg-[var(--aurora-surface-variant)] flex items-center justify-center transition-colors">
+          <MoreHorizontal size={20} className="text-[var(--aurora-text)]" />
+        </button>
       </div>
 
       <div className="max-w-xl mx-auto">
@@ -913,17 +905,46 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Name + Bio */}
+          {/* Name + Action buttons row */}
           <div className="mb-4">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h2 className="text-base font-bold text-[var(--aurora-text)]">{(userProfile as any)?.preferredName || userProfile?.name || 'User'}</h2>
-              {userProfile?.accountType === 'business' && (
-                <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-500/15 text-aurora-indigo text-[10px] font-bold rounded-md uppercase">Business</span>
-              )}
+            <div className="flex items-start justify-between gap-2 mb-0.5">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-[var(--aurora-text)] truncate">{(userProfile as any)?.preferredName || userProfile?.name || 'User'}</h2>
+                  {userProfile?.accountType === 'business' && (
+                    <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-500/15 text-aurora-indigo text-[10px] font-bold rounded-md uppercase flex-shrink-0">Business</span>
+                  )}
+                </div>
+                {(userProfile as any)?.preferredName && userProfile?.name && (userProfile as any).preferredName !== userProfile.name && (
+                  <p className="text-[13px] text-[var(--aurora-text-muted)]">{userProfile.name}</p>
+                )}
+              </div>
+              {/* Edit / Share / Settings inline */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={handleEditPress}
+                  className="px-3 py-1.5 bg-[var(--aurora-surface-variant)] rounded-lg font-semibold text-xs text-[var(--aurora-text)] hover:bg-[var(--aurora-border)] transition-colors flex items-center gap-1.5"
+                >
+                  <Edit3 size={13} /> <span className="hidden sm:inline">Edit</span><span className="sm:hidden">Edit</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({ title: `${userProfile?.name} on ethniCity`, url: window.location.href });
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-[var(--aurora-surface-variant)] rounded-lg font-semibold text-xs text-[var(--aurora-text)] hover:bg-[var(--aurora-border)] transition-colors flex items-center gap-1.5"
+                >
+                  <Share2 size={13} /> <span className="hidden sm:inline">Share</span><span className="sm:hidden">Share</span>
+                </button>
+                <button
+                  onClick={() => setSettingsOpen(true)}
+                  className="w-8 h-8 bg-[var(--aurora-surface-variant)] rounded-lg hover:bg-[var(--aurora-border)] transition-colors flex items-center justify-center flex-shrink-0"
+                >
+                  <Settings size={14} className="text-[var(--aurora-text)]" />
+                </button>
+              </div>
             </div>
-            {(userProfile as any)?.preferredName && userProfile?.name && (userProfile as any).preferredName !== userProfile.name && (
-              <p className="text-[13px] text-[var(--aurora-text-muted)]">{userProfile.name}</p>
-            )}
             {userProfile?.profession && (
               <p className="text-sm text-aurora-indigo font-medium">{userProfile.profession}</p>
             )}
@@ -957,30 +978,88 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Action buttons — Follow / Message style */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleEditPress}
-              className="flex-1 py-2.5 bg-[var(--aurora-surface-variant)] rounded-xl font-semibold text-sm text-[var(--aurora-text)] hover:bg-[var(--aurora-border)] transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Edit3 size={15} /> Edit Profile
-            </button>
-            <button
-              onClick={() => {
-                if (navigator.share) {
-                  navigator.share({ title: `${userProfile?.name} on ethniCity`, url: window.location.href });
-                }
-              }}
-              className="flex-1 py-2.5 bg-[var(--aurora-surface-variant)] rounded-xl font-semibold text-sm text-[var(--aurora-text)] hover:bg-[var(--aurora-border)] transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Share2 size={15} /> Share Profile
-            </button>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="w-11 py-2.5 bg-[var(--aurora-surface-variant)] rounded-xl hover:bg-[var(--aurora-border)] transition-colors flex items-center justify-center"
-            >
-              <Settings size={16} className="text-[var(--aurora-text)]" />
-            </button>
+          {/* Privacy & Blocked Users — surfaced on profile */}
+          <div className="space-y-3">
+            {/* Privacy */}
+            <div className="bg-[var(--aurora-surface-variant)] rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Lock size={14} className="text-[var(--aurora-text-muted)]" />
+                  <span className="text-sm font-semibold text-[var(--aurora-text)]">Who can message you?</span>
+                </div>
+                <select
+                  value={messagingPrivacy}
+                  onChange={(e) => handleUpdatePrivacy(e.target.value)}
+                  className="px-2.5 py-1.5 border border-[var(--aurora-border)] rounded-lg text-xs font-medium text-[var(--aurora-text)] bg-[var(--aurora-surface)] focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                >
+                  {PRIVACY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Blocked Users */}
+            <div className="bg-[var(--aurora-surface-variant)] rounded-xl overflow-hidden">
+              {!showBlockedSection ? (
+                <button
+                  onClick={() => {
+                    setShowBlockedSection(true);
+                    loadBlockedUsers();
+                  }}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--aurora-border)]/20 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Ban size={14} className="text-[var(--aurora-text-muted)]" />
+                    <span className="text-sm font-semibold text-[var(--aurora-text)]">Blocked Users</span>
+                  </div>
+                  <ChevronRight size={16} className="text-[var(--aurora-text-muted)]" />
+                </button>
+              ) : loadingBlocked ? (
+                <div className="flex items-center justify-center py-5">
+                  <Loader2 size={18} className="animate-spin text-aurora-indigo" />
+                </div>
+              ) : blockedUsers.length === 0 ? (
+                <div className="px-4 py-5 text-center">
+                  <UserX size={22} className="mx-auto mb-1.5 text-[var(--aurora-text-muted)]" />
+                  <p className="text-sm font-medium text-[var(--aurora-text)]">No blocked users</p>
+                  <p className="text-xs text-[var(--aurora-text-muted)] mt-0.5">Block users from the ⋯ menu on their posts</p>
+                </div>
+              ) : (
+                <div>
+                  <div className="px-4 py-2.5 border-b border-[var(--aurora-border)]/50">
+                    <div className="flex items-center gap-2">
+                      <Ban size={14} className="text-[var(--aurora-text-muted)]" />
+                      <span className="text-sm font-semibold text-[var(--aurora-text)]">Blocked Users ({blockedUsers.length})</span>
+                    </div>
+                  </div>
+                  {blockedUsers.map((blockedUser, idx) => (
+                    <div
+                      key={blockedUser.uid}
+                      className={`px-4 py-2.5 flex items-center gap-3 ${idx < blockedUsers.length - 1 ? 'border-b border-[var(--aurora-border)]/50' : ''}`}
+                    >
+                      <div className="w-7 h-7 rounded-full bg-[var(--aurora-surface)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {blockedUser.avatar && blockedUser.avatar.startsWith('http') ? (
+                          <img src={blockedUser.avatar} alt={blockedUser.name} className="w-7 h-7 rounded-full object-cover" />
+                        ) : (
+                          <span className="text-xs">{blockedUser.avatar || blockedUser.name?.charAt(0) || '👤'}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[var(--aurora-text)] truncate">{blockedUser.name}</p>
+                      </div>
+                      <button
+                        onClick={() => handleUnblockUser(blockedUser.uid, blockedUser.name)}
+                        disabled={unblockingUid === blockedUser.uid}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface)] transition-colors disabled:opacity-50"
+                      >
+                        {unblockingUid === blockedUser.uid ? 'Unblocking...' : 'Unblock'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1362,82 +1441,6 @@ export default function ProfilePage() {
                   {' · '}
                   {settings.privacy.searchable ? 'Visible in Discover' : 'Hidden from Discover'}
                 </p>
-              </div>
-
-              {/* Privacy */}
-              <div>
-                <SectionHeader icon={<Lock size={14} />} title="Privacy" />
-                <div className="bg-[var(--aurora-surface-variant)] rounded-xl px-4 py-3">
-                  <label className="block text-sm text-[var(--aurora-text)] mb-2 font-medium">Who can message you?</label>
-                  <select
-                    value={messagingPrivacy}
-                    onChange={(e) => handleUpdatePrivacy(e.target.value)}
-                    className="w-full px-3 py-2 border border-[var(--aurora-border)] rounded-lg text-sm text-[var(--aurora-text)] bg-[var(--aurora-surface)] focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
-                  >
-                    {PRIVACY_OPTIONS.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Blocked Users */}
-              <div>
-                <SectionHeader icon={<Ban size={14} />} title="Blocked Users" />
-                <div className="bg-[var(--aurora-surface-variant)] rounded-xl overflow-hidden">
-                  {!showBlockedSection ? (
-                    <button
-                      onClick={() => {
-                        setShowBlockedSection(true);
-                        loadBlockedUsers();
-                      }}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--aurora-border)]/20 transition-colors"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <UserX size={16} className="text-[var(--aurora-text-muted)]" />
-                        <span className="text-sm text-[var(--aurora-text)]">Manage Blocked Users</span>
-                      </div>
-                      <ChevronRight size={16} className="text-[var(--aurora-text-muted)]" />
-                    </button>
-                  ) : loadingBlocked ? (
-                    <div className="flex items-center justify-center py-6">
-                      <Loader2 size={20} className="animate-spin text-aurora-indigo" />
-                    </div>
-                  ) : blockedUsers.length === 0 ? (
-                    <div className="px-4 py-6 text-center">
-                      <UserX size={24} className="mx-auto mb-2 text-[var(--aurora-text-muted)]" />
-                      <p className="text-sm font-medium text-[var(--aurora-text)]">No blocked users</p>
-                      <p className="text-xs text-[var(--aurora-text-muted)] mt-1">Block users from the ⋯ menu on their posts</p>
-                    </div>
-                  ) : (
-                    <div>
-                      {blockedUsers.map((blockedUser, idx) => (
-                        <div
-                          key={blockedUser.uid}
-                          className={`px-4 py-3 flex items-center gap-3 ${idx < blockedUsers.length - 1 ? 'border-b border-[var(--aurora-border)]/50' : ''}`}
-                        >
-                          <div className="w-8 h-8 rounded-full bg-[var(--aurora-surface)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                            {blockedUser.avatar && blockedUser.avatar.startsWith('http') ? (
-                              <img src={blockedUser.avatar} alt={blockedUser.name} className="w-8 h-8 rounded-full object-cover" />
-                            ) : (
-                              <span className="text-sm">{blockedUser.avatar || blockedUser.name?.charAt(0) || '👤'}</span>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-[var(--aurora-text)] truncate">{blockedUser.name}</p>
-                          </div>
-                          <button
-                            onClick={() => handleUnblockUser(blockedUser.uid, blockedUser.name)}
-                            disabled={unblockingUid === blockedUser.uid}
-                            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface)] transition-colors disabled:opacity-50"
-                          >
-                            {unblockingUid === blockedUser.uid ? 'Unblocking...' : 'Unblock'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* Data & Privacy */}
