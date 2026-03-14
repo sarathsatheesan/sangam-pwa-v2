@@ -1984,9 +1984,71 @@ export default function BusinessPage() {
         >
           <div
             className="bg-aurora-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl
-                       max-h-[92vh] flex flex-col border border-aurora-border"
+                       max-h-[92vh] flex flex-col border border-aurora-border relative"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Modal action buttons — positioned outside hero to avoid overflow-hidden clipping */}
+            <button
+              onClick={() => setSelectedBusiness(null)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors z-[5]"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {user && (
+              <div className="absolute top-3 right-14 z-[5]">
+                <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMenuBusinessId(menuBusinessId === selectedBusiness.id ? null : selectedBusiness.id); }}
+                  className="w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+                <ClickOutsideOverlay isOpen={menuBusinessId === selectedBusiness.id} onClose={() => setMenuBusinessId(null)} />
+                {menuBusinessId === selectedBusiness.id && (
+                  <div className="absolute right-0 top-10 bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-[60] min-w-[180px]">
+                    {isOwnerOrAdmin(selectedBusiness) && (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleStartEdit(); }}
+                          className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+                        >
+                          <Edit3 size={16} /> Edit Business
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleDeleteBusiness(selectedBusiness.id); }}
+                          className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                        >
+                          <Trash2 size={16} /> Delete Business
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openReportModal(selectedBusiness.id); }}
+                      className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+                      disabled={reportedBusinesses.has(selectedBusiness.id)}
+                    >
+                      <Flag size={16} /> {reportedBusinesses.has(selectedBusiness.id) ? 'Reported' : 'Report Business'}
+                    </button>
+                    {selectedBusiness.ownerId && selectedBusiness.ownerId !== user?.uid && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openBlockConfirm(selectedBusiness.ownerId!, selectedBusiness.name); }}
+                        className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                      >
+                        <Ban size={16} /> {blockedUsers.has(selectedBusiness.ownerId!) ? 'Blocked' : 'Block Owner'}
+                      </button>
+                    )}
+                  </div>
+                )}
+                </div>
+              </div>
+            )}
+            <button
+              onClick={(e) => toggleFavorite(selectedBusiness.id, e)}
+              className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors z-[5]`}
+            >
+              <Heart className={`w-4 h-4 ${favorites.has(selectedBusiness.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
+            </button>
+
             {/* Hero Banner */}
             <div
               className="relative h-40 sm:rounded-t-2xl flex items-end p-5 overflow-hidden"
@@ -2000,66 +2062,6 @@ export default function BusinessPage() {
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent sm:rounded-t-2xl" />
-              <button
-                onClick={() => setSelectedBusiness(null)}
-                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              {user && (
-                <div className="absolute top-3 right-14">
-                  <div className="relative">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setMenuBusinessId(menuBusinessId === selectedBusiness.id ? null : selectedBusiness.id); }}
-                    className="w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-                  >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                  <ClickOutsideOverlay isOpen={menuBusinessId === selectedBusiness.id} onClose={() => setMenuBusinessId(null)} />
-                  {menuBusinessId === selectedBusiness.id && (
-                    <div className="absolute right-0 top-10 bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-50 min-w-[180px]">
-                      {isOwnerOrAdmin(selectedBusiness) && (
-                        <>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleStartEdit(); }}
-                            className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
-                          >
-                            <Edit3 size={16} /> Edit Business
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleDeleteBusiness(selectedBusiness.id); }}
-                            className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
-                          >
-                            <Trash2 size={16} /> Delete Business
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openReportModal(selectedBusiness.id); }}
-                        className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
-                        disabled={reportedBusinesses.has(selectedBusiness.id)}
-                      >
-                        <Flag size={16} /> {reportedBusinesses.has(selectedBusiness.id) ? 'Reported' : 'Report Business'}
-                      </button>
-                      {selectedBusiness.ownerId && selectedBusiness.ownerId !== user?.uid && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); openBlockConfirm(selectedBusiness.ownerId!, selectedBusiness.name); }}
-                          className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
-                        >
-                          <Ban size={16} /> {blockedUsers.has(selectedBusiness.ownerId!) ? 'Blocked' : 'Block Owner'}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  </div>
-                </div>
-              )}
-              <button
-                onClick={(e) => toggleFavorite(selectedBusiness.id, e)}
-                className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors`}
-              >
-                <Heart className={`w-4 h-4 ${favorites.has(selectedBusiness.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
-              </button>
               {selectedBusiness.promoted && (
                 <div className="absolute top-3 left-3">
                   <span className="px-2.5 py-1 bg-amber-400 text-amber-900 text-[11px] font-bold rounded-lg flex items-center gap-1">
