@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserSettings } from '@/contexts/UserSettingsContext';
 import { db, auth } from '@/services/firebase';
-import { doc, updateDoc, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, arrayRemove, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { downloadMyData, deleteMyData } from '@/services/dataPrivacy';
 import { AVATAR_OPTIONS, ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, BUSINESS_TYPES, PRIORITY_ETHNICITIES } from '@/constants/config';
@@ -17,7 +17,7 @@ import {
   Mail, X, Check, Loader2, MoreHorizontal, Share2,
   Star, TrendingUp, Award, Globe, Hash, Building2,
   Camera, Link2, ChevronDown, UserPlus, Send, Sparkles,
-  Tag, Home, Store, ShoppingBag, CalendarDays, Package
+  Tag, Home, Store, ShoppingBag, CalendarDays, Package, Ban, UserX
 } from 'lucide-react';
 
 /* ─── constants ─── */
@@ -207,6 +207,12 @@ export default function ProfilePage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<'grid' | 'saved' | 'listings'>(initialTab as any);
+
+  // Blocked users
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ uid: string; name: string; avatar: string }>>([]);
+  const [loadingBlocked, setLoadingBlocked] = useState(false);
+  const [unblockingUid, setUnblockingUid] = useState<string | null>(null);
+  const [showBlockedSection, setShowBlockedSection] = useState(false);
   const [listingsFilter, setListingsFilter] = useState<'all' | 'business' | 'housing' | 'marketplace' | 'event'>('all');
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [savedLoading, setSavedLoading] = useState(false);
@@ -583,6 +589,56 @@ export default function ProfilePage() {
       setToastMessage('Failed to sign out. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // ─── Blocked Users ────────────────────────────────────────────
+  const loadBlockedUsers = async () => {
+    if (!user) return;
+    setLoadingBlocked(true);
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists() && userDoc.data().blockedUsers) {
+        const blockedUids: string[] = userDoc.data().blockedUsers;
+        const userDetails = await Promise.all(
+          blockedUids.map(async (uid) => {
+            try {
+              const blockedDoc = await getDoc(doc(db, 'users', uid));
+              if (blockedDoc.exists()) {
+                const data = blockedDoc.data();
+                return { uid, name: data.name || 'Unknown User', avatar: data.avatar || '' };
+              }
+            } catch (e) {
+              console.error('Error loading blocked user:', e);
+            }
+            return { uid, name: 'Unknown User', avatar: '' };
+          })
+        );
+        setBlockedUsers(userDetails);
+      } else {
+        setBlockedUsers([]);
+      }
+    } catch (e) {
+      console.error('Error loading blocked users:', e);
+    } finally {
+      setLoadingBlocked(false);
+    }
+  };
+
+  const handleUnblockUser = async (uid: string, name: string) => {
+    if (!user) return;
+    try {
+      setUnblockingUid(uid);
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayRemove(uid),
+      });
+      setBlockedUsers((prev) => prev.filter((u) => u.uid !== uid));
+      setToastMessage(`${name} has been unblocked.`);
+    } catch (e) {
+      console.error('Error unblocking user:', e);
+      setToastMessage('Failed to unblock user.');
+    } finally {
+      setUnblockingUid(null);
     }
   };
 
@@ -1322,6 +1378,65 @@ export default function ProfilePage() {
                       <option key={option} value={option}>{option}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Blocked Users */}
+              <div>
+                <SectionHeader icon={<Ban size={14} />} title="Blocked Users" />
+                <div className="bg-[var(--aurora-surface-variant)] rounded-xl overflow-hidden">
+                  {!showBlockedSection ? (
+                    <button
+                      onClick={() => {
+                        setShowBlockedSection(true);
+                        loadBlockedUsers();
+                      }}
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--aurora-border)]/20 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <UserX size={16} className="text-[var(--aurora-text-muted)]" />
+                        <span className="text-sm text-[var(--aurora-text)]">Manage Blocked Users</span>
+                      </div>
+                      <ChevronRight size={16} className="text-[var(--aurora-text-muted)]" />
+                    </button>
+                  ) : loadingBlocked ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 size={20} className="animate-spin text-aurora-indigo" />
+                    </div>
+                  ) : blockedUsers.length === 0 ? (
+                    <div className="px-4 py-6 text-center">
+                      <UserX size={24} className="mx-auto mb-2 text-[var(--aurora-text-muted)]" />
+                      <p className="text-sm font-medium text-[var(--aurora-text)]">No blocked users</p>
+                      <p className="text-xs text-[var(--aurora-text-muted)] mt-1">Block users from the ⋯ menu on their posts</p>
+                    </div>
+                  ) : (
+                    <div>
+                      {blockedUsers.map((blockedUser, idx) => (
+                        <div
+                          key={blockedUser.uid}
+                          className={`px-4 py-3 flex items-center gap-3 ${idx < blockedUsers.length - 1 ? 'border-b border-[var(--aurora-border)]/50' : ''}`}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-[var(--aurora-surface)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {blockedUser.avatar && blockedUser.avatar.startsWith('http') ? (
+                              <img src={blockedUser.avatar} alt={blockedUser.name} className="w-8 h-8 rounded-full object-cover" />
+                            ) : (
+                              <span className="text-sm">{blockedUser.avatar || blockedUser.name?.charAt(0) || '👤'}</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[var(--aurora-text)] truncate">{blockedUser.name}</p>
+                          </div>
+                          <button
+                            onClick={() => handleUnblockUser(blockedUser.uid, blockedUser.name)}
+                            disabled={unblockingUid === blockedUser.uid}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface)] transition-colors disabled:opacity-50"
+                          >
+                            {unblockingUid === blockedUser.uid ? 'Unblocking...' : 'Unblock'}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
