@@ -1727,13 +1727,13 @@ export default function BusinessPage() {
                   return (
                     <div
                       key={business.id}
-                      className="group bg-aurora-surface rounded-2xl border border-aurora-border overflow-hidden
+                      className="group bg-aurora-surface rounded-2xl border border-aurora-border overflow-visible
                                  cursor-pointer hover:shadow-lg hover:border-aurora-border/80 transition-all duration-200"
                       onClick={() => { setSelectedBusiness(business); setActiveTab('about'); }}
                     >
                       {/* Card Image Area */}
                       <div
-                        className="relative h-36 flex items-center justify-center overflow-hidden"
+                        className="relative h-36 flex items-center justify-center overflow-hidden rounded-t-2xl"
                         style={{
                           background: business.photos?.length ? undefined : `linear-gradient(135deg, ${business.bgColor}22, ${business.bgColor}44)`,
                         }}
