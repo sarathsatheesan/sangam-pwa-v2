@@ -1001,63 +1001,68 @@ export default function ProfilePage() {
 
             {/* Blocked Users */}
             <div className="bg-[var(--aurora-surface-variant)] rounded-xl overflow-hidden">
-              {!showBlockedSection ? (
-                <button
-                  onClick={() => {
+              {/* Always-visible header — acts as toggle */}
+              <button
+                onClick={() => {
+                  if (!showBlockedSection) {
                     setShowBlockedSection(true);
                     loadBlockedUsers();
-                  }}
-                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--aurora-border)]/20 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Ban size={14} className="text-[var(--aurora-text-muted)]" />
-                    <span className="text-sm font-semibold text-[var(--aurora-text)]">Blocked Users</span>
-                  </div>
-                  <ChevronRight size={16} className="text-[var(--aurora-text-muted)]" />
-                </button>
-              ) : loadingBlocked ? (
-                <div className="flex items-center justify-center py-5">
-                  <Loader2 size={18} className="animate-spin text-aurora-indigo" />
+                  } else {
+                    setShowBlockedSection(false);
+                  }
+                }}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--aurora-border)]/20 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Ban size={14} className="text-[var(--aurora-text-muted)]" />
+                  <span className="text-sm font-semibold text-[var(--aurora-text)]">Blocked Users</span>
+                  {showBlockedSection && !loadingBlocked && blockedUsers.length > 0 && (
+                    <span className="text-xs text-[var(--aurora-text-muted)]">({blockedUsers.length})</span>
+                  )}
                 </div>
-              ) : blockedUsers.length === 0 ? (
-                <div className="px-4 py-5 text-center">
-                  <UserX size={22} className="mx-auto mb-1.5 text-[var(--aurora-text-muted)]" />
-                  <p className="text-sm font-medium text-[var(--aurora-text)]">No blocked users</p>
-                  <p className="text-xs text-[var(--aurora-text-muted)] mt-0.5">Block users from the ⋯ menu on their posts</p>
-                </div>
-              ) : (
-                <div>
-                  <div className="px-4 py-2.5 border-b border-[var(--aurora-border)]/50">
-                    <div className="flex items-center gap-2">
-                      <Ban size={14} className="text-[var(--aurora-text-muted)]" />
-                      <span className="text-sm font-semibold text-[var(--aurora-text)]">Blocked Users ({blockedUsers.length})</span>
-                    </div>
+                <ChevronDown size={16} className={`text-[var(--aurora-text-muted)] transition-transform ${showBlockedSection ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Expandable content */}
+              {showBlockedSection && (
+                loadingBlocked ? (
+                  <div className="flex items-center justify-center py-5 border-t border-[var(--aurora-border)]/50">
+                    <Loader2 size={18} className="animate-spin text-aurora-indigo" />
                   </div>
-                  {blockedUsers.map((blockedUser, idx) => (
-                    <div
-                      key={blockedUser.uid}
-                      className={`px-4 py-2.5 flex items-center gap-3 ${idx < blockedUsers.length - 1 ? 'border-b border-[var(--aurora-border)]/50' : ''}`}
-                    >
-                      <div className="w-7 h-7 rounded-full bg-[var(--aurora-surface)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                        {blockedUser.avatar && blockedUser.avatar.startsWith('http') ? (
-                          <img src={blockedUser.avatar} alt={blockedUser.name} className="w-7 h-7 rounded-full object-cover" />
-                        ) : (
-                          <span className="text-xs">{blockedUser.avatar || blockedUser.name?.charAt(0) || '👤'}</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[var(--aurora-text)] truncate">{blockedUser.name}</p>
-                      </div>
-                      <button
-                        onClick={() => handleUnblockUser(blockedUser.uid, blockedUser.name)}
-                        disabled={unblockingUid === blockedUser.uid}
-                        className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface)] transition-colors disabled:opacity-50"
+                ) : blockedUsers.length === 0 ? (
+                  <div className="px-4 py-4 text-center border-t border-[var(--aurora-border)]/50">
+                    <UserX size={22} className="mx-auto mb-1.5 text-[var(--aurora-text-muted)]" />
+                    <p className="text-sm font-medium text-[var(--aurora-text)]">No blocked users</p>
+                    <p className="text-xs text-[var(--aurora-text-muted)] mt-0.5">Block users from the ⋯ menu on their posts</p>
+                  </div>
+                ) : (
+                  <div className="border-t border-[var(--aurora-border)]/50">
+                    {blockedUsers.map((blockedUser, idx) => (
+                      <div
+                        key={blockedUser.uid}
+                        className={`px-4 py-2.5 flex items-center gap-3 ${idx < blockedUsers.length - 1 ? 'border-b border-[var(--aurora-border)]/50' : ''}`}
                       >
-                        {unblockingUid === blockedUser.uid ? 'Unblocking...' : 'Unblock'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                        <div className="w-7 h-7 rounded-full bg-[var(--aurora-surface)] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {blockedUser.avatar && blockedUser.avatar.startsWith('http') ? (
+                            <img src={blockedUser.avatar} alt={blockedUser.name} className="w-7 h-7 rounded-full object-cover" />
+                          ) : (
+                            <span className="text-xs">{blockedUser.avatar || blockedUser.name?.charAt(0) || '👤'}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[var(--aurora-text)] truncate">{blockedUser.name}</p>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleUnblockUser(blockedUser.uid, blockedUser.name); }}
+                          disabled={unblockingUid === blockedUser.uid}
+                          className="px-2.5 py-1 rounded-lg text-xs font-medium border border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface)] transition-colors disabled:opacity-50"
+                        >
+                          {unblockingUid === blockedUser.uid ? 'Unblocking...' : 'Unblock'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </div>
