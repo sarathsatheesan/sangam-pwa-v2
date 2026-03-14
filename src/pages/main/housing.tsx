@@ -3,12 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import {
   collection,
   getDocs,
+  getDoc,
   addDoc,
   deleteDoc,
   updateDoc,
   doc,
   Timestamp,
   increment,
+  query,
+  where,
+  serverTimestamp,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,7 +27,8 @@ import {
   Maximize2, Tag, CheckCircle2, Map,
   Wind, Snowflake,
   UtensilsCrossed, Dumbbell, Waves, Package, TreePine,
-  DoorOpen, Flame, Zap, Droplets, Sun, MessageCircle, Star
+  DoorOpen, Flame, Zap, Droplets, Sun, MessageCircle, Star,
+  Flag, Ban, MoreHorizontal,
 } from 'lucide-react';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
 import { ClickOutsideOverlay } from '../../components/ClickOutsideOverlay';
@@ -71,8 +77,20 @@ interface Listing {
   neighborhoodHighlights?: string[];
   viewCount?: number;
   saveCount?: number;
+  isHidden?: boolean;
+  hiddenAt?: string;
+  hiddenReason?: string;
 }
 
+const REPORT_CATEGORIES = [
+  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
+  { id: 'hate_speech', label: 'Hate Speech or Bullying', icon: '🛑', description: 'Content targeting race, ethnicity, religion, gender, or personal attacks' },
+  { id: 'inappropriate', label: 'Inappropriate Content', icon: '⚠️', description: 'Sexual, violent, or graphic content not suitable for the community' },
+  { id: 'ip_violation', label: 'Intellectual Property Violation', icon: '©️', description: 'Unauthorized use of copyrighted material or trademarks' },
+  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
+  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
+  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
+];
 
 interface Comment {
   id: string;
@@ -493,6 +511,20 @@ export default function HousingPage() {
   const [deleteCommentInfo, setDeleteCommentInfo] = useState<{ listingId: string; commentId: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Report/Block/Mute state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportListingId, setReportListingId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportedListings, setReportedListings] = useState<Set<string>>(new Set());
+  const [mutedListings, setMutedListings] = useState<Set<string>>(new Set());
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
+  const [menuListingId, setMenuListingId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+
   /* form state */
   const [formData, setFormData] = useState({
     title: '',
@@ -614,7 +646,7 @@ export default function HousingPage() {
   const fetchListings = async () => {
     try {
       const snapshot = await getDocs(collection(db, 'listings'));
-      const data: Listing[] = snapshot.docs.map((d) => ({
+      const data: Listing[] = snapshot.docs.filter((d) => !d.data().isHidden).map((d) => ({
         id: d.id,
         title: d.data().title || '',
         type: d.data().type || 'rent',
@@ -668,6 +700,22 @@ export default function HousingPage() {
 
   useEffect(() => { fetchListings(); }, []);
 
+  // Load user safety data (muted listings, blocked users)
+  useEffect(() => {
+    if (!user) return;
+    const loadUserSafetyData = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.mutedHousingListings) setMutedListings(new Set(data.mutedHousingListings));
+          if (data.blockedUsers) setBlockedUsers(new Set(data.blockedUsers));
+        }
+      } catch (e) { console.error('Error loading user safety data:', e); }
+    };
+    loadUserSafetyData();
+  }, [user]);
+
   /* Load comments and track view count when detail modal opens */
   useEffect(() => {
     if (selectedListing) {
@@ -710,6 +758,10 @@ export default function HousingPage() {
   /* filter + sort */
   const filteredListings = useMemo(() => {
     let result = listings.filter((l) => {
+      // Mute-on-report: hide listings the user has reported
+      if (mutedListings.has(l.id)) return false;
+      // Block filter: hide listings from blocked owners
+      if (l.posterId && blockedUsers.has(l.posterId)) return false;
       if (myProperties && user?.uid) {
         if (l.posterId !== user.uid) return false;
       }
@@ -745,7 +797,7 @@ export default function HousingPage() {
     });
 
     return result;
-  }, [listings, selectedTypes, searchQuery, bedsFilter, priceRange, sortBy, statusFilter, myProperties, user?.uid]);
+  }, [listings, selectedTypes, searchQuery, bedsFilter, priceRange, sortBy, statusFilter, myProperties, user?.uid, mutedListings, blockedUsers]);
 
   const similarListings = useMemo(() => {
     if (!selectedListing) return [];
@@ -1052,6 +1104,165 @@ export default function HousingPage() {
         setToastMessage('Failed to copy listing link. Please try again.');
       }
     }
+  };
+
+  // Three-dot menu open/close
+  const openMenu = (listingId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (menuListingId === listingId) {
+      setMenuListingId(null); setMenuPosition(null); return;
+    }
+    const btn = e.currentTarget as HTMLElement;
+    const rect = btn.getBoundingClientRect();
+    setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setMenuListingId(listingId);
+  };
+  const closeMenu = () => { setMenuListingId(null); setMenuPosition(null); };
+
+  const openReportModal = (listingId: string) => {
+    setReportListingId(listingId);
+    setReportReason('');
+    setReportDetails('');
+    setShowReportModal(true);
+  };
+
+  // Handle submit report (full implementation with moderation queue)
+  const handleSubmitReport = async () => {
+    if (!reportReason || !reportListingId || !user) return;
+    try {
+      setReportSubmitting(true);
+      const reportedListing = listings.find((l) => l.id === reportListingId);
+      const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
+
+      // Write to reports collection (stealth: no owner notification)
+      await addDoc(collection(db, 'reports'), {
+        listingId: reportListingId,
+        reportedBy: user.uid,
+        reporterName: userProfile?.name || user.displayName || 'Anonymous',
+        reporterAvatar: userProfile?.avatar || '',
+        category: reportReason,
+        categoryLabel: categoryObj?.label || reportReason,
+        details: reportDetails.trim() || '',
+        createdAt: serverTimestamp(),
+        status: 'pending',
+      });
+
+      // Check if moderationQueue entry already exists for this listing
+      const modQueueQuery = query(
+        collection(db, 'moderationQueue'),
+        where('contentId', '==', reportListingId)
+      );
+      const existingMods = await getDocs(modQueueQuery);
+
+      let totalReportCount = 1;
+
+      if (existingMods.docs.length > 0) {
+        const existingDoc = existingMods.docs[0];
+        const existingData = existingDoc.data();
+        totalReportCount = (existingData.reportCount || 1) + 1;
+        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
+          reportCount: totalReportCount,
+          reporters: arrayUnion({
+            uid: user.uid,
+            name: userProfile?.name || user.displayName || 'Anonymous',
+            avatar: userProfile?.avatar || '',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }),
+        });
+      } else {
+        await addDoc(collection(db, 'moderationQueue'), {
+          type: 'housing',
+          content: reportedListing?.title || '',
+          contentId: reportListingId,
+          collection: 'listings',
+          authorId: reportedListing?.posterId || '',
+          authorName: reportedListing?.posterName || 'Unknown',
+          authorAvatar: reportedListing?.posterAvatar || '',
+          images: reportedListing?.photos || [],
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
+          reportedBy: user.uid,
+          reporterName: userProfile?.name || user.displayName || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          reportCount: 1,
+          reporters: [{
+            uid: user.uid,
+            name: userProfile?.name || user.displayName || 'Anonymous',
+            avatar: userProfile?.avatar || '',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }],
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      // 3-strike auto-hide
+      if (totalReportCount >= 3) {
+        await updateDoc(doc(db, 'listings', reportListingId), {
+          isHidden: true,
+          hiddenAt: new Date().toISOString(),
+          hiddenReason: 'Auto-hidden: reached 3 community reports',
+        });
+        if (reportedListing?.posterId) {
+          await addDoc(collection(db, 'notifications'), {
+            type: 'content_hidden',
+            recipientId: reportedListing.posterId,
+            recipientName: reportedListing.posterName || '',
+            postId: reportListingId,
+            reason: 'Your housing listing received multiple community reports and has been temporarily hidden for review.',
+            message: 'Your housing listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
+            actionUrl: '/housing',
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+
+      // Mute-on-report: hide this listing from the reporter's view
+      await updateDoc(doc(db, 'users', user.uid), {
+        mutedHousingListings: arrayUnion(reportListingId),
+      });
+      setMutedListings((prev) => new Set(prev).add(reportListingId));
+
+      setReportedListings((prev) => new Set(prev).add(reportListingId));
+      setShowReportModal(false);
+      setReportReason('');
+      setReportDetails('');
+      setToastMessage('Report submitted. The listing has been hidden from your view. Thank you for helping keep the community safe.');
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      alert('Failed to submit report.');
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!user || !blockTargetUser) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayUnion(blockTargetUser.uid),
+      });
+      setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
+      setShowBlockConfirm(false);
+      setBlockTargetUser(null);
+      setToastMessage(`${blockTargetUser.name} has been blocked. Their listings will no longer appear.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      alert('Failed to block user. Please try again.');
+    }
+  };
+
+  const openBlockConfirm = (posterId: string, posterName: string) => {
+    setMenuListingId(null);
+    setBlockTargetUser({ uid: posterId, name: posterName });
+    setShowBlockConfirm(true);
   };
 
   const isOwnerOrAdmin = (l: Listing) => l.posterId === user?.uid || userRole === 'admin';
@@ -1645,6 +1856,16 @@ export default function HousingPage() {
                       </div>
                     )}
 
+                    {/* Three-dot menu */}
+                    {listing.posterId !== user?.uid && (
+                      <button
+                        onClick={(e) => openMenu(listing.id, e)}
+                        className="absolute top-3 right-14 w-9 h-9 rounded-full bg-white/80 hover:bg-white flex items-center justify-center transition-all shadow-sm z-10"
+                      >
+                        <MoreHorizontal size={18} className="text-gray-600" />
+                      </button>
+                    )}
+
                     {/* Save heart */}
                     <button
                       onClick={(e) => toggleSave(listing.id, e)}
@@ -2228,22 +2449,31 @@ export default function HousingPage() {
             </div>
 
             {/* Actions bar */}
-            {isOwnerOrAdmin(selectedListing) && (
-              <div className="border-t border-[var(--aurora-border)] p-4 flex gap-3 flex-shrink-0">
+            <div className="border-t border-[var(--aurora-border)] p-4 flex gap-3 flex-shrink-0">
+              {isOwnerOrAdmin(selectedListing) ? (
+                <>
+                  <button
+                    onClick={handleStartEdit}
+                    className="flex-1 flex items-center justify-center gap-2 bg-aurora-indigo text-white py-2.5 rounded-xl font-medium hover:opacity-90 transition-opacity"
+                  >
+                    <Edit3 size={16} /> Edit Listing
+                  </button>
+                  <button
+                    onClick={() => handleDeleteListing(selectedListing.id)}
+                    className="px-4 py-2.5 bg-red-500/10 text-red-600 rounded-xl font-medium hover:bg-red-500/20 transition-colors flex items-center gap-1.5"
+                  >
+                    <Trash2 size={16} /> Delete
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={handleStartEdit}
-                  className="flex-1 flex items-center justify-center gap-2 bg-aurora-indigo text-white py-2.5 rounded-xl font-medium hover:opacity-90 transition-opacity"
+                  onClick={(e) => openMenu(selectedListing.id, e)}
+                  className="p-2 rounded-lg border border-[var(--aurora-border)] text-[var(--aurora-text)] hover:bg-[var(--aurora-bg)]"
                 >
-                  <Edit3 size={16} /> Edit Listing
+                  <MoreHorizontal className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={() => handleDeleteListing(selectedListing.id)}
-                  className="px-4 py-2.5 bg-red-500/10 text-red-600 rounded-xl font-medium hover:bg-red-500/20 transition-colors flex items-center gap-1.5"
-                >
-                  <Trash2 size={16} /> Delete
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2406,6 +2636,178 @@ export default function HousingPage() {
               </button>
               <button onClick={confirmDeleteComment} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 transition-colors">
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SHARED THREE-DOT CONTEXT MENU (fixed-position, escapes all overflow)
+          ═══════════════════════════════════════════════════════════════════ */}
+      {menuListingId && menuPosition && (() => {
+        const listing = listings.find((l) => l.id === menuListingId) || selectedListing;
+        if (!listing) return null;
+        return (
+          <>
+            <div className="fixed inset-0 z-[55]" onClick={closeMenu} />
+            <div
+              className="fixed bg-[var(--aurora-surface)] rounded-xl shadow-lg border border-[var(--aurora-border)] py-1.5 z-[56] min-w-[200px]"
+              style={{ top: menuPosition.top, right: menuPosition.right }}
+            >
+              {isOwnerOrAdmin(listing) && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeMenu(); setSelectedListing(listing); setTimeout(() => handleStartEdit(), 50); }}
+                    className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                  >
+                    <Edit3 size={16} /> Edit Listing
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeMenu(); handleDeleteListing(listing.id); }}
+                    className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                  >
+                    <Trash2 size={16} /> Delete Listing
+                  </button>
+                </>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); closeMenu(); openReportModal(listing.id); }}
+                className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                disabled={reportedListings.has(listing.id)}
+              >
+                <Flag size={16} /> {reportedListings.has(listing.id) ? 'Reported' : 'Report Listing'}
+              </button>
+              {listing.posterId && listing.posterId !== user?.uid && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); closeMenu(); openBlockConfirm(listing.posterId, listing.posterName); }}
+                  className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                >
+                  <Ban size={16} /> {blockedUsers.has(listing.posterId) ? 'Blocked' : 'Block Owner'}
+                </button>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          REPORT LISTING MODAL
+          ═══════════════════════════════════════════════════════════════════ */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-[var(--aurora-surface)] rounded-2xl shadow-xl w-full max-w-md border border-[var(--aurora-border)] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-[var(--aurora-border)] bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 id="report-modal-title" className="text-lg font-bold text-[var(--aurora-text)] flex items-center gap-2">
+                    <Flag size={18} className="text-red-500" />
+                    Report Listing
+                  </h3>
+                  <p className="text-sm text-[var(--aurora-text-muted)] mt-0.5">Select a category that best describes the issue</p>
+                </div>
+                <button onClick={() => setShowReportModal(false)} className="p-1.5 rounded-full hover:bg-[var(--aurora-surface-variant)] transition-colors">
+                  <X size={18} className="text-[var(--aurora-text-muted)]" />
+                </button>
+              </div>
+            </div>
+
+            {/* Categories */}
+            <div className="px-5 py-3 space-y-2 max-h-[40vh] overflow-y-auto">
+              {REPORT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setReportReason(cat.id)}
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 ${
+                    reportReason === cat.id
+                      ? 'border-red-400 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-300'
+                      : 'border-[var(--aurora-border)] hover:border-[var(--aurora-border)]/80 hover:bg-[var(--aurora-surface-variant)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg shrink-0">{cat.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${reportReason === cat.id ? 'text-red-700 dark:text-red-400' : 'text-[var(--aurora-text)]'}`}>
+                        {cat.label}
+                      </p>
+                      <p className="text-xs text-[var(--aurora-text-muted)] mt-0.5 leading-relaxed">{cat.description}</p>
+                    </div>
+                    {reportReason === cat.id && (
+                      <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center shrink-0">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Optional Details */}
+            {reportReason && (
+              <div className="px-5 py-3 border-t border-[var(--aurora-border)]/50">
+                <label className="text-xs font-semibold text-[var(--aurora-text-secondary)] uppercase tracking-wider">Additional Details (Optional)</label>
+                <textarea
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="Provide more context about why you're reporting this listing..."
+                  maxLength={500}
+                  rows={3}
+                  className="mt-1.5 w-full px-3 py-2.5 bg-[var(--aurora-surface-variant)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-muted)] focus:outline-none focus:ring-2 focus:ring-red-300/50 resize-none"
+                />
+                <p className="text-[10px] text-[var(--aurora-text-muted)] text-right mt-1">{reportDetails.length}/500</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="px-5 py-4 border-t border-[var(--aurora-border)] flex gap-3">
+              <button
+                onClick={() => { setShowReportModal(false); setReportReason(''); setReportDetails(''); }}
+                className="flex-1 py-2.5 rounded-xl border border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] font-medium hover:bg-[var(--aurora-surface-variant)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReport}
+                disabled={!reportReason || reportSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              >
+                {reportSubmitting ? (
+                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting...</>
+                ) : (
+                  <><Flag size={14} /> Submit Report</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          BLOCK USER CONFIRMATION MODAL
+          ═══════════════════════════════════════════════════════════════════ */}
+      {showBlockConfirm && blockTargetUser && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-[var(--aurora-surface)] rounded-2xl shadow-xl border border-[var(--aurora-border)] max-w-sm w-full p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+              <Ban size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-[var(--aurora-text)] mb-2">Block {blockTargetUser.name}?</h3>
+            <p className="text-sm text-[var(--aurora-text-muted)] mb-6">
+              They won't be notified. Their housing listings will be hidden from your view. You can unblock them anytime from your Profile settings.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}
+                className="flex-1 py-2.5 rounded-xl border border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] font-medium hover:bg-[var(--aurora-surface-variant)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlockUser}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
+              >
+                Block
               </button>
             </div>
           </div>
