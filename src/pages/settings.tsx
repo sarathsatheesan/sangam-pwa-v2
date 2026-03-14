@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUserSettings } from '../contexts/UserSettingsContext';
 import {
   Settings,
@@ -25,11 +25,13 @@ import {
   ExternalLink,
   AlertTriangle,
   Check,
+  Ban,
+  UserX,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../services/firebase';
 import { db } from '../services/firebase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayRemove, collection, query, where, getDocs } from 'firebase/firestore';
 import { signOut, deleteUser } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { resetPassword } from '../services/auth';
@@ -50,7 +52,7 @@ const LANGUAGES = [
   { code: 'es', label: 'Spanish' },
 ];
 
-type Section = 'main' | 'notifications' | 'privacy' | 'language' | 'appearance' | 'help' | 'account';
+type Section = 'main' | 'notifications' | 'privacy' | 'language' | 'appearance' | 'help' | 'account' | 'blocked';
 
 // ─── Toggle Component ────────────────────────────────────────────────────
 const Toggle: React.FC<{ enabled: boolean; onChange: (val: boolean) => void; disabled?: boolean }> = ({
@@ -117,6 +119,63 @@ const SettingsPage: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [helpModal, setHelpModal] = useState<'faq' | 'tos' | 'privacy' | 'about' | null>(null);
 
+  // Blocked users state
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ uid: string; name: string; avatar: string }>>([]);
+  const [loadingBlocked, setLoadingBlocked] = useState(false);
+  const [unblockingUid, setUnblockingUid] = useState<string | null>(null);
+
+  // Load blocked users when entering the blocked section
+  useEffect(() => {
+    if (section !== 'blocked' || !user) return;
+    const loadBlockedUsers = async () => {
+      setLoadingBlocked(true);
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data().blockedUsers) {
+          const blockedUids: string[] = userDoc.data().blockedUsers;
+          const userDetails = await Promise.all(
+            blockedUids.map(async (uid) => {
+              try {
+                const blockedDoc = await getDoc(doc(db, 'users', uid));
+                if (blockedDoc.exists()) {
+                  const data = blockedDoc.data();
+                  return { uid, name: data.name || 'Unknown User', avatar: data.avatar || '' };
+                }
+              } catch (e) {
+                console.error('Error loading blocked user:', e);
+              }
+              return { uid, name: 'Unknown User', avatar: '' };
+            })
+          );
+          setBlockedUsers(userDetails);
+        } else {
+          setBlockedUsers([]);
+        }
+      } catch (e) {
+        console.error('Error loading blocked users:', e);
+      } finally {
+        setLoadingBlocked(false);
+      }
+    };
+    loadBlockedUsers();
+  }, [section, user]);
+
+  const handleUnblockUser = async (uid: string) => {
+    if (!user) return;
+    try {
+      setUnblockingUid(uid);
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayRemove(uid),
+      });
+      setBlockedUsers((prev) => prev.filter((u) => u.uid !== uid));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      console.error('Error unblocking user:', e);
+    } finally {
+      setUnblockingUid(null);
+    }
+  };
 
   // Wrap updateSetting to show save indicator
   const handleUpdateSetting = <K extends keyof typeof settings>(
@@ -368,6 +427,16 @@ const SettingsPage: React.FC = () => {
               onChange={(v) => handleUpdateSetting('privacy', 'searchable', v)}
             />
           }
+        />
+
+        <div className="px-4 pt-3 pb-1">
+          <p className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider">Safety</p>
+        </div>
+        <SettingRow
+          icon={<Ban size={18} />}
+          label="Blocked Users"
+          description="Manage users you've blocked"
+          onClick={() => setSection('blocked')}
         />
       </div>
     </div>
@@ -795,6 +864,61 @@ const SettingsPage: React.FC = () => {
     </div>
   );
 
+  // ─── Blocked Users ─────────────────────────────────────────────────
+  const renderBlocked = () => (
+    <div className="flex flex-col min-h-0">
+      <SectionHeader title="Blocked Users" onBack={() => setSection('privacy')} />
+      <div className="divide-y divide-aurora-border">
+        <div className="px-4 py-3 bg-aurora-danger/10">
+          <p className="text-xs text-aurora-danger font-medium">
+            Blocked users cannot see your posts and their content is hidden from your feed
+          </p>
+        </div>
+
+        {loadingBlocked ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-aurora-indigo border-t-transparent" />
+          </div>
+        ) : blockedUsers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="w-16 h-16 rounded-full bg-aurora-surface-variant flex items-center justify-center mb-4">
+              <UserX size={28} className="text-aurora-text-muted" />
+            </div>
+            <p className="text-base font-semibold text-aurora-text mb-1">No blocked users</p>
+            <p className="text-sm text-aurora-text-muted text-center">
+              Users you block will appear here. You can block someone from the three-dot menu on their posts.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-aurora-border">
+            {blockedUsers.map((blockedUser) => (
+              <div key={blockedUser.uid} className="flex items-center gap-3 px-4 py-3.5">
+                <div className="w-10 h-10 rounded-full bg-aurora-surface-variant flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {blockedUser.avatar && blockedUser.avatar.startsWith('http') ? (
+                    <img src={blockedUser.avatar} alt={blockedUser.name} className="w-10 h-10 rounded-full object-cover" />
+                  ) : (
+                    <span className="text-lg">{blockedUser.avatar || blockedUser.name?.charAt(0) || '👤'}</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-aurora-text truncate">{blockedUser.name}</p>
+                  <p className="text-xs text-aurora-text-muted">Blocked</p>
+                </div>
+                <button
+                  onClick={() => handleUnblockUser(blockedUser.uid)}
+                  disabled={unblockingUid === blockedUser.uid}
+                  className="px-4 py-2 rounded-xl text-sm font-medium border border-aurora-border text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors disabled:opacity-50"
+                >
+                  {unblockingUid === blockedUser.uid ? 'Unblocking...' : 'Unblock'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   // ─── Main Menu ─────────────────────────────────────────────────────
   const renderMain = () => {
     const sections = [
@@ -869,6 +993,7 @@ const SettingsPage: React.FC = () => {
       {section === 'appearance' && renderAppearance()}
       {section === 'help' && renderHelp()}
       {section === 'account' && renderAccount()}
+      {section === 'blocked' && renderBlocked()}
     </div>
   );
 };

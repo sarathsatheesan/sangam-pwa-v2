@@ -46,6 +46,7 @@ import {
   Search,
   ChevronDown,
   AlertTriangle,
+  Ban,
 } from 'lucide-react';
 
 interface Post {
@@ -334,20 +335,31 @@ export default function FeedPage() {
   const [mutedPosts, setMutedPosts] = useState<Set<string>>(new Set());
   const [reportSubmitting, setReportSubmitting] = useState(false);
 
-  // Load user's muted posts on mount
+  // Blocked users
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
+
+  // Load user's muted posts and blocked users on mount
   useEffect(() => {
     if (!user) return;
-    const loadMutedPosts = async () => {
+    const loadUserSafetyData = async () => {
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().mutedPosts) {
-          setMutedPosts(new Set(userDoc.data().mutedPosts));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.mutedPosts) {
+            setMutedPosts(new Set(data.mutedPosts));
+          }
+          if (data.blockedUsers) {
+            setBlockedUsers(new Set(data.blockedUsers));
+          }
         }
       } catch (e) {
-        console.error('Error loading muted posts:', e);
+        console.error('Error loading user safety data:', e);
       }
     };
-    loadMutedPosts();
+    loadUserSafetyData();
   }, [user]);
 
   // Moderation notifications
@@ -1125,12 +1137,39 @@ export default function FeedPage() {
     }
   };
 
+  // ─── Block User ────────────────────────────────────────────────────────
+
+  const handleBlockUser = async () => {
+    if (!user || !blockTargetUser) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayUnion(blockTargetUser.uid),
+      });
+      setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
+      setShowBlockConfirm(false);
+      setBlockTargetUser(null);
+      setToastMessage(`${blockTargetUser.name} has been blocked. Their content will no longer appear in your feed.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      alert('Failed to block user. Please try again.');
+    }
+  };
+
+  const openBlockConfirm = (userId: string, userName: string) => {
+    setMenuPostId(null);
+    setBlockTargetUser({ uid: userId, name: userName });
+    setShowBlockConfirm(true);
+  };
+
   // ─── Filter & Sort ────────────────────────────────────────────────────────
 
   const filteredPosts = useMemo(() => {
     let result = posts.filter((post) => {
       // Mute-on-report: hide posts the user has reported
       if (mutedPosts.has(post.id)) return false;
+      // Block filter: hide posts from blocked users
+      if (blockedUsers.has(post.userId)) return false;
       // Search filter
       if (feedSearchQuery.trim()) {
         const q = feedSearchQuery.toLowerCase();
@@ -1180,7 +1219,7 @@ export default function FeedPage() {
     }
 
     return result;
-  }, [posts, selectedHeritage, sortMode, savedPosts, feedSearchQuery, showSavedOnly, mutedPosts]);
+  }, [posts, selectedHeritage, sortMode, savedPosts, feedSearchQuery, showSavedOnly, mutedPosts, blockedUsers]);
 
   // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -1962,6 +2001,15 @@ export default function FeedPage() {
                           <Flag size={16} />
                           {reportedPosts.has(post.id) ? 'Reported' : 'Report Post'}
                         </button>
+                        {post.userId !== user?.uid && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openBlockConfirm(post.userId, post.userName); }}
+                            className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                          >
+                            <Ban size={16} />
+                            {blockedUsers.has(post.userId) ? 'Blocked' : 'Block User'}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2588,7 +2636,7 @@ export default function FeedPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {comments.map((comment) => (
+                    {comments.filter((comment) => !blockedUsers.has(comment.userId)).map((comment) => (
                       <div key={comment.id} className="flex gap-3">
                         {renderAvatar(comment.userAvatar, comment.userName, 'sm')}
                         <div className="flex-1">
@@ -2849,6 +2897,37 @@ export default function FeedPage() {
                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          BLOCK USER CONFIRMATION MODAL
+          ═══════════════════════════════════════════════════════════════════ */}
+      {showBlockConfirm && blockTargetUser && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-aurora-surface rounded-2xl shadow-aurora-4 border border-aurora-border max-w-sm w-full p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+              <Ban size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-aurora-text mb-2">Block {blockTargetUser.name}?</h3>
+            <p className="text-sm text-aurora-text-muted mb-6">
+              They won't be notified. Their posts and comments will be hidden from your feed. You can unblock them anytime from Settings.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}
+                className="flex-1 py-2.5 rounded-xl border border-aurora-border text-aurora-text-secondary font-medium hover:bg-aurora-surface-variant transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlockUser}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
+              >
+                Block
               </button>
             </div>
           </div>
