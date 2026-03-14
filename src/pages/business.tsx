@@ -486,7 +486,26 @@ export default function BusinessPage() {
 
   // Report / Block / Mute state
   const [menuBusinessId, setMenuBusinessId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const openMenu = (businessId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (menuBusinessId === businessId) {
+      setMenuBusinessId(null);
+      setMenuPosition(null);
+      return;
+    }
+    const btn = e.currentTarget as HTMLElement;
+    const rect = btn.getBoundingClientRect();
+    setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setMenuBusinessId(businessId);
+  };
+
+  const closeMenu = () => {
+    setMenuBusinessId(null);
+    setMenuPosition(null);
+  };
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportBusinessId, setReportBusinessId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState('');
@@ -1762,52 +1781,14 @@ export default function BusinessPage() {
                             }`} />
                           </button>
                           {user && (
-                            <div className="relative" ref={menuBusinessId === business.id ? menuRef : undefined}>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setMenuBusinessId(menuBusinessId === business.id ? null : business.id); }}
-                                className="w-8 h-8 rounded-full bg-white/90 dark:bg-aurora-surface/90
-                                           flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
-                                           transition-colors shadow-sm"
-                              >
-                                <MoreHorizontal className="w-4 h-4 text-gray-500" />
-                              </button>
-                              <ClickOutsideOverlay isOpen={menuBusinessId === business.id} onClose={() => setMenuBusinessId(null)} />
-                              {menuBusinessId === business.id && (
-                                <div className="absolute right-0 top-10 bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-50 min-w-[180px]">
-                                  {isOwnerOrAdmin(business) && (
-                                    <>
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); setSelectedBusiness(business); handleStartEdit(); }}
-                                        className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
-                                      >
-                                        <Edit3 size={16} /> Edit Business
-                                      </button>
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleDeleteBusiness(business.id); }}
-                                        className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
-                                      >
-                                        <Trash2 size={16} /> Delete Business
-                                      </button>
-                                    </>
-                                  )}
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); openReportModal(business.id); }}
-                                    className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
-                                    disabled={reportedBusinesses.has(business.id)}
-                                  >
-                                    <Flag size={16} /> {reportedBusinesses.has(business.id) ? 'Reported' : 'Report Business'}
-                                  </button>
-                                  {business.ownerId && business.ownerId !== user?.uid && (
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); openBlockConfirm(business.ownerId!, business.name); }}
-                                      className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
-                                    >
-                                      <Ban size={16} /> {blockedUsers.has(business.ownerId!) ? 'Blocked' : 'Block Owner'}
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
+                            <button
+                              onClick={(e) => openMenu(business.id, e)}
+                              className="w-8 h-8 rounded-full bg-white/90 dark:bg-aurora-surface/90
+                                         flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
+                                         transition-colors shadow-sm"
+                            >
+                              <MoreHorizontal className="w-4 h-4 text-gray-500" />
+                            </button>
                           )}
                         </div>
 
@@ -1995,52 +1976,12 @@ export default function BusinessPage() {
               <X className="w-5 h-5" />
             </button>
             {user && (
-              <div className="absolute top-3 right-14 z-[5]">
-                <div className="relative">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setMenuBusinessId(menuBusinessId === selectedBusiness.id ? null : selectedBusiness.id); }}
-                  className="w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-                <ClickOutsideOverlay isOpen={menuBusinessId === selectedBusiness.id} onClose={() => setMenuBusinessId(null)} />
-                {menuBusinessId === selectedBusiness.id && (
-                  <div className="absolute right-0 top-10 bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-[60] min-w-[180px]">
-                    {isOwnerOrAdmin(selectedBusiness) && (
-                      <>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleStartEdit(); }}
-                          className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
-                        >
-                          <Edit3 size={16} /> Edit Business
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleDeleteBusiness(selectedBusiness.id); }}
-                          className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
-                        >
-                          <Trash2 size={16} /> Delete Business
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openReportModal(selectedBusiness.id); }}
-                      className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
-                      disabled={reportedBusinesses.has(selectedBusiness.id)}
-                    >
-                      <Flag size={16} /> {reportedBusinesses.has(selectedBusiness.id) ? 'Reported' : 'Report Business'}
-                    </button>
-                    {selectedBusiness.ownerId && selectedBusiness.ownerId !== user?.uid && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openBlockConfirm(selectedBusiness.ownerId!, selectedBusiness.name); }}
-                        className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
-                      >
-                        <Ban size={16} /> {blockedUsers.has(selectedBusiness.ownerId!) ? 'Blocked' : 'Block Owner'}
-                      </button>
-                    )}
-                  </div>
-                )}
-                </div>
-              </div>
+              <button
+                onClick={(e) => openMenu(selectedBusiness.id, e)}
+                className="absolute top-3 right-14 z-[5] w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
             )}
             <button
               onClick={(e) => toggleFavorite(selectedBusiness.id, e)}
@@ -2638,6 +2579,55 @@ export default function BusinessPage() {
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SHARED THREE-DOT CONTEXT MENU (fixed-position, escapes all overflow)
+          ═══════════════════════════════════════════════════════════════════ */}
+      {menuBusinessId && menuPosition && (() => {
+        const biz = businesses.find((b) => b.id === menuBusinessId) || selectedBusiness;
+        if (!biz) return null;
+        return (
+          <>
+            <div className="fixed inset-0 z-[55]" onClick={closeMenu} />
+            <div
+              className="fixed bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-[56] min-w-[200px]"
+              style={{ top: menuPosition.top, right: menuPosition.right }}
+            >
+              {isOwnerOrAdmin(biz) && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeMenu(); if (!selectedBusiness) setSelectedBusiness(biz); setTimeout(() => handleStartEdit(), 50); }}
+                    className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+                  >
+                    <Edit3 size={16} /> Edit Business
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); closeMenu(); handleDeleteBusiness(biz.id); }}
+                    className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                  >
+                    <Trash2 size={16} /> Delete Business
+                  </button>
+                </>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); closeMenu(); openReportModal(biz.id); }}
+                className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+                disabled={reportedBusinesses.has(biz.id)}
+              >
+                <Flag size={16} /> {reportedBusinesses.has(biz.id) ? 'Reported' : 'Report Business'}
+              </button>
+              {biz.ownerId && biz.ownerId !== user?.uid && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); closeMenu(); openBlockConfirm(biz.ownerId!, biz.name); }}
+                  className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                >
+                  <Ban size={16} /> {blockedUsers.has(biz.ownerId!) ? 'Blocked' : 'Block Owner'}
+                </button>
+              )}
+            </div>
+          </>
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════════════════
           REPORT BUSINESS MODAL
