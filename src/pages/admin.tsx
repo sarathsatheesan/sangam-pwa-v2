@@ -1219,21 +1219,32 @@ export default function AdminPage() {
   // ─── Hidden Posts ────────────────────────────────
   const [modTab, setModTab] = useState<'reports' | 'hidden'>('reports');
   const [hiddenPosts, setHiddenPosts] = useState<any[]>([]);
+  const [hiddenBusinesses, setHiddenBusinesses] = useState<any[]>([]);
   const [loadingHidden, setLoadingHidden] = useState(false);
 
   async function loadHiddenPosts() {
     try {
       setLoadingHidden(true);
-      const q = query(collection(db, 'posts'), where('isHidden', '==', true));
-      const snap = await getDocs(q);
+      // Load hidden posts
+      const postsQ = query(collection(db, 'posts'), where('isHidden', '==', true));
+      const postsSnap = await getDocs(postsQ);
       setHiddenPosts(
-        snap.docs.map((d) => ({
+        postsSnap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }))
+      );
+      // Load hidden businesses
+      const bizQ = query(collection(db, 'businesses'), where('isHidden', '==', true));
+      const bizSnap = await getDocs(bizQ);
+      setHiddenBusinesses(
+        bizSnap.docs.map((d) => ({
           id: d.id,
           ...d.data(),
         }))
       );
     } catch (error) {
-      console.error('Error loading hidden posts:', error);
+      console.error('Error loading hidden content:', error);
     } finally {
       setLoadingHidden(false);
     }
@@ -1250,6 +1261,17 @@ export default function AdminPage() {
     }
   }
 
+  async function unhideBusiness(businessId: string) {
+    try {
+      await updateDoc(doc(db, 'businesses', businessId), { isHidden: false, hiddenAt: null, hiddenReason: null });
+      setHiddenBusinesses((prev) => prev.filter((b) => b.id !== businessId));
+      setToastMessage('Business restored and visible to public.');
+    } catch (error) {
+      console.error('Error unhiding business:', error);
+      setToastMessage('Failed to restore business.');
+    }
+  }
+
   async function permanentlyDeletePost(postId: string) {
     try {
       await deleteDoc(doc(db, 'posts', postId));
@@ -1258,6 +1280,17 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error deleting post:', error);
       setToastMessage('Failed to delete post.');
+    }
+  }
+
+  async function permanentlyDeleteBusiness(businessId: string) {
+    try {
+      await deleteDoc(doc(db, 'businesses', businessId));
+      setHiddenBusinesses((prev) => prev.filter((b) => b.id !== businessId));
+      setToastMessage('Business permanently deleted.');
+    } catch (error) {
+      console.error('Error deleting business:', error);
+      setToastMessage('Failed to delete business.');
     }
   }
 
@@ -2092,30 +2125,35 @@ export default function AdminPage() {
                     }`}
                   >
                     <EyeOff size={14} />
-                    Hidden Posts
-                    {hiddenPosts.length > 0 && (
+                    Hidden Content
+                    {(hiddenPosts.length + hiddenBusinesses.length) > 0 && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
-                        {hiddenPosts.length}
+                        {hiddenPosts.length + hiddenBusinesses.length}
                       </span>
                     )}
                   </button>
                 </div>
 
-                {/* ─── Hidden Posts Tab ─── */}
+                {/* ─── Hidden Content Tab ─── */}
                 {modTab === 'hidden' && (
                   <div className="space-y-4">
                     {loadingHidden ? (
                       <div className="space-y-3">
                         {[...Array(2)].map((_, i) => <SkeletonRow key={i} />)}
                       </div>
-                    ) : hiddenPosts.length === 0 ? (
+                    ) : (hiddenPosts.length === 0 && hiddenBusinesses.length === 0) ? (
                       <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16">
                         <Eye size={48} className="mx-auto mb-3 text-emerald-400" />
-                        <p className="font-semibold text-[var(--aurora-text)]">No hidden posts</p>
-                        <p className="text-sm text-[var(--aurora-text-secondary)]">All posts are currently visible to the public</p>
+                        <p className="font-semibold text-[var(--aurora-text)]">No hidden content</p>
+                        <p className="text-sm text-[var(--aurora-text-secondary)]">All posts and businesses are currently visible to the public</p>
                       </div>
                     ) : (
-                      hiddenPosts.map((post) => (
+                      <>
+                      {/* Hidden Posts */}
+                      {hiddenPosts.length > 0 && (
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-semibold text-[var(--aurora-text-secondary)] px-1">Hidden Posts ({hiddenPosts.length})</h4>
+                          {hiddenPosts.map((post) => (
                         <div
                           key={post.id}
                           className="bg-[var(--aurora-surface)] rounded-2xl border border-orange-200 dark:border-orange-800/30 overflow-hidden"
@@ -2124,7 +2162,7 @@ export default function AdminPage() {
                           <div className="px-5 pt-4 pb-2 border-b border-[var(--aurora-border)]/50">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 uppercase flex items-center gap-1">
-                                <EyeOff size={10} /> Hidden
+                                <EyeOff size={10} /> Hidden Post
                               </span>
                               {post.hiddenReason && (
                                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
@@ -2204,7 +2242,105 @@ export default function AdminPage() {
                             </button>
                           </div>
                         </div>
-                      ))
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Hidden Businesses */}
+                      {hiddenBusinesses.length > 0 && (
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-semibold text-[var(--aurora-text-secondary)] px-1">Hidden Businesses ({hiddenBusinesses.length})</h4>
+                          {hiddenBusinesses.map((biz) => (
+                            <div
+                              key={biz.id}
+                              className="bg-[var(--aurora-surface)] rounded-2xl border border-orange-200 dark:border-orange-800/30 overflow-hidden"
+                            >
+                              {/* Header */}
+                              <div className="px-5 pt-4 pb-2 border-b border-[var(--aurora-border)]/50">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 uppercase flex items-center gap-1">
+                                    <EyeOff size={10} /> Hidden Business
+                                  </span>
+                                  {biz.hiddenReason && (
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                      {biz.hiddenReason}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] text-[var(--aurora-text-secondary)] ml-auto">
+                                    Hidden: {biz.hiddenAt ? new Date(biz.hiddenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Content */}
+                              <div className="px-5 py-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xl">{biz.emoji || '💼'}</span>
+                                  <p className="text-sm font-semibold text-[var(--aurora-text)]">{biz.name || 'Unnamed Business'}</p>
+                                  {biz.category && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)]">{biz.category}</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-[var(--aurora-text-secondary)] leading-relaxed">
+                                  {(biz.desc || '').length > 200 ? (biz.desc || '').slice(0, 200) + '...' : (biz.desc || 'No description')}
+                                </p>
+                                {biz.photos && biz.photos.length > 0 && (
+                                  <div className="flex gap-2 mt-2 overflow-x-auto">
+                                    {biz.photos.slice(0, 4).map((img: string, idx: number) => (
+                                      <img key={idx} src={img} alt={`Photo ${idx + 1}`} className="w-16 h-16 rounded-lg object-cover border border-[var(--aurora-border)]" />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Owner Info */}
+                              <div className="px-5 py-2 bg-[var(--aurora-surface-variant)]/30 border-t border-[var(--aurora-border)]/50">
+                                <p className="text-xs text-[var(--aurora-text-secondary)]">
+                                  {biz.location && <span>{biz.location} · </span>}
+                                  Owner ID: <span className="font-mono text-[10px]">{biz.ownerId || 'Unknown'}</span>
+                                </p>
+                              </div>
+
+                              {/* Actions */}
+                              <div className="px-5 py-3 border-t border-[var(--aurora-border)]/50 flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setConfirmModal({
+                                      title: 'Restore Business?',
+                                      message: 'Make this business listing visible to the public again?',
+                                      confirmLabel: 'Restore',
+                                      onConfirm: async () => {
+                                        setConfirmModal(null);
+                                        await unhideBusiness(biz.id);
+                                      }
+                                    });
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 transition"
+                                >
+                                  <Eye size={12} /> Restore / Unhide
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setConfirmModal({
+                                      title: 'Permanently Delete?',
+                                      message: 'This will permanently remove the business listing. This cannot be undone.',
+                                      confirmLabel: 'Delete Forever',
+                                      onConfirm: async () => {
+                                        setConfirmModal(null);
+                                        await permanentlyDeleteBusiness(biz.id);
+                                      }
+                                    });
+                                  }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 transition"
+                                >
+                                  <Trash2 size={12} /> Delete Permanently
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      </>
                     )}
                   </div>
                 )}
@@ -2401,16 +2537,19 @@ export default function AdminPage() {
                                     if (item.contentId && item.collection) {
                                       await updateDoc(doc(db, item.collection, item.contentId), { isHidden: true, hiddenAt: new Date().toISOString(), hiddenReason: item.categoryLabel || item.reason || '' });
                                     }
-                                    // Standardized appeals notification to post author
+                                    // Standardized appeals notification to content author/owner
                                     if (item.authorId) {
+                                      const isBusiness = item.type === 'business';
                                       await addDoc(collection(db, 'notifications'), {
                                         type: 'content_hidden',
                                         recipientId: item.authorId,
                                         recipientName: item.authorName || '',
                                         postId: item.contentId || '',
                                         reason: item.categoryLabel || item.reason || 'Community guideline violation',
-                                        message: 'Your post has been hidden by a moderator for violating community guidelines. If you believe this was a mistake, you can submit an appeal by contacting support.',
-                                        actionUrl: '/feed',
+                                        message: isBusiness
+                                          ? 'Your business listing has been hidden by a moderator for violating community guidelines. If you believe this was a mistake, you can submit an appeal by contacting support.'
+                                          : 'Your post has been hidden by a moderator for violating community guidelines. If you believe this was a mistake, you can submit an appeal by contacting support.',
+                                        actionUrl: isBusiness ? '/business' : '/feed',
                                         read: false,
                                         createdAt: serverTimestamp(),
                                       });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, Timestamp, query, where, setDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, Timestamp, query, where, setDoc, getDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -9,7 +9,8 @@ import {
   ExternalLink, Trash2, Edit3, Loader2, Award, TrendingUp, Utensils,
   Scissors, BookOpen, Laptop, Scale, Stethoscope, Plane, Palette,
   DollarSign, Users, Briefcase, Home, ChevronDown, Building2, UtensilsCrossed,
-  ChevronLeft, Upload, Image as ImageIcon, Camera, Gem, Shirt, Flower2
+  ChevronLeft, Upload, Image as ImageIcon, Camera, Gem, Shirt, Flower2,
+  Flag, Ban, AlertTriangle, MoreHorizontal
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, HERITAGE_OPTIONS, PRIORITY_ETHNICITIES } from '@/constants/config';
@@ -48,6 +49,9 @@ interface Business {
   deals?: Deal[];
   photos?: string[];
   coverPhotoIndex?: number;
+  isHidden?: boolean;
+  hiddenAt?: string;
+  hiddenReason?: string;
 }
 
 interface MenuItem {
@@ -173,6 +177,16 @@ const CATEGORY_ICONS: { [key: string]: any } = {
   'Travel & Tourism': Plane,
   'Other': Briefcase,
 };
+
+const REPORT_CATEGORIES = [
+  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
+  { id: 'hate_speech', label: 'Hate Speech or Bullying', icon: '🛑', description: 'Content targeting race, ethnicity, religion, gender, or personal attacks' },
+  { id: 'inappropriate', label: 'Inappropriate Content', icon: '⚠️', description: 'Sexual, violent, or graphic content not suitable for the community' },
+  { id: 'ip_violation', label: 'Intellectual Property Violation', icon: '©️', description: 'Unauthorized use of copyrighted material or trademarks' },
+  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
+  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
+  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
+];
 
 // ═════════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
@@ -470,6 +484,20 @@ export default function BusinessPage() {
   const [editPhotos, setEditPhotos] = useState<string[]>([]);
   const [editCoverPhotoIndex, setEditCoverPhotoIndex] = useState(0);
 
+  // Report / Block / Mute state
+  const [menuBusinessId, setMenuBusinessId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportBusinessId, setReportBusinessId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportedBusinesses, setReportedBusinesses] = useState<Set<string>>(new Set());
+  const [mutedBusinesses, setMutedBusinesses] = useState<Set<string>>(new Set());
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     category: CATEGORIES[0],
@@ -494,6 +522,8 @@ export default function BusinessPage() {
       const data: Business[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
+        // Skip hidden businesses (unless user is owner or admin)
+        if (d.isHidden) return;
         data.push({
           id: docSnap.id,
           name: d.name || '',
@@ -522,6 +552,9 @@ export default function BusinessPage() {
           deals: d.deals || [],
           photos: d.photos || [],
           coverPhotoIndex: d.coverPhotoIndex || 0,
+          isHidden: d.isHidden || false,
+          hiddenAt: d.hiddenAt || '',
+          hiddenReason: d.hiddenReason || '',
         });
       });
       setBusinesses(data);
@@ -563,6 +596,28 @@ export default function BusinessPage() {
   useEffect(() => {
     fetchBusinesses();
   }, []);
+
+  // Load user safety data (muted businesses, blocked users)
+  useEffect(() => {
+    if (!user) return;
+    const loadUserSafetyData = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.mutedBusinesses) {
+            setMutedBusinesses(new Set(data.mutedBusinesses));
+          }
+          if (data.blockedUsers) {
+            setBlockedUsers(new Set(data.blockedUsers));
+          }
+        }
+      } catch (e) {
+        console.error('Error loading user safety data:', e);
+      }
+    };
+    loadUserSafetyData();
+  }, [user]);
 
   useEffect(() => {
     if (selectedBusiness) {
@@ -612,8 +667,161 @@ export default function BusinessPage() {
     });
   };
 
+  // ── Report / Block / Mute handlers ──────────────────────────────────
+
+  const openReportModal = (businessId: string) => {
+    setMenuBusinessId(null);
+    setReportBusinessId(businessId);
+    setReportReason('');
+    setReportDetails('');
+    setShowReportModal(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason || !reportBusinessId || !user) return;
+    try {
+      setReportSubmitting(true);
+      const reportedBusiness = businesses.find((b) => b.id === reportBusinessId);
+      const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
+
+      // Write to reports collection (stealth: no owner notification)
+      await addDoc(collection(db, 'reports'), {
+        businessId: reportBusinessId,
+        reportedBy: user.uid,
+        reporterName: userProfile?.name || user.displayName || 'Anonymous',
+        reporterAvatar: userProfile?.avatar || '',
+        category: reportReason,
+        categoryLabel: categoryObj?.label || reportReason,
+        details: reportDetails.trim() || '',
+        createdAt: serverTimestamp(),
+        status: 'pending',
+      });
+
+      // Check if moderationQueue entry already exists for this business
+      const modQueueQuery = query(
+        collection(db, 'moderationQueue'),
+        where('contentId', '==', reportBusinessId)
+      );
+      const existingMods = await getDocs(modQueueQuery);
+
+      let totalReportCount = 1;
+
+      if (existingMods.docs.length > 0) {
+        const existingDoc = existingMods.docs[0];
+        const existingData = existingDoc.data();
+        totalReportCount = (existingData.reportCount || 1) + 1;
+        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
+          reportCount: totalReportCount,
+          reporters: arrayUnion({
+            uid: user.uid,
+            name: userProfile?.name || user.displayName || 'Anonymous',
+            avatar: userProfile?.avatar || '',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }),
+        });
+      } else {
+        await addDoc(collection(db, 'moderationQueue'), {
+          type: 'business',
+          content: reportedBusiness?.name || '',
+          contentId: reportBusinessId,
+          collection: 'businesses',
+          authorId: reportedBusiness?.ownerId || '',
+          authorName: reportedBusiness?.name || 'Unknown Business',
+          authorAvatar: '',
+          images: reportedBusiness?.photos || [],
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
+          reportedBy: user.uid,
+          reporterName: userProfile?.name || user.displayName || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          reportCount: 1,
+          reporters: [{
+            uid: user.uid,
+            name: userProfile?.name || user.displayName || 'Anonymous',
+            avatar: userProfile?.avatar || '',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }],
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      // 3-strike auto-hide
+      if (totalReportCount >= 3) {
+        await updateDoc(doc(db, 'businesses', reportBusinessId), {
+          isHidden: true,
+          hiddenAt: new Date().toISOString(),
+          hiddenReason: 'Auto-hidden: reached 3 community reports',
+        });
+        if (reportedBusiness?.ownerId) {
+          await addDoc(collection(db, 'notifications'), {
+            type: 'content_hidden',
+            recipientId: reportedBusiness.ownerId,
+            recipientName: reportedBusiness.name || '',
+            postId: reportBusinessId,
+            reason: 'Your business listing received multiple community reports and has been temporarily hidden for review.',
+            message: 'Your business listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
+            actionUrl: '/business',
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+
+      // Mute-on-report: hide this business from the reporter's view
+      await updateDoc(doc(db, 'users', user.uid), {
+        mutedBusinesses: arrayUnion(reportBusinessId),
+      });
+      setMutedBusinesses((prev) => new Set(prev).add(reportBusinessId));
+
+      setReportedBusinesses((prev) => new Set(prev).add(reportBusinessId));
+      setShowReportModal(false);
+      setReportReason('');
+      setReportDetails('');
+      alert('Report submitted. The business has been hidden from your view. Thank you for helping keep the community safe.');
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      alert('Failed to submit report.');
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!user || !blockTargetUser) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayUnion(blockTargetUser.uid),
+      });
+      setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
+      setShowBlockConfirm(false);
+      setBlockTargetUser(null);
+      setToastMessage(`${blockTargetUser.name} has been blocked. Their businesses will no longer appear in your listings.`);
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      alert('Failed to block user. Please try again.');
+    }
+  };
+
+  const openBlockConfirm = (ownerId: string, businessName: string) => {
+    setMenuBusinessId(null);
+    setBlockTargetUser({ uid: ownerId, name: businessName });
+    setShowBlockConfirm(true);
+  };
+
   const filteredBusinesses = useMemo(() => {
-    let filtered = businesses;
+    let filtered = businesses.filter((b) => {
+      // Mute-on-report: hide businesses the user has reported
+      if (mutedBusinesses.has(b.id)) return false;
+      // Block filter: hide businesses from blocked owners
+      if (b.ownerId && blockedUsers.has(b.ownerId)) return false;
+      return true;
+    });
     if (selectedCategory !== 'All') {
       filtered = filtered.filter((b) => b.category === selectedCategory);
     }
@@ -650,7 +858,7 @@ export default function BusinessPage() {
       });
     }
     return filtered;
-  }, [businesses, selectedCategory, selectedHeritage, searchQuery, activeCollection, favorites]);
+  }, [businesses, selectedCategory, selectedHeritage, searchQuery, activeCollection, favorites, mutedBusinesses, blockedUsers]);
 
   const featuredBusinesses = useMemo(() => {
     let featured = businesses.filter((b) => b.promoted);
@@ -1542,16 +1750,66 @@ export default function BusinessPage() {
                           </span>
                         )}
 
-                        <button
-                          onClick={(e) => toggleFavorite(business.id, e)}
-                          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 dark:bg-aurora-surface/90
-                                     flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
-                                     transition-colors shadow-sm"
-                        >
-                          <Heart className={`w-4 h-4 transition-colors ${
-                            favorites.has(business.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'
-                          }`} />
-                        </button>
+                        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                          <button
+                            onClick={(e) => toggleFavorite(business.id, e)}
+                            className="w-8 h-8 rounded-full bg-white/90 dark:bg-aurora-surface/90
+                                       flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
+                                       transition-colors shadow-sm"
+                          >
+                            <Heart className={`w-4 h-4 transition-colors ${
+                              favorites.has(business.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'
+                            }`} />
+                          </button>
+                          {user && (
+                            <div className="relative" ref={menuBusinessId === business.id ? menuRef : undefined}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setMenuBusinessId(menuBusinessId === business.id ? null : business.id); }}
+                                className="w-8 h-8 rounded-full bg-white/90 dark:bg-aurora-surface/90
+                                           flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
+                                           transition-colors shadow-sm"
+                              >
+                                <MoreHorizontal className="w-4 h-4 text-gray-500" />
+                              </button>
+                              <ClickOutsideOverlay isOpen={menuBusinessId === business.id} onClose={() => setMenuBusinessId(null)} />
+                              {menuBusinessId === business.id && (
+                                <div className="absolute right-0 top-10 bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-50 min-w-[180px]">
+                                  {isOwnerOrAdmin(business) && (
+                                    <>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); setSelectedBusiness(business); handleStartEdit(); }}
+                                        className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+                                      >
+                                        <Edit3 size={16} /> Edit Business
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleDeleteBusiness(business.id); }}
+                                        className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                                      >
+                                        <Trash2 size={16} /> Delete Business
+                                      </button>
+                                    </>
+                                  )}
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openReportModal(business.id); }}
+                                    className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+                                    disabled={reportedBusinesses.has(business.id)}
+                                  >
+                                    <Flag size={16} /> {reportedBusinesses.has(business.id) ? 'Reported' : 'Report Business'}
+                                  </button>
+                                  {business.ownerId && business.ownerId !== user?.uid && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openBlockConfirm(business.ownerId!, business.name); }}
+                                      className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                                    >
+                                      <Ban size={16} /> {blockedUsers.has(business.ownerId!) ? 'Blocked' : 'Block Owner'}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
 
                         <div className="absolute top-3 left-3 flex flex-col gap-1.5">
                           {business.promoted && (
@@ -1748,9 +2006,57 @@ export default function BusinessPage() {
               >
                 <X className="w-5 h-5" />
               </button>
+              {user && (
+                <div className="absolute top-3 right-14">
+                  <div className="relative">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setMenuBusinessId(menuBusinessId === selectedBusiness.id ? null : selectedBusiness.id); }}
+                    className="w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                  <ClickOutsideOverlay isOpen={menuBusinessId === selectedBusiness.id} onClose={() => setMenuBusinessId(null)} />
+                  {menuBusinessId === selectedBusiness.id && (
+                    <div className="absolute right-0 top-10 bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-50 min-w-[180px]">
+                      {isOwnerOrAdmin(selectedBusiness) && (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleStartEdit(); }}
+                            className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+                          >
+                            <Edit3 size={16} /> Edit Business
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setMenuBusinessId(null); handleDeleteBusiness(selectedBusiness.id); }}
+                            className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                          >
+                            <Trash2 size={16} /> Delete Business
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openReportModal(selectedBusiness.id); }}
+                        className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
+                        disabled={reportedBusinesses.has(selectedBusiness.id)}
+                      >
+                        <Flag size={16} /> {reportedBusinesses.has(selectedBusiness.id) ? 'Reported' : 'Report Business'}
+                      </button>
+                      {selectedBusiness.ownerId && selectedBusiness.ownerId !== user?.uid && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openBlockConfirm(selectedBusiness.ownerId!, selectedBusiness.name); }}
+                          className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
+                        >
+                          <Ban size={16} /> {blockedUsers.has(selectedBusiness.ownerId!) ? 'Blocked' : 'Block Owner'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  </div>
+                </div>
+              )}
               <button
                 onClick={(e) => toggleFavorite(selectedBusiness.id, e)}
-                className="absolute top-3 right-14 w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors"
+                className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors`}
               >
                 <Heart className={`w-4 h-4 ${favorites.has(selectedBusiness.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
               </button>
@@ -2326,6 +2632,129 @@ export default function BusinessPage() {
                   Delete
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          REPORT BUSINESS MODAL
+          ═══════════════════════════════════════════════════════════════════ */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-aurora-surface rounded-2xl shadow-aurora-4 w-full max-w-md border border-aurora-border overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-aurora-border bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 id="report-modal-title" className="text-lg font-bold text-aurora-text flex items-center gap-2">
+                    <Flag size={18} className="text-red-500" />
+                    Report Business
+                  </h3>
+                  <p className="text-sm text-aurora-text-muted mt-0.5">Select a category that best describes the issue</p>
+                </div>
+                <button onClick={() => setShowReportModal(false)} className="p-1.5 rounded-full hover:bg-aurora-surface-variant transition-colors">
+                  <X size={18} className="text-aurora-text-muted" />
+                </button>
+              </div>
+            </div>
+
+            {/* Categories */}
+            <div className="px-5 py-3 space-y-2 max-h-[40vh] overflow-y-auto">
+              {REPORT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setReportReason(cat.id)}
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 ${
+                    reportReason === cat.id
+                      ? 'border-red-400 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-300'
+                      : 'border-aurora-border hover:border-aurora-border-glass hover:bg-aurora-surface-variant'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg shrink-0">{cat.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${reportReason === cat.id ? 'text-red-700 dark:text-red-400' : 'text-aurora-text'}`}>
+                        {cat.label}
+                      </p>
+                      <p className="text-xs text-aurora-text-muted mt-0.5 leading-relaxed">{cat.description}</p>
+                    </div>
+                    {reportReason === cat.id && (
+                      <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center shrink-0">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Optional Details */}
+            {reportReason && (
+              <div className="px-5 py-3 border-t border-aurora-border/50">
+                <label className="text-xs font-semibold text-aurora-text-secondary uppercase tracking-wider">Additional Details (Optional)</label>
+                <textarea
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="Provide more context about why you're reporting this business..."
+                  maxLength={500}
+                  rows={3}
+                  className="mt-1.5 w-full px-3 py-2.5 bg-aurora-surface-variant border border-aurora-border rounded-xl text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-red-300/50 resize-none"
+                />
+                <p className="text-[10px] text-aurora-text-muted text-right mt-1">{reportDetails.length}/500</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="px-5 py-4 border-t border-aurora-border flex gap-3">
+              <button
+                onClick={() => { setShowReportModal(false); setReportReason(''); setReportDetails(''); }}
+                className="flex-1 py-2.5 rounded-xl border border-aurora-border text-aurora-text-secondary font-medium hover:bg-aurora-surface-variant transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReport}
+                disabled={!reportReason || reportSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 disabled:opacity-50 transition-colors btn-press flex items-center justify-center gap-2"
+              >
+                {reportSubmitting ? (
+                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting...</>
+                ) : (
+                  <><Flag size={14} /> Submit Report</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          BLOCK USER CONFIRMATION MODAL
+          ═══════════════════════════════════════════════════════════════════ */}
+      {showBlockConfirm && blockTargetUser && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-aurora-surface rounded-2xl shadow-aurora-4 border border-aurora-border max-w-sm w-full p-6 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+              <Ban size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-aurora-text mb-2">Block {blockTargetUser.name}?</h3>
+            <p className="text-sm text-aurora-text-muted mb-6">
+              They won't be notified. Their businesses will be hidden from your listings. You can unblock them anytime from your Profile settings.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}
+                className="flex-1 py-2.5 rounded-xl border border-aurora-border text-aurora-text-secondary font-medium hover:bg-aurora-surface-variant transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlockUser}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
+              >
+                Block
+              </button>
             </div>
           </div>
         </div>
