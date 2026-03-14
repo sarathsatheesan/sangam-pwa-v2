@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
-  collection, query, where, orderBy, getDocs, addDoc, deleteDoc,
-  doc, updateDoc, Timestamp, limit, arrayUnion, arrayRemove, onSnapshot,
+  collection, query, where, orderBy, getDocs, getDoc, addDoc, deleteDoc,
+  doc, updateDoc, Timestamp, limit, arrayUnion, arrayRemove, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +14,7 @@ import {
   Trophy, Handshake, Baby, Church, Tag, Share2,
   ChevronLeft, AlertCircle, Download, Send, MessageCircle,
   Check, ChevronDown, MoreVertical, Upload, Camera, Image as ImageIcon, Edit2,
-  SlidersHorizontal, Globe
+  SlidersHorizontal, Globe, Flag, Ban, MoreHorizontal
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ETHNICITY_HIERARCHY, ETHNICITY_CHILDREN, HERITAGE_OPTIONS, PRIORITY_ETHNICITIES } from '@/constants/config';
@@ -70,7 +70,20 @@ interface Event {
   photos?: string[];
   coverPhotoIndex?: number;
   heritage?: string[];
+  isHidden?: boolean;
+  hiddenAt?: string;
+  hiddenReason?: string;
 }
+
+const REPORT_CATEGORIES = [
+  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
+  { id: 'hate_speech', label: 'Hate Speech or Bullying', icon: '🛑', description: 'Content targeting race, ethnicity, religion, gender, or personal attacks' },
+  { id: 'inappropriate', label: 'Inappropriate Content', icon: '⚠️', description: 'Sexual, violent, or graphic content not suitable for the community' },
+  { id: 'ip_violation', label: 'Intellectual Property Violation', icon: '©️', description: 'Unauthorized use of copyrighted material or trademarks' },
+  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
+  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
+  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
+];
 
 const EVENT_TYPES: { [key: string]: string } = {
   Cultural: '🎭', Community: '🎉', Religious: '🙏', Sports: '⚽',
@@ -462,6 +475,20 @@ export default function EventsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // ── Report / Block / Mute state ──
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportEventId, setReportEventId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [mutedEvents, setMutedEvents] = useState<Set<string>>(new Set());
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
+  const [menuEventId, setMenuEventId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState({
@@ -488,6 +515,160 @@ export default function EventsPage() {
     photos: [] as string[],
     coverPhotoIndex: 0,
   });
+
+  // ── Report / Block / Mute handlers ──────────────────────────────────
+
+  const openMenu = (eventId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setMenuEventId(eventId);
+  };
+
+  const closeMenu = () => { setMenuEventId(null); setMenuPosition(null); };
+
+  const openReportModal = (eventId: string) => {
+    closeMenu();
+    setReportEventId(eventId);
+    setReportReason('');
+    setReportDetails('');
+    setShowReportModal(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason || !reportEventId || !user) return;
+    try {
+      setReportSubmitting(true);
+      const reportedEvent = events.find((ev) => ev.id === reportEventId);
+      const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
+
+      // Write to reports collection (stealth: no owner notification)
+      await addDoc(collection(db, 'reports'), {
+        eventId: reportEventId,
+        reportedBy: user.uid,
+        reporterName: userProfile?.name || user.displayName || 'Anonymous',
+        reporterAvatar: userProfile?.avatar || '',
+        category: reportReason,
+        categoryLabel: categoryObj?.label || reportReason,
+        details: reportDetails.trim() || '',
+        createdAt: serverTimestamp(),
+        status: 'pending',
+      });
+
+      // Check if moderationQueue entry already exists for this event
+      const modQueueQuery = query(
+        collection(db, 'moderationQueue'),
+        where('contentId', '==', reportEventId)
+      );
+      const existingMods = await getDocs(modQueueQuery);
+
+      let totalReportCount = 1;
+
+      if (existingMods.docs.length > 0) {
+        const existingDoc = existingMods.docs[0];
+        const existingData = existingDoc.data();
+        totalReportCount = (existingData.reportCount || 1) + 1;
+        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
+          reportCount: totalReportCount,
+          reporters: arrayUnion({
+            uid: user.uid,
+            name: userProfile?.name || user.displayName || 'Anonymous',
+            avatar: userProfile?.avatar || '',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }),
+        });
+      } else {
+        await addDoc(collection(db, 'moderationQueue'), {
+          type: 'event',
+          content: reportedEvent?.title || '',
+          contentId: reportEventId,
+          collection: 'events',
+          authorId: reportedEvent?.posterId || '',
+          authorName: reportedEvent?.posterName || 'Unknown',
+          authorAvatar: '',
+          images: reportedEvent?.photos || [],
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
+          reportedBy: user.uid,
+          reporterName: userProfile?.name || user.displayName || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          reportCount: 1,
+          reporters: [{
+            uid: user.uid,
+            name: userProfile?.name || user.displayName || 'Anonymous',
+            avatar: userProfile?.avatar || '',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }],
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      // 3-strike auto-hide
+      if (totalReportCount >= 3) {
+        await updateDoc(doc(db, 'events', reportEventId), {
+          isHidden: true,
+          hiddenAt: new Date().toISOString(),
+          hiddenReason: 'Auto-hidden: reached 3 community reports',
+        });
+        if (reportedEvent?.posterId) {
+          await addDoc(collection(db, 'notifications'), {
+            type: 'content_hidden',
+            recipientId: reportedEvent.posterId,
+            recipientName: reportedEvent.posterName || '',
+            postId: reportEventId,
+            reason: 'Your event received multiple community reports and has been temporarily hidden for review.',
+            message: 'Your event has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
+            actionUrl: '/events',
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+
+      // Mute-on-report: hide this event from the reporter's view
+      await updateDoc(doc(db, 'users', user.uid), {
+        mutedEvents: arrayUnion(reportEventId),
+      });
+      setMutedEvents((prev) => new Set(prev).add(reportEventId));
+
+      setShowReportModal(false);
+      setReportReason('');
+      setReportDetails('');
+      setToastMessage('Report submitted. The event has been hidden from your view. Thank you for helping keep the community safe.');
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      setToastMessage('Failed to submit report.');
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const handleBlockUser = async () => {
+    if (!user || !blockTargetUser) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayUnion(blockTargetUser.uid),
+      });
+      setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
+      setShowBlockConfirm(false);
+      setBlockTargetUser(null);
+      setToastMessage(`${blockTargetUser.name} has been blocked. Their events will no longer appear in your listings.`);
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      setToastMessage('Failed to block user. Please try again.');
+    }
+  };
+
+  const openBlockConfirm = (posterId: string, posterName: string) => {
+    closeMenu();
+    setBlockTargetUser({ uid: posterId, name: posterName });
+    setShowBlockConfirm(true);
+  };
 
   const isOwnerOrAdmin = (e: Event) => e.posterId === user?.uid || userRole === 'admin';
 
@@ -539,6 +720,7 @@ export default function EventsPage() {
       snapshot.forEach((d) => {
         const data = d.data();
         if (data.disabled) return;
+        if (data.isHidden) return;
         eventsList.push({
           id: d.id, title: data.title || '', emoji: data.emoji || EVENT_TYPES[data.type] || '📌',
           type: data.type || 'Other', fullDate: data.fullDate || '', time: data.time || '',
@@ -587,6 +769,22 @@ export default function EventsPage() {
   };
 
   useEffect(() => { fetchEvents(); }, [user?.uid]);
+
+  // Load user safety data (muted events, blocked users)
+  useEffect(() => {
+    if (!user) return;
+    const loadUserSafetyData = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.mutedEvents) setMutedEvents(new Set(data.mutedEvents));
+          if (data.blockedUsers) setBlockedUsers(new Set(data.blockedUsers));
+        }
+      } catch (e) { console.error('Error loading user safety data:', e); }
+    };
+    loadUserSafetyData();
+  }, [user]);
 
   useEffect(() => {
     return () => {
@@ -673,7 +871,11 @@ export default function EventsPage() {
   };
 
   const filteredEvents = useMemo(() => {
-    let result = events;
+    let result = events.filter((event) => {
+      if (mutedEvents.has(event.id)) return false;
+      if (event.posterId && blockedUsers.has(event.posterId)) return false;
+      return true;
+    });
 
     if (myEvents && user?.uid) {
       result = result.filter((event) => event.posterId === user.uid);
@@ -696,7 +898,7 @@ export default function EventsPage() {
 
       return matchesSearch && matchesFilter && matchesDate && matchesHeritage;
     });
-  }, [events, searchQuery, selectedFilter, selectedDateFilter, showPast, myEvents, user, selectedHeritage]);
+  }, [events, searchQuery, selectedFilter, selectedDateFilter, showPast, myEvents, user, selectedHeritage, mutedEvents, blockedUsers]);
 
   const featuredEvents = events.filter((e) => e.promoted && !isEventPast(e.fullDate));
 
@@ -1776,16 +1978,26 @@ export default function EventsPage() {
                         </p>
                       </div>
 
-                      {/* Save/Bookmark */}
+                      {/* Three-dot menu + Save/Bookmark */}
+                      <div className="flex items-center gap-1 flex-shrink-0 self-start">
+                        {event.posterId !== user?.uid && (
+                          <button
+                            onClick={(e) => openMenu(event.id, e)}
+                            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-aurora-surface-variant transition-colors"
+                          >
+                            <MoreHorizontal size={16} className="text-aurora-text-muted" />
+                          </button>
+                        )}
                       <button
                         onClick={(e) => toggleSaved(event.id, e)}
                         className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-                                   hover:bg-aurora-surface-variant transition-colors self-start"
+                                   hover:bg-aurora-surface-variant transition-colors"
                       >
                         <Heart className={`w-4 h-4 transition-colors ${
                           savedEvents.has(event.id) ? 'fill-red-500 text-red-500' : 'text-aurora-text-muted'
                         }`} />
                       </button>
+                      </div>
                     </div>
 
                     {/* Footer: type badge, attendance, price, RSVP status */}
@@ -2261,6 +2473,30 @@ export default function EventsPage() {
                     <Trash2 className="w-4 h-4" /> Delete Event
                   </button>
                 </>
+              )}
+
+              {/* Report & Block — for non-owners */}
+              {selectedEvent.posterId !== user?.uid && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openReportModal(selectedEvent.id)}
+                    className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-aurora-border
+                               text-aurora-text hover:bg-aurora-surface-variant transition-colors
+                               flex items-center justify-center gap-2"
+                  >
+                    <Flag className="w-4 h-4" /> Report
+                  </button>
+                  {selectedEvent.posterId && (
+                    <button
+                      onClick={() => openBlockConfirm(selectedEvent.posterId, selectedEvent.posterName || selectedEvent.organizer)}
+                      className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-red-200 dark:border-red-500/20
+                                 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors
+                                 flex items-center justify-center gap-2"
+                    >
+                      <Ban className="w-4 h-4" /> Block Organizer
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -2778,6 +3014,126 @@ export default function EventsPage() {
                 className="flex-1 bg-aurora-indigo text-white py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-indigo/90 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
               >
                 {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Three-Dot Context Menu (fixed-position) ===== */}
+      {menuEventId && menuPosition && (
+        <>
+          <div className="fixed inset-0 z-[55]" onClick={closeMenu} />
+          <div
+            className="fixed z-[56] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[180px]"
+            style={{ top: menuPosition.top, right: menuPosition.right }}
+          >
+            <button
+              onClick={(e) => { e.stopPropagation(); openReportModal(menuEventId); }}
+              className="w-full px-4 py-2.5 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2.5 text-gray-700 dark:text-gray-200"
+            >
+              <Flag size={15} className="text-gray-500" /> Report Event
+            </button>
+            {(() => {
+              const ev = events.find((e) => e.id === menuEventId);
+              return ev?.posterId && ev.posterId !== user?.uid ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); openBlockConfirm(ev.posterId, ev.posterName || ev.organizer); }}
+                  className="w-full px-4 py-2.5 text-sm text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2.5 text-red-600 dark:text-red-400"
+                >
+                  <Ban size={15} /> Block Organizer
+                </button>
+              ) : null;
+            })()}
+          </div>
+        </>
+      )}
+
+      {/* ===== Report Event Modal ===== */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Report Event</h3>
+              <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Why are you reporting this event? Your report is confidential.</p>
+              {REPORT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setReportReason(cat.id)}
+                  className={`w-full p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${
+                    reportReason === cat.id
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 ring-1 ring-indigo-500'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <span className="text-xl">{cat.icon}</span>
+                  <div>
+                    <p className="font-medium text-sm text-gray-900 dark:text-white">{cat.label}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{cat.description}</p>
+                  </div>
+                </button>
+              ))}
+              {reportReason && (
+                <textarea
+                  placeholder="Additional details (optional)..."
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  rows={3}
+                />
+              )}
+            </div>
+            <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-5 py-4 flex gap-3 rounded-b-2xl">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReport}
+                disabled={!reportReason || reportSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {reportSubmitting ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Flag size={16} /> Submit Report</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Block User Confirmation Modal ===== */}
+      {showBlockConfirm && blockTargetUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockConfirm(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="w-14 h-14 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Ban className="w-7 h-7 text-red-600 dark:text-red-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Block {blockTargetUser.name}?
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Their events will be hidden from your view. You can unblock them anytime from your Profile settings.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBlockConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlockUser}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 flex items-center justify-center gap-2"
+              >
+                <Ban size={16} /> Block
               </button>
             </div>
           </div>
