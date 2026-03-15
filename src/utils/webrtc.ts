@@ -22,8 +22,22 @@ import { db } from '@/services/firebase';
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun3.l.google.com:19302' },
+  // Free TURN servers for NAT traversal (needed for symmetric NATs / mobile networks)
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 const CALL_TIMEOUT_MS = 45_000; // 45 seconds to answer
@@ -202,9 +216,13 @@ export class CallManager {
     // Set up remote stream — use event.track directly (more reliable than event.streams)
     this.remoteStream = new MediaStream();
     pc.ontrack = (event) => {
-      console.log('[WebRTC] ontrack fired, kind:', event.track.kind);
+      console.log('[WebRTC] ontrack fired, kind:', event.track.kind, 'readyState:', event.track.readyState);
       this.remoteStream!.addTrack(event.track);
-      this.setState({ remoteStream: this.remoteStream });
+      // Create a new MediaStream reference so React detects the state change
+      // (adding tracks to the same object doesn't trigger re-renders)
+      const newStream = new MediaStream(this.remoteStream!.getTracks());
+      this.remoteStream = newStream;
+      this.setState({ remoteStream: newStream });
     };
 
     // Send ICE candidates to Firestore
@@ -350,6 +368,7 @@ export class CallManager {
         (snap) => {
           snap.docChanges().forEach((change) => {
             if (change.type === 'added') {
+              console.log('[WebRTC] Received callee ICE candidate');
               this.addIceCandidateSafe(change.doc.data() as RTCIceCandidateInit);
             }
           });
@@ -397,6 +416,31 @@ export class CallManager {
         this.pc!.addTrack(track, this.localStream!);
       });
 
+      // Start listening for caller ICE candidates EARLY (before setting remote desc)
+      // so candidates get buffered and flushed after remote description is set
+      const unsubCandidates = onSnapshot(
+        collection(db, 'calls', callId, 'callerCandidates'),
+        (snap) => {
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              console.log('[WebRTC] Received caller ICE candidate');
+              this.addIceCandidateSafe(change.doc.data() as RTCIceCandidateInit);
+            }
+          });
+        }
+      );
+      this.unsubscribers.push(unsubCandidates);
+
+      // Listen for call status changes (ended by caller)
+      const unsubCall = onSnapshot(doc(db, 'calls', callId), (snap) => {
+        const data = snap.data();
+        if (!data) return;
+        if (data.status === 'ended') {
+          this.endCall(data.endReason || 'ended');
+        }
+      });
+      this.unsubscribers.push(unsubCall);
+
       // Fetch the call document to get the offer (direct read, not snapshot)
       const callSnap = await getDoc(doc(db, 'calls', callId));
       const callData = callSnap.data();
@@ -424,29 +468,6 @@ export class CallManager {
       });
 
       console.log('[WebRTC] Answer sent to Firestore');
-
-      // Listen for call status changes (ended by caller)
-      const unsubCall = onSnapshot(doc(db, 'calls', callId), (snap) => {
-        const data = snap.data();
-        if (!data) return;
-        if (data.status === 'ended') {
-          this.endCall(data.endReason || 'ended');
-        }
-      });
-      this.unsubscribers.push(unsubCall);
-
-      // Listen for caller ICE candidates (buffer-safe)
-      const unsubCandidates = onSnapshot(
-        collection(db, 'calls', callId, 'callerCandidates'),
-        (snap) => {
-          snap.docChanges().forEach((change) => {
-            if (change.type === 'added') {
-              this.addIceCandidateSafe(change.doc.data() as RTCIceCandidateInit);
-            }
-          });
-        }
-      );
-      this.unsubscribers.push(unsubCandidates);
 
       this.stopRingtone();
 

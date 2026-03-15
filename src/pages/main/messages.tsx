@@ -1270,6 +1270,7 @@ export default function MessagesPage() {
   const callManagerRef = useRef(getCallManager());
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
   // Refs
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1366,10 +1367,20 @@ export default function MessagesPage() {
     if (localVideoRef.current && callState.localStream) {
       localVideoRef.current.srcObject = callState.localStream;
     }
+  }, [callState.localStream]);
+
+  // Attach remote stream — use a separate effect that also re-runs on status changes
+  // (the video element may not be in the DOM until status becomes 'connected')
+  useEffect(() => {
     if (remoteVideoRef.current && callState.remoteStream) {
       remoteVideoRef.current.srcObject = callState.remoteStream;
     }
-  }, [callState.localStream, callState.remoteStream]);
+    // Also attach to the hidden audio element for audio-only calls
+    if (remoteAudioRef.current && callState.remoteStream) {
+      remoteAudioRef.current.srcObject = callState.remoteStream;
+      remoteAudioRef.current.play().catch((err) => console.warn('[WebRTC] Remote audio play failed:', err));
+    }
+  }, [callState.remoteStream, callState.status]);
 
   // E2EE: Generate/load ECDH key pair on mount, publish public key to Firestore
   useEffect(() => {
@@ -3550,13 +3561,17 @@ export default function MessagesPage() {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
       <div className="w-full h-full max-w-lg mx-auto flex flex-col items-center justify-between py-12 px-6 relative">
 
-        {/* Remote video (full background for video calls) */}
-        {callState.callType === 'video' && callState.status === 'connected' && (
+        {/* Hidden audio element for remote stream (needed for audio calls and as fallback) */}
+        <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
+
+        {/* Remote video (full background for video calls) — always rendered so ref is available */}
+        {callState.callType === 'video' && (
           <video
             ref={remoteVideoRef}
             autoPlay
             playsInline
             className="absolute inset-0 w-full h-full object-cover"
+            style={{ opacity: callState.status === 'connected' ? 1 : 0 }}
           />
         )}
 
