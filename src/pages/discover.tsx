@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, writeBatch, arrayUnion } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
@@ -9,7 +9,7 @@ import {
   Search, MapPin, Users, UserPlus, UserCheck, UserMinus,
   X, ChevronDown, MessageCircle, Sparkles,
   Globe, Loader2,
-  Clock, Check, Bookmark,
+  Clock, Check, Bookmark, Ban, MoreVertical,
 } from 'lucide-react';
 
 // Interfaces
@@ -208,6 +208,51 @@ export default function DiscoverPage() {
   const [disconnectPersonId, setDisconnectPersonId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeTile, setActiveTile] = useState<'connections' | 'pending' | 'members' | null>(null);
+  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [blockTargetUser, setBlockTargetUser] = useState<{ id: string; name: string } | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Load blocked users from Firestore
+  useEffect(() => {
+    if (!user) return;
+    const loadBlocked = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          setBlockedUsers(userDoc.data().blockedUsers || []);
+        }
+      } catch (err) {
+        console.error('Failed to load blocked users:', err);
+      }
+    };
+    loadBlocked();
+  }, [user]);
+
+  // Block user handler
+  const handleBlockUser = async () => {
+    if (!user || !blockTargetUser) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayUnion(blockTargetUser.id),
+      });
+      setBlockedUsers((prev) => [...prev, blockTargetUser.id]);
+      setToastMessage(`${blockTargetUser.name} has been blocked`);
+      setSelectedPerson(null);
+    } catch (err) {
+      console.error('Failed to block user:', err);
+      setToastMessage('Failed to block user');
+    } finally {
+      setShowBlockConfirm(false);
+      setBlockTargetUser(null);
+    }
+  };
+
+  const openBlockConfirm = (personId: string, personName: string) => {
+    setBlockTargetUser({ id: personId, name: personName });
+    setShowBlockConfirm(true);
+    setOpenMenuId(null);
+  };
 
   // Handle tile click — switch tab and highlight tile
   const handleTileClick = useCallback((tile: 'connections' | 'pending' | 'members') => {
@@ -220,6 +265,14 @@ export default function DiscoverPage() {
   }, []);
 
   // Close heritage dropdown on click outside - replaced with ClickOutsideOverlay component
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleClick = () => setOpenMenuId(null);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [openMenuId]);
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -569,6 +622,11 @@ export default function DiscoverPage() {
   const filteredPeople = useMemo(() => {
     let filtered = people;
 
+    // Filter out blocked users
+    if (blockedUsers.length > 0) {
+      filtered = filtered.filter((p) => !blockedUsers.includes(p.id));
+    }
+
     // Tab filtering
     if (activeTab === 'discover') {
       filtered = filtered.filter((p) => {
@@ -622,7 +680,7 @@ export default function DiscoverPage() {
         computeMatchScore(b, userProfile, mutualB) - computeMatchScore(a, userProfile, mutualA)
       );
     });
-  }, [people, selectedHeritage, searchQuery, userProfile, sortBy, connections, connectionDetails, activeTab, user?.uid]);
+  }, [people, selectedHeritage, searchQuery, userProfile, sortBy, connections, connectionDetails, activeTab, user?.uid, blockedUsers]);
 
   // PYMK Groups
   const pymkGroups = useMemo(() => {
@@ -1539,6 +1597,26 @@ export default function DiscoverPage() {
                         NEW
                       </span>
                     )}
+                    {/* Three-dot menu */}
+                    <div className="absolute top-2 right-2 z-10">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
+                        className="p-1 bg-black/30 hover:bg-black/50 rounded-full transition-colors"
+                        aria-label="More options"
+                      >
+                        <MoreVertical className="w-4 h-4 text-white" />
+                      </button>
+                      {openMenuId === person.id && (
+                        <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-20">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Ban className="w-4 h-4" /> Block User
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="p-3">
                     <div className="relative flex items-end gap-3 -mt-8">
@@ -1654,14 +1732,35 @@ export default function DiscoverPage() {
                           </span>
                         )}
                       </div>
-                      {score >= 40 && (
-                        <div className="text-right">
-                          <div className={`text-lg font-bold ${score >= 75 ? 'text-green-600' : 'text-blue-600'}`}>
-                            {score}%
+                      <div className="flex items-center gap-2">
+                        {score >= 40 && (
+                          <div className="text-right">
+                            <div className={`text-lg font-bold ${score >= 75 ? 'text-green-600' : 'text-blue-600'}`}>
+                              {score}%
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Match</div>
                           </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Match</div>
+                        )}
+                        <div className="relative">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
+                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                            aria-label="More options"
+                          >
+                            <MoreVertical className="w-4 h-4 text-gray-500" />
+                          </button>
+                          {openMenuId === person.id && (
+                            <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-20">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              >
+                                <Ban className="w-4 h-4" /> Block User
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">{person.profession}</p>}
@@ -1882,6 +1981,45 @@ export default function DiscoverPage() {
                     <UserPlus className="w-4 h-4" /> Connect
                   </button>
                 )}
+              </div>
+
+              {/* Block User button in modal */}
+              <button
+                onClick={() => openBlockConfirm(selectedPerson.id, selectedPerson.name)}
+                className="w-full mt-3 flex items-center justify-center gap-2 py-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+              >
+                <Ban className="w-4 h-4" /> Block User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Block User Confirmation Modal */}
+      {showBlockConfirm && blockTargetUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Ban size={24} className="text-red-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Block {blockTargetUser.name}?</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+                They won't be able to see your profile and you won't see them in discover, events, or other listings. You can unblock them from your Profile page.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}
+                  className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBlockUser}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
+                >
+                  Block
+                </button>
               </div>
             </div>
           </div>
