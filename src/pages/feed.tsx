@@ -2053,15 +2053,20 @@ export default function FeedPage() {
                       <div
                         key={idx}
                         className={`rounded-xl overflow-hidden bg-aurora-surface-variant ${
-                          post.images!.length === 1 ? 'max-h-80' :
+                          post.images!.length === 1 ? 'flex items-center justify-center' :
                           post.images!.length === 3 && idx === 0 ? 'row-span-2' : ''
                         }`}
+                        style={post.images!.length === 1 ? { maxHeight: '480px' } : undefined}
                       >
                         <img
                           src={img}
                           alt=""
-                          className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                          style={post.images!.length === 1 ? { maxHeight: '320px' } : { aspectRatio: post.images!.length === 3 && idx === 0 ? '1/2' : '1/1' }}
+                          className={`cursor-pointer hover:opacity-95 transition-opacity ${
+                            post.images!.length === 1
+                              ? 'w-full h-auto object-contain'
+                              : 'w-full h-full object-cover'
+                          }`}
+                          style={post.images!.length === 1 ? { maxHeight: '480px' } : { aspectRatio: post.images!.length === 3 && idx === 0 ? '1/2' : '1/1' }}
                           onClick={() => openPostDetail(post)}
                         />
                       </div>
@@ -2501,15 +2506,20 @@ export default function FeedPage() {
                       <div
                         key={idx}
                         className={`rounded-xl overflow-hidden bg-aurora-surface-variant ${
-                          selectedPost.images!.length === 1 ? '' :
+                          selectedPost.images!.length === 1 ? 'flex items-center justify-center' :
                           selectedPost.images!.length === 3 && idx === 0 ? 'row-span-2' : ''
                         }`}
+                        style={selectedPost.images!.length === 1 ? { maxHeight: '520px' } : undefined}
                       >
                         <img
                           src={img}
                           alt=""
-                          className="w-full h-full object-cover"
-                          style={selectedPost.images!.length === 1 ? { maxHeight: '400px', width: '100%' } : { aspectRatio: selectedPost.images!.length === 3 && idx === 0 ? '1/2' : '1/1' }}
+                          className={`${
+                            selectedPost.images!.length === 1
+                              ? 'w-full h-auto object-contain'
+                              : 'w-full h-full object-cover'
+                          }`}
+                          style={selectedPost.images!.length === 1 ? { maxHeight: '520px' } : { aspectRatio: selectedPost.images!.length === 3 && idx === 0 ? '1/2' : '1/1' }}
                         />
                       </div>
                     ))}
