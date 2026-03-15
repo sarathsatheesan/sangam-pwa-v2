@@ -289,6 +289,35 @@ export async function unwrapGroupKeyForMember(
   return importGroupKey(raw);
 }
 
+/**
+ * Wrap a group key for a member using the ECDH shared key derived from
+ * the distributor's private key and the member's public key.
+ * All-in-one helper: derives shared key, wraps group key.
+ */
+export async function wrapGroupKeyForMemberWithECDH(
+  groupKey: CryptoKey,
+  distributorPrivateKey: CryptoKey,
+  memberPublicKeyJwk: ExportedPublicKey
+): Promise<string> {
+  const sharedKey = await deriveSharedKey(distributorPrivateKey, memberPublicKeyJwk);
+  const groupKeyRaw = await exportGroupKey(groupKey);
+  return wrapGroupKeyForMember(groupKeyRaw, sharedKey);
+}
+
+/**
+ * Unwrap a group key using the ECDH shared key derived from
+ * our private key and the distributor's public key.
+ * All-in-one helper: derives shared key, unwraps group key.
+ */
+export async function unwrapGroupKeyWithECDH(
+  wrappedPayload: string,
+  myPrivateKey: CryptoKey,
+  distributorPublicKeyJwk: ExportedPublicKey
+): Promise<CryptoKey> {
+  const sharedKey = await deriveSharedKey(myPrivateKey, distributorPublicKeyJwk);
+  return unwrapGroupKeyForMember(wrappedPayload, sharedKey);
+}
+
 // ─── Base64 Utility Helpers ──────────────────────────────────────────
 
 function arrayToBase64(arr: Uint8Array): string {

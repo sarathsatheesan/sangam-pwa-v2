@@ -13,6 +13,8 @@ import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
 import {
   generateConversationKey, encryptMessage, decryptMessage,
   getOrCreateKeyPair, deriveSharedKey, e2eEncrypt, e2eDecrypt,
+  generateGroupKey, exportGroupKey, wrapGroupKeyForMember,
+  unwrapGroupKeyWithECDH, wrapGroupKeyForMemberWithECDH,
   type ExportedPublicKey,
 } from '../../utils/encryption';
 import {
@@ -1139,7 +1141,9 @@ export default function MessagesPage() {
 
   // E2EE state
   const e2ePrivateKeyRef = useRef<CryptoKey | null>(null);
+  const e2ePublicKeyRef = useRef<ExportedPublicKey | null>(null);
   const e2eSharedKeysRef = useRef<Map<string, CryptoKey>>(new Map());
+  const e2eGroupKeysRef = useRef<Map<string, CryptoKey>>(new Map());
   const [e2eReady, setE2eReady] = useState(false);
 
   // Report / Block state
@@ -1174,6 +1178,7 @@ export default function MessagesPage() {
         const { publicKey, privateKey } = await getOrCreateKeyPair(user.uid);
         if (cancelled) return;
         e2ePrivateKeyRef.current = privateKey;
+        e2ePublicKeyRef.current = publicKey;
         // Publish public key to user's Firestore document for peer exchange
         await updateDoc(doc(db, 'users', user.uid), {
           e2ePublicKey: publicKey,
@@ -1219,6 +1224,49 @@ export default function MessagesPage() {
     deriveKey();
     return () => { cancelled = true; };
   }, [user?.uid, selectedUser, e2eReady]);
+
+  // E2EE: Unwrap group key when opening a group conversation
+  useEffect(() => {
+    if (!user?.uid || !selectedConvId || !e2eReady || !e2ePrivateKeyRef.current) return;
+    const activeConv = conversations.find((c) => c.id === selectedConvId);
+    if (!activeConv?.isGroup) return;
+    // Skip if already cached
+    if (e2eGroupKeysRef.current.has(selectedConvId)) return;
+
+    let cancelled = false;
+    const unwrapKey = async () => {
+      try {
+        // Fetch group conversation for e2eGroupKeys
+        const convDoc = await getDoc(doc(db, 'conversations', selectedConvId));
+        const convData = convDoc.data();
+        if (!convData?.e2eGroupKeys || !convData.e2eGroupKeys[user.uid]) {
+          // No group key distributed for us yet
+          return;
+        }
+        const wrappedKey = convData.e2eGroupKeys[user.uid];
+        const distributorUid = convData.e2eKeyDistributor || convData.groupCreatedBy;
+
+        // Fetch distributor's public key
+        const distributorDoc = await getDoc(doc(db, 'users', distributorUid));
+        const distributorData = distributorDoc.data();
+        if (!distributorData?.e2ePublicKey) return;
+
+        if (cancelled) return;
+        const groupKey = await unwrapGroupKeyWithECDH(
+          wrappedKey,
+          e2ePrivateKeyRef.current!,
+          distributorData.e2ePublicKey as ExportedPublicKey
+        );
+        if (!cancelled) {
+          e2eGroupKeysRef.current.set(selectedConvId, groupKey);
+        }
+      } catch (err) {
+        console.error('E2EE group key unwrap failed:', err);
+      }
+    };
+    unwrapKey();
+    return () => { cancelled = true; };
+  }, [user?.uid, selectedConvId, conversations, e2eReady]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -1309,57 +1357,77 @@ export default function MessagesPage() {
 
           const isEncrypted = (rawMsg as Record<string, unknown>).encrypted;
 
-          if (isEncrypted && selectedUser) {
-            // Try v2 E2EE decryption first
-            const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
-            if (sharedKey) {
-              try {
-                const parsed = JSON.parse(text);
-                if (parsed.v === 2) {
-                  text = await e2eDecrypt(text, sharedKey);
-                  // Decrypt image if present and encrypted
-                  if (image) {
-                    try {
-                      const imgParsed = JSON.parse(image);
-                      if (imgParsed.v === 2) {
-                        image = await e2eDecrypt(image, sharedKey);
-                      }
-                    } catch { /* not encrypted or not JSON */ }
+          if (isEncrypted) {
+            // Determine which decryption key to use
+            const activeConv = selectedConvId ? conversations.find((c) => c.id === selectedConvId) : null;
+            const isGroupConv = !!activeConv?.isGroup;
+
+            // Helper to decrypt all fields with a given key
+            const decryptAllFields = async (key: CryptoKey) => {
+              text = await e2eDecrypt(text, key);
+              if (image) {
+                try {
+                  const imgParsed = JSON.parse(image);
+                  if (imgParsed.v === 2) {
+                    image = await e2eDecrypt(image, key);
                   }
-                  // Decrypt voice audioUrl if present and encrypted
-                  if (voiceMessage?.audioUrl) {
-                    try {
-                      const voiceParsed = JSON.parse(voiceMessage.audioUrl);
-                      if (voiceParsed.v === 2) {
-                        voiceMessage = {
-                          ...voiceMessage,
-                          audioUrl: await e2eDecrypt(voiceMessage.audioUrl, sharedKey),
-                        };
-                      }
-                    } catch { /* not encrypted or not JSON */ }
+                } catch { /* not encrypted or not JSON */ }
+              }
+              if (voiceMessage?.audioUrl) {
+                try {
+                  const voiceParsed = JSON.parse(voiceMessage.audioUrl);
+                  if (voiceParsed.v === 2) {
+                    voiceMessage = {
+                      ...voiceMessage,
+                      audioUrl: await e2eDecrypt(voiceMessage.audioUrl, key),
+                    };
                   }
-                } else {
-                  // v1 legacy — fall through to legacy decrypt
-                  throw new Error('v1');
-                }
-              } catch (e) {
-                // Not v2 JSON or v1 — try legacy decrypt
-                if ((e as Error).message === 'v1' || true) {
-                  try {
-                    const convKey = generateConversationKey(user.uid, selectedUser.id);
-                    text = decryptMessage(text, convKey);
-                  } catch {
-                    text = '[Encrypted]';
+                } catch { /* not encrypted or not JSON */ }
+              }
+            };
+
+            if (isGroupConv && selectedConvId) {
+              // Group decryption
+              const groupKey = e2eGroupKeysRef.current.get(selectedConvId);
+              if (groupKey) {
+                try {
+                  const parsed = JSON.parse(text);
+                  if (parsed.v === 2) {
+                    await decryptAllFields(groupKey);
                   }
+                } catch {
+                  // Not v2 — leave as-is (old unencrypted group messages)
                 }
               }
-            } else {
-              // No shared key — try legacy v1 decrypt
-              try {
-                const convKey = generateConversationKey(user.uid, selectedUser.id);
-                text = decryptMessage(text, convKey);
-              } catch {
-                text = '[Encrypted]';
+            } else if (selectedUser) {
+              // 1:1 decryption — try v2 E2EE first, fall back to v1
+              const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+              if (sharedKey) {
+                try {
+                  const parsed = JSON.parse(text);
+                  if (parsed.v === 2) {
+                    await decryptAllFields(sharedKey);
+                  } else {
+                    throw new Error('v1');
+                  }
+                } catch (e) {
+                  if ((e as Error).message === 'v1' || true) {
+                    try {
+                      const convKey = generateConversationKey(user.uid, selectedUser.id);
+                      text = decryptMessage(text, convKey);
+                    } catch {
+                      text = '[Encrypted]';
+                    }
+                  }
+                }
+              } else {
+                // No shared key — try legacy v1 decrypt
+                try {
+                  const convKey = generateConversationKey(user.uid, selectedUser.id);
+                  text = decryptMessage(text, convKey);
+                } catch {
+                  text = '[Encrypted]';
+                }
               }
             }
           }
@@ -1637,25 +1705,39 @@ export default function MessagesPage() {
     }
 
     let payload = messageText.trim();
-    const shouldEncrypt = !isGroup && encryptionEnabled && selectedUser;
     let imageToSend = pendingImage;
+    let shouldEncrypt = false;
 
-    if (shouldEncrypt && selectedUser) {
-      // Try v2 E2EE first, fall back to v1 legacy
-      const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
-      if (sharedKey) {
-        // V2 E2EE: encrypt text, image with AES-256-GCM
-        if (payload) {
-          payload = await e2eEncrypt(payload, sharedKey);
+    if (encryptionEnabled) {
+      if (isGroup && convId) {
+        // Group E2EE: use cached group key
+        const groupKey = e2eGroupKeysRef.current.get(convId);
+        if (groupKey) {
+          shouldEncrypt = true;
+          if (payload) {
+            payload = await e2eEncrypt(payload, groupKey);
+          }
+          if (imageToSend) {
+            imageToSend = await e2eEncrypt(imageToSend, groupKey);
+          }
         }
-        if (imageToSend) {
-          imageToSend = await e2eEncrypt(imageToSend, sharedKey);
-        }
-      } else {
-        // V1 legacy: only encrypt text
-        if (payload) {
-          const convKey = generateConversationKey(user.uid, selectedUser.id);
-          payload = encryptMessage(payload, convKey);
+      } else if (selectedUser) {
+        // 1:1 E2EE: try v2 ECDH shared key first, fall back to v1 legacy
+        shouldEncrypt = true;
+        const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+        if (sharedKey) {
+          if (payload) {
+            payload = await e2eEncrypt(payload, sharedKey);
+          }
+          if (imageToSend) {
+            imageToSend = await e2eEncrypt(imageToSend, sharedKey);
+          }
+        } else {
+          // V1 legacy: only encrypt text
+          if (payload) {
+            const convKey = generateConversationKey(user.uid, selectedUser.id);
+            payload = encryptMessage(payload, convKey);
+          }
         }
       }
     }
@@ -1752,17 +1834,29 @@ export default function MessagesPage() {
         audioData = await blobToBase64(audioBlob);
       }
 
-      // Encrypt voice data for 1:1 chats
-      const shouldEncryptVoice = !isGroup && encryptionEnabled && selectedUser;
+      // Encrypt voice data
+      let shouldEncryptVoice = false;
       let encryptedText = '🎤 Voice message';
       let encryptedAudioUrl = audioData;
 
-      if (shouldEncryptVoice && selectedUser) {
-        const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
-        if (sharedKey) {
-          encryptedText = await e2eEncrypt(encryptedText, sharedKey);
-          if (encryptedAudioUrl) {
-            encryptedAudioUrl = await e2eEncrypt(encryptedAudioUrl, sharedKey);
+      if (encryptionEnabled) {
+        if (isGroup && convId) {
+          const groupKey = e2eGroupKeysRef.current.get(convId);
+          if (groupKey) {
+            shouldEncryptVoice = true;
+            encryptedText = await e2eEncrypt(encryptedText, groupKey);
+            if (encryptedAudioUrl) {
+              encryptedAudioUrl = await e2eEncrypt(encryptedAudioUrl, groupKey);
+            }
+          }
+        } else if (selectedUser) {
+          const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+          if (sharedKey) {
+            shouldEncryptVoice = true;
+            encryptedText = await e2eEncrypt(encryptedText, sharedKey);
+            if (encryptedAudioUrl) {
+              encryptedAudioUrl = await e2eEncrypt(encryptedAudioUrl, sharedKey);
+            }
           }
         }
       }
@@ -1802,6 +1896,35 @@ export default function MessagesPage() {
     try {
       const participantIds = [user.uid, ...selectedGroupMembers.map((m) => m.id)];
       const groupId = `group__${Date.now()}__${user.uid}`;
+
+      // Generate and distribute E2EE group key
+      let e2eGroupKeys: Record<string, string> = {};
+      if (encryptionEnabled && e2eReady && e2ePrivateKeyRef.current) {
+        try {
+          const groupKey = await generateGroupKey();
+          const wrappedKeys: Record<string, string> = {};
+
+          // Wrap group key for each participant (including self)
+          for (const memberId of participantIds) {
+            const memberDoc = await getDoc(doc(db, 'users', memberId));
+            const memberData = memberDoc.data();
+            if (memberData?.e2ePublicKey) {
+              wrappedKeys[memberId] = await wrapGroupKeyForMemberWithECDH(
+                groupKey,
+                e2ePrivateKeyRef.current,
+                memberData.e2ePublicKey as ExportedPublicKey
+              );
+            }
+          }
+          e2eGroupKeys = wrappedKeys;
+          // Cache the group key locally
+          e2eGroupKeysRef.current.set(groupId, groupKey);
+        } catch (err) {
+          console.error('Failed to generate group E2EE keys:', err);
+          // Continue without encryption — group still created
+        }
+      }
+
       await setDoc(doc(db, 'conversations', groupId), {
         participants: participantIds,
         isGroup: true,
@@ -1813,6 +1936,10 @@ export default function MessagesPage() {
         lastMessageSenderId: user.uid,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
+        ...(Object.keys(e2eGroupKeys).length > 0 ? {
+          e2eGroupKeys,
+          e2eKeyDistributor: user.uid,
+        } : {}),
       });
       // Add a system message
       await addDoc(collection(db, 'conversations', groupId, 'messages'), {
@@ -1892,10 +2019,34 @@ export default function MessagesPage() {
     }
     try {
       const updatedParticipants = [...(conv?.participants || []), newMember.id];
-      await updateDoc(doc(db, 'conversations', selectedConvId), {
+      const updateData: Record<string, unknown> = {
         participants: updatedParticipants,
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      // Wrap group key for the new member
+      if (encryptionEnabled && e2ePrivateKeyRef.current) {
+        const groupKey = e2eGroupKeysRef.current.get(selectedConvId);
+        if (groupKey) {
+          try {
+            const memberDoc = await getDoc(doc(db, 'users', newMember.id));
+            const memberData = memberDoc.data();
+            if (memberData?.e2ePublicKey) {
+              const wrappedKey = await wrapGroupKeyForMemberWithECDH(
+                groupKey,
+                e2ePrivateKeyRef.current,
+                memberData.e2ePublicKey as ExportedPublicKey
+              );
+              updateData[`e2eGroupKeys.${newMember.id}`] = wrappedKey;
+              updateData.e2eKeyDistributor = user.uid;
+            }
+          } catch (err) {
+            console.error('Failed to wrap group key for new member:', err);
+          }
+        }
+      }
+
+      await updateDoc(doc(db, 'conversations', selectedConvId), updateData);
       await addDoc(collection(db, 'conversations', selectedConvId, 'messages'), {
         text: `${user?.displayName || 'Admin'} added ${newMember.name} to the group`,
         senderId: 'system',
