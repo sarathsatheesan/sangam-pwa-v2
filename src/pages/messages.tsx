@@ -26,7 +26,7 @@ import {
   Strikethrough, MicOff, Pause, Play, Search as SearchIcon,
   ChevronUp, Palette, Minimize2, Maximize2, AlertCircle, CheckCircle,
   Check, CheckCheck, Paperclip, Users, Shield, UserPlus, UserMinus, Crown, Settings,
-  Flag, Ban,
+  Flag, Ban, VolumeX,
   Phone, PhoneOff, Video, VideoOff, SwitchCamera, PhoneIncoming, PhoneOutgoing,
 } from 'lucide-react';
 import {
@@ -793,25 +793,70 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number, audioB
 function VoiceMessageBubble({ duration, audioUrl, isMine }: { duration: number; audioUrl?: string; isMine: boolean }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [audioError, setAudioError] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!audioUrl) return;
-    const audio = new Audio(audioUrl);
+    // Check if audioUrl is still encrypted JSON (decryption failed/pending)
+    if (audioUrl.startsWith('{')) {
+      console.warn('[VoiceMessage] audioUrl appears to be encrypted JSON, decryption may be pending');
+      setAudioError(true);
+      return;
+    }
+    setAudioError(false);
+
+    // Convert data URL to blob URL for better cross-browser compatibility
+    let objectUrl: string | null = null;
+    try {
+      if (audioUrl.startsWith('data:')) {
+        const [header, b64Data] = audioUrl.split(',');
+        const mimeMatch = header.match(/data:([^;]+)/);
+        const mime = mimeMatch ? mimeMatch[1] : 'audio/webm';
+        const binary = atob(b64Data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: mime });
+        objectUrl = URL.createObjectURL(blob);
+        blobUrlRef.current = objectUrl;
+      } else {
+        objectUrl = audioUrl;
+      }
+    } catch (err) {
+      console.error('[VoiceMessage] Failed to convert data URL to blob:', err);
+      objectUrl = audioUrl; // fallback to raw URL
+    }
+
+    const audio = new Audio(objectUrl);
     audioRef.current = audio;
     audio.onended = () => { setPlaying(false); setCurrentTime(0); };
     audio.ontimeupdate = () => setCurrentTime(audio.currentTime);
-    return () => { audio.pause(); audio.src = ''; };
+    audio.onerror = (e) => {
+      console.error('[VoiceMessage] Audio playback error:', e);
+      setAudioError(true);
+    };
+    return () => {
+      audio.pause();
+      audio.src = '';
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
   }, [audioUrl]);
 
   const togglePlay = () => {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) return;
+    if (!audio || !audioUrl || audioError) return;
     if (playing) {
       audio.pause();
       setPlaying(false);
     } else {
-      audio.play().catch(() => {});
+      audio.play().catch((err) => {
+        console.error('[VoiceMessage] play() failed:', err);
+        setAudioError(true);
+      });
       setPlaying(true);
     }
   };
@@ -823,8 +868,8 @@ function VoiceMessageBubble({ duration, audioUrl, isMine }: { duration: number; 
 
   return (
     <div className="flex items-center gap-3 py-1">
-      <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
-        {playing ? <Pause size={16} className="text-white" /> : <Play size={16} className="text-white" style={{ marginLeft: '2px' }} />}
+      <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: audioError ? '#EF4444' : '#6366F1' }} title={audioError ? 'Unable to play audio' : undefined}>
+        {audioError ? <VolumeX size={16} className="text-white" /> : playing ? <Pause size={16} className="text-white" /> : <Play size={16} className="text-white" style={{ marginLeft: '2px' }} />}
       </button>
       <div className="flex gap-[3px] items-end flex-1">
         {[...Array(20)].map((_, i) => {
@@ -1150,6 +1195,8 @@ export default function MessagesPage() {
   const e2eSharedKeysRef = useRef<Map<string, CryptoKey>>(new Map());
   const e2eGroupKeysRef = useRef<Map<string, CryptoKey>>(new Map());
   const [e2eReady, setE2eReady] = useState(false);
+  // Bumped whenever a shared/group key is derived so message listener re-decrypts
+  const [e2eKeyVersion, setE2eKeyVersion] = useState(0);
 
   // Report / Block state
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
@@ -1257,6 +1304,7 @@ export default function MessagesPage() {
         );
         if (!cancelled) {
           e2eSharedKeysRef.current.set(cacheKey, sharedKey);
+          setE2eKeyVersion((v) => v + 1); // trigger message re-decryption
         }
       } catch (err) {
         console.error('E2EE shared key derivation failed:', err);
@@ -1300,6 +1348,7 @@ export default function MessagesPage() {
         );
         if (!cancelled) {
           e2eGroupKeysRef.current.set(selectedConvId, groupKey);
+          setE2eKeyVersion((v) => v + 1); // trigger message re-decryption
         }
       } catch (err) {
         console.error('E2EE group key unwrap failed:', err);
@@ -1418,9 +1467,11 @@ export default function MessagesPage() {
                 try {
                   const voiceParsed = JSON.parse(voiceMessage.audioUrl);
                   if (voiceParsed.v === 2) {
+                    const decryptedAudio = await e2eDecrypt(voiceMessage.audioUrl, key);
+                    console.log('[E2EE] Voice audioUrl decrypted, starts with:', decryptedAudio.substring(0, 30));
                     voiceMessage = {
                       ...voiceMessage,
-                      audioUrl: await e2eDecrypt(voiceMessage.audioUrl, key),
+                      audioUrl: decryptedAudio,
                     };
                   }
                 } catch { /* not encrypted or not JSON */ }
@@ -1486,7 +1537,8 @@ export default function MessagesPage() {
     );
     unsubscribersRef.current.push(unsubscribe);
     return () => unsubscribe();
-  }, [selectedUser, selectedConvId, user, encryptionEnabled]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUser, selectedConvId, user, encryptionEnabled, e2eKeyVersion]);
 
   // Cleanup unsubscribers on unmount
   useEffect(() => {
