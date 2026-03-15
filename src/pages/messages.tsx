@@ -27,7 +27,12 @@ import {
   ChevronUp, Palette, Minimize2, Maximize2, AlertCircle, CheckCircle,
   Check, CheckCheck, Paperclip, Users, Shield, UserPlus, UserMinus, Crown, Settings,
   Flag, Ban,
+  Phone, PhoneOff, Video, VideoOff, SwitchCamera, PhoneIncoming, PhoneOutgoing,
 } from 'lucide-react';
+import {
+  getCallManager, formatCallDuration,
+  type CallState, type CallType,
+} from '@/utils/webrtc';
 
 // ===== TYPES =====
 /**
@@ -1158,6 +1163,12 @@ export default function MessagesPage() {
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
 
+  // Call state
+  const [callState, setCallState] = useState<CallState>(getCallManager().getState());
+  const callManagerRef = useRef(getCallManager());
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
   // Refs
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1168,6 +1179,36 @@ export default function MessagesPage() {
       setSelectedWallpaper(saved);
     }
   }, []);
+
+  // Subscribe to call manager state changes
+  useEffect(() => {
+    const unsub = callManagerRef.current.subscribe((state) => {
+      setCallState(state);
+    });
+    return unsub;
+  }, []);
+
+  // Listen for incoming calls
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = callManagerRef.current.listenForIncomingCalls(
+      user.uid,
+      (_callId, _callerName, _callType) => {
+        // State is updated by the CallManager — UI reacts via callState
+      }
+    );
+    return unsub;
+  }, [user?.uid]);
+
+  // Attach media streams to video elements
+  useEffect(() => {
+    if (localVideoRef.current && callState.localStream) {
+      localVideoRef.current.srcObject = callState.localStream;
+    }
+    if (remoteVideoRef.current && callState.remoteStream) {
+      remoteVideoRef.current.srcObject = callState.remoteStream;
+    }
+  }, [callState.localStream, callState.remoteStream]);
 
   // E2EE: Generate/load ECDH key pair on mount, publish public key to Firestore
   useEffect(() => {
@@ -2666,6 +2707,28 @@ export default function MessagesPage() {
           </>
         ) : null}
         <div className="flex gap-1">
+          {/* Audio call button (1:1 only) */}
+          {selectedUser && !activeGroupConv && (
+            <button
+              onClick={() => initiateCall('audio')}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              aria-label="Audio call"
+              disabled={callState.status !== 'idle'}
+            >
+              <Phone size={18} className="text-white" />
+            </button>
+          )}
+          {/* Video call button (1:1 only) */}
+          {selectedUser && !activeGroupConv && (
+            <button
+              onClick={() => initiateCall('video')}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              aria-label="Video call"
+              disabled={callState.status !== 'idle'}
+            >
+              <Video size={18} className="text-white" />
+            </button>
+          )}
           <button
             onClick={() => setChatSearch(!chatSearch)}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
@@ -3211,6 +3274,204 @@ export default function MessagesPage() {
     </div>
   );
 
+  // === Call Helper Functions ===
+  const initiateCall = async (callType: CallType) => {
+    if (!user?.uid || !selectedUser) return;
+    try {
+      await callManagerRef.current.startCall(
+        user.uid,
+        user.displayName || 'User',
+        selectedUser.id,
+        selectedUser.name,
+        callType
+      );
+    } catch (err) {
+      showNotif(
+        err instanceof Error && err.message.includes('Permission')
+          ? `${callType === 'video' ? 'Camera and microphone' : 'Microphone'} access is required for calls`
+          : 'Failed to start call',
+        'error'
+      );
+    }
+  };
+
+  const handleAnswerCall = async () => {
+    if (!callState.callId) return;
+    try {
+      await callManagerRef.current.answerCall(callState.callId, callState.callType);
+    } catch (err) {
+      showNotif('Failed to answer call', 'error');
+    }
+  };
+
+  const handleEndCall = () => {
+    callManagerRef.current.endCall('ended');
+  };
+
+  const handleRejectCall = () => {
+    callManagerRef.current.rejectCall();
+  };
+
+  // === Call Overlay UI ===
+  const callOverlay = callState.status !== 'idle' ? (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
+      <div className="w-full h-full max-w-lg mx-auto flex flex-col items-center justify-between py-12 px-6 relative">
+
+        {/* Remote video (full background for video calls) */}
+        {callState.callType === 'video' && callState.status === 'connected' && (
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+
+        {/* Local video (picture-in-picture) */}
+        {callState.callType === 'video' && callState.localStream && (
+          <div className="absolute top-4 right-4 w-28 h-40 rounded-xl overflow-hidden shadow-xl border-2 border-white/30 z-10">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover mirror"
+              style={{ transform: 'scaleX(-1)' }}
+            />
+          </div>
+        )}
+
+        {/* Top section: call info */}
+        <div className="text-center z-10 relative">
+          {/* Peer avatar placeholder */}
+          <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold"
+            style={{ backgroundColor: callState.callType === 'video' && callState.status === 'connected' ? 'transparent' : '#6366F1' }}
+          >
+            {callState.callType !== 'video' || callState.status !== 'connected' ? (
+              callState.peerName?.[0]?.toUpperCase() || '?'
+            ) : null}
+          </div>
+
+          <h2 className="text-white text-xl font-semibold mb-1">{callState.peerName || 'Unknown'}</h2>
+
+          <p className="text-white/70 text-sm">
+            {callState.status === 'calling' && 'Calling...'}
+            {callState.status === 'ringing' && (
+              <span className="flex items-center justify-center gap-2">
+                <PhoneIncoming size={16} className="animate-pulse" />
+                Incoming {callState.callType} call
+              </span>
+            )}
+            {callState.status === 'connecting' && 'Connecting...'}
+            {callState.status === 'connected' && formatCallDuration(callState.duration)}
+            {callState.status === 'ended' && 'Call ended'}
+          </p>
+
+          {/* E2EE badge */}
+          {callState.status === 'connected' && (
+            <div className="flex items-center justify-center gap-1 mt-2 text-green-400 text-xs">
+              <Shield size={12} />
+              <span>End-to-end encrypted</span>
+            </div>
+          )}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Bottom section: call controls */}
+        <div className="z-10 relative">
+          {/* Incoming call: accept/reject */}
+          {callState.status === 'ringing' && (
+            <div className="flex items-center gap-8">
+              <button
+                onClick={handleRejectCall}
+                className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 transition-colors shadow-lg"
+                aria-label="Reject call"
+              >
+                <PhoneOff size={28} className="text-white" />
+              </button>
+              <button
+                onClick={handleAnswerCall}
+                className="w-16 h-16 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 transition-colors shadow-lg animate-pulse"
+                aria-label="Answer call"
+              >
+                <Phone size={28} className="text-white" />
+              </button>
+            </div>
+          )}
+
+          {/* Outgoing call: cancel */}
+          {callState.status === 'calling' && (
+            <div className="flex items-center gap-6">
+              <button
+                onClick={handleEndCall}
+                className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 transition-colors shadow-lg"
+                aria-label="Cancel call"
+              >
+                <PhoneOff size={28} className="text-white" />
+              </button>
+            </div>
+          )}
+
+          {/* Active call: mute, video toggle, end */}
+          {(callState.status === 'connecting' || callState.status === 'connected') && (
+            <div className="flex items-center gap-4">
+              {/* Mute */}
+              <button
+                onClick={() => callManagerRef.current.toggleMute()}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors shadow-lg ${
+                  callState.isMuted ? 'bg-white text-gray-800' : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+                aria-label={callState.isMuted ? 'Unmute' : 'Mute'}
+              >
+                {callState.isMuted ? <MicOff size={22} /> : <Mic size={22} />}
+              </button>
+
+              {/* Video toggle (only for video calls) */}
+              {callState.callType === 'video' && (
+                <button
+                  onClick={() => callManagerRef.current.toggleVideo()}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors shadow-lg ${
+                    callState.isVideoOff ? 'bg-white text-gray-800' : 'bg-white/20 text-white hover:bg-white/30'
+                  }`}
+                  aria-label={callState.isVideoOff ? 'Turn on camera' : 'Turn off camera'}
+                >
+                  {callState.isVideoOff ? <VideoOff size={22} /> : <Video size={22} />}
+                </button>
+              )}
+
+              {/* Switch camera (video calls on mobile) */}
+              {callState.callType === 'video' && (
+                <button
+                  onClick={() => callManagerRef.current.switchCamera()}
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 text-white hover:bg-white/30 transition-colors shadow-lg"
+                  aria-label="Switch camera"
+                >
+                  <SwitchCamera size={22} />
+                </button>
+              )}
+
+              {/* End call */}
+              <button
+                onClick={handleEndCall}
+                className="w-14 h-14 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 transition-colors shadow-lg"
+                aria-label="End call"
+              >
+                <PhoneOff size={24} className="text-white" />
+              </button>
+            </div>
+          )}
+
+          {/* Ended state — auto-dismisses */}
+          {callState.status === 'ended' && (
+            <p className="text-white/50 text-sm">Call ended</p>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // === MOBILE LAYOUT: single panel switching ===
   // === DESKTOP LAYOUT (md+): side-by-side panels like WhatsApp Web ===
   return (
@@ -3231,6 +3492,9 @@ export default function MessagesPage() {
       <div className={`${viewState === 'list' ? 'hidden md:flex' : 'flex'} flex-col h-full flex-1 min-w-0`}>
         {(selectedUser || activeGroupConv) ? chatRoomPanel : emptyRightPanel}
       </div>
+
+      {/* Call overlay */}
+      {callOverlay}
 
       {/* Global overlays */}
       {contextMenuMsg && (
