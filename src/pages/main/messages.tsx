@@ -690,7 +690,7 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number, audioB
         recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.start(200); // collect chunks every 200ms
       } catch {
-        setRecError('Microphone access denied');
+        setRecError('Microphone access denied. Please allow microphone access in your browser settings and try again.');
       }
     })();
     return () => {
@@ -745,7 +745,7 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number, audioB
         onClick={(e) => e.stopPropagation()}
       >
         {recError ? (
-          <div className="text-red-500 text-sm">{recError}</div>
+          <div className="text-red-500 text-sm text-center max-w-[250px]">{recError}</div>
         ) : (
           <>
             <div className="text-3xl font-bold text-aurora-indigo">
@@ -2865,20 +2865,18 @@ export default function MessagesPage() {
             ) : (
               <button
                 onClick={async () => {
+                  // Quick check if mic permission is explicitly denied (non-blocking)
                   try {
-                    // Check microphone permission first
-                    const permResult = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-                    if (permResult.state === 'denied') {
+                    const perm = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+                    if (perm.state === 'denied') {
                       showNotif('Microphone access is blocked. Please enable it in your browser settings.', 'error');
                       return;
                     }
-                    // Request access (will show browser prompt if 'prompt' state)
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    stream.getTracks().forEach(t => t.stop()); // Release immediately, VoiceRecorder will acquire its own
-                    setIsRecording(true);
                   } catch {
-                    showNotif('Microphone access is required to send voice messages. Please allow microphone access and try again.', 'error');
+                    // permissions.query not supported — proceed and let VoiceRecorder handle it
                   }
+                  // Open VoiceRecorder — it will request mic access via getUserMedia internally
+                  setIsRecording(true);
                 }}
                 className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
                 style={{ backgroundColor: '#6366F1' }}
