@@ -57,6 +57,18 @@ export interface CallState {
 
 export type CallStateListener = (state: CallState) => void;
 
+/** Fired when a call ends — used to write system messages to the chat */
+export interface CallEndedEvent {
+  callId: string;
+  callType: CallType;
+  peerId: string;
+  peerName: string;
+  isCaller: boolean;
+  endReason: string; // 'ended' | 'timeout' | 'rejected' | 'connection_lost' | 'cancelled'
+  duration: number;  // seconds (0 for missed/rejected)
+}
+export type CallEndedListener = (event: CallEndedEvent) => void;
+
 // ─── WebRTC Call Manager ─────────────────────────────────────────────
 
 export class CallManager {
@@ -68,6 +80,7 @@ export class CallManager {
   private durationIntervalId: ReturnType<typeof setInterval> | null = null;
   private ringAudio: HTMLAudioElement | null = null;
   private listeners: Set<CallStateListener> = new Set();
+  private callEndedListeners: Set<CallEndedListener> = new Set();
   // ICE candidate buffer — holds candidates received before remote description is set
   private pendingIceCandidates: RTCIceCandidateInit[] = [];
   private remoteDescriptionSet = false;
@@ -97,6 +110,12 @@ export class CallManager {
     this.listeners.add(listener);
     listener(this.getState());
     return () => this.listeners.delete(listener);
+  }
+
+  /** Register a listener for when calls end (for writing chat messages) */
+  onCallEnded(listener: CallEndedListener): () => void {
+    this.callEndedListeners.add(listener);
+    return () => this.callEndedListeners.delete(listener);
   }
 
   private setState(partial: Partial<CallState>) {
@@ -534,7 +553,7 @@ export class CallManager {
   // ── End Call ─────────────────────────────────────────────────────
 
   async endCall(reason: string = 'ended'): Promise<void> {
-    const { callId, status } = this.state;
+    const { callId, status, callType, peerId, peerName, isCaller, duration } = this.state;
 
     if (status === 'idle' || status === 'ended') return;
 
@@ -552,6 +571,22 @@ export class CallManager {
       } catch (err) {
         console.error('[WebRTC] Failed to update call status:', err);
       }
+    }
+
+    // Fire call-ended event for chat message logging
+    if (callId && peerId) {
+      const event: CallEndedEvent = {
+        callId,
+        callType,
+        peerId,
+        peerName: peerName || 'Unknown',
+        isCaller,
+        endReason: reason,
+        duration,
+      };
+      this.callEndedListeners.forEach((fn) => {
+        try { fn(event); } catch (err) { console.error('[WebRTC] callEnded listener error:', err); }
+      });
     }
 
     this.cleanup();
@@ -660,6 +695,7 @@ export class CallManager {
   destroy() {
     this.cleanup();
     this.listeners.clear();
+    this.callEndedListeners.clear();
   }
 }
 

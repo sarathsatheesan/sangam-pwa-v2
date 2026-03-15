@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import {
   getCallManager, formatCallDuration,
-  type CallState, type CallType,
+  type CallState, type CallType, type CallEndedEvent,
 } from '../../utils/webrtc';
 
 // ===== TYPES =====
@@ -67,6 +67,11 @@ type Message = {
   image?: string;
   read?: boolean;
   readAt?: Timestamp;
+  callEvent?: {
+    type: 'missed' | 'completed' | 'rejected' | 'cancelled';
+    callType: 'audio' | 'video';
+    duration?: number; // seconds, only for completed calls
+  };
 };
 
 /**
@@ -895,6 +900,50 @@ function VoiceMessageBubble({ duration, audioUrl, isMine }: { duration: number; 
 }
 
 /**
+ * CallEventBubble Component
+ * Displays missed/completed/rejected call events in chat
+ */
+function CallEventBubble({ callEvent, isMine }: { callEvent: NonNullable<Message['callEvent']>; isMine: boolean }) {
+  const isMissed = callEvent.type === 'missed' || callEvent.type === 'rejected';
+  const isVideo = callEvent.callType === 'video';
+
+  const icon = isMissed
+    ? <PhoneOff size={16} className="text-red-500" />
+    : isVideo
+      ? <Video size={16} className="text-green-600" />
+      : <Phone size={16} className="text-green-600" />;
+
+  let label = '';
+  if (callEvent.type === 'missed') {
+    label = isMine ? `Unanswered ${isVideo ? 'video' : 'voice'} call` : `Missed ${isVideo ? 'video' : 'voice'} call`;
+  } else if (callEvent.type === 'rejected') {
+    label = isMine ? `Declined ${isVideo ? 'video' : 'voice'} call` : `${isVideo ? 'Video' : 'Voice'} call declined`;
+  } else if (callEvent.type === 'cancelled') {
+    label = isMine ? `Cancelled ${isVideo ? 'video' : 'voice'} call` : `Missed ${isVideo ? 'video' : 'voice'} call`;
+  } else {
+    // completed
+    const dur = callEvent.duration || 0;
+    const m = Math.floor(dur / 60);
+    const s = dur % 60;
+    const durStr = dur > 0 ? ` (${m}:${String(s).padStart(2, '0')})` : '';
+    label = `${isVideo ? 'Video' : 'Voice'} call${durStr}`;
+  }
+
+  return (
+    <div className="flex items-center gap-2 py-1 px-1">
+      <div className={`w-7 h-7 rounded-full flex items-center justify-center ${isMissed ? 'bg-red-50' : 'bg-green-50'}`}>
+        {icon}
+      </div>
+      <div className="flex flex-col">
+        <span className={`text-[13px] font-medium ${isMissed ? 'text-red-600' : 'text-gray-700'}`}>
+          {label}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * WallpaperPicker Component
  * Modal for selecting chat wallpaper from presets
  */
@@ -1244,6 +1293,65 @@ export default function MessagesPage() {
         // State is updated by the CallManager — UI reacts via callState
       }
     );
+    return unsub;
+  }, [user?.uid]);
+
+  // Write call event messages to chat when calls end
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = callManagerRef.current.onCallEnded(async (event: CallEndedEvent) => {
+      try {
+        // Determine call event type for the chat message
+        let eventType: 'missed' | 'completed' | 'rejected' | 'cancelled';
+        if (event.endReason === 'timeout') {
+          eventType = event.isCaller ? 'cancelled' : 'missed';
+        } else if (event.endReason === 'rejected') {
+          eventType = 'rejected';
+        } else if (event.endReason === 'cancelled') {
+          eventType = 'cancelled';
+        } else if (event.duration > 0) {
+          eventType = 'completed';
+        } else {
+          // ended with 0 duration = missed/cancelled
+          eventType = event.isCaller ? 'cancelled' : 'missed';
+        }
+
+        const convId = generateConvId(user.uid, event.peerId);
+        const callLabel = event.callType === 'video' ? 'Video' : 'Voice';
+        const textLabel = eventType === 'completed'
+          ? `${callLabel} call`
+          : eventType === 'missed'
+            ? `Missed ${callLabel.toLowerCase()} call`
+            : eventType === 'rejected'
+              ? `Declined ${callLabel.toLowerCase()} call`
+              : `Cancelled ${callLabel.toLowerCase()} call`;
+
+        await addDoc(collection(db, 'conversations', convId, 'messages'), {
+          text: textLabel,
+          senderId: user.uid,
+          time: formatMessageTime(Timestamp.now()),
+          createdAt: serverTimestamp(),
+          callEvent: {
+            type: eventType,
+            callType: event.callType,
+            ...(event.duration > 0 ? { duration: event.duration } : {}),
+          },
+        });
+
+        // Update conversation last message
+        await setDoc(doc(db, 'conversations', convId), {
+          lastMessage: textLabel,
+          lastMessageTime: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastMessageSenderId: user.uid,
+          participants: [user.uid, event.peerId].sort(),
+        }, { merge: true });
+
+        console.log('[CallEvent] Wrote call event message:', eventType, event.callType);
+      } catch (err) {
+        console.error('[CallEvent] Failed to write call event message:', err);
+      }
+    });
     return unsub;
   }, [user?.uid]);
 
@@ -3155,7 +3263,9 @@ export default function MessagesPage() {
                             {users.find((u) => u.id === msg.senderId)?.name || 'Unknown'}
                           </div>
                         )}
-                        {msg.voiceMessage ? (
+                        {msg.callEvent ? (
+                          <CallEventBubble callEvent={msg.callEvent} isMine={isMine} />
+                        ) : msg.voiceMessage ? (
                           <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} />
                         ) : (
                           <>
