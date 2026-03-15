@@ -13,7 +13,7 @@
 
 import {
   doc, setDoc, updateDoc, onSnapshot, collection, query, where,
-  addDoc, getDocs, deleteDoc, serverTimestamp, Timestamp,
+  addDoc, getDoc, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 
@@ -27,7 +27,6 @@ const ICE_SERVERS: RTCIceServer[] = [
 ];
 
 const CALL_TIMEOUT_MS = 45_000; // 45 seconds to answer
-const RING_AUDIO_SRC = '/ring.mp3'; // Optional ringtone
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -58,23 +57,6 @@ export interface CallState {
 
 export type CallStateListener = (state: CallState) => void;
 
-// ─── Firestore Call Document Schema ──────────────────────────────────
-// Path: calls/{callId}
-// {
-//   callerId: string,
-//   calleeId: string,
-//   callerName: string,
-//   callType: 'audio' | 'video',
-//   status: 'ringing' | 'connected' | 'ended' | 'missed' | 'rejected',
-//   offer: RTCSessionDescriptionInit | null,
-//   answer: RTCSessionDescriptionInit | null,
-//   createdAt: Timestamp,
-//   endedAt: Timestamp | null,
-//   endReason: string | null,
-// }
-// ICE candidates: calls/{callId}/callerCandidates/{id}
-//                 calls/{callId}/calleeCandidates/{id}
-
 // ─── WebRTC Call Manager ─────────────────────────────────────────────
 
 export class CallManager {
@@ -86,6 +68,9 @@ export class CallManager {
   private durationIntervalId: ReturnType<typeof setInterval> | null = null;
   private ringAudio: HTMLAudioElement | null = null;
   private listeners: Set<CallStateListener> = new Set();
+  // ICE candidate buffer — holds candidates received before remote description is set
+  private pendingIceCandidates: RTCIceCandidateInit[] = [];
+  private remoteDescriptionSet = false;
 
   private state: CallState = {
     status: 'idle',
@@ -148,17 +133,56 @@ export class CallManager {
     }
   }
 
+  // ── ICE Candidate Buffering ──────────────────────────────────────
+
+  /**
+   * Add an ICE candidate, buffering it if remote description isn't set yet.
+   * This prevents the common WebRTC failure where candidates arrive before
+   * the SDP answer/offer is applied.
+   */
+  private async addIceCandidateSafe(candidateInit: RTCIceCandidateInit): Promise<void> {
+    if (!this.pc) return;
+    if (this.remoteDescriptionSet) {
+      try {
+        await this.pc.addIceCandidate(new RTCIceCandidate(candidateInit));
+      } catch (err) {
+        console.warn('Failed to add ICE candidate:', err);
+      }
+    } else {
+      // Buffer until remote description is set
+      this.pendingIceCandidates.push(candidateInit);
+    }
+  }
+
+  /** Flush all buffered ICE candidates after remote description is set */
+  private async flushIceCandidates(): Promise<void> {
+    if (!this.pc) return;
+    this.remoteDescriptionSet = true;
+    const candidates = [...this.pendingIceCandidates];
+    this.pendingIceCandidates = [];
+    for (const c of candidates) {
+      try {
+        await this.pc.addIceCandidate(new RTCIceCandidate(c));
+      } catch (err) {
+        console.warn('Failed to flush buffered ICE candidate:', err);
+      }
+    }
+  }
+
   // ── Peer Connection Setup ────────────────────────────────────────
 
   private createPeerConnection(callId: string, isCaller: boolean): RTCPeerConnection {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-    // Set up remote stream
+    // Reset ICE buffer for new connection
+    this.pendingIceCandidates = [];
+    this.remoteDescriptionSet = false;
+
+    // Set up remote stream — use event.track directly (more reliable than event.streams)
     this.remoteStream = new MediaStream();
     pc.ontrack = (event) => {
-      event.streams[0]?.getTracks().forEach((track) => {
-        this.remoteStream!.addTrack(track);
-      });
+      console.log('[WebRTC] ontrack fired, kind:', event.track.kind);
+      this.remoteStream!.addTrack(event.track);
       this.setState({ remoteStream: this.remoteStream });
     };
 
@@ -169,12 +193,17 @@ export class CallManager {
         addDoc(
           collection(db, 'calls', callId, candidateCollection),
           event.candidate.toJSON()
-        ).catch(console.error);
+        ).catch((err) => console.error('[WebRTC] Failed to send ICE candidate:', err));
       }
+    };
+
+    pc.onicegatheringstatechange = () => {
+      console.log('[WebRTC] ICE gathering state:', pc.iceGatheringState);
     };
 
     // Track connection state
     pc.onconnectionstatechange = () => {
+      console.log('[WebRTC] Connection state:', pc.connectionState);
       if (pc.connectionState === 'connected') {
         this.setState({ status: 'connected' });
         this.startDurationTimer();
@@ -185,14 +214,23 @@ export class CallManager {
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-        // Give it a moment to recover before ending
+      console.log('[WebRTC] ICE connection state:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed') {
+        // ICE failed — try to restart
+        console.warn('[WebRTC] ICE failed, ending call');
+        this.endCall('connection_lost');
+      } else if (pc.iceConnectionState === 'disconnected') {
+        // Give it a moment to recover
         setTimeout(() => {
-          if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+          if (this.pc && this.pc.iceConnectionState === 'disconnected') {
             this.endCall('connection_lost');
           }
         }, 5000);
       }
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log('[WebRTC] Signaling state:', pc.signalingState);
     };
 
     return pc;
@@ -258,8 +296,10 @@ export class CallManager {
         endReason: null,
       });
 
+      console.log('[WebRTC] Call created:', callId);
+
       // Listen for answer from callee
-      const unsubCall = onSnapshot(doc(db, 'calls', callId), (snap) => {
+      const unsubCall = onSnapshot(doc(db, 'calls', callId), async (snap) => {
         const data = snap.data();
         if (!data) return;
 
@@ -269,10 +309,16 @@ export class CallManager {
         }
 
         if (data.answer && this.pc && !this.pc.currentRemoteDescription) {
-          const answer = new RTCSessionDescription(data.answer);
-          this.pc.setRemoteDescription(answer).then(() => {
+          try {
+            console.log('[WebRTC] Received answer, setting remote description');
+            const answer = new RTCSessionDescription(data.answer);
+            await this.pc.setRemoteDescription(answer);
+            // Flush any buffered ICE candidates now that remote description is set
+            await this.flushIceCandidates();
             this.setState({ status: 'connecting' });
-          }).catch(console.error);
+          } catch (err) {
+            console.error('[WebRTC] Failed to set remote description:', err);
+          }
         }
       });
       this.unsubscribers.push(unsubCall);
@@ -282,9 +328,8 @@ export class CallManager {
         collection(db, 'calls', callId, 'calleeCandidates'),
         (snap) => {
           snap.docChanges().forEach((change) => {
-            if (change.type === 'added' && this.pc) {
-              const candidate = new RTCIceCandidate(change.doc.data());
-              this.pc.addIceCandidate(candidate).catch(console.error);
+            if (change.type === 'added') {
+              this.addIceCandidateSafe(change.doc.data() as RTCIceCandidateInit);
             }
           });
         }
@@ -301,7 +346,7 @@ export class CallManager {
       this.playRingtone();
 
     } catch (err) {
-      console.error('Failed to start call:', err);
+      console.error('[WebRTC] Failed to start call:', err);
       this.cleanup();
       this.setState({
         status: 'idle',
@@ -331,41 +376,51 @@ export class CallManager {
         this.pc!.addTrack(track, this.localStream!);
       });
 
-      // Get the call document to read the offer
-      const unsubCall = onSnapshot(doc(db, 'calls', callId), async (snap) => {
+      // Fetch the call document to get the offer (direct read, not snapshot)
+      const callSnap = await getDoc(doc(db, 'calls', callId));
+      const callData = callSnap.data();
+      if (!callData?.offer) {
+        throw new Error('No offer found in call document');
+      }
+
+      // Set the offer as remote description
+      console.log('[WebRTC] Setting offer as remote description');
+      const offer = new RTCSessionDescription(callData.offer);
+      await this.pc.setRemoteDescription(offer);
+
+      // Now flush any ICE candidates that arrived while we were setting up
+      await this.flushIceCandidates();
+
+      // Create and send answer
+      console.log('[WebRTC] Creating answer');
+      const answer = await this.pc.createAnswer();
+      await this.pc.setLocalDescription(answer);
+
+      // Write answer to Firestore
+      await updateDoc(doc(db, 'calls', callId), {
+        answer: { type: answer.type, sdp: answer.sdp },
+        status: 'connected',
+      });
+
+      console.log('[WebRTC] Answer sent to Firestore');
+
+      // Listen for call status changes (ended by caller)
+      const unsubCall = onSnapshot(doc(db, 'calls', callId), (snap) => {
         const data = snap.data();
         if (!data) return;
-
         if (data.status === 'ended') {
           this.endCall(data.endReason || 'ended');
-          return;
-        }
-
-        // Set remote description (offer) if not yet set
-        if (data.offer && this.pc && !this.pc.currentRemoteDescription) {
-          const offer = new RTCSessionDescription(data.offer);
-          await this.pc.setRemoteDescription(offer);
-
-          // Create and send answer
-          const answer = await this.pc.createAnswer();
-          await this.pc.setLocalDescription(answer);
-
-          await updateDoc(doc(db, 'calls', callId), {
-            answer: { type: answer.type, sdp: answer.sdp },
-            status: 'connected',
-          });
         }
       });
       this.unsubscribers.push(unsubCall);
 
-      // Listen for caller ICE candidates
+      // Listen for caller ICE candidates (buffer-safe)
       const unsubCandidates = onSnapshot(
         collection(db, 'calls', callId, 'callerCandidates'),
         (snap) => {
           snap.docChanges().forEach((change) => {
-            if (change.type === 'added' && this.pc) {
-              const candidate = new RTCIceCandidate(change.doc.data());
-              this.pc.addIceCandidate(candidate).catch(console.error);
+            if (change.type === 'added') {
+              this.addIceCandidateSafe(change.doc.data() as RTCIceCandidateInit);
             }
           });
         }
@@ -375,7 +430,7 @@ export class CallManager {
       this.stopRingtone();
 
     } catch (err) {
-      console.error('Failed to answer call:', err);
+      console.error('[WebRTC] Failed to answer call:', err);
       this.cleanup();
       this.setState({
         status: 'idle',
@@ -391,8 +446,6 @@ export class CallManager {
     myUid: string,
     onIncoming: (callId: string, callerName: string, callType: CallType) => void
   ): () => void {
-    // We listen to the 'calls' collection for documents where we are the callee
-    // and status is 'ringing'. We use onSnapshot for real-time.
     const q = query(
       collection(db, 'calls'),
       where('calleeId', '==', myUid)
@@ -464,19 +517,17 @@ export class CallManager {
       });
       const newVideoTrack = newStream.getVideoTracks()[0];
 
-      // Replace track in peer connection
       const sender = this.pc.getSenders().find((s) => s.track?.kind === 'video');
       if (sender) {
         await sender.replaceTrack(newVideoTrack);
       }
 
-      // Replace in local stream
       this.localStream.removeTrack(videoTrack);
       videoTrack.stop();
       this.localStream.addTrack(newVideoTrack);
       this.setState({ localStream: this.localStream });
     } catch (err) {
-      console.error('Failed to switch camera:', err);
+      console.error('[WebRTC] Failed to switch camera:', err);
     }
   }
 
@@ -499,7 +550,7 @@ export class CallManager {
           endReason: reason,
         });
       } catch (err) {
-        console.error('Failed to update call status:', err);
+        console.error('[WebRTC] Failed to update call status:', err);
       }
     }
 
@@ -531,20 +582,18 @@ export class CallManager {
   // ── Cleanup ──────────────────────────────────────────────────────
 
   private cleanup() {
-    // Stop media
     this.stopMedia();
+    this.pendingIceCandidates = [];
+    this.remoteDescriptionSet = false;
 
-    // Close peer connection
     if (this.pc) {
       this.pc.close();
       this.pc = null;
     }
 
-    // Unsubscribe Firestore listeners
     this.unsubscribers.forEach((fn) => fn());
     this.unsubscribers = [];
 
-    // Clear timers
     if (this.callTimeoutId) {
       clearTimeout(this.callTimeoutId);
       this.callTimeoutId = null;
@@ -571,11 +620,10 @@ export class CallManager {
 
   private playRingtone() {
     try {
-      // Use a simple oscillator beep instead of an audio file (no dependency)
       this.stopRingtone();
       const ctx = new AudioContext();
       const playBeep = () => {
-        if (!this.ringAudio) return; // stopped
+        if (!this.ringAudio) return;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
@@ -587,7 +635,6 @@ export class CallManager {
         gain.gain.setValueAtTime(0.15, ctx.currentTime + 0.2);
         gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
       };
-      // Use a dummy audio element as a flag
       this.ringAudio = new Audio();
       playBeep();
       const interval = setInterval(() => {
@@ -596,7 +643,7 @@ export class CallManager {
       }, 2000);
       (this.ringAudio as unknown as Record<string, unknown>)._interval = interval;
     } catch {
-      // Audio not available — silent ringtone
+      // Audio not available
     }
   }
 
