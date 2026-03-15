@@ -1597,35 +1597,35 @@ export default function DiscoverPage() {
                         NEW
                       </span>
                     )}
-                    {/* Three-dot menu */}
-                    <div className="absolute top-2 right-2 z-10">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
-                        className="p-1 bg-black/30 hover:bg-black/50 rounded-full transition-colors"
-                        aria-label="More options"
-                      >
-                        <MoreVertical className="w-4 h-4 text-white" />
-                      </button>
-                      {openMenuId === person.id && (
-                        <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-20">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          >
-                            <Ban className="w-4 h-4" /> Block User
-                          </button>
-                        </div>
-                      )}
-                    </div>
                   </div>
                   <div className="p-3">
                     <div className="relative flex items-end gap-3 -mt-8">
                       <div className="w-14 h-14 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-lg relative z-10 border-3 border-white shrink-0 shadow-sm">
                         {renderAvatar(person.avatar, person.name)}
                       </div>
-                      <div className="min-w-0 pb-1">
+                      <div className="min-w-0 flex-1 pb-1">
                         <h3 className="font-bold text-[var(--aurora-text)] text-sm truncate leading-tight">{person.name}</h3>
                         {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                      </div>
+                      {/* Three-dot menu */}
+                      <div className="relative pb-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
+                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                          aria-label="More options"
+                        >
+                          <MoreVertical className="w-4 h-4 text-gray-400" />
+                        </button>
+                        {openMenuId === person.id && (
+                          <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-20">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            >
+                              <Ban className="w-4 h-4" /> Block User
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="mt-2 space-y-0.5">
