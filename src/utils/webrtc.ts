@@ -12,7 +12,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import {
-  doc, setDoc, updateDoc, onSnapshot, collection,
+  doc, setDoc, updateDoc, onSnapshot, collection, query, where,
   addDoc, getDocs, deleteDoc, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
@@ -393,16 +393,15 @@ export class CallManager {
   ): () => void {
     // We listen to the 'calls' collection for documents where we are the callee
     // and status is 'ringing'. We use onSnapshot for real-time.
-    const q = collection(db, 'calls');
+    const q = query(
+      collection(db, 'calls'),
+      where('calleeId', '==', myUid)
+    );
     const unsub = onSnapshot(q, (snap) => {
       snap.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const data = change.doc.data();
-          if (
-            data.calleeId === myUid &&
-            data.status === 'ringing' &&
-            this.state.status === 'idle'
-          ) {
+          if (data.status === 'ringing' && this.state.status === 'idle') {
             // Check if call is still fresh (not older than timeout)
             const createdAt = data.createdAt as Timestamp | null;
             if (createdAt) {
