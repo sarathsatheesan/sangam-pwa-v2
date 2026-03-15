@@ -18,6 +18,7 @@ import {
   onSnapshot,
   setDoc,
   getDoc,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -44,6 +45,16 @@ const THREAD_FLAIRS = [
   { id: 'advice', label: 'Advice', emoji: '💡', color: 'bg-emerald-500 text-white dark:bg-emerald-600 dark:text-white' },
   { id: 'news', label: 'News', emoji: '📰', color: 'bg-amber-500 text-white dark:bg-amber-600 dark:text-white' },
   { id: 'event', label: 'Event', emoji: '📅', color: 'bg-purple-500 text-white dark:bg-purple-600 dark:text-white' },
+];
+
+const FORUM_REPORT_CATEGORIES = [
+  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
+  { id: 'harassment', label: 'Harassment or Bullying', icon: '🛑', description: 'Threatening, abusive, or intimidating posts or replies' },
+  { id: 'hate_speech', label: 'Hate Speech', icon: '⚠️', description: 'Content targeting race, ethnicity, religion, gender, or identity' },
+  { id: 'inappropriate', label: 'Inappropriate Content', icon: '🔞', description: 'Sexual, violent, or graphic content not suitable for the community' },
+  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
+  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
+  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
 ];
 
 /* ─── types ─── */
@@ -379,6 +390,15 @@ export default function ForumScreen() {
   const [showMoreMenu, setShowMoreMenu] = useState<string | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
+  /* enhanced report modal state */
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+
+  /* block user state */
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
+
   /* form state */
   const [threadTitle, setThreadTitle] = useState('');
   const [threadContent, setThreadContent] = useState('');
@@ -650,7 +670,8 @@ export default function ForumScreen() {
       const snapshot = await getDocs(threadsQuery);
       let threadsList: ForumThread[] = snapshot.docs
         .map((d) => ({ id: d.id, ...d.data() } as ForumThread))
-        .filter((t) => !t.isRemoved);
+        .filter((t) => !t.isRemoved)
+        .filter((t) => !blockedUsers.has(t.authorId));
 
       // Calculate karma map
       const karmaMapTemp = new Map<string, number>();
@@ -702,7 +723,7 @@ export default function ForumScreen() {
     } finally {
       setLoading(false);
     }
-  }, [selectedTopic, heritageFilter, sortBy, selectedFlair, user?.uid, loadThreadVotes]);
+  }, [selectedTopic, heritageFilter, sortBy, selectedFlair, user?.uid, loadThreadVotes, blockedUsers]);
 
   const loadReplies = useCallback(async () => {
     if (!selectedThread) return;
@@ -715,7 +736,8 @@ export default function ForumScreen() {
       const snapshot = await getDocs(repliesQuery);
       const repliesList: ForumReply[] = snapshot.docs
         .map((d) => ({ id: d.id, ...d.data() } as ForumReply))
-        .filter((r) => !r.isRemoved);
+        .filter((r) => !r.isRemoved)
+        .filter((r) => !blockedUsers.has(r.authorId));
 
       // Build reply tree
       const treeReplies = buildReplyTree(repliesList);
@@ -733,6 +755,23 @@ export default function ForumScreen() {
   useEffect(() => { loadTopics(); }, [loadTopics]);
   useEffect(() => { if (viewMode === 'threads' && selectedTopic) loadThreads(); }, [viewMode, selectedTopic, loadThreads]);
   useEffect(() => { if (viewMode === 'detail' && selectedThread) loadReplies(); }, [viewMode, selectedThread, loadReplies]);
+
+  // Load blocked users
+  useEffect(() => {
+    if (!user?.uid) return;
+    const loadBlockedUsers = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.blockedUsers) setBlockedUsers(new Set(data.blockedUsers));
+        }
+      } catch (error) {
+        console.error('Error loading blocked users:', error);
+      }
+    };
+    loadBlockedUsers();
+  }, [user?.uid]);
 
   // Deep-link: open specific thread from profile activity
   useEffect(() => {
@@ -933,42 +972,119 @@ export default function ForumScreen() {
     }
   }, [user, userProfile, selectedThread, replyContent, replyingToId, replyingToName, replies, loadReplies]);
 
+  const openReportModal = useCallback((contentId: string, contentType: 'thread' | 'reply') => {
+    setReportingContent({ contentId, contentType });
+    setReportReason('');
+    setReportDetails('');
+    setShowReportModal(true);
+    setShowMoreMenu(null);
+  }, []);
+
   const handleSubmitReport = useCallback(async () => {
     if (!user || !reportingContent || !reportReason) { setToastMessage('Please select a reason'); return; }
+    setReportSubmitting(true);
     try {
-      // Write to reports for record-keeping
-      await addDoc(collection(db, 'reports'), {
-        contentId: reportingContent.contentId, contentType: reportingContent.contentType,
-        reportedBy: user.uid, reason: reportReason, details: reportDetails,
-        status: 'pending', createdAt: serverTimestamp(),
-      });
-
-      // Write to moderationQueue so it appears in Admin panel
       const reportedThread = threads.find((t) => t.id === reportingContent.contentId);
       const reportedReply = replies.find((r) => r.id === reportingContent.contentId);
       const flaggedContent = reportedThread?.content || reportedReply?.content || '';
       const authorId = reportedThread?.authorId || reportedReply?.authorId || '';
       const authorName = reportedThread?.authorName || reportedReply?.authorName || 'Unknown';
+      const authorAvatar = reportedThread?.authorAvatar || reportedReply?.authorAvatar || '';
+      const categoryObj = FORUM_REPORT_CATEGORIES.find((c) => c.id === reportReason);
 
-      await addDoc(collection(db, 'moderationQueue'), {
-        type: reportingContent.contentType === 'thread' ? 'forum_thread' : 'forum_reply',
-        content: flaggedContent,
+      // Write to reports collection
+      await addDoc(collection(db, 'reports'), {
         contentId: reportingContent.contentId,
-        collection: reportingContent.contentType === 'thread' ? 'forumThreads' : 'forumReplies',
-        authorId,
-        authorName,
-        reason: `${reportReason}${reportDetails ? ': ' + reportDetails : ''}`,
+        contentType: reportingContent.contentType,
+        type: reportingContent.contentType === 'thread' ? 'forum_thread' : 'forum_reply',
         reportedBy: user.uid,
+        reporterName: user.displayName || userProfile?.name || 'Anonymous',
+        reporterAvatar: userProfile?.avatar || '',
+        reportedUserId: authorId,
+        reportedUserName: authorName,
+        category: reportReason,
+        categoryLabel: categoryObj?.label || reportReason,
+        details: reportDetails.trim() || '',
+        status: 'pending',
         createdAt: serverTimestamp(),
       });
 
-      setReportReason(''); setReportDetails(''); setReportingContent(null); setShowReport(false);
+      // Write to moderationQueue (check for existing entry)
+      const modQueueQuery = query(
+        collection(db, 'moderationQueue'),
+        where('contentId', '==', reportingContent.contentId)
+      );
+      const existingMods = await getDocs(modQueueQuery);
+
+      if (existingMods.docs.length > 0) {
+        const existingDoc = existingMods.docs[0];
+        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
+          reportCount: (existingDoc.data().reportCount || 1) + 1,
+          reporters: arrayUnion({
+            uid: user.uid,
+            name: user.displayName || userProfile?.name || 'Anonymous',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }),
+        });
+      } else {
+        await addDoc(collection(db, 'moderationQueue'), {
+          type: reportingContent.contentType === 'thread' ? 'forum_thread' : 'forum_reply',
+          content: flaggedContent.substring(0, 500),
+          contentId: reportingContent.contentId,
+          collection: reportingContent.contentType === 'thread' ? 'forumThreads' : 'forumReplies',
+          authorId,
+          authorName,
+          authorAvatar,
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
+          reportedBy: user.uid,
+          reporterName: user.displayName || userProfile?.name || 'Anonymous',
+          reportCount: 1,
+          reporters: [{
+            uid: user.uid,
+            name: user.displayName || userProfile?.name || 'Anonymous',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }],
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      setReportReason(''); setReportDetails(''); setReportingContent(null); setShowReportModal(false);
       setToastMessage('Report submitted. Thank you for helping keep our community safe.');
     } catch (error) {
       console.error('Error submitting report:', error instanceof Error ? error.message : 'Unknown error');
       setToastMessage('Failed to submit report. Please try again.');
+    } finally {
+      setReportSubmitting(false);
     }
-  }, [user, reportingContent, reportReason, reportDetails, threads, replies]);
+  }, [user, userProfile, reportingContent, reportReason, reportDetails, threads, replies]);
+
+  const openBlockConfirm = useCallback((uid: string, name: string) => {
+    setBlockTargetUser({ uid, name });
+    setShowBlockConfirm(true);
+    setShowMoreMenu(null);
+  }, []);
+
+  const handleBlockUser = useCallback(async () => {
+    if (!user || !blockTargetUser) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayUnion(blockTargetUser.uid),
+      });
+      setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
+      setShowBlockConfirm(false);
+      setBlockTargetUser(null);
+      setToastMessage(`${blockTargetUser.name} has been blocked. You can unblock them from your Profile page.`);
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      setToastMessage('Failed to block user. Please try again.');
+    }
+  }, [user, blockTargetUser]);
 
   const handleVoteThread = useCallback(async (threadId: string, voteType: 'up' | 'down') => {
     if (!user || likingInProgress) return;
@@ -1282,6 +1398,101 @@ export default function ForumScreen() {
                 <button onClick={() => { setShowContentWarning(false); setContentWarningCallback(null); }} className="flex-1 py-2.5 rounded-xl border border-[var(--aurora-border)] text-sm font-semibold text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-variant)] transition-colors">Cancel</button>
                 <button onClick={async () => { setShowContentWarning(false); if (contentWarningCallback) await contentWarningCallback(); setContentWarningCallback(null); }} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors">Post Anyway</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Report {reportingContent?.contentType === 'thread' ? 'Thread' : 'Reply'}
+              </h3>
+              <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Why are you reporting this {reportingContent?.contentType === 'thread' ? 'thread' : 'reply'}? Your report is confidential.
+              </p>
+              {FORUM_REPORT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setReportReason(cat.id)}
+                  className={`w-full p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${
+                    reportReason === cat.id
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 ring-1 ring-indigo-500'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <span className="text-xl">{cat.icon}</span>
+                  <div>
+                    <p className="font-medium text-sm text-gray-900 dark:text-white">{cat.label}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{cat.description}</p>
+                  </div>
+                </button>
+              ))}
+              {reportReason && (
+                <textarea
+                  placeholder="Additional details (optional)..."
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  rows={3}
+                />
+              )}
+            </div>
+            <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-5 py-4 flex gap-3 rounded-b-2xl">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReport}
+                disabled={!reportReason || reportSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {reportSubmitting ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Flag size={16} /> Submit Report</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Block User Confirmation Modal */}
+      {showBlockConfirm && blockTargetUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockConfirm(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="w-14 h-14 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Ban className="w-7 h-7 text-red-600 dark:text-red-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Block {blockTargetUser.name}?
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Their posts, threads, and replies will be hidden. They won&apos;t appear in your discover, events, or other listings. You can unblock them from your Profile page.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBlockConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlockUser}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 flex items-center justify-center gap-2"
+              >
+                <Ban size={16} /> Block
+              </button>
             </div>
           </div>
         </div>
@@ -1611,13 +1822,21 @@ export default function ForumScreen() {
                       </button>
                       <ClickOutsideOverlay isOpen={!!showMoreMenu} onClose={() => setShowMoreMenu(null)} />
                       {showMoreMenu === thread.id && (
-                        <div className="absolute right-0 bottom-full mb-1 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl shadow-xl py-1 w-40 z-50">
+                        <div className="absolute right-0 bottom-full mb-1 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl shadow-xl py-1 w-44 z-50">
                           <button
-                            onClick={(e) => { e.stopPropagation(); setReportingContent({ contentId: thread.id, contentType: 'thread' }); setShowReport(true); setShowMoreMenu(null); }}
+                            onClick={(e) => { e.stopPropagation(); openReportModal(thread.id, 'thread'); }}
                             className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface-variant)]"
                           >
-                            <Flag size={13} /> Report
+                            <Flag size={13} /> Report Post
                           </button>
+                          {user && thread.authorId !== user.uid && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openBlockConfirm(thread.authorId, thread.authorName); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"
+                            >
+                              <Ban size={13} /> Block User
+                            </button>
+                          )}
                           {(isAdmin || (user && thread.authorId === user.uid)) && (
                             <button
                               onClick={(e) => { e.stopPropagation(); handleDeleteThread(thread.id, thread.authorId); setShowMoreMenu(null); }}
@@ -1842,12 +2061,21 @@ export default function ForumScreen() {
               )}
 
               <button
-                onClick={() => { setReportingContent({ contentId: selectedThread.id, contentType: 'thread' }); setShowReport(true); }}
+                onClick={() => openReportModal(selectedThread.id, 'thread')}
                 className="p-1.5 rounded-lg text-[var(--aurora-text-muted)] hover:bg-[var(--aurora-surface-variant)] transition-colors"
                 title="Report"
               >
                 <Flag size={14} />
               </button>
+              {user && selectedThread.authorId !== user.uid && (
+                <button
+                  onClick={() => openBlockConfirm(selectedThread.authorId, selectedThread.authorName)}
+                  className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                  title="Block User"
+                >
+                  <Ban size={14} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -2015,11 +2243,22 @@ export default function ForumScreen() {
                           )}
 
                           <button
-                            onClick={() => { setReportingContent({ contentId: reply.id, contentType: 'reply' }); setShowReport(true); }}
+                            onClick={() => openReportModal(reply.id, 'reply')}
                             className="p-1.5 rounded-md text-[var(--aurora-text-muted)] hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                            title="Report"
                           >
                             <Flag size={12} />
                           </button>
+
+                          {user && reply.authorId !== user.uid && (
+                            <button
+                              onClick={() => openBlockConfirm(reply.authorId, reply.authorName)}
+                              className="p-1.5 rounded-md text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                              title="Block User"
+                            >
+                              <Ban size={12} />
+                            </button>
+                          )}
 
                           {(isAdmin || (user && reply.authorId === user.uid)) && (
                             <button
