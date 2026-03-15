@@ -3472,10 +3472,10 @@ export default function MessagesPage() {
     </div>
   ) : null;
 
-  // === MOBILE LAYOUT: single panel switching ===
+  // === MOBILE LAYOUT: full-screen chat when in room view ===
   // === DESKTOP LAYOUT (md+): side-by-side panels like WhatsApp Web ===
   return (
-    <div className="h-full flex overflow-hidden">
+    <div className={`h-full flex overflow-hidden ${viewState === 'room' ? 'fixed inset-0 z-50 bg-white md:relative md:inset-auto md:z-auto' : ''}`}>
       {/* Left panel - conversation list */}
       {/* On mobile: show only when viewState is 'list' */}
       {/* On desktop: always show */}
