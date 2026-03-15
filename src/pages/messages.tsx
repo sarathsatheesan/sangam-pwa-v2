@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
-  onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc,
+  onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +22,7 @@ import {
   Strikethrough, MicOff, Pause, Play, Search as SearchIcon,
   ChevronUp, Palette, Minimize2, Maximize2, AlertCircle, CheckCircle,
   Check, CheckCheck, Paperclip, Users, Shield, UserPlus, UserMinus, Crown, Settings,
+  Flag, Ban,
 } from 'lucide-react';
 
 // ===== TYPES =====
@@ -471,21 +472,33 @@ function QuickReactionBar({ onReact, onClose }: { onReact: (emoji: string) => vo
   );
 }
 
+const MESSAGE_REPORT_CATEGORIES = [
+  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
+  { id: 'harassment', label: 'Harassment or Bullying', icon: '🛑', description: 'Threatening, abusive, or intimidating messages' },
+  { id: 'hate_speech', label: 'Hate Speech', icon: '⚠️', description: 'Content targeting race, ethnicity, religion, gender, or identity' },
+  { id: 'inappropriate', label: 'Inappropriate Content', icon: '🔞', description: 'Sexual, violent, or graphic content not suitable for the community' },
+  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
+  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
+];
+
 /**
  * MessageContextMenu Component
- * Context menu for message actions (edit, delete)
- * Only shows edit option for own messages within 15-minute window
+ * Context menu for message actions (edit, delete, report, block)
  */
 function MessageContextMenu({
   isMine,
   onDelete,
   onEdit,
+  onReport,
+  onBlock,
   onClose,
   isRecent,
 }: {
   isMine: boolean;
   onDelete: () => void;
   onEdit?: () => void;
+  onReport?: () => void;
+  onBlock?: () => void;
   onClose: () => void;
   isRecent: boolean;
 }) {
@@ -498,7 +511,7 @@ function MessageContextMenu({
               onEdit();
               onClose();
             }}
-            className="w-40 px-4 py-2 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm"
+            className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm"
           >
             <Edit3 size={15} className="text-aurora-indigo" /> Edit
           </button>
@@ -509,9 +522,32 @@ function MessageContextMenu({
               onDelete();
               onClose();
             }}
-            className="w-40 px-4 py-2 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm text-red-500"
+            className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm text-red-500"
           >
             <Trash2 size={15} /> Delete
+          </button>
+        )}
+        {!isMine && onReport && (
+          <button
+            onClick={() => {
+              onReport();
+              onClose();
+            }}
+            className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm"
+            style={{ color: '#667781' }}
+          >
+            <Flag size={15} /> Report Message
+          </button>
+        )}
+        {!isMine && onBlock && (
+          <button
+            onClick={() => {
+              onBlock();
+              onClose();
+            }}
+            className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm text-red-500"
+          >
+            <Ban size={15} /> Block User
           </button>
         )}
       </div>
@@ -1011,6 +1047,18 @@ export default function MessagesPage() {
   const [imageCompressing, setImageCompressing] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // Report / Block state
+  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportMessageId, setReportMessageId] = useState<string | null>(null);
+  const [reportMessageText, setReportMessageText] = useState('');
+  const [reportSenderId, setReportSenderId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
+
   // Refs
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1134,6 +1182,135 @@ export default function MessagesPage() {
       unsubscribersRef.current.forEach((unsub) => unsub());
     };
   }, []);
+
+  // Load blocked users from Firestore
+  useEffect(() => {
+    if (!user) return;
+    const loadBlocked = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data.blockedUsers) setBlockedUsers(new Set(data.blockedUsers));
+        }
+      } catch (e) { console.error('Error loading blocked users:', e); }
+    };
+    loadBlocked();
+  }, [user]);
+
+  // ===== REPORT & BLOCK HANDLERS =====
+
+  const openReportModal = (msgId: string, msgText: string, senderId: string) => {
+    setReportMessageId(msgId);
+    setReportMessageText(msgText);
+    setReportSenderId(senderId);
+    setReportReason('');
+    setReportDetails('');
+    setShowReportModal(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason || !reportMessageId || !user || !reportSenderId) return;
+    try {
+      setReportSubmitting(true);
+      const categoryObj = MESSAGE_REPORT_CATEGORIES.find((c) => c.id === reportReason);
+      const senderUser = users.find((u) => u.id === reportSenderId);
+
+      // Write to reports collection
+      await addDoc(collection(db, 'reports'), {
+        type: 'message',
+        messageId: reportMessageId,
+        messageText: reportMessageText.slice(0, 200),
+        reportedUserId: reportSenderId,
+        reportedUserName: senderUser?.name || 'Unknown',
+        reportedBy: user.uid,
+        reporterName: user.displayName || 'Anonymous',
+        category: reportReason,
+        categoryLabel: categoryObj?.label || reportReason,
+        details: reportDetails.trim() || '',
+        createdAt: serverTimestamp(),
+        status: 'pending',
+      });
+
+      // Write to moderationQueue
+      const modQueueQuery = query(
+        collection(db, 'moderationQueue'),
+        where('contentId', '==', reportMessageId)
+      );
+      const existingMods = await getDocs(modQueueQuery);
+      let totalReportCount = 1;
+
+      if (existingMods.docs.length > 0) {
+        const existingDoc = existingMods.docs[0];
+        totalReportCount = (existingDoc.data().reportCount || 1) + 1;
+        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
+          reportCount: totalReportCount,
+          reporters: arrayUnion({
+            uid: user.uid,
+            name: user.displayName || 'Anonymous',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }),
+        });
+      } else {
+        await addDoc(collection(db, 'moderationQueue'), {
+          type: 'message',
+          content: reportMessageText.slice(0, 200),
+          contentId: reportMessageId,
+          collection: 'messages',
+          authorId: reportSenderId,
+          authorName: senderUser?.name || 'Unknown',
+          authorAvatar: senderUser?.avatar || '',
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
+          reportedBy: user.uid,
+          reporterName: user.displayName || 'Anonymous',
+          reportCount: 1,
+          reporters: [{
+            uid: user.uid,
+            name: user.displayName || 'Anonymous',
+            category: reportReason,
+            details: reportDetails.trim() || '',
+            createdAt: new Date().toISOString(),
+          }],
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      setShowReportModal(false);
+      setReportReason('');
+      setReportDetails('');
+      showNotif('Report submitted. Thank you for helping keep the community safe.', 'success');
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      showNotif('Failed to submit report.', 'error');
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
+  const openBlockConfirm = (uid: string, name: string) => {
+    setBlockTargetUser({ uid, name });
+    setShowBlockConfirm(true);
+  };
+
+  const handleBlockUser = async () => {
+    if (!user || !blockTargetUser) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        blockedUsers: arrayUnion(blockTargetUser.uid),
+      });
+      setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
+      setShowBlockConfirm(false);
+      setBlockTargetUser(null);
+      showNotif(`${blockTargetUser.name} has been blocked. Their messages will be hidden.`, 'success');
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      showNotif('Failed to block user. Please try again.', 'error');
+    }
+  };
 
   // ===== UTILITY FUNCTIONS =====
 
@@ -1632,6 +1809,12 @@ export default function MessagesPage() {
       // Hide group conversations if group messaging is disabled
       if (conv.isGroup && !groupMessagingEnabled) return false;
 
+      // Filter out conversations with blocked users (1:1 only)
+      if (!conv.isGroup && blockedUsers.size > 0) {
+        const otherParticipant = conv.participants.find((p) => p !== user?.uid);
+        if (otherParticipant && blockedUsers.has(otherParticipant)) return false;
+      }
+
       // Group conversations: search by group name
       if (conv.isGroup) {
         return (conv.groupName || 'Group').toLowerCase().includes(searchTerm.toLowerCase());
@@ -1652,7 +1835,7 @@ export default function MessagesPage() {
     }
 
     return result;
-  }, [conversations, searchTerm, activeFilter, user?.uid, users, groupMessagingEnabled]);
+  }, [conversations, searchTerm, activeFilter, user?.uid, users, groupMessagingEnabled, blockedUsers]);
 
   // === Conversation list panel (reused in both mobile and desktop) ===
   const conversationListPanel = (
@@ -2124,6 +2307,18 @@ export default function MessagesPage() {
                   {compactMode ? <Maximize2 size={16} style={{ color: '#667781' }} /> : <Minimize2 size={16} style={{ color: '#667781' }} />}
                   {compactMode ? 'Comfortable' : 'Compact'}
                 </button>
+                {/* Block User option - only for 1:1 chats */}
+                {selectedUser && (
+                  <button
+                    onClick={() => {
+                      openBlockConfirm(selectedUser.id, selectedUser.name);
+                      setShowChatMenu(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-red-50 transition flex items-center gap-3 text-sm text-red-600"
+                  >
+                    <Ban size={16} /> Block User
+                  </button>
+                )}
               </div>
               </>
             )}
@@ -2627,6 +2822,15 @@ export default function MessagesPage() {
             deleteMessage(contextMenuMsg.id);
             setContextMenuMsg(null);
           }}
+          onReport={contextMenuMsg.senderId !== user?.uid ? () => {
+            openReportModal(contextMenuMsg.id, contextMenuMsg.text, contextMenuMsg.senderId);
+            setContextMenuMsg(null);
+          } : undefined}
+          onBlock={contextMenuMsg.senderId !== user?.uid ? () => {
+            const senderUser = users.find((u) => u.id === contextMenuMsg.senderId);
+            openBlockConfirm(contextMenuMsg.senderId, senderUser?.name || 'this user');
+            setContextMenuMsg(null);
+          } : undefined}
           onClose={() => setContextMenuMsg(null)}
         />
       )}
@@ -2657,6 +2861,97 @@ export default function MessagesPage() {
             <div className="flex gap-3 justify-end">
               <button onClick={() => { setShowDeleteMsgConfirm(false); setDeleteMsgId(null); }} className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
               <button onClick={confirmDeleteMessage} className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Report Message Modal ===== */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Report Message</h3>
+              <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <X size={20} className="text-gray-500" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Why are you reporting this message? Your report is confidential.</p>
+              {MESSAGE_REPORT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setReportReason(cat.id)}
+                  className={`w-full p-3 rounded-xl border text-left transition-all flex items-start gap-3 ${
+                    reportReason === cat.id
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 ring-1 ring-indigo-500'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <span className="text-xl">{cat.icon}</span>
+                  <div>
+                    <p className="font-medium text-sm text-gray-900 dark:text-white">{cat.label}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{cat.description}</p>
+                  </div>
+                </button>
+              ))}
+              {reportReason && (
+                <textarea
+                  placeholder="Additional details (optional)..."
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-xl text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                  rows={3}
+                />
+              )}
+            </div>
+            <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-5 py-4 flex gap-3 rounded-b-2xl">
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitReport}
+                disabled={!reportReason || reportSubmitting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {reportSubmitting ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Flag size={16} /> Submit Report</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== Block User Confirmation Modal ===== */}
+      {showBlockConfirm && blockTargetUser && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockConfirm(false)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="w-14 h-14 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Ban className="w-7 h-7 text-red-600 dark:text-red-400" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              Block {blockTargetUser.name}?
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              Their messages and conversations will be hidden. They won't appear in your discover, events, or other listings. You can unblock them from your Profile page.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBlockConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlockUser}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 flex items-center justify-center gap-2"
+              >
+                <Ban size={16} /> Block
+              </button>
             </div>
           </div>
         </div>

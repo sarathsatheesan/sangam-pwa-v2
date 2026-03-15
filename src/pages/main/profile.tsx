@@ -1033,7 +1033,7 @@ export default function ProfilePage() {
                   <div className="px-4 py-4 text-center border-t border-[var(--aurora-border)]/50">
                     <UserX size={22} className="mx-auto mb-1.5 text-[var(--aurora-text-muted)]" />
                     <p className="text-sm font-medium text-[var(--aurora-text)]">No blocked users</p>
-                    <p className="text-xs text-[var(--aurora-text-muted)] mt-0.5">Block users from the ⋯ menu on their posts</p>
+                    <p className="text-xs text-[var(--aurora-text-muted)] mt-0.5">Block users from the ⋯ menu on posts, messages, or discover</p>
                   </div>
                 ) : (
                   <div className="border-t border-[var(--aurora-border)]/50">
