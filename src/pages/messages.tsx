@@ -7,8 +7,7 @@ import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
   onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/services/firebase';
+import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
@@ -1584,6 +1583,15 @@ export default function MessagesPage() {
     }
   };
 
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const sendVoiceMessage = async (duration: number, audioBlob?: Blob) => {
     if (!user?.uid) return;
     let convId: string | null = null;
@@ -1597,15 +1605,16 @@ export default function MessagesPage() {
     if (!convId) return;
 
     try {
-      let audioUrl: string | undefined;
+      let audioData: string | undefined;
 
-      // Upload audio blob to Firebase Storage
-      if (audioBlob && storage) {
-        const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
-        const fileName = `voice_${Date.now()}_${user.uid}.${ext}`;
-        const storageRef = ref(storage, `voiceMessages/${convId}/${fileName}`);
-        await uploadBytes(storageRef, audioBlob, { contentType: audioBlob.type });
-        audioUrl = await getDownloadURL(storageRef);
+      // Convert audio blob to base64 data URL for Firestore storage
+      // Firestore doc limit is ~1MB, base64 adds ~33% overhead, so cap blob at ~700KB
+      if (audioBlob && audioBlob.size > 0) {
+        if (audioBlob.size > 700 * 1024) {
+          showNotif('Voice message is too long. Please keep it under 60 seconds.', 'error');
+          return;
+        }
+        audioData = await blobToBase64(audioBlob);
       }
 
       const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), {
@@ -1613,7 +1622,7 @@ export default function MessagesPage() {
         senderId: user.uid,
         time: formatMessageTime(Timestamp.now()),
         createdAt: serverTimestamp(),
-        voiceMessage: { duration, ...(audioUrl ? { audioUrl } : {}) },
+        voiceMessage: { duration, ...(audioData ? { audioUrl: audioData } : {}) },
       });
       setUndoMessageId(msgRef.id);
       setShowUndoToast(true);
@@ -2855,7 +2864,22 @@ export default function MessagesPage() {
               </button>
             ) : (
               <button
-                onClick={() => setIsRecording(true)}
+                onClick={async () => {
+                  try {
+                    // Check microphone permission first
+                    const permResult = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+                    if (permResult.state === 'denied') {
+                      showNotif('Microphone access is blocked. Please enable it in your browser settings.', 'error');
+                      return;
+                    }
+                    // Request access (will show browser prompt if 'prompt' state)
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(t => t.stop()); // Release immediately, VoiceRecorder will acquire its own
+                    setIsRecording(true);
+                  } catch {
+                    showNotif('Microphone access is required to send voice messages. Please allow microphone access and try again.', 'error');
+                  }
+                }}
                 className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
                 style={{ backgroundColor: '#6366F1' }}
                 aria-label="Start voice recording"
