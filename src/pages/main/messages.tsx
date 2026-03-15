@@ -1362,25 +1362,35 @@ export default function MessagesPage() {
     return unsub;
   }, [user?.uid]);
 
-  // Attach media streams to video elements
+  // Attach local media stream to video element
   useEffect(() => {
     if (localVideoRef.current && callState.localStream) {
       localVideoRef.current.srcObject = callState.localStream;
+      localVideoRef.current.play().catch((err) => console.warn('[WebRTC] Local video play failed:', err));
     }
   }, [callState.localStream]);
 
-  // Attach remote stream — use a separate effect that also re-runs on status changes
-  // (the video element may not be in the DOM until status becomes 'connected')
+  // Attach remote stream to the correct element based on call type
+  // Re-runs on status changes because the video element may mount late
   useEffect(() => {
-    if (remoteVideoRef.current && callState.remoteStream) {
+    if (!callState.remoteStream) return;
+    const isVideo = callState.callType === 'video';
+
+    if (isVideo && remoteVideoRef.current) {
+      // For video calls: use the <video> element for both audio + video
+      console.log('[WebRTC] Setting remote video srcObject, tracks:', callState.remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
       remoteVideoRef.current.srcObject = callState.remoteStream;
-    }
-    // Also attach to the hidden audio element for audio-only calls
-    if (remoteAudioRef.current && callState.remoteStream) {
+      remoteVideoRef.current.play().catch((err) => console.warn('[WebRTC] Remote video play failed:', err));
+      // Clear audio element to avoid conflict
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
+    } else if (!isVideo && remoteAudioRef.current) {
+      // For audio calls: use the hidden <audio> element
       remoteAudioRef.current.srcObject = callState.remoteStream;
       remoteAudioRef.current.play().catch((err) => console.warn('[WebRTC] Remote audio play failed:', err));
     }
-  }, [callState.remoteStream, callState.status]);
+  }, [callState.remoteStream, callState.status, callState.callType]);
 
   // E2EE: Generate/load ECDH key pair on mount, publish public key to Firestore
   useEffect(() => {
