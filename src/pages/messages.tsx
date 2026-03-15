@@ -7,7 +7,8 @@ import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
   onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion,
 } from 'firebase/firestore';
-import { db } from '@/services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
@@ -54,7 +55,7 @@ type Message = {
   encrypted?: boolean;
   replyTo?: { id: string; text: string; senderId: string };
   reactions?: Record<string, string[]>;
-  voiceMessage?: { duration: number };
+  voiceMessage?: { duration: number; audioUrl?: string };
   image?: string;
   read?: boolean;
   readAt?: Timestamp;
@@ -668,8 +669,39 @@ const compressImage = (file: File, maxWidth = 800, quality = 0.7): Promise<strin
  * VoiceRecorder Component
  * Voice message recording UI with timer and waveform animation
  */
-function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number) => void; onCancel: () => void }) {
+function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number, audioBlob: Blob) => void; onCancel: () => void }) {
   const [seconds, setSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [recError, setRecError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Start recording on mount
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        mediaRecorderRef.current = recorder;
+        chunksRef.current = [];
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        recorder.start(200); // collect chunks every 200ms
+      } catch {
+        setRecError('Microphone access denied');
+      }
+    })();
+    return () => {
+      // Cleanup on unmount
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -677,41 +709,69 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number) => voi
   }, []);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') handleCancel(); };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onCancel]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCancel = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    onCancel();
+  };
+
+  const handleSend = () => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') { onCancel(); return; }
+    const dur = seconds;
+    recorder.onstop = () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      const mimeType = recorder.mimeType || 'audio/webm';
+      const blob = new Blob(chunksRef.current, { type: mimeType });
+      onSend(dur, blob);
+    };
+    recorder.stop();
+  };
 
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={handleCancel}>
       <div
         className="bg-white dark:bg-[var(--aurora-surface)] rounded-lg p-6 flex flex-col items-center gap-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-3xl font-bold text-aurora-indigo">
-          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-        </div>
-        <div className="flex gap-2 items-center">
-          {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="w-1 h-8 bg-aurora-indigo rounded animate-pulse"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            />
-          ))}
-        </div>
+        {recError ? (
+          <div className="text-red-500 text-sm">{recError}</div>
+        ) : (
+          <>
+            <div className="text-3xl font-bold text-aurora-indigo">
+              {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+            </div>
+            <div className="flex gap-2 items-center">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className="w-1 h-8 bg-aurora-indigo rounded animate-pulse"
+                  style={{ animationDelay: `${i * 0.1}s` }}
+                />
+              ))}
+            </div>
+          </>
+        )}
         <div className="flex gap-3">
-          <button onClick={onCancel} className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600">
+          <button onClick={handleCancel} className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600">
             <MicOff size={18} />
           </button>
-          <button onClick={() => onSend(seconds)} className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600">
-            <Send size={18} />
-          </button>
+          {!recError && (
+            <button onClick={handleSend} className="px-4 py-2 rounded bg-green-500 text-white hover:bg-green-600">
+              <Send size={18} />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -722,28 +782,57 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number) => voi
  * VoiceMessageBubble Component
  * Displays voice message with play/pause button and duration
  */
-function VoiceMessageBubble({ duration, isMine }: { duration: number; isMine: boolean }) {
+function VoiceMessageBubble({ duration, audioUrl, isMine }: { duration: number; audioUrl?: string; isMine: boolean }) {
   const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const mins = Math.floor(duration / 60);
-  const secs = duration % 60;
+  useEffect(() => {
+    if (!audioUrl) return;
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    audio.onended = () => { setPlaying(false); setCurrentTime(0); };
+    audio.ontimeupdate = () => setCurrentTime(audio.currentTime);
+    return () => { audio.pause(); audio.src = ''; };
+  }, [audioUrl]);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio || !audioUrl) return;
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      audio.play().catch(() => {});
+      setPlaying(true);
+    }
+  };
+
+  const progress = duration > 0 ? currentTime / duration : 0;
+  const displayTime = playing ? Math.floor(currentTime) : 0;
+  const mins = Math.floor((playing ? displayTime : duration) / 60);
+  const secs = (playing ? displayTime : duration) % 60;
 
   return (
     <div className="flex items-center gap-3 py-1">
-      <button onClick={() => setPlaying(!playing)} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
+      <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
         {playing ? <Pause size={16} className="text-white" /> : <Play size={16} className="text-white" style={{ marginLeft: '2px' }} />}
       </button>
       <div className="flex gap-[3px] items-end flex-1">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="w-[2.5px] rounded-full"
-            style={{
-              height: `${4 + Math.abs(Math.sin(i * 0.8)) * 14}px`,
-              backgroundColor: playing ? '#6366F1' : '#A5B4FC',
-            }}
-          />
-        ))}
+        {[...Array(20)].map((_, i) => {
+          const barProgress = (i + 1) / 20;
+          const isActive = playing && barProgress <= progress;
+          return (
+            <div
+              key={i}
+              className="w-[2.5px] rounded-full transition-colors"
+              style={{
+                height: `${4 + Math.abs(Math.sin(i * 0.8)) * 14}px`,
+                backgroundColor: isActive ? '#6366F1' : '#A5B4FC',
+              }}
+            />
+          );
+        })}
       </div>
       <span className="text-[11px] font-mono" style={{ color: '#667781' }}>
         {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
@@ -1495,7 +1584,7 @@ export default function MessagesPage() {
     }
   };
 
-  const sendVoiceMessage = async (duration: number) => {
+  const sendVoiceMessage = async (duration: number, audioBlob?: Blob) => {
     if (!user?.uid) return;
     let convId: string | null = null;
     const activeConv = selectedConvId ? conversations.find((c) => c.id === selectedConvId) : null;
@@ -1508,12 +1597,23 @@ export default function MessagesPage() {
     if (!convId) return;
 
     try {
+      let audioUrl: string | undefined;
+
+      // Upload audio blob to Firebase Storage
+      if (audioBlob && storage) {
+        const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+        const fileName = `voice_${Date.now()}_${user.uid}.${ext}`;
+        const storageRef = ref(storage, `voiceMessages/${convId}/${fileName}`);
+        await uploadBytes(storageRef, audioBlob, { contentType: audioBlob.type });
+        audioUrl = await getDownloadURL(storageRef);
+      }
+
       const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), {
         text: '🎤 Voice message',
         senderId: user.uid,
         time: formatMessageTime(Timestamp.now()),
         createdAt: serverTimestamp(),
-        voiceMessage: { duration },
+        voiceMessage: { duration, ...(audioUrl ? { audioUrl } : {}) },
       });
       setUndoMessageId(msgRef.id);
       setShowUndoToast(true);
@@ -2630,7 +2730,7 @@ export default function MessagesPage() {
                           </div>
                         )}
                         {msg.voiceMessage ? (
-                          <VoiceMessageBubble duration={msg.voiceMessage.duration} isMine={isMine} />
+                          <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} />
                         ) : (
                           <>
                             {msg.image && (
@@ -2834,7 +2934,7 @@ export default function MessagesPage() {
           onClose={() => setContextMenuMsg(null)}
         />
       )}
-      {isRecording && <VoiceRecorder onSend={(dur) => { setIsRecording(false); sendVoiceMessage(dur); }} onCancel={() => setIsRecording(false)} />}
+      {isRecording && <VoiceRecorder onSend={(dur, blob) => { setIsRecording(false); sendVoiceMessage(dur, blob); }} onCancel={() => setIsRecording(false)} />}
       {showWallpaperPicker && (
         <WallpaperPicker
           current={selectedWallpaper}
