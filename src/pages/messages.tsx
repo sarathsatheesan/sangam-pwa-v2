@@ -12,6 +12,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
   generateConversationKey, encryptMessage, decryptMessage,
+  getOrCreateKeyPair, deriveSharedKey, e2eEncrypt, e2eDecrypt,
+  type ExportedPublicKey,
 } from '@/utils/encryption';
 import {
   Search, X, Send, Smile, MoreVertical,
@@ -1080,7 +1082,7 @@ export default function MessagesPage() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [encryptionEnabled, setEncryptionEnabled] = useState(true);
+  const encryptionEnabled = isFeatureEnabled('messages_encryption');
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'connects'>('all');
   const [showPenMenu, setShowPenMenu] = useState(false);
   const [showNewMsgPicker, setShowNewMsgPicker] = useState(false);
@@ -1135,6 +1137,11 @@ export default function MessagesPage() {
   const [imageCompressing, setImageCompressing] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // E2EE state
+  const e2ePrivateKeyRef = useRef<CryptoKey | null>(null);
+  const e2eSharedKeysRef = useRef<Map<string, CryptoKey>>(new Map());
+  const [e2eReady, setE2eReady] = useState(false);
+
   // Report / Block state
   const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
   const [showReportModal, setShowReportModal] = useState(false);
@@ -1157,6 +1164,61 @@ export default function MessagesPage() {
       setSelectedWallpaper(saved);
     }
   }, []);
+
+  // E2EE: Generate/load ECDH key pair on mount, publish public key to Firestore
+  useEffect(() => {
+    if (!user?.uid) return;
+    let cancelled = false;
+    const initE2E = async () => {
+      try {
+        const { publicKey, privateKey } = await getOrCreateKeyPair(user.uid);
+        if (cancelled) return;
+        e2ePrivateKeyRef.current = privateKey;
+        // Publish public key to user's Firestore document for peer exchange
+        await updateDoc(doc(db, 'users', user.uid), {
+          e2ePublicKey: publicKey,
+        });
+        setE2eReady(true);
+      } catch (err) {
+        console.error('E2EE init failed:', err);
+        // Fall back to legacy encryption if E2EE init fails
+      }
+    };
+    initE2E();
+    return () => { cancelled = true; };
+  }, [user?.uid]);
+
+  // E2EE: Derive shared key when opening a 1:1 conversation
+  useEffect(() => {
+    if (!user?.uid || !selectedUser || !e2eReady || !e2ePrivateKeyRef.current) return;
+    let cancelled = false;
+    const deriveKey = async () => {
+      const cacheKey = selectedUser.id;
+      // Skip if already cached
+      if (e2eSharedKeysRef.current.has(cacheKey)) return;
+      try {
+        // Fetch peer's public key from Firestore
+        const peerDoc = await getDoc(doc(db, 'users', selectedUser.id));
+        const peerData = peerDoc.data();
+        if (!peerData?.e2ePublicKey) {
+          // Peer hasn't set up E2EE yet — will fall back to legacy
+          return;
+        }
+        if (cancelled) return;
+        const sharedKey = await deriveSharedKey(
+          e2ePrivateKeyRef.current!,
+          peerData.e2ePublicKey as ExportedPublicKey
+        );
+        if (!cancelled) {
+          e2eSharedKeysRef.current.set(cacheKey, sharedKey);
+        }
+      } catch (err) {
+        console.error('E2EE shared key derivation failed:', err);
+      }
+    };
+    deriveKey();
+    return () => { cancelled = true; };
+  }, [user?.uid, selectedUser, e2eReady]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -1237,20 +1299,73 @@ export default function MessagesPage() {
     setMessagesLoading(true);
     const unsubscribe = onSnapshot(
       query(collection(db, 'conversations', convId, 'messages'), orderBy('createdAt', 'asc')),
-      (snap) => {
+      async (snap) => {
+        const rawMsgs = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
         const msgs: Message[] = [];
-        snap.forEach((d) => {
-          let text = d.data().text || '';
-          if (d.data().encrypted && encryptionEnabled && selectedUser) {
-            try {
-              const convKey = generateConversationKey(user.uid, selectedUser.id);
-              text = decryptMessage(text, convKey);
-            } catch {
-              text = '[Encrypted]';
+        for (const rawMsg of rawMsgs) {
+          let text = (rawMsg as Record<string, unknown>).text as string || '';
+          let image = (rawMsg as Record<string, unknown>).image as string | undefined;
+          let voiceMessage = (rawMsg as Record<string, unknown>).voiceMessage as Message['voiceMessage'];
+
+          const isEncrypted = (rawMsg as Record<string, unknown>).encrypted;
+
+          if (isEncrypted && selectedUser) {
+            // Try v2 E2EE decryption first
+            const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+            if (sharedKey) {
+              try {
+                const parsed = JSON.parse(text);
+                if (parsed.v === 2) {
+                  text = await e2eDecrypt(text, sharedKey);
+                  // Decrypt image if present and encrypted
+                  if (image) {
+                    try {
+                      const imgParsed = JSON.parse(image);
+                      if (imgParsed.v === 2) {
+                        image = await e2eDecrypt(image, sharedKey);
+                      }
+                    } catch { /* not encrypted or not JSON */ }
+                  }
+                  // Decrypt voice audioUrl if present and encrypted
+                  if (voiceMessage?.audioUrl) {
+                    try {
+                      const voiceParsed = JSON.parse(voiceMessage.audioUrl);
+                      if (voiceParsed.v === 2) {
+                        voiceMessage = {
+                          ...voiceMessage,
+                          audioUrl: await e2eDecrypt(voiceMessage.audioUrl, sharedKey),
+                        };
+                      }
+                    } catch { /* not encrypted or not JSON */ }
+                  }
+                } else {
+                  // v1 legacy — fall through to legacy decrypt
+                  throw new Error('v1');
+                }
+              } catch (e) {
+                // Not v2 JSON or v1 — try legacy decrypt
+                if ((e as Error).message === 'v1' || true) {
+                  try {
+                    const convKey = generateConversationKey(user.uid, selectedUser.id);
+                    text = decryptMessage(text, convKey);
+                  } catch {
+                    text = '[Encrypted]';
+                  }
+                }
+              }
+            } else {
+              // No shared key — try legacy v1 decrypt
+              try {
+                const convKey = generateConversationKey(user.uid, selectedUser.id);
+                text = decryptMessage(text, convKey);
+              } catch {
+                text = '[Encrypted]';
+              }
             }
           }
-          msgs.push({ ...d.data(), id: d.id, text } as Message);
-        });
+
+          msgs.push({ ...(rawMsg as Record<string, unknown>), id: (rawMsg as Record<string, unknown>).id as string, text, image, voiceMessage } as Message);
+        }
         setMessages(msgs);
         setMessagesLoading(false);
         setTimeout(() => scrollToBottom(), 100);
@@ -1425,8 +1540,13 @@ export default function MessagesPage() {
     }
     let payload = newText.trim();
     if (!selectedConvId && encryptionEnabled && selectedUser) {
-      const convKey = generateConversationKey(user.uid, selectedUser.id);
-      payload = encryptMessage(newText.trim(), convKey);
+      const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+      if (sharedKey) {
+        payload = await e2eEncrypt(payload, sharedKey);
+      } else {
+        const convKey = generateConversationKey(user.uid, selectedUser.id);
+        payload = encryptMessage(newText.trim(), convKey);
+      }
     }
     try {
       await updateDoc(doc(db, 'conversations', convId, 'messages', messageId), {
@@ -1518,12 +1638,27 @@ export default function MessagesPage() {
 
     let payload = messageText.trim();
     const shouldEncrypt = !isGroup && encryptionEnabled && selectedUser;
-    if (shouldEncrypt && selectedUser && payload) {
-      const convKey = generateConversationKey(user.uid, selectedUser.id);
-      payload = encryptMessage(payload, convKey);
-    }
+    let imageToSend = pendingImage;
 
-    const imageToSend = pendingImage;
+    if (shouldEncrypt && selectedUser) {
+      // Try v2 E2EE first, fall back to v1 legacy
+      const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+      if (sharedKey) {
+        // V2 E2EE: encrypt text, image with AES-256-GCM
+        if (payload) {
+          payload = await e2eEncrypt(payload, sharedKey);
+        }
+        if (imageToSend) {
+          imageToSend = await e2eEncrypt(imageToSend, sharedKey);
+        }
+      } else {
+        // V1 legacy: only encrypt text
+        if (payload) {
+          const convKey = generateConversationKey(user.uid, selectedUser.id);
+          payload = encryptMessage(payload, convKey);
+        }
+      }
+    }
 
     try {
       const msgData: Record<string, unknown> = {
@@ -1617,12 +1752,28 @@ export default function MessagesPage() {
         audioData = await blobToBase64(audioBlob);
       }
 
+      // Encrypt voice data for 1:1 chats
+      const shouldEncryptVoice = !isGroup && encryptionEnabled && selectedUser;
+      let encryptedText = '🎤 Voice message';
+      let encryptedAudioUrl = audioData;
+
+      if (shouldEncryptVoice && selectedUser) {
+        const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+        if (sharedKey) {
+          encryptedText = await e2eEncrypt(encryptedText, sharedKey);
+          if (encryptedAudioUrl) {
+            encryptedAudioUrl = await e2eEncrypt(encryptedAudioUrl, sharedKey);
+          }
+        }
+      }
+
       const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), {
-        text: '🎤 Voice message',
+        text: encryptedText,
         senderId: user.uid,
         time: formatMessageTime(Timestamp.now()),
         createdAt: serverTimestamp(),
-        voiceMessage: { duration, ...(audioData ? { audioUrl: audioData } : {}) },
+        encrypted: !!shouldEncryptVoice,
+        voiceMessage: { duration, ...(encryptedAudioUrl ? { audioUrl: encryptedAudioUrl } : {}) },
       });
       setUndoMessageId(msgRef.id);
       setShowUndoToast(true);
