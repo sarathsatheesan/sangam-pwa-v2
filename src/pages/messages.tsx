@@ -28,6 +28,7 @@ import {
   Check, CheckCheck, Paperclip, Users, Shield, UserPlus, UserMinus, Crown, Settings,
   Flag, Ban, VolumeX,
   Phone, PhoneOff, Video, VideoOff, SwitchCamera, PhoneIncoming, PhoneOutgoing,
+  Download, Share2,
 } from 'lucide-react';
 import {
   getCallManager, formatCallDuration,
@@ -1238,6 +1239,11 @@ export default function MessagesPage() {
   const [imageCompressing, setImageCompressing] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
+  // Image lightbox state
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [lightboxForwardOpen, setLightboxForwardOpen] = useState(false);
+  const [forwardingImage, setForwardingImage] = useState(false);
+
   // E2EE state
   const e2ePrivateKeyRef = useRef<CryptoKey | null>(null);
   const e2ePublicKeyRef = useRef<ExportedPublicKey | null>(null);
@@ -1999,6 +2005,71 @@ export default function MessagesPage() {
       setImageCompressing(false);
       if (imageInputRef.current) imageInputRef.current.value = '';
     }
+  };
+
+  // Forward an image to another conversation
+  const forwardImageToConversation = async (targetConvId: string) => {
+    if (!user?.uid || !lightboxImage) return;
+    setForwardingImage(true);
+    try {
+      const targetConv = conversations.find((c) => c.id === targetConvId);
+      let imageToSend = lightboxImage;
+
+      // Encrypt for target conversation
+      if (encryptionEnabled) {
+        if (targetConv?.isGroup) {
+          const convDoc = await getDoc(doc(db, 'conversations', targetConvId));
+          const groupKeyData = convDoc.data()?.groupKey;
+          if (groupKeyData) {
+            const raw = await crypto.subtle.exportKey('raw', await crypto.subtle.importKey('raw', new Uint8Array(Object.values(groupKeyData)), { name: 'AES-GCM' }, true, ['encrypt']));
+            const groupKey = await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt']);
+            imageToSend = await e2eEncrypt(imageToSend, groupKey);
+          }
+        } else {
+          // 1:1 — derive/use shared key
+          const peerId = targetConv?.participants.find((p) => p !== user.uid) || '';
+          const cachedKey = e2eSharedKeysRef.current.get(peerId);
+          if (cachedKey) {
+            imageToSend = await e2eEncrypt(imageToSend, cachedKey);
+          }
+        }
+      }
+
+      const msgData: Record<string, unknown> = {
+        text: '',
+        senderId: user.uid,
+        createdAt: serverTimestamp(),
+        image: imageToSend,
+      };
+
+      await addDoc(collection(db, 'conversations', targetConvId, 'messages'), msgData);
+      await updateDoc(doc(db, 'conversations', targetConvId), {
+        lastMessage: '📷 Forwarded photo',
+        lastMessageTime: serverTimestamp(),
+        lastMessageSenderId: user.uid,
+        updatedAt: serverTimestamp(),
+      });
+
+      showNotif('Image forwarded', 'success');
+      setLightboxForwardOpen(false);
+      setLightboxImage(null);
+    } catch (err) {
+      console.error('Error forwarding image:', err);
+      showNotif('Failed to forward image', 'error');
+    } finally {
+      setForwardingImage(false);
+    }
+  };
+
+  // Download image from lightbox
+  const downloadLightboxImage = () => {
+    if (!lightboxImage) return;
+    const link = document.createElement('a');
+    link.href = lightboxImage;
+    link.download = `image_${Date.now()}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -3276,7 +3347,7 @@ export default function MessagesPage() {
                                   alt="Shared image"
                                   className="rounded-t-[7.5px] w-full max-w-[280px] object-cover cursor-pointer"
                                   style={{ maxHeight: '300px' }}
-                                  onClick={() => window.open(msg.image, '_blank')}
+                                  onClick={() => setLightboxImage(msg.image!)}
                                 />
                               </div>
                             )}
@@ -3804,6 +3875,130 @@ export default function MessagesPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ===== IMAGE LIGHTBOX MODAL ===== */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[9999] flex flex-col"
+          style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) { setLightboxImage(null); setLightboxForwardOpen(false); } }}
+        >
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={downloadLightboxImage}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Download image"
+              >
+                <Download size={22} className="text-white" />
+              </button>
+              <button
+                onClick={() => setLightboxForwardOpen(true)}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Forward image"
+              >
+                <Share2 size={22} className="text-white" />
+              </button>
+            </div>
+            <button
+              onClick={() => { setLightboxImage(null); setLightboxForwardOpen(false); }}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              aria-label="Close"
+            >
+              <X size={26} className="text-white" />
+            </button>
+          </div>
+
+          {/* Image area */}
+          <div className="flex-1 flex items-center justify-center overflow-auto p-4">
+            <img
+              src={lightboxImage}
+              alt="Full size"
+              className="max-w-full max-h-full object-contain rounded-lg select-none"
+              style={{ maxHeight: 'calc(100vh - 120px)' }}
+              draggable={false}
+            />
+          </div>
+
+          {/* Forward picker overlay */}
+          {lightboxForwardOpen && (
+            <div
+              className="absolute inset-0 z-[10000] flex items-end sm:items-center justify-center"
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+              onClick={(e) => { if (e.target === e.currentTarget) setLightboxForwardOpen(false); }}
+            >
+              <div
+                className="w-full sm:max-w-md bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl max-h-[70vh] flex flex-col shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Forward header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">Forward to</h3>
+                  <button
+                    onClick={() => setLightboxForwardOpen(false)}
+                    className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <X size={20} className="text-gray-500" />
+                  </button>
+                </div>
+
+                {/* Conversation list */}
+                <div className="flex-1 overflow-y-auto">
+                  {conversations.filter((c) => !c.archived).length === 0 ? (
+                    <div className="p-6 text-center text-gray-400 text-sm">No conversations to forward to</div>
+                  ) : (
+                    conversations.filter((c) => !c.archived).map((conv) => {
+                      const otherUser = conv.isGroup
+                        ? null
+                        : users.find((u) => u.id === conv.participants.find((p) => p !== user?.uid));
+                      const displayName = conv.isGroup ? (conv.groupName || 'Group') : (otherUser?.name || 'Unknown');
+                      const displayAvatar = conv.isGroup ? null : otherUser?.avatar;
+                      const isCurrent = conv.id === selectedConvId;
+
+                      return (
+                        <button
+                          key={conv.id}
+                          onClick={() => !forwardingImage && forwardImageToConversation(conv.id)}
+                          disabled={forwardingImage}
+                          className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left ${isCurrent ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''} ${forwardingImage ? 'opacity-50' : ''}`}
+                        >
+                          {/* Avatar */}
+                          <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{ backgroundColor: conv.isGroup ? '#6366F1' : '#E8E2F8' }}>
+                            {displayAvatar ? (
+                              <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
+                            ) : conv.isGroup ? (
+                              <Users size={18} className="text-white" />
+                            ) : (
+                              <span className="text-sm font-semibold" style={{ color: '#6366F1' }}>
+                                {displayName.charAt(0).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          {/* Name */}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{displayName}</div>
+                            {isCurrent && <div className="text-xs text-indigo-500">Current chat</div>}
+                          </div>
+                          {/* Send icon */}
+                          <Send size={18} className="text-gray-400 flex-shrink-0" />
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                {forwardingImage && (
+                  <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-center gap-2">
+                    <Loader2 size={16} className="animate-spin text-indigo-500" />
+                    <span className="text-sm text-gray-500">Forwarding...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
