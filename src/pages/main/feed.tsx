@@ -2052,11 +2052,14 @@ export default function FeedPage() {
                     {post.images.map((img, idx) => (
                       <div
                         key={idx}
-                        className={`rounded-xl overflow-hidden bg-aurora-surface-variant ${
+                        className={`rounded-xl overflow-hidden ${
                           post.images!.length === 1 ? 'flex items-center justify-center' :
                           post.images!.length === 3 && idx === 0 ? 'row-span-2' : ''
-                        }`}
-                        style={post.images!.length === 1 ? { maxHeight: '480px' } : undefined}
+                        } ${post.images!.length !== 1 ? 'bg-aurora-surface-variant' : ''}`}
+                        style={post.images!.length === 1 ? {
+                          maxHeight: '480px',
+                          backgroundColor: !isNeutral ? `${theme.colors.primary}15` : 'var(--color-aurora-surface-variant)'
+                        } : undefined}
                       >
                         <img
                           src={img}
@@ -2505,11 +2508,14 @@ export default function FeedPage() {
                     {selectedPost.images.map((img, idx) => (
                       <div
                         key={idx}
-                        className={`rounded-xl overflow-hidden bg-aurora-surface-variant ${
+                        className={`rounded-xl overflow-hidden ${
                           selectedPost.images!.length === 1 ? 'flex items-center justify-center' :
                           selectedPost.images!.length === 3 && idx === 0 ? 'row-span-2' : ''
-                        }`}
-                        style={selectedPost.images!.length === 1 ? { maxHeight: '520px' } : undefined}
+                        } ${selectedPost.images!.length !== 1 ? 'bg-aurora-surface-variant' : ''}`}
+                        style={selectedPost.images!.length === 1 ? {
+                          maxHeight: '520px',
+                          backgroundColor: !isNeutral ? `${theme.colors.primary}15` : 'var(--color-aurora-surface-variant)'
+                        } : undefined}
                       >
                         <img
                           src={img}
