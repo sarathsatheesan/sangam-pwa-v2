@@ -84,6 +84,8 @@ export class CallManager {
   // ICE candidate buffer — holds candidates received before remote description is set
   private pendingIceCandidates: RTCIceCandidateInit[] = [];
   private remoteDescriptionSet = false;
+  // Guard against endCall being called multiple times concurrently
+  private endingCall = false;
 
   private state: CallState = {
     status: 'idle',
@@ -556,6 +558,9 @@ export class CallManager {
     const { callId, status, callType, peerId, peerName, isCaller, duration } = this.state;
 
     if (status === 'idle' || status === 'ended') return;
+    // Prevent re-entrant calls (UI click + Firestore snapshot echo + timeout)
+    if (this.endingCall) return;
+    this.endingCall = true;
 
     // Update Firestore call status
     if (callId) {
@@ -598,6 +603,7 @@ export class CallManager {
 
     // Reset to idle after brief delay
     setTimeout(() => {
+      this.endingCall = false;
       this.setState({
         status: 'idle',
         callId: null,
