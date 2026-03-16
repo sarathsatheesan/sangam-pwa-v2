@@ -80,14 +80,25 @@ const GlobalCallOverlay: React.FC = () => {
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
   // Callback ref for remote video — sets srcObject immediately when element mounts/changes
-  // Video element is always MUTED — audio comes exclusively from the <audio> element
+  // (fires when switching between PiP and fullscreen since the <video> DOM node changes)
   const remoteVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
     (remoteVideoRef as React.MutableRefObject<HTMLVideoElement | null>).current = node;
     if (node && callState.remoteStream) {
       node.setAttribute('webkit-playsinline', '');
-      node.muted = true; // Audio comes from <audio> element, not <video>
+      node.muted = true; // Video element is muted — audio comes from <audio> element
       node.srcObject = callState.remoteStream;
       node.play().catch((err) => console.warn('[WebRTC] Remote video play (ref callback):', err));
+
+      // Also ensure audio element has its own separate stream after PiP/fullscreen switch
+      if (remoteAudioRef.current) {
+        const audioTracks = callState.remoteStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          const audioOnlyStream = new MediaStream(audioTracks);
+          remoteAudioRef.current.srcObject = audioOnlyStream;
+          remoteAudioRef.current.muted = false;
+          remoteAudioRef.current.play().catch(() => {});
+        }
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callState.remoteStream]);
@@ -179,53 +190,85 @@ const GlobalCallOverlay: React.FC = () => {
     }
   }, [callState.localStream]);
 
-  // Attach remote stream — audio ALWAYS goes to <audio> element, video to <video> element
-  // This is the standard WebRTC pattern: separate audio and video playback.
-  // The <video> elements are always muted (audio comes only from <audio>).
-  // This prevents cross-browser autoplay issues from killing audio.
+  // Attach remote stream to media elements.
+  //
+  // CRITICAL: For video calls, the <audio> and <video> elements must NOT share
+  // the same MediaStream object. On Safari/Android, a muted <video> element's
+  // mute state can bleed into the shared stream, silencing the <audio> element.
+  //
+  // Solution:
+  //  - Audio calls: <audio> gets the full stream (no <video> involved)
+  //  - Video calls: <audio> gets a SEPARATE audio-only MediaStream (cloned audio tracks)
+  //                 <video muted> gets the full stream (for video display only)
   useEffect(() => {
     if (!callState.remoteStream) return;
     const tracks = callState.remoteStream.getTracks();
     console.log('[WebRTC] Attaching remote stream, tracks:', tracks.map(t => `${t.kind}:${t.readyState}`).join(', '));
 
-    // 1. ALWAYS set <audio> element to the remote stream for audio playback
-    //    (works for both audio-only and video calls)
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = callState.remoteStream;
-      // Play audio — this is the critical path for hearing the other user
-      remoteAudioRef.current.play().catch((err) => {
-        console.warn('[WebRTC] Audio play blocked, will retry on user gesture:', err);
-      });
-    }
+    const isVideo = callState.callType === 'video';
 
-    // 2. For video calls, also set <video> element (it stays muted — audio comes from <audio>)
-    if (callState.callType === 'video' && remoteVideoRef.current) {
-      remoteVideoRef.current.setAttribute('webkit-playsinline', '');
-      remoteVideoRef.current.srcObject = callState.remoteStream;
-      remoteVideoRef.current.play().catch((err) => {
-        console.warn('[WebRTC] Video play failed:', err);
-      });
+    if (isVideo) {
+      // VIDEO CALL: separate streams to avoid mute-bleed
+      // 1. Audio element gets its own audio-only stream
+      if (remoteAudioRef.current) {
+        const audioTracks = callState.remoteStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          const audioOnlyStream = new MediaStream(audioTracks);
+          remoteAudioRef.current.srcObject = audioOnlyStream;
+          remoteAudioRef.current.muted = false;
+          remoteAudioRef.current.play().catch((err) => {
+            console.warn('[WebRTC] Audio play blocked, will retry on user gesture:', err);
+          });
+        }
+      }
+      // 2. Video element gets the full stream (muted — video display only)
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.setAttribute('webkit-playsinline', '');
+        remoteVideoRef.current.muted = true;
+        remoteVideoRef.current.srcObject = callState.remoteStream;
+        remoteVideoRef.current.play().catch((err) => {
+          console.warn('[WebRTC] Video play failed:', err);
+        });
+      }
+    } else {
+      // AUDIO CALL: just use the <audio> element
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = callState.remoteStream;
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.play().catch((err) => {
+          console.warn('[WebRTC] Audio play blocked, will retry on user gesture:', err);
+        });
+      }
     }
   }, [callState.remoteStream, callState.status, callState.callType]);
 
-  // When call status changes to connected, ensure audio is playing
-  // This is especially important for the CALLER side — they initiated the call
-  // (which was a user gesture), but the remote stream arrives later.
-  // We retry play() here as a safety net.
+  // When call status changes to connected, ensure audio is playing.
+  // Also re-create audio-only stream for video calls as a safety net.
   useEffect(() => {
-    if (callState.status === 'connected' && remoteAudioRef.current?.srcObject) {
+    if (callState.status !== 'connected' || !callState.remoteStream) return;
+
+    if (remoteAudioRef.current) {
+      // For video calls, ensure the audio element has its own separate stream
+      if (callState.callType === 'video') {
+        const audioTracks = callState.remoteStream.getAudioTracks();
+        if (audioTracks.length > 0 && remoteAudioRef.current.srcObject !== null) {
+          // Stream already set — just retry play
+        } else if (audioTracks.length > 0) {
+          remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
+        }
+      }
       remoteAudioRef.current.muted = false;
       remoteAudioRef.current.play().catch((err) => {
         console.warn('[WebRTC] Connected but audio play failed, will retry:', err);
-        // Last resort: retry after a short delay
         setTimeout(() => {
           if (remoteAudioRef.current?.srcObject) {
+            remoteAudioRef.current.muted = false;
             remoteAudioRef.current.play().catch(() => {});
           }
         }, 500);
       });
     }
-  }, [callState.status]);
+  }, [callState.status, callState.remoteStream, callState.callType]);
 
   // Reset minimized state when call ends
   useEffect(() => {
@@ -260,16 +303,26 @@ const GlobalCallOverlay: React.FC = () => {
   /**
    * Retry playing all media elements after a user gesture.
    * User gestures (tap/click) unlock autoplay on ALL browsers.
-   * The <audio> element is the critical one for hearing the other user.
-   * The <video> elements are muted — they just need play() called.
+   * The <audio> element is critical — ensure it has its own stream and is not muted.
    */
   const retryMediaPlayback = useCallback(() => {
-    // Most important: retry the audio element (this is how users hear each other)
-    if (remoteAudioRef.current?.srcObject) {
-      remoteAudioRef.current.muted = false; // Ensure not muted
-      remoteAudioRef.current.play().catch((err) =>
-        console.warn('[WebRTC] Audio retry play failed:', err)
-      );
+    const state = callManagerRef.current.getState();
+
+    // Ensure audio element has content and play it
+    if (remoteAudioRef.current) {
+      // For video calls, ensure audio element has its own separate audio-only stream
+      if (state.callType === 'video' && state.remoteStream && !remoteAudioRef.current.srcObject) {
+        const audioTracks = state.remoteStream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
+        }
+      }
+      if (remoteAudioRef.current.srcObject) {
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.play().catch((err) =>
+          console.warn('[WebRTC] Audio retry play failed:', err)
+        );
+      }
     }
     // Video elements stay muted — just need play() for rendering
     if (remoteVideoRef.current?.srcObject) {
