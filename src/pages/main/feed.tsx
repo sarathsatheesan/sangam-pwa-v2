@@ -2044,36 +2044,77 @@ export default function FeedPage() {
 
                 {/* ── Post Images ── */}
                 {post.images && post.images.length > 0 && (
-                  <div className={`px-4 pb-3 ${
-                    post.images.length === 1 ? '' :
-                    'grid gap-1 ' + (post.images.length === 2 ? 'grid-cols-2' :
-                    post.images.length === 3 ? 'grid-cols-2' : 'grid-cols-2')
-                  }`}>
-                    {post.images.map((img, idx) => (
+                  <div className="px-4 pb-3">
+                    {post.images.length === 1 ? (
+                      /* Single image — show full image without cropping */
                       <div
-                        key={idx}
-                        className={`rounded-xl overflow-hidden ${
-                          post.images!.length === 1 ? 'flex items-center justify-center' :
-                          post.images!.length === 3 && idx === 0 ? 'row-span-2' : ''
-                        } ${post.images!.length !== 1 ? 'bg-aurora-surface-variant' : ''}`}
-                        style={post.images!.length === 1 ? {
-                          maxHeight: '480px',
+                        className="rounded-xl overflow-hidden flex items-center justify-center"
+                        style={{
+                          maxHeight: '520px',
                           backgroundColor: !isNeutral ? `${theme.colors.primary}15` : 'var(--color-aurora-surface-variant)'
-                        } : undefined}
+                        }}
                       >
                         <img
-                          src={img}
+                          src={post.images[0]}
                           alt=""
-                          className={`cursor-pointer hover:opacity-95 transition-opacity ${
-                            post.images!.length === 1
-                              ? 'w-full h-auto object-contain'
-                              : 'w-full h-full object-cover'
-                          }`}
-                          style={post.images!.length === 1 ? { maxHeight: '480px' } : { aspectRatio: post.images!.length === 3 && idx === 0 ? '1/2' : '1/1' }}
+                          className="w-full h-auto object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                          style={{ maxHeight: '520px' }}
                           onClick={() => openPostDetail(post)}
                         />
                       </div>
-                    ))}
+                    ) : post.images.length === 2 ? (
+                      /* Two images — side by side with 4:5 aspect ratio (portrait-friendly) */
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {post.images.map((img, idx) => (
+                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                            <img
+                              src={img}
+                              alt=""
+                              className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                              style={{ aspectRatio: '4/5', minHeight: '180px' }}
+                              onClick={() => openPostDetail(post)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : post.images.length === 3 ? (
+                      /* Three images — first large on left, two stacked on right */
+                      <div className="grid grid-cols-2 gap-1.5" style={{ height: '360px' }}>
+                        <div className="rounded-xl overflow-hidden bg-aurora-surface-variant row-span-2">
+                          <img
+                            src={post.images[0]}
+                            alt=""
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                            onClick={() => openPostDetail(post)}
+                          />
+                        </div>
+                        {post.images.slice(1).map((img, idx) => (
+                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                            <img
+                              src={img}
+                              alt=""
+                              className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                              onClick={() => openPostDetail(post)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* Four images — 2x2 grid with 4:3 aspect ratio */
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {post.images.map((img, idx) => (
+                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                            <img
+                              src={img}
+                              alt=""
+                              className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                              style={{ aspectRatio: '4/3' }}
+                              onClick={() => openPostDetail(post)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2500,35 +2541,50 @@ export default function FeedPage() {
 
                 {/* Post images in detail */}
                 {selectedPost.images && selectedPost.images.length > 0 && (
-                  <div className={`mt-3 ${
-                    selectedPost.images.length === 1 ? '' :
-                    'grid gap-1.5 ' + (selectedPost.images.length === 2 ? 'grid-cols-2' :
-                    selectedPost.images.length === 3 ? 'grid-cols-2' : 'grid-cols-2')
-                  }`}>
-                    {selectedPost.images.map((img, idx) => (
+                  <div className="mt-3">
+                    {selectedPost.images.length === 1 ? (
                       <div
-                        key={idx}
-                        className={`rounded-xl overflow-hidden ${
-                          selectedPost.images!.length === 1 ? 'flex items-center justify-center' :
-                          selectedPost.images!.length === 3 && idx === 0 ? 'row-span-2' : ''
-                        } ${selectedPost.images!.length !== 1 ? 'bg-aurora-surface-variant' : ''}`}
-                        style={selectedPost.images!.length === 1 ? {
+                        className="rounded-xl overflow-hidden flex items-center justify-center"
+                        style={{
                           maxHeight: '520px',
                           backgroundColor: !isNeutral ? `${theme.colors.primary}15` : 'var(--color-aurora-surface-variant)'
-                        } : undefined}
+                        }}
                       >
                         <img
-                          src={img}
+                          src={selectedPost.images[0]}
                           alt=""
-                          className={`${
-                            selectedPost.images!.length === 1
-                              ? 'w-full h-auto object-contain'
-                              : 'w-full h-full object-cover'
-                          }`}
-                          style={selectedPost.images!.length === 1 ? { maxHeight: '520px' } : { aspectRatio: selectedPost.images!.length === 3 && idx === 0 ? '1/2' : '1/1' }}
+                          className="w-full h-auto object-contain"
+                          style={{ maxHeight: '520px' }}
                         />
                       </div>
-                    ))}
+                    ) : selectedPost.images.length === 2 ? (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {selectedPost.images.map((img, idx) => (
+                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                            <img src={img} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '4/5', minHeight: '180px' }} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : selectedPost.images.length === 3 ? (
+                      <div className="grid grid-cols-2 gap-1.5" style={{ height: '380px' }}>
+                        <div className="rounded-xl overflow-hidden bg-aurora-surface-variant row-span-2">
+                          <img src={selectedPost.images[0]} alt="" className="w-full h-full object-cover" />
+                        </div>
+                        {selectedPost.images.slice(1).map((img, idx) => (
+                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                            <img src={img} alt="" className="w-full h-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {selectedPost.images.map((img, idx) => (
+                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                            <img src={img} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '4/3' }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
