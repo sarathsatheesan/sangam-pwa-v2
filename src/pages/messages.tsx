@@ -2929,6 +2929,11 @@ export default function MessagesPage() {
         {/* Back button - only show on mobile */}
         <button
           onClick={() => {
+            // If in an active call, minimize to PiP instead of leaving
+            const activeCall = callState.status !== 'idle' && callState.status !== 'ended';
+            if (activeCall) {
+              setCallMinimized(true);
+            }
             setViewState('list');
             setSelectedUser(null);
             setSelectedConvId(null);
@@ -3583,6 +3588,29 @@ export default function MessagesPage() {
       setCallMinimized(false);
     }
   }, [callState.status]);
+
+  // Intercept browser/hardware back button during active calls → minimize to PiP
+  useEffect(() => {
+    const isActiveCall = callState.status !== 'idle' && callState.status !== 'ended';
+    if (!isActiveCall || callMinimized) return;
+
+    // Push a history entry so that the back button can be intercepted
+    window.history.pushState({ callActive: true }, '');
+
+    const handlePopState = () => {
+      const stillActive = callManagerRef.current.getState().status !== 'idle' &&
+                          callManagerRef.current.getState().status !== 'ended';
+      if (stillActive) {
+        setCallMinimized(true);
+        // Don't navigate away — the popstate already consumed the history entry
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [callState.status, callMinimized]);
 
   // === Call Overlay UI ===
   const callOverlay = callState.status !== 'idle' ? (
