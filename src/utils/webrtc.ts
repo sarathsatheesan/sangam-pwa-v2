@@ -100,6 +100,12 @@ export class CallManager {
   private remoteDescriptionSet = false;
   // Guard against endCall being called multiple times concurrently
   private endingCall = false;
+  // Track current camera facing mode (getSettings() is unreliable on some devices)
+  private currentFacingMode: 'user' | 'environment' = 'user';
+  // Adaptive bitrate monitoring
+  private bitrateIntervalId: ReturnType<typeof setInterval> | null = null;
+  private lastBytesReceived = 0;
+  private lastTimestamp = 0;
 
   private state: CallState = {
     status: 'idle',
@@ -246,6 +252,7 @@ export class CallManager {
       if (pc.connectionState === 'connected') {
         this.setState({ status: 'connected' });
         this.startDurationTimer();
+        this.startAdaptiveBitrate();
         this.stopRingtone();
       } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
         this.endCall('connection_lost');
@@ -550,26 +557,56 @@ export class CallManager {
     const videoTrack = this.localStream.getVideoTracks()[0];
     if (!videoTrack) return;
 
-    const currentFacingMode = videoTrack.getSettings().facingMode;
-    const newFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    // Use tracked facing mode (getSettings().facingMode is unreliable on many devices)
+    const newFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+    console.log('[WebRTC] Switching camera from', this.currentFacingMode, 'to', newFacingMode);
 
     try {
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: newFacingMode },
+        video: {
+          facingMode: { exact: newFacingMode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
       const newVideoTrack = newStream.getVideoTracks()[0];
 
+      // Replace the track on the RTCPeerConnection sender
       const sender = this.pc.getSenders().find((s) => s.track?.kind === 'video');
       if (sender) {
         await sender.replaceTrack(newVideoTrack);
       }
 
+      // Update the local stream
       this.localStream.removeTrack(videoTrack);
       videoTrack.stop();
       this.localStream.addTrack(newVideoTrack);
-      this.setState({ localStream: this.localStream });
+      this.currentFacingMode = newFacingMode;
+
+      // Create new reference so React detects the change
+      const updatedStream = new MediaStream(this.localStream.getTracks());
+      this.localStream = updatedStream;
+      this.setState({ localStream: updatedStream });
     } catch (err) {
       console.error('[WebRTC] Failed to switch camera:', err);
+      // If { exact } fails (device has only one camera), try without exact
+      try {
+        const fallback = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: newFacingMode },
+        });
+        const newVideoTrack = fallback.getVideoTracks()[0];
+        const sender = this.pc!.getSenders().find((s) => s.track?.kind === 'video');
+        if (sender) await sender.replaceTrack(newVideoTrack);
+        this.localStream!.removeTrack(videoTrack);
+        videoTrack.stop();
+        this.localStream!.addTrack(newVideoTrack);
+        this.currentFacingMode = newFacingMode;
+        const updatedStream = new MediaStream(this.localStream!.getTracks());
+        this.localStream = updatedStream;
+        this.setState({ localStream: updatedStream });
+      } catch {
+        console.warn('[WebRTC] Device may only have one camera');
+      }
     }
   }
 
@@ -664,6 +701,10 @@ export class CallManager {
       clearInterval(this.durationIntervalId);
       this.durationIntervalId = null;
     }
+    if (this.bitrateIntervalId) {
+      clearInterval(this.bitrateIntervalId);
+      this.bitrateIntervalId = null;
+    }
 
     this.stopRingtone();
   }
@@ -676,6 +717,61 @@ export class CallManager {
     this.durationIntervalId = setInterval(() => {
       this.setState({ duration: Math.floor((Date.now() - startTime) / 1000) });
     }, 1000);
+  }
+
+  // ── Adaptive Bitrate ──────────────────────────────────────────────
+
+  private startAdaptiveBitrate() {
+    if (this.bitrateIntervalId || this.state.callType !== 'video') return;
+    this.lastBytesReceived = 0;
+    this.lastTimestamp = Date.now();
+
+    this.bitrateIntervalId = setInterval(async () => {
+      if (!this.pc) return;
+      try {
+        const stats = await this.pc.getStats();
+        let currentBytes = 0;
+        stats.forEach((report) => {
+          if (report.type === 'inbound-rtp' && report.kind === 'video') {
+            currentBytes = report.bytesReceived || 0;
+          }
+        });
+
+        const now = Date.now();
+        const elapsed = (now - this.lastTimestamp) / 1000;
+        if (elapsed > 0 && this.lastBytesReceived > 0) {
+          const bitrateKbps = ((currentBytes - this.lastBytesReceived) * 8) / elapsed / 1000;
+
+          // Adjust outgoing video quality based on observed incoming bitrate
+          const sender = this.pc?.getSenders().find((s) => s.track?.kind === 'video');
+          if (sender) {
+            const params = sender.getParameters();
+            if (params.encodings && params.encodings.length > 0) {
+              if (bitrateKbps < 100) {
+                // Very poor connection — limit to 150kbps, reduce resolution
+                params.encodings[0].maxBitrate = 150_000;
+                params.encodings[0].scaleResolutionDownBy = 4;
+                console.log('[WebRTC] Adaptive: Poor connection, reducing to 150kbps');
+              } else if (bitrateKbps < 300) {
+                // Moderate connection — limit to 400kbps
+                params.encodings[0].maxBitrate = 400_000;
+                params.encodings[0].scaleResolutionDownBy = 2;
+                console.log('[WebRTC] Adaptive: Moderate connection, 400kbps');
+              } else {
+                // Good connection — allow full quality
+                params.encodings[0].maxBitrate = 1_500_000;
+                delete params.encodings[0].scaleResolutionDownBy;
+              }
+              await sender.setParameters(params);
+            }
+          }
+        }
+        this.lastBytesReceived = currentBytes;
+        this.lastTimestamp = now;
+      } catch (err) {
+        // Stats not available — ignore
+      }
+    }, 5000); // Check every 5 seconds
   }
 
   // ── Ringtone ─────────────────────────────────────────────────────
