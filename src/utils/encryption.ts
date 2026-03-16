@@ -70,9 +70,10 @@ export interface ExportedPublicKey {
 
 /**
  * Generate or retrieve the user's ECDH key pair.
- * Keys are synced across devices via Firestore and cached locally in IndexedDB.
+ * Firestore is the source of truth for the canonical key pair.
+ * IndexedDB is a local cache for fast offline access.
  *
- * Priority: IndexedDB (fast local cache) → Firestore (cross-device sync) → Generate new
+ * Priority: Firestore (canonical) → IndexedDB (offline fallback) → Generate new
  */
 export async function getOrCreateKeyPair(uid: string): Promise<{
   publicKey: ExportedPublicKey;
@@ -80,80 +81,97 @@ export async function getOrCreateKeyPair(uid: string): Promise<{
 }> {
   const storeKey = `ecdh_${uid}`;
 
-  // 1) Try loading from IndexedDB (fast local cache)
-  const stored = await idbGet<{ publicJwk: JsonWebKey; privateJwk: JsonWebKey }>(storeKey);
-  if (stored?.privateJwk && stored?.publicJwk) {
-    console.log('[E2EE] Key pair loaded from IndexedDB');
-    const privateKey = await crypto.subtle.importKey(
-      'jwk', stored.privateJwk,
-      { name: 'ECDH', namedCurve: 'P-256' },
-      false, ['deriveKey', 'deriveBits']
-    );
-    return {
-      publicKey: stored.publicJwk as unknown as ExportedPublicKey,
-      privateKey,
-    };
-  }
+  // Helper to import a private JWK into a CryptoKey
+  const importPrivate = (jwk: JsonWebKey) =>
+    crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey', 'deriveBits']);
 
-  // 2) Try loading from Firestore (synced from another device)
+  // 1) Try Firestore first — this is the canonical source of truth
   try {
     const userDoc = await getDoc(doc(db, 'users', uid));
     const userData = userDoc.data();
     if (userData?.e2ePrivateKey && userData?.e2ePublicKey) {
-      console.log('[E2EE] Key pair loaded from Firestore (synced from another device)');
+      console.log('[E2EE] Key pair loaded from Firestore (canonical)');
       const privateJwk = userData.e2ePrivateKey as JsonWebKey;
       const publicJwk = userData.e2ePublicKey as JsonWebKey;
 
-      // Cache in IndexedDB for future fast access
+      // Sync to IndexedDB (overwrite any stale local key)
       await idbSet(storeKey, { publicJwk, privateJwk });
 
-      const privateKey = await crypto.subtle.importKey(
-        'jwk', privateJwk,
-        { name: 'ECDH', namedCurve: 'P-256' },
-        false, ['deriveKey', 'deriveBits']
-      );
+      const privateKey = await importPrivate(privateJwk);
       return {
         publicKey: publicJwk as unknown as ExportedPublicKey,
         privateKey,
       };
     }
+
+    // Firestore has no private key yet — check if there's a public-only key
+    // (legacy state before multi-device sync was added)
+    if (userData?.e2ePublicKey && !userData?.e2ePrivateKey) {
+      console.log('[E2EE] Firestore has public key but no private key (legacy). Checking IndexedDB...');
+      // Try IndexedDB — if it has a matching key pair, push the private key to Firestore
+      const stored = await idbGet<{ publicJwk: JsonWebKey; privateJwk: JsonWebKey }>(storeKey);
+      if (stored?.privateJwk && stored?.publicJwk) {
+        const localPub = stored.publicJwk as unknown as ExportedPublicKey;
+        const firestorePub = userData.e2ePublicKey as ExportedPublicKey;
+
+        if (localPub.x === firestorePub.x && localPub.y === firestorePub.y) {
+          // Local key matches Firestore public key — push private key to complete the sync
+          console.log('[E2EE] IndexedDB key matches Firestore public key. Syncing private key to Firestore.');
+          await updateDoc(doc(db, 'users', uid), {
+            e2ePrivateKey: stored.privateJwk,
+          });
+          const privateKey = await importPrivate(stored.privateJwk);
+          return {
+            publicKey: localPub,
+            privateKey,
+          };
+        } else {
+          // Local key doesn't match Firestore — local key is stale.
+          // Generate fresh key pair and push both to Firestore.
+          console.log('[E2EE] IndexedDB key does NOT match Firestore. Generating new canonical key pair.');
+        }
+      }
+    }
   } catch (err) {
-    console.warn('[E2EE] Failed to check Firestore for existing key pair:', err);
+    console.warn('[E2EE] Firestore check failed, falling back to IndexedDB:', err);
+    // Offline fallback — use IndexedDB if available
+    const stored = await idbGet<{ publicJwk: JsonWebKey; privateJwk: JsonWebKey }>(storeKey);
+    if (stored?.privateJwk && stored?.publicJwk) {
+      console.log('[E2EE] Key pair loaded from IndexedDB (offline fallback)');
+      const privateKey = await importPrivate(stored.privateJwk);
+      return {
+        publicKey: stored.publicJwk as unknown as ExportedPublicKey,
+        privateKey,
+      };
+    }
   }
 
-  // 3) Generate new ECDH P-256 key pair
-  console.log('[E2EE] Generating new key pair');
+  // 2) No canonical key pair exists anywhere — generate new one
+  console.log('[E2EE] Generating new canonical key pair');
   const keyPair = await crypto.subtle.generateKey(
     { name: 'ECDH', namedCurve: 'P-256' },
-    true, // extractable for storage
+    true,
     ['deriveKey', 'deriveBits']
   );
 
-  // Export keys for storage
   const publicJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
   const privateJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
 
   // Store in IndexedDB
   await idbSet(storeKey, { publicJwk, privateJwk });
 
-  // Sync key pair to Firestore for other devices
+  // Push to Firestore as the canonical key pair
   try {
     await updateDoc(doc(db, 'users', uid), {
       e2ePublicKey: publicJwk,
       e2ePrivateKey: privateJwk,
     });
-    console.log('[E2EE] Key pair synced to Firestore');
+    console.log('[E2EE] New canonical key pair synced to Firestore');
   } catch (err) {
-    console.warn('[E2EE] Failed to sync key pair to Firestore:', err);
+    console.warn('[E2EE] Failed to sync new key pair to Firestore:', err);
   }
 
-  // Re-import private key as non-extractable for runtime use
-  const privateKey = await crypto.subtle.importKey(
-    'jwk', privateJwk,
-    { name: 'ECDH', namedCurve: 'P-256' },
-    false, ['deriveKey', 'deriveBits']
-  );
-
+  const privateKey = await importPrivate(privateJwk);
   return {
     publicKey: publicJwk as unknown as ExportedPublicKey,
     privateKey,

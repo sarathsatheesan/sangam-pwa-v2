@@ -1484,14 +1484,27 @@ export default function MessagesPage() {
             const activeConv = selectedConvId ? conversations.find((c) => c.id === selectedConvId) : null;
             const isGroupConv = !!activeConv?.isGroup;
 
+            // Helper to check if a string is still encrypted (decryption failed)
+            const isStillEncrypted = (s: string): boolean => {
+              try {
+                const p = JSON.parse(s);
+                return !!(p.v === 2 && p.iv && p.ct);
+              } catch { return false; }
+            };
+
             // Helper to decrypt all fields with a given key
             const decryptAllFields = async (key: CryptoKey) => {
               text = await e2eDecrypt(text, key);
+              // If decryption failed (returned raw JSON), show friendly message
+              if (isStillEncrypted(text)) {
+                text = '\u{1F512} This message cannot be decrypted on this device';
+              }
               if (image) {
                 try {
                   const imgParsed = JSON.parse(image);
                   if (imgParsed.v === 2) {
                     image = await e2eDecrypt(image, key);
+                    if (isStillEncrypted(image)) image = undefined;
                   }
                 } catch { /* not encrypted or not JSON */ }
               }
@@ -1500,11 +1513,13 @@ export default function MessagesPage() {
                   const voiceParsed = JSON.parse(voiceMessage.audioUrl);
                   if (voiceParsed.v === 2) {
                     const decryptedAudio = await e2eDecrypt(voiceMessage.audioUrl, key);
-                    console.log('[E2EE] Voice audioUrl decrypted, starts with:', decryptedAudio.substring(0, 30));
-                    voiceMessage = {
-                      ...voiceMessage,
-                      audioUrl: decryptedAudio,
-                    };
+                    if (!isStillEncrypted(decryptedAudio)) {
+                      console.log('[E2EE] Voice audioUrl decrypted, starts with:', decryptedAudio.substring(0, 30));
+                      voiceMessage = {
+                        ...voiceMessage,
+                        audioUrl: decryptedAudio,
+                      };
+                    }
                   }
                 } catch { /* not encrypted or not JSON */ }
               }
