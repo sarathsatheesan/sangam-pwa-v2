@@ -2,19 +2,22 @@
 // End-to-End Encryption (E2EE) for ethniCity Messages
 // ═══════════════════════════════════════════════════════════════════════
 // Uses ECDH P-256 key exchange + AES-256-GCM (authenticated encryption)
-// via the Web Crypto API. Private keys never leave the device.
+// via the Web Crypto API. Key pairs are synced across devices via Firestore
+// and cached locally in IndexedDB for fast access.
 //
 // Industry compliance:
 //  - ECDH P-256 for key agreement (NIST approved, FIPS 186-4)
 //  - AES-256-GCM for authenticated encryption (NIST SP 800-38D)
 //  - HKDF-SHA256 for key derivation (RFC 5869)
 //  - Per-message random 96-bit IV (NIST recommended for GCM)
-//  - Private keys stored in IndexedDB (device-local, never transmitted)
+//  - Key pairs synced via Firestore for multi-device support
 //  - Public keys distributed via Firestore for peer key exchange
 // ═══════════════════════════════════════════════════════════════════════
 
 import CryptoJS from 'crypto-js';
 import { ENCRYPTION_SALT } from '../constants/config';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 // ─── IndexedDB Storage for Private Keys ──────────────────────────────
 
@@ -67,8 +70,9 @@ export interface ExportedPublicKey {
 
 /**
  * Generate or retrieve the user's ECDH key pair.
- * Private key is stored in IndexedDB (never leaves device).
- * Returns the public key in JWK format for Firestore distribution.
+ * Keys are synced across devices via Firestore and cached locally in IndexedDB.
+ *
+ * Priority: IndexedDB (fast local cache) → Firestore (cross-device sync) → Generate new
  */
 export async function getOrCreateKeyPair(uid: string): Promise<{
   publicKey: ExportedPublicKey;
@@ -76,9 +80,10 @@ export async function getOrCreateKeyPair(uid: string): Promise<{
 }> {
   const storeKey = `ecdh_${uid}`;
 
-  // Try loading existing key pair from IndexedDB
+  // 1) Try loading from IndexedDB (fast local cache)
   const stored = await idbGet<{ publicJwk: JsonWebKey; privateJwk: JsonWebKey }>(storeKey);
-  if (stored) {
+  if (stored?.privateJwk && stored?.publicJwk) {
+    console.log('[E2EE] Key pair loaded from IndexedDB');
     const privateKey = await crypto.subtle.importKey(
       'jwk', stored.privateJwk,
       { name: 'ECDH', namedCurve: 'P-256' },
@@ -90,7 +95,34 @@ export async function getOrCreateKeyPair(uid: string): Promise<{
     };
   }
 
-  // Generate new ECDH P-256 key pair
+  // 2) Try loading from Firestore (synced from another device)
+  try {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    const userData = userDoc.data();
+    if (userData?.e2ePrivateKey && userData?.e2ePublicKey) {
+      console.log('[E2EE] Key pair loaded from Firestore (synced from another device)');
+      const privateJwk = userData.e2ePrivateKey as JsonWebKey;
+      const publicJwk = userData.e2ePublicKey as JsonWebKey;
+
+      // Cache in IndexedDB for future fast access
+      await idbSet(storeKey, { publicJwk, privateJwk });
+
+      const privateKey = await crypto.subtle.importKey(
+        'jwk', privateJwk,
+        { name: 'ECDH', namedCurve: 'P-256' },
+        false, ['deriveKey', 'deriveBits']
+      );
+      return {
+        publicKey: publicJwk as unknown as ExportedPublicKey,
+        privateKey,
+      };
+    }
+  } catch (err) {
+    console.warn('[E2EE] Failed to check Firestore for existing key pair:', err);
+  }
+
+  // 3) Generate new ECDH P-256 key pair
+  console.log('[E2EE] Generating new key pair');
   const keyPair = await crypto.subtle.generateKey(
     { name: 'ECDH', namedCurve: 'P-256' },
     true, // extractable for storage
@@ -103,6 +135,17 @@ export async function getOrCreateKeyPair(uid: string): Promise<{
 
   // Store in IndexedDB
   await idbSet(storeKey, { publicJwk, privateJwk });
+
+  // Sync key pair to Firestore for other devices
+  try {
+    await updateDoc(doc(db, 'users', uid), {
+      e2ePublicKey: publicJwk,
+      e2ePrivateKey: privateJwk,
+    });
+    console.log('[E2EE] Key pair synced to Firestore');
+  } catch (err) {
+    console.warn('[E2EE] Failed to sync key pair to Firestore:', err);
+  }
 
   // Re-import private key as non-extractable for runtime use
   const privateKey = await crypto.subtle.importKey(

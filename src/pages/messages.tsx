@@ -1288,7 +1288,7 @@ export default function MessagesPage() {
     return unsub;
   }, []);
 
-  // E2EE: Generate/load ECDH key pair on mount, publish public key to Firestore
+  // E2EE: Generate/load ECDH key pair on mount (syncs across devices via Firestore)
   useEffect(() => {
     if (!user?.uid) return;
     let cancelled = false;
@@ -1298,11 +1298,12 @@ export default function MessagesPage() {
         if (cancelled) return;
         e2ePrivateKeyRef.current = privateKey;
         e2ePublicKeyRef.current = publicKey;
-        // Publish public key to user's Firestore document for peer exchange
+        // Ensure public key is published (getOrCreateKeyPair handles full sync for new keys)
         await updateDoc(doc(db, 'users', user.uid), {
           e2ePublicKey: publicKey,
         });
         setE2eReady(true);
+        console.log('[E2EE] Initialized successfully');
       } catch (err) {
         console.error('E2EE init failed:', err);
         // Fall back to legacy encryption if E2EE init fails
