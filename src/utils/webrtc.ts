@@ -229,6 +229,15 @@ export class CallManager {
       const newStream = new MediaStream(this.remoteStream!.getTracks());
       this.remoteStream = newStream;
       this.setState({ remoteStream: newStream });
+
+      // Safari: tracks can arrive in 'live' state but not fire 'unmute' events
+      // Listen for track unmute/ended to re-trigger state update
+      event.track.onunmute = () => {
+        console.log('[WebRTC] Track unmuted:', event.track.kind);
+        const refreshedStream = new MediaStream(this.remoteStream!.getTracks());
+        this.remoteStream = refreshedStream;
+        this.setState({ remoteStream: refreshedStream });
+      };
     };
 
     // Send ICE candidates to Firestore
@@ -325,7 +334,11 @@ export class CallManager {
       });
 
       // Create SDP offer
-      const offer = await this.pc.createOffer();
+      // Safari: explicitly request audio/video receive capabilities
+      const offer = await this.pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: callType === 'video',
+      });
       await this.pc.setLocalDescription(offer);
 
       // Write call document to Firestore (this signals the callee)
@@ -779,9 +792,20 @@ export class CallManager {
   private playRingtone() {
     try {
       this.stopRingtone();
-      const ctx = new AudioContext();
+      // Safari requires AudioContext to be created/resumed from a user gesture.
+      // Use webkitAudioContext fallback for older Safari.
+      const AudioCtx = (window as unknown as Record<string, unknown>).webkitAudioContext as typeof AudioContext || AudioContext;
+      const ctx = new AudioCtx();
+      // Safari: resume() must be called to unlock suspended AudioContext
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
       const playBeep = () => {
         if (!this.ringAudio) return;
+        // Safari: re-check context state and resume if needed
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);

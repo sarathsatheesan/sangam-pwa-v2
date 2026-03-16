@@ -15,6 +15,44 @@ import {
   PhoneIncoming, X, Shield, Minimize2,
 } from 'lucide-react';
 
+// ─── Safari Compatibility Helpers ─────────────────────────────────
+const isSafari = (): boolean => {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua);
+};
+
+/**
+ * Safari-safe play: retries with muted fallback if autoplay is blocked.
+ * Safari iOS blocks play() unless triggered by a user gesture.
+ * We attempt play → if blocked, mute and retry → then unmute after a tick.
+ */
+const safariSafePlay = async (el: HTMLMediaElement): Promise<void> => {
+  try {
+    await el.play();
+  } catch (err: unknown) {
+    const name = (err as { name?: string })?.name;
+    if (name === 'NotAllowedError' || name === 'AbortError') {
+      console.warn('[Safari] Autoplay blocked, retrying with muted workaround');
+      // For video elements: temporarily mute, play, then unmute
+      // (Safari sometimes allows muted autoplay)
+      const wasMuted = el.muted;
+      el.muted = true;
+      try {
+        await el.play();
+        // Unmute after a short delay — Safari may allow it once playing
+        if (!wasMuted && el instanceof HTMLAudioElement) {
+          setTimeout(() => { el.muted = false; }, 100);
+        }
+      } catch {
+        console.warn('[Safari] Even muted play failed — will require user tap');
+      }
+    } else {
+      console.warn('[WebRTC] Play failed:', err);
+    }
+  }
+};
+
 // ─── Helpers ───────────────────────────────────────────────────────
 
 const generateConvId = (uid1: string, uid2: string): string => {
@@ -44,8 +82,10 @@ const GlobalCallOverlay: React.FC = () => {
   const remoteVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
     (remoteVideoRef as React.MutableRefObject<HTMLVideoElement | null>).current = node;
     if (node && callState.remoteStream) {
+      // Safari: ensure webkit-playsinline attribute
+      node.setAttribute('webkit-playsinline', '');
       node.srcObject = callState.remoteStream;
-      node.play().catch((err) => console.warn('[WebRTC] Remote video play (ref callback):', err));
+      safariSafePlay(node);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callState.remoteStream]);
@@ -131,8 +171,9 @@ const GlobalCallOverlay: React.FC = () => {
   // Attach local media stream to video element
   useEffect(() => {
     if (localVideoRef.current && callState.localStream) {
+      localVideoRef.current.setAttribute('webkit-playsinline', '');
       localVideoRef.current.srcObject = callState.localStream;
-      localVideoRef.current.play().catch((err) => console.warn('[WebRTC] Local video play failed:', err));
+      safariSafePlay(localVideoRef.current);
     }
   }, [callState.localStream]);
 
@@ -143,14 +184,15 @@ const GlobalCallOverlay: React.FC = () => {
 
     if (isVideo && remoteVideoRef.current) {
       console.log('[WebRTC] Setting remote video srcObject, tracks:', callState.remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
+      remoteVideoRef.current.setAttribute('webkit-playsinline', '');
       remoteVideoRef.current.srcObject = callState.remoteStream;
-      remoteVideoRef.current.play().catch((err) => console.warn('[WebRTC] Remote video play failed:', err));
+      safariSafePlay(remoteVideoRef.current);
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = null;
       }
     } else if (!isVideo && remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = callState.remoteStream;
-      remoteAudioRef.current.play().catch((err) => console.warn('[WebRTC] Remote audio play failed:', err));
+      safariSafePlay(remoteAudioRef.current);
     }
   }, [callState.remoteStream, callState.status, callState.callType]);
 
@@ -184,10 +226,28 @@ const GlobalCallOverlay: React.FC = () => {
 
   // ── Handlers ──
 
+  /**
+   * Safari: retry playing all media elements after a user gesture.
+   * User gestures (tap/click) unlock autoplay on Safari iOS.
+   */
+  const retryMediaPlayback = useCallback(() => {
+    if (remoteVideoRef.current?.srcObject) {
+      safariSafePlay(remoteVideoRef.current);
+    }
+    if (remoteAudioRef.current?.srcObject) {
+      safariSafePlay(remoteAudioRef.current);
+    }
+    if (localVideoRef.current?.srcObject) {
+      safariSafePlay(localVideoRef.current);
+    }
+  }, []);
+
   const handleAnswerCall = async () => {
     if (!callState.callId) return;
     try {
       await callManagerRef.current.answerCall(callState.callId, callState.callType);
+      // Safari: answering is a user gesture — retry media playback
+      setTimeout(retryMediaPlayback, 300);
     } catch (err) {
       console.error('Failed to answer call:', err);
     }
@@ -206,8 +266,15 @@ const GlobalCallOverlay: React.FC = () => {
 
   return (
     <>
-      {/* Hidden audio element — always in DOM for audio calls */}
-      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
+      {/* Audio element — positioned off-screen instead of display:none (Safari won't play hidden audio) */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        // @ts-ignore webkit-playsinline for older Safari
+        webkit-playsinline=""
+        style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }}
+      />
 
       {/* ── MINIMIZED PiP MODE ── */}
       {callMinimized ? (
@@ -217,8 +284,17 @@ const GlobalCallOverlay: React.FC = () => {
             width: callState.callType === 'video' ? '140px' : '200px',
             backgroundColor: '#1a1a2e',
             border: '2px solid rgba(99,102,241,0.5)',
+            // Safari iOS: force GPU compositing layer for reliable position:fixed
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
           }}
-          onClick={() => setCallMinimized(false)}
+          onClick={() => {
+            setCallMinimized(false);
+            // Safari: expanding PiP is a user gesture — retry media playback
+            setTimeout(retryMediaPlayback, 100);
+          }}
         >
           {/* PiP video */}
           {callState.callType === 'video' && (
@@ -227,6 +303,8 @@ const GlobalCallOverlay: React.FC = () => {
                 ref={remoteVideoCallbackRef}
                 autoPlay
                 playsInline
+                // @ts-ignore webkit-playsinline for older Safari
+                webkit-playsinline=""
                 className="w-full h-full object-cover"
                 style={{ opacity: callState.status === 'connected' ? 1 : 0 }}
               />
@@ -284,7 +362,12 @@ const GlobalCallOverlay: React.FC = () => {
         </div>
       ) : (
         /* ── FULLSCREEN CALL MODE ── */
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.92)' }}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{
+          backgroundColor: 'rgba(0,0,0,0.92)',
+          // Safari iOS: force GPU compositing for reliable position:fixed
+          WebkitTransform: 'translateZ(0)',
+          transform: 'translateZ(0)',
+        }}>
           <div className="w-full h-full max-w-lg mx-auto flex flex-col items-center justify-between py-12 px-6 relative">
 
             {/* Minimize button (top left) — only when connected/connecting */}
@@ -304,6 +387,8 @@ const GlobalCallOverlay: React.FC = () => {
                 ref={remoteVideoCallbackRef}
                 autoPlay
                 playsInline
+                // @ts-ignore webkit-playsinline for older Safari
+                webkit-playsinline=""
                 className="absolute inset-0 w-full h-full object-cover"
                 style={{ opacity: callState.status === 'connected' ? 1 : 0 }}
               />
@@ -316,6 +401,8 @@ const GlobalCallOverlay: React.FC = () => {
                   ref={localVideoRef}
                   autoPlay
                   playsInline
+                  // @ts-ignore webkit-playsinline for older Safari
+                  webkit-playsinline=""
                   muted
                   className="w-full h-full object-cover"
                   style={{ transform: 'scaleX(-1)' }}
