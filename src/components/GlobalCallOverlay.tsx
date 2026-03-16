@@ -41,8 +41,9 @@ const safariSafePlay = async (el: HTMLMediaElement): Promise<void> => {
       try {
         await el.play();
         // Unmute after a short delay — Safari may allow it once playing
-        if (!wasMuted && el instanceof HTMLAudioElement) {
-          setTimeout(() => { el.muted = false; }, 100);
+        // (applies to both audio and video elements so audio track in video calls works)
+        if (!wasMuted) {
+          setTimeout(() => { el.muted = false; }, 200);
         }
       } catch {
         console.warn('[Safari] Even muted play failed — will require user tap');
@@ -261,6 +262,14 @@ const GlobalCallOverlay: React.FC = () => {
     callManagerRef.current.rejectCall();
   };
 
+  // Determine if remote video should be visible:
+  // Show when connected OR when we have a remote stream with video tracks
+  // (covers the case where ICE/peer connection state events fire late)
+  const hasRemoteVideoTrack = callState.remoteStream
+    ? callState.remoteStream.getVideoTracks().length > 0
+    : false;
+  const showRemoteVideo = callState.status === 'connected' || hasRemoteVideoTrack;
+
   // Don't render anything when idle
   if (callState.status === 'idle') return null;
 
@@ -306,9 +315,9 @@ const GlobalCallOverlay: React.FC = () => {
                 // @ts-ignore webkit-playsinline for older Safari
                 webkit-playsinline=""
                 className="w-full h-full object-cover"
-                style={{ opacity: callState.status === 'connected' ? 1 : 0 }}
+                style={{ opacity: showRemoteVideo ? 1 : 0 }}
               />
-              {callState.status !== 'connected' && (
+              {!showRemoteVideo && (
                 <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: '#6366F1' }}>
                   <span className="text-white text-2xl font-bold">{callState.peerName?.[0]?.toUpperCase() || '?'}</span>
                 </div>
@@ -390,7 +399,7 @@ const GlobalCallOverlay: React.FC = () => {
                 // @ts-ignore webkit-playsinline for older Safari
                 webkit-playsinline=""
                 className="absolute inset-0 w-full h-full object-cover"
-                style={{ opacity: callState.status === 'connected' ? 1 : 0 }}
+                style={{ opacity: showRemoteVideo ? 1 : 0 }}
               />
             )}
 
@@ -419,9 +428,9 @@ const GlobalCallOverlay: React.FC = () => {
             {/* Top section: call info */}
             <div className="text-center z-10 relative">
               <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold"
-                style={{ backgroundColor: callState.callType === 'video' && callState.status === 'connected' ? 'transparent' : '#6366F1' }}
+                style={{ backgroundColor: callState.callType === 'video' && showRemoteVideo ? 'transparent' : '#6366F1' }}
               >
-                {callState.callType !== 'video' || callState.status !== 'connected' ? (
+                {callState.callType !== 'video' || !showRemoteVideo ? (
                   callState.peerName?.[0]?.toUpperCase() || '?'
                 ) : null}
               </div>

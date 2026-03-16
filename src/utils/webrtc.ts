@@ -270,7 +270,19 @@ export class CallManager {
 
     pc.oniceconnectionstatechange = () => {
       console.log('[WebRTC] ICE connection state:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'failed') {
+      // Fallback for browsers (especially Safari) where onconnectionstatechange
+      // doesn't reliably fire 'connected'. ICE 'connected' or 'completed' means
+      // media is flowing — treat it the same as peer connection 'connected'.
+      if (
+        (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') &&
+        this.state.status !== 'connected'
+      ) {
+        console.log('[WebRTC] ICE connected/completed — promoting to connected status');
+        this.setState({ status: 'connected' });
+        this.startDurationTimer();
+        this.startAdaptiveBitrate();
+        this.stopRingtone();
+      } else if (pc.iceConnectionState === 'failed') {
         // ICE failed — try to restart
         console.warn('[WebRTC] ICE failed, ending call');
         this.endCall('connection_lost');
