@@ -47,6 +47,7 @@ import {
   ChevronDown,
   AlertTriangle,
   Ban,
+  Download,
 } from 'lucide-react';
 
 interface Post {
@@ -438,6 +439,9 @@ export default function FeedPage() {
 
   // Enhancement 6: Sorting
   const [sortMode, setSortMode] = useState<'recent' | 'popular' | 'trending'>('recent');
+
+  // Lightbox image viewer
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Native-language greeting based on user's ethnicity
   const nativeGreeting = useMemo(() => {
@@ -1160,6 +1164,36 @@ export default function FeedPage() {
     setMenuPostId(null);
     setBlockTargetUser({ uid: userId, name: userName });
     setShowBlockConfirm(true);
+  };
+
+  // ─── Lightbox Handlers ────────────────────────────────────────────────────
+  const downloadLightboxImage = () => {
+    if (!lightboxImage) return;
+    const link = document.createElement('a');
+    link.href = lightboxImage;
+    link.download = `image_${Date.now()}.jpg`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const shareLightboxImage = async () => {
+    if (!lightboxImage) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ url: lightboxImage });
+      } catch { /* user cancelled */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(lightboxImage);
+        setToastMessage('Image link copied to clipboard');
+        setTimeout(() => setToastMessage(null), 3000);
+      } catch {
+        setToastMessage('Could not share image');
+        setTimeout(() => setToastMessage(null), 3000);
+      }
+    }
   };
 
   // ─── Filter & Sort ────────────────────────────────────────────────────────
@@ -2059,7 +2093,7 @@ export default function FeedPage() {
                           alt=""
                           className="w-full h-auto object-contain cursor-pointer hover:opacity-95 transition-opacity"
                           style={{ maxHeight: '520px' }}
-                          onClick={() => openPostDetail(post)}
+                          onClick={(e) => { e.stopPropagation(); setLightboxImage(post.images![0]); }}
                         />
                       </div>
                     ) : post.images.length === 2 ? (
@@ -2072,7 +2106,7 @@ export default function FeedPage() {
                               alt=""
                               className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
                               style={{ aspectRatio: '4/5', minHeight: '180px' }}
-                              onClick={() => openPostDetail(post)}
+                              onClick={(e) => { e.stopPropagation(); setLightboxImage(img); }}
                             />
                           </div>
                         ))}
@@ -2085,7 +2119,7 @@ export default function FeedPage() {
                             src={post.images[0]}
                             alt=""
                             className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                            onClick={() => openPostDetail(post)}
+                            onClick={(e) => { e.stopPropagation(); setLightboxImage(post.images![0]); }}
                           />
                         </div>
                         {post.images.slice(1).map((img, idx) => (
@@ -2094,7 +2128,7 @@ export default function FeedPage() {
                               src={img}
                               alt=""
                               className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                              onClick={() => openPostDetail(post)}
+                              onClick={(e) => { e.stopPropagation(); setLightboxImage(img); }}
                             />
                           </div>
                         ))}
@@ -2109,7 +2143,7 @@ export default function FeedPage() {
                               alt=""
                               className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
                               style={{ aspectRatio: '4/3' }}
-                              onClick={() => openPostDetail(post)}
+                              onClick={(e) => { e.stopPropagation(); setLightboxImage(img); }}
                             />
                           </div>
                         ))}
@@ -2553,26 +2587,27 @@ export default function FeedPage() {
                         <img
                           src={selectedPost.images[0]}
                           alt=""
-                          className="w-full h-auto object-contain"
+                          className="w-full h-auto object-contain cursor-pointer hover:opacity-95 transition-opacity"
                           style={{ maxHeight: '520px' }}
+                          onClick={() => setLightboxImage(selectedPost.images![0])}
                         />
                       </div>
                     ) : selectedPost.images.length === 2 ? (
                       <div className="grid grid-cols-2 gap-1.5">
                         {selectedPost.images.map((img, idx) => (
                           <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
-                            <img src={img} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '4/5', minHeight: '180px' }} />
+                            <img src={img} alt="" className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity" style={{ aspectRatio: '4/5', minHeight: '180px' }} onClick={() => setLightboxImage(img)} />
                           </div>
                         ))}
                       </div>
                     ) : selectedPost.images.length === 3 ? (
                       <div className="grid grid-cols-2 gap-1.5" style={{ height: '380px' }}>
                         <div className="rounded-xl overflow-hidden bg-aurora-surface-variant row-span-2">
-                          <img src={selectedPost.images[0]} alt="" className="w-full h-full object-cover" />
+                          <img src={selectedPost.images[0]} alt="" className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setLightboxImage(selectedPost.images![0])} />
                         </div>
                         {selectedPost.images.slice(1).map((img, idx) => (
                           <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
-                            <img src={img} alt="" className="w-full h-full object-cover" />
+                            <img src={img} alt="" className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setLightboxImage(img)} />
                           </div>
                         ))}
                       </div>
@@ -2580,7 +2615,7 @@ export default function FeedPage() {
                       <div className="grid grid-cols-2 gap-1.5">
                         {selectedPost.images.map((img, idx) => (
                           <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
-                            <img src={img} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '4/3' }} />
+                            <img src={img} alt="" className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity" style={{ aspectRatio: '4/3' }} onClick={() => setLightboxImage(img)} />
                           </div>
                         ))}
                       </div>
@@ -3002,6 +3037,55 @@ export default function FeedPage() {
                 Block
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          LIGHTBOX IMAGE VIEWER
+          ═══════════════════════════════════════════════════════════════════ */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[9999] flex flex-col"
+          style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+          onClick={() => setLightboxImage(null)}
+        >
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={downloadLightboxImage}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Download image"
+              >
+                <Download size={22} className="text-white" />
+              </button>
+              <button
+                onClick={shareLightboxImage}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Share image"
+              >
+                <Share2 size={22} className="text-white" />
+              </button>
+            </div>
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="p-2 rounded-full hover:bg-white/10 transition-colors"
+              aria-label="Close lightbox"
+            >
+              <X size={24} className="text-white" />
+            </button>
+          </div>
+
+          {/* Centered image */}
+          <div className="flex-1 flex items-center justify-center p-4 min-h-0" onClick={() => setLightboxImage(null)}>
+            <img
+              src={lightboxImage}
+              alt=""
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+              draggable={false}
+            />
           </div>
         </div>
       )}
