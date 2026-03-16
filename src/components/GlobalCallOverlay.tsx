@@ -80,13 +80,14 @@ const GlobalCallOverlay: React.FC = () => {
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
   // Callback ref for remote video — sets srcObject immediately when element mounts/changes
+  // Video element is always MUTED — audio comes exclusively from the <audio> element
   const remoteVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
     (remoteVideoRef as React.MutableRefObject<HTMLVideoElement | null>).current = node;
     if (node && callState.remoteStream) {
-      // Safari: ensure webkit-playsinline attribute
       node.setAttribute('webkit-playsinline', '');
+      node.muted = true; // Audio comes from <audio> element, not <video>
       node.srcObject = callState.remoteStream;
-      safariSafePlay(node);
+      node.play().catch((err) => console.warn('[WebRTC] Remote video play (ref callback):', err));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callState.remoteStream]);
@@ -178,24 +179,53 @@ const GlobalCallOverlay: React.FC = () => {
     }
   }, [callState.localStream]);
 
-  // Attach remote stream to the correct element based on call type
+  // Attach remote stream — audio ALWAYS goes to <audio> element, video to <video> element
+  // This is the standard WebRTC pattern: separate audio and video playback.
+  // The <video> elements are always muted (audio comes only from <audio>).
+  // This prevents cross-browser autoplay issues from killing audio.
   useEffect(() => {
     if (!callState.remoteStream) return;
-    const isVideo = callState.callType === 'video';
+    const tracks = callState.remoteStream.getTracks();
+    console.log('[WebRTC] Attaching remote stream, tracks:', tracks.map(t => `${t.kind}:${t.readyState}`).join(', '));
 
-    if (isVideo && remoteVideoRef.current) {
-      console.log('[WebRTC] Setting remote video srcObject, tracks:', callState.remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
+    // 1. ALWAYS set <audio> element to the remote stream for audio playback
+    //    (works for both audio-only and video calls)
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = callState.remoteStream;
+      // Play audio — this is the critical path for hearing the other user
+      remoteAudioRef.current.play().catch((err) => {
+        console.warn('[WebRTC] Audio play blocked, will retry on user gesture:', err);
+      });
+    }
+
+    // 2. For video calls, also set <video> element (it stays muted — audio comes from <audio>)
+    if (callState.callType === 'video' && remoteVideoRef.current) {
       remoteVideoRef.current.setAttribute('webkit-playsinline', '');
       remoteVideoRef.current.srcObject = callState.remoteStream;
-      safariSafePlay(remoteVideoRef.current);
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = null;
-      }
-    } else if (!isVideo && remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = callState.remoteStream;
-      safariSafePlay(remoteAudioRef.current);
+      remoteVideoRef.current.play().catch((err) => {
+        console.warn('[WebRTC] Video play failed:', err);
+      });
     }
   }, [callState.remoteStream, callState.status, callState.callType]);
+
+  // When call status changes to connected, ensure audio is playing
+  // This is especially important for the CALLER side — they initiated the call
+  // (which was a user gesture), but the remote stream arrives later.
+  // We retry play() here as a safety net.
+  useEffect(() => {
+    if (callState.status === 'connected' && remoteAudioRef.current?.srcObject) {
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.play().catch((err) => {
+        console.warn('[WebRTC] Connected but audio play failed, will retry:', err);
+        // Last resort: retry after a short delay
+        setTimeout(() => {
+          if (remoteAudioRef.current?.srcObject) {
+            remoteAudioRef.current.play().catch(() => {});
+          }
+        }, 500);
+      });
+    }
+  }, [callState.status]);
 
   // Reset minimized state when call ends
   useEffect(() => {
@@ -228,18 +258,26 @@ const GlobalCallOverlay: React.FC = () => {
   // ── Handlers ──
 
   /**
-   * Safari: retry playing all media elements after a user gesture.
-   * User gestures (tap/click) unlock autoplay on Safari iOS.
+   * Retry playing all media elements after a user gesture.
+   * User gestures (tap/click) unlock autoplay on ALL browsers.
+   * The <audio> element is the critical one for hearing the other user.
+   * The <video> elements are muted — they just need play() called.
    */
   const retryMediaPlayback = useCallback(() => {
-    if (remoteVideoRef.current?.srcObject) {
-      safariSafePlay(remoteVideoRef.current);
-    }
+    // Most important: retry the audio element (this is how users hear each other)
     if (remoteAudioRef.current?.srcObject) {
-      safariSafePlay(remoteAudioRef.current);
+      remoteAudioRef.current.muted = false; // Ensure not muted
+      remoteAudioRef.current.play().catch((err) =>
+        console.warn('[WebRTC] Audio retry play failed:', err)
+      );
+    }
+    // Video elements stay muted — just need play() for rendering
+    if (remoteVideoRef.current?.srcObject) {
+      remoteVideoRef.current.muted = true;
+      remoteVideoRef.current.play().catch(() => {});
     }
     if (localVideoRef.current?.srcObject) {
-      safariSafePlay(localVideoRef.current);
+      localVideoRef.current.play().catch(() => {});
     }
   }, []);
 
@@ -247,8 +285,11 @@ const GlobalCallOverlay: React.FC = () => {
     if (!callState.callId) return;
     try {
       await callManagerRef.current.answerCall(callState.callId, callState.callType);
-      // Safari: answering is a user gesture — retry media playback
-      setTimeout(retryMediaPlayback, 300);
+      // Answering is a user gesture — retry media playback at multiple intervals
+      // to cover the window between when tracks arrive and when play() is allowed
+      setTimeout(retryMediaPlayback, 200);
+      setTimeout(retryMediaPlayback, 800);
+      setTimeout(retryMediaPlayback, 2000);
     } catch (err) {
       console.error('Failed to answer call:', err);
     }
@@ -275,7 +316,9 @@ const GlobalCallOverlay: React.FC = () => {
 
   return (
     <>
-      {/* Audio element — positioned off-screen instead of display:none (Safari won't play hidden audio) */}
+      {/* Audio element — handles ALL remote audio for BOTH audio and video calls.
+          Positioned off-screen (not display:none — Safari won't play hidden audio).
+          NEVER muted — this is the only path for hearing the remote user. */}
       <audio
         ref={remoteAudioRef}
         autoPlay
@@ -301,17 +344,19 @@ const GlobalCallOverlay: React.FC = () => {
           }}
           onClick={() => {
             setCallMinimized(false);
-            // Safari: expanding PiP is a user gesture — retry media playback
-            setTimeout(retryMediaPlayback, 100);
+            // User gesture opportunity — retry media playback (especially audio)
+            retryMediaPlayback();
+            setTimeout(retryMediaPlayback, 300);
           }}
         >
-          {/* PiP video */}
+          {/* PiP video — muted because audio comes from <audio> element */}
           {callState.callType === 'video' && (
             <div className="relative" style={{ height: '180px' }}>
               <video
                 ref={remoteVideoCallbackRef}
                 autoPlay
                 playsInline
+                muted
                 // @ts-ignore webkit-playsinline for older Safari
                 webkit-playsinline=""
                 className="w-full h-full object-cover"
@@ -371,12 +416,17 @@ const GlobalCallOverlay: React.FC = () => {
         </div>
       ) : (
         /* ── FULLSCREEN CALL MODE ── */
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{
-          backgroundColor: 'rgba(0,0,0,0.92)',
-          // Safari iOS: force GPU compositing for reliable position:fixed
-          WebkitTransform: 'translateZ(0)',
-          transform: 'translateZ(0)',
-        }}>
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.92)',
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+          }}
+          // Any tap on the call screen is a user gesture — retry audio
+          onTouchStart={retryMediaPlayback}
+          onClick={retryMediaPlayback}
+        >
           <div className="w-full h-full max-w-lg mx-auto flex flex-col items-center justify-between py-12 px-6 relative">
 
             {/* Minimize button (top left) — only when connected/connecting */}
@@ -390,12 +440,13 @@ const GlobalCallOverlay: React.FC = () => {
               </button>
             )}
 
-            {/* Remote video (full background for video calls) */}
+            {/* Remote video (full background) — muted because audio comes from <audio> element */}
             {callState.callType === 'video' && (
               <video
                 ref={remoteVideoCallbackRef}
                 autoPlay
                 playsInline
+                muted
                 // @ts-ignore webkit-playsinline for older Safari
                 webkit-playsinline=""
                 className="absolute inset-0 w-full h-full object-cover"
