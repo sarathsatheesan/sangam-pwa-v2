@@ -2446,8 +2446,8 @@ export default function MessagesPage() {
     if (activeFilter === 'unread') {
       result = result.filter((conv) => (conv.unreadCount || 0) > 0 && conv.lastMessageSenderId !== user?.uid);
     } else if (activeFilter === 'connects') {
-      // Show all users you've connected with (all conversations)
-      // No additional filtering needed - shows all conversations
+      // Show only group conversations
+      result = result.filter((conv) => conv.isGroup === true);
     }
 
     return result;
@@ -2647,8 +2647,8 @@ export default function MessagesPage() {
         ) : activeFilter === 'connects' ? (
           <div className="p-8 text-center" style={{ color: '#667781' }}>
             <MessageSquare size={48} className="mx-auto mb-3 opacity-40" />
-            <p className="text-sm">No connects yet</p>
-            <p className="text-xs mt-1">Start a conversation to build your connections</p>
+            <p className="text-sm">No group chats yet</p>
+            <p className="text-xs mt-1">Create a group to start chatting with multiple people</p>
           </div>
         ) : (
           <div className="p-8 text-center" style={{ color: '#667781' }}>
