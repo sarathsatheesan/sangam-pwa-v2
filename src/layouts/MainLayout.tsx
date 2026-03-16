@@ -4,6 +4,7 @@ import AppHeader from '../components/layout/AppHeader';
 import ModuleSelector from '../components/layout/ModuleSelector';
 import AppFooter from '../components/layout/AppFooter';
 import { ToastContainer } from '../components/shared/Toast';
+import GlobalCallOverlay from '../components/GlobalCallOverlay';
 
 export const MainLayout: React.FC = () => {
   return (
@@ -24,6 +25,9 @@ export const MainLayout: React.FC = () => {
 
       {/* Toast notifications */}
       <ToastContainer />
+
+      {/* Global call overlay — persists across all route changes */}
+      <GlobalCallOverlay />
     </div>
   );
 };

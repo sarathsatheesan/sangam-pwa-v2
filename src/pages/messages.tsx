@@ -27,12 +27,12 @@ import {
   ChevronUp, Palette, Minimize2, Maximize2, AlertCircle, CheckCircle,
   Check, CheckCheck, Paperclip, Users, Shield, UserPlus, UserMinus, Crown, Settings,
   Flag, Ban, VolumeX,
-  Phone, PhoneOff, Video, VideoOff, SwitchCamera, PhoneIncoming, PhoneOutgoing,
+  Phone, PhoneOff, Video, VideoOff,
   Download, Share2,
 } from 'lucide-react';
 import {
-  getCallManager, formatCallDuration,
-  type CallState, type CallType, type CallEndedEvent,
+  getCallManager,
+  type CallState, type CallType,
 } from '@/utils/webrtc';
 
 // ===== TYPES =====
@@ -1265,23 +1265,9 @@ export default function MessagesPage() {
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
 
-  // Call state
+  // Call state — subscribe to CallManager for header button states
   const [callState, setCallState] = useState<CallState>(getCallManager().getState());
-  const [callMinimized, setCallMinimized] = useState(false);
   const callManagerRef = useRef(getCallManager());
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);
-
-  // Callback ref for remote video — sets srcObject immediately when element mounts/changes
-  const remoteVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
-    (remoteVideoRef as React.MutableRefObject<HTMLVideoElement | null>).current = node;
-    if (node && callState.remoteStream) {
-      node.srcObject = callState.remoteStream;
-      node.play().catch((err) => console.warn('[WebRTC] Remote video play (ref callback):', err));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callState.remoteStream]);
 
   // Refs
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1294,114 +1280,13 @@ export default function MessagesPage() {
     }
   }, []);
 
-  // Subscribe to call manager state changes
+  // Subscribe to call manager state changes (for header button enabled/disabled state)
   useEffect(() => {
     const unsub = callManagerRef.current.subscribe((state) => {
       setCallState(state);
     });
     return unsub;
   }, []);
-
-  // Listen for incoming calls
-  useEffect(() => {
-    if (!user?.uid) return;
-    const unsub = callManagerRef.current.listenForIncomingCalls(
-      user.uid,
-      (_callId, _callerName, _callType) => {
-        // State is updated by the CallManager — UI reacts via callState
-      }
-    );
-    return unsub;
-  }, [user?.uid]);
-
-  // Write call event messages to chat when calls end
-  useEffect(() => {
-    if (!user?.uid) return;
-    const unsub = callManagerRef.current.onCallEnded(async (event: CallEndedEvent) => {
-      try {
-        // Determine call event type for the chat message
-        let eventType: 'missed' | 'completed' | 'rejected' | 'cancelled';
-        if (event.endReason === 'timeout') {
-          eventType = event.isCaller ? 'cancelled' : 'missed';
-        } else if (event.endReason === 'rejected') {
-          eventType = 'rejected';
-        } else if (event.endReason === 'cancelled') {
-          eventType = 'cancelled';
-        } else if (event.duration > 0) {
-          eventType = 'completed';
-        } else {
-          // ended with 0 duration = missed/cancelled
-          eventType = event.isCaller ? 'cancelled' : 'missed';
-        }
-
-        const convId = generateConvId(user.uid, event.peerId);
-        const callLabel = event.callType === 'video' ? 'Video' : 'Voice';
-        const textLabel = eventType === 'completed'
-          ? `${callLabel} call`
-          : eventType === 'missed'
-            ? `Missed ${callLabel.toLowerCase()} call`
-            : eventType === 'rejected'
-              ? `Declined ${callLabel.toLowerCase()} call`
-              : `Cancelled ${callLabel.toLowerCase()} call`;
-
-        await addDoc(collection(db, 'conversations', convId, 'messages'), {
-          text: textLabel,
-          senderId: user.uid,
-          time: formatMessageTime(Timestamp.now()),
-          createdAt: serverTimestamp(),
-          callEvent: {
-            type: eventType,
-            callType: event.callType,
-            ...(event.duration > 0 ? { duration: event.duration } : {}),
-          },
-        });
-
-        // Update conversation last message
-        await setDoc(doc(db, 'conversations', convId), {
-          lastMessage: textLabel,
-          lastMessageTime: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          lastMessageSenderId: user.uid,
-          participants: [user.uid, event.peerId].sort(),
-        }, { merge: true });
-
-        console.log('[CallEvent] Wrote call event message:', eventType, event.callType);
-      } catch (err) {
-        console.error('[CallEvent] Failed to write call event message:', err);
-      }
-    });
-    return unsub;
-  }, [user?.uid]);
-
-  // Attach local media stream to video element
-  useEffect(() => {
-    if (localVideoRef.current && callState.localStream) {
-      localVideoRef.current.srcObject = callState.localStream;
-      localVideoRef.current.play().catch((err) => console.warn('[WebRTC] Local video play failed:', err));
-    }
-  }, [callState.localStream]);
-
-  // Attach remote stream to the correct element based on call type
-  // Re-runs on status changes because the video element may mount late
-  useEffect(() => {
-    if (!callState.remoteStream) return;
-    const isVideo = callState.callType === 'video';
-
-    if (isVideo && remoteVideoRef.current) {
-      // For video calls: use the <video> element for both audio + video
-      console.log('[WebRTC] Setting remote video srcObject, tracks:', callState.remoteStream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
-      remoteVideoRef.current.srcObject = callState.remoteStream;
-      remoteVideoRef.current.play().catch((err) => console.warn('[WebRTC] Remote video play failed:', err));
-      // Clear audio element to avoid conflict
-      if (remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = null;
-      }
-    } else if (!isVideo && remoteAudioRef.current) {
-      // For audio calls: use the hidden <audio> element
-      remoteAudioRef.current.srcObject = callState.remoteStream;
-      remoteAudioRef.current.play().catch((err) => console.warn('[WebRTC] Remote audio play failed:', err));
-    }
-  }, [callState.remoteStream, callState.status, callState.callType]);
 
   // E2EE: Generate/load ECDH key pair on mount, publish public key to Firestore
   useEffect(() => {
@@ -2929,11 +2814,6 @@ export default function MessagesPage() {
         {/* Back button - only show on mobile */}
         <button
           onClick={() => {
-            // If in an active call, minimize to PiP instead of leaving
-            const activeCall = callState.status !== 'idle' && callState.status !== 'ended';
-            if (activeCall) {
-              setCallMinimized(true);
-            }
             setViewState('list');
             setSelectedUser(null);
             setSelectedConvId(null);
@@ -3565,351 +3445,7 @@ export default function MessagesPage() {
     }
   };
 
-  const handleAnswerCall = async () => {
-    if (!callState.callId) return;
-    try {
-      await callManagerRef.current.answerCall(callState.callId, callState.callType);
-    } catch (err) {
-      showNotif('Failed to answer call', 'error');
-    }
-  };
-
-  const handleEndCall = () => {
-    callManagerRef.current.endCall('ended');
-  };
-
-  const handleRejectCall = () => {
-    callManagerRef.current.rejectCall();
-  };
-
-  // Reset minimized state when call ends
-  useEffect(() => {
-    if (callState.status === 'idle' || callState.status === 'ended') {
-      setCallMinimized(false);
-    }
-  }, [callState.status]);
-
-  // Intercept browser/hardware back button during active calls → minimize to PiP
-  useEffect(() => {
-    const isActiveCall = callState.status !== 'idle' && callState.status !== 'ended';
-    if (!isActiveCall || callMinimized) return;
-
-    // Push a history entry so that the back button can be intercepted
-    window.history.pushState({ callActive: true }, '');
-
-    const handlePopState = () => {
-      const stillActive = callManagerRef.current.getState().status !== 'idle' &&
-                          callManagerRef.current.getState().status !== 'ended';
-      if (stillActive) {
-        setCallMinimized(true);
-        // Don't navigate away — the popstate already consumed the history entry
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [callState.status, callMinimized]);
-
-  // === Call Overlay UI ===
-  const callOverlay = callState.status !== 'idle' ? (
-    <>
-      {/* Hidden audio element — always in DOM for audio calls */}
-      <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
-
-      {/* ── MINIMIZED PiP MODE ── */}
-      {callMinimized ? (
-        <div
-          className="fixed bottom-20 right-4 z-[9999] rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 cursor-pointer"
-          style={{ width: callState.callType === 'video' ? '140px' : '200px', backgroundColor: '#1a1a2e' }}
-          onClick={() => setCallMinimized(false)}
-        >
-          {/* PiP video — show remote video for video calls */}
-          {callState.callType === 'video' && (
-            <div className="relative" style={{ height: '180px' }}>
-              <video
-                ref={remoteVideoCallbackRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-                style={{ opacity: callState.status === 'connected' ? 1 : 0 }}
-              />
-              {(callState.status !== 'connected') && (
-                <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: '#6366F1' }}>
-                  <span className="text-white text-2xl font-bold">{callState.peerName?.[0]?.toUpperCase() || '?'}</span>
-                </div>
-              )}
-              {/* Mute/video-off indicators on PiP */}
-              <div className="absolute top-1.5 left-1.5 flex gap-1">
-                {callState.isMuted && (
-                  <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
-                    <MicOff size={12} className="text-white" />
-                  </div>
-                )}
-                {callState.isVideoOff && (
-                  <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
-                    <VideoOff size={12} className="text-white" />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          {/* PiP audio call info */}
-          {callState.callType === 'audio' && (
-            <div className="px-3 py-3 flex items-center gap-2">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
-                <span className="text-white text-sm font-bold">{callState.peerName?.[0]?.toUpperCase() || '?'}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-white text-xs font-medium truncate">{callState.peerName}</div>
-                <div className="text-white/60 text-[10px]">
-                  {callState.status === 'connected' ? formatCallDuration(callState.duration) : 'Connecting...'}
-                </div>
-              </div>
-              {callState.isMuted && (
-                <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-                  <MicOff size={10} className="text-white" />
-                </div>
-              )}
-            </div>
-          )}
-          {/* PiP bottom bar */}
-          <div className="flex items-center justify-between px-2 py-1.5" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <span className="text-white/70 text-[10px]">
-              {callState.status === 'connected' && callState.callType === 'video' ? formatCallDuration(callState.duration) : 'Tap to expand'}
-            </span>
-            <button
-              onClick={(e) => { e.stopPropagation(); handleEndCall(); }}
-              className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center"
-            >
-              <PhoneOff size={12} className="text-white" />
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* ── FULLSCREEN CALL MODE ── */
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.92)' }}>
-          <div className="w-full h-full max-w-lg mx-auto flex flex-col items-center justify-between py-12 px-6 relative">
-
-            {/* Minimize button (top left) — only when connected/connecting */}
-            {(callState.status === 'connected' || callState.status === 'connecting') && (
-              <button
-                onClick={() => setCallMinimized(true)}
-                className="absolute top-4 left-4 z-20 p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-                aria-label="Minimize call"
-              >
-                <Minimize2 size={20} className="text-white" />
-              </button>
-            )}
-
-            {/* Remote video (full background for video calls) — always rendered so ref is available */}
-            {callState.callType === 'video' && (
-              <video
-                ref={remoteVideoCallbackRef}
-                autoPlay
-                playsInline
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{ opacity: callState.status === 'connected' ? 1 : 0 }}
-              />
-            )}
-
-            {/* Local video (picture-in-picture corner) */}
-            {callState.callType === 'video' && callState.localStream && (
-              <div className="absolute top-4 right-4 w-28 h-40 rounded-xl overflow-hidden shadow-xl border-2 border-white/30 z-10">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                  style={{ transform: 'scaleX(-1)' }}
-                />
-                {/* "Camera off" overlay on local PiP */}
-                {callState.isVideoOff && (
-                  <div className="absolute inset-0 bg-gray-900/80 flex flex-col items-center justify-center">
-                    <VideoOff size={20} className="text-white/70" />
-                    <span className="text-white/60 text-[9px] mt-1">Camera off</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Top section: call info */}
-            <div className="text-center z-10 relative">
-              {/* Peer avatar placeholder */}
-              <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold"
-                style={{ backgroundColor: callState.callType === 'video' && callState.status === 'connected' ? 'transparent' : '#6366F1' }}
-              >
-                {callState.callType !== 'video' || callState.status !== 'connected' ? (
-                  callState.peerName?.[0]?.toUpperCase() || '?'
-                ) : null}
-              </div>
-
-              <h2 className="text-white text-xl font-semibold mb-1">{callState.peerName || 'Unknown'}</h2>
-
-              <p className="text-white/70 text-sm">
-                {callState.status === 'calling' && 'Calling...'}
-                {callState.status === 'ringing' && (
-                  <span className="flex items-center justify-center gap-2">
-                    <PhoneIncoming size={16} className="animate-pulse" />
-                    Incoming {callState.callType} call
-                  </span>
-                )}
-                {callState.status === 'connecting' && 'Connecting...'}
-                {callState.status === 'connected' && formatCallDuration(callState.duration)}
-                {callState.status === 'ended' && 'Call ended'}
-              </p>
-
-              {/* E2EE badge */}
-              {callState.status === 'connected' && (
-                <div className="flex items-center justify-center gap-1 mt-2 text-green-400 text-xs">
-                  <Shield size={12} />
-                  <span>End-to-end encrypted</span>
-                </div>
-              )}
-
-              {/* Active status indicators (muted / video off) */}
-              {callState.status === 'connected' && (callState.isMuted || callState.isVideoOff) && (
-                <div className="flex items-center justify-center gap-2 mt-3">
-                  {callState.isMuted && (
-                    <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/90 text-white text-xs font-medium">
-                      <MicOff size={12} /> Muted
-                    </div>
-                  )}
-                  {callState.isVideoOff && (
-                    <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/90 text-white text-xs font-medium">
-                      <VideoOff size={12} /> Camera off
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Spacer */}
-            <div className="flex-1" />
-
-            {/* Bottom section: call controls */}
-            <div className="z-10 relative">
-              {/* Incoming call: accept/reject */}
-              {callState.status === 'ringing' && (
-                <div className="flex items-center gap-8">
-                  <div className="flex flex-col items-center gap-1">
-                    <button
-                      onClick={handleRejectCall}
-                      className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 transition-colors shadow-lg"
-                      aria-label="Reject call"
-                    >
-                      <PhoneOff size={28} className="text-white" />
-                    </button>
-                    <span className="text-white/60 text-xs">Decline</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <button
-                      onClick={handleAnswerCall}
-                      className="w-16 h-16 rounded-full flex items-center justify-center bg-green-500 hover:bg-green-600 transition-colors shadow-lg animate-pulse"
-                      aria-label="Answer call"
-                    >
-                      <Phone size={28} className="text-white" />
-                    </button>
-                    <span className="text-white/60 text-xs">Accept</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Outgoing call: cancel */}
-              {callState.status === 'calling' && (
-                <div className="flex flex-col items-center gap-1">
-                  <button
-                    onClick={handleEndCall}
-                    className="w-16 h-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 transition-colors shadow-lg"
-                    aria-label="Cancel call"
-                  >
-                    <PhoneOff size={28} className="text-white" />
-                  </button>
-                  <span className="text-white/60 text-xs">Cancel</span>
-                </div>
-              )}
-
-              {/* Active call: mute, video toggle, flip camera, minimize, end */}
-              {(callState.status === 'connecting' || callState.status === 'connected') && (
-                <div className="flex items-center gap-3">
-                  {/* Mute */}
-                  <div className="flex flex-col items-center gap-1">
-                    <button
-                      onClick={() => callManagerRef.current.toggleMute()}
-                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                        callState.isMuted
-                          ? 'bg-red-500 text-white ring-2 ring-red-300'
-                          : 'bg-white/20 text-white hover:bg-white/30'
-                      }`}
-                      aria-label={callState.isMuted ? 'Unmute' : 'Mute'}
-                    >
-                      {callState.isMuted ? <MicOff size={22} /> : <Mic size={22} />}
-                    </button>
-                    <span className={`text-xs ${callState.isMuted ? 'text-red-400' : 'text-white/50'}`}>
-                      {callState.isMuted ? 'Muted' : 'Mic'}
-                    </span>
-                  </div>
-
-                  {/* Video toggle (only for video calls) */}
-                  {callState.callType === 'video' && (
-                    <div className="flex flex-col items-center gap-1">
-                      <button
-                        onClick={() => callManagerRef.current.toggleVideo()}
-                        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                          callState.isVideoOff
-                            ? 'bg-red-500 text-white ring-2 ring-red-300'
-                            : 'bg-white/20 text-white hover:bg-white/30'
-                        }`}
-                        aria-label={callState.isVideoOff ? 'Turn on camera' : 'Turn off camera'}
-                      >
-                        {callState.isVideoOff ? <VideoOff size={22} /> : <Video size={22} />}
-                      </button>
-                      <span className={`text-xs ${callState.isVideoOff ? 'text-red-400' : 'text-white/50'}`}>
-                        {callState.isVideoOff ? 'Off' : 'Video'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Switch camera (video calls) */}
-                  {callState.callType === 'video' && (
-                    <div className="flex flex-col items-center gap-1">
-                      <button
-                        onClick={() => callManagerRef.current.switchCamera()}
-                        className="w-12 h-12 rounded-full flex items-center justify-center bg-white/20 text-white hover:bg-white/30 transition-colors shadow-lg"
-                        aria-label="Switch camera"
-                      >
-                        <SwitchCamera size={22} />
-                      </button>
-                      <span className="text-white/50 text-xs">Flip</span>
-                    </div>
-                  )}
-
-                  {/* End call */}
-                  <div className="flex flex-col items-center gap-1">
-                    <button
-                      onClick={handleEndCall}
-                      className="w-14 h-14 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 transition-colors shadow-lg"
-                      aria-label="End call"
-                    >
-                      <PhoneOff size={24} className="text-white" />
-                    </button>
-                    <span className="text-red-400 text-xs">End</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Ended state — auto-dismisses */}
-              {callState.status === 'ended' && (
-                <p className="text-white/50 text-sm">Call ended</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  ) : null;
+  // Call overlay UI is now in GlobalCallOverlay (src/components/GlobalCallOverlay.tsx)
 
   // === MOBILE LAYOUT: full-screen chat when in room view ===
   // === DESKTOP LAYOUT (md+): side-by-side panels like WhatsApp Web ===
@@ -3931,9 +3467,6 @@ export default function MessagesPage() {
       <div className={`${viewState === 'list' ? 'hidden md:flex' : 'flex'} flex-col h-full flex-1 min-w-0`}>
         {(selectedUser || activeGroupConv) ? chatRoomPanel : emptyRightPanel}
       </div>
-
-      {/* Call overlay */}
-      {callOverlay}
 
       {/* Global overlays */}
       {contextMenuMsg && (
