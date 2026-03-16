@@ -22,11 +22,6 @@ const isSafari = (): boolean => {
   return /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua);
 };
 
-/**
- * Safari-safe play: retries with muted fallback if autoplay is blocked.
- * Safari iOS blocks play() unless triggered by a user gesture.
- * We attempt play → if blocked, mute and retry → then unmute after a tick.
- */
 const safariSafePlay = async (el: HTMLMediaElement): Promise<void> => {
   try {
     await el.play();
@@ -34,14 +29,10 @@ const safariSafePlay = async (el: HTMLMediaElement): Promise<void> => {
     const name = (err as { name?: string })?.name;
     if (name === 'NotAllowedError' || name === 'AbortError') {
       console.warn('[Safari] Autoplay blocked, retrying with muted workaround');
-      // For video elements: temporarily mute, play, then unmute
-      // (Safari sometimes allows muted autoplay)
       const wasMuted = el.muted;
       el.muted = true;
       try {
         await el.play();
-        // Unmute after a short delay — Safari may allow it once playing
-        // (applies to both audio and video elements so audio track in video calls works)
         if (!wasMuted) {
           setTimeout(() => { el.muted = false; }, 200);
         }
@@ -79,30 +70,6 @@ const GlobalCallOverlay: React.FC = () => {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
-  // Callback ref for remote video — sets srcObject immediately when element mounts/changes
-  // (fires when switching between PiP and fullscreen since the <video> DOM node changes)
-  const remoteVideoCallbackRef = useCallback((node: HTMLVideoElement | null) => {
-    (remoteVideoRef as React.MutableRefObject<HTMLVideoElement | null>).current = node;
-    if (node && callState.remoteStream) {
-      node.setAttribute('webkit-playsinline', '');
-      node.muted = true; // Video element is muted — audio comes from <audio> element
-      node.srcObject = callState.remoteStream;
-      node.play().catch((err) => console.warn('[WebRTC] Remote video play (ref callback):', err));
-
-      // Also ensure audio element has its own separate stream after PiP/fullscreen switch
-      if (remoteAudioRef.current) {
-        const audioTracks = callState.remoteStream.getAudioTracks();
-        if (audioTracks.length > 0) {
-          const audioOnlyStream = new MediaStream(audioTracks);
-          remoteAudioRef.current.srcObject = audioOnlyStream;
-          remoteAudioRef.current.muted = false;
-          remoteAudioRef.current.play().catch(() => {});
-        }
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callState.remoteStream]);
-
   // Subscribe to call manager state changes
   useEffect(() => {
     const unsub = callManagerRef.current.subscribe((state) => {
@@ -117,8 +84,6 @@ const GlobalCallOverlay: React.FC = () => {
     const unsub = callManagerRef.current.listenForIncomingCalls(
       user.uid,
       (_callId, _callerName, _callType) => {
-        // State is updated by the CallManager — UI reacts via callState
-        // Ensure we're in fullscreen mode for incoming calls
         setCallMinimized(false);
       }
     );
@@ -192,14 +157,14 @@ const GlobalCallOverlay: React.FC = () => {
 
   // Attach remote stream to media elements.
   //
-  // CRITICAL: For video calls, the <audio> and <video> elements must NOT share
-  // the same MediaStream object. On Safari/Android, a muted <video> element's
-  // mute state can bleed into the shared stream, silencing the <audio> element.
+  // CRITICAL: For video calls, <audio> and <video> must NOT share the same
+  // MediaStream. On Safari/Android, a muted <video>'s mute state can bleed
+  // into the shared stream, silencing the <audio> element.
   //
   // Solution:
-  //  - Audio calls: <audio> gets the full stream (no <video> involved)
-  //  - Video calls: <audio> gets a SEPARATE audio-only MediaStream (cloned audio tracks)
-  //                 <video muted> gets the full stream (for video display only)
+  //  - Audio calls: <audio> gets the full stream
+  //  - Video calls: <audio> gets a SEPARATE audio-only MediaStream
+  //                 <video muted> gets the full stream (video display only)
   useEffect(() => {
     if (!callState.remoteStream) return;
     const tracks = callState.remoteStream.getTracks();
@@ -208,8 +173,7 @@ const GlobalCallOverlay: React.FC = () => {
     const isVideo = callState.callType === 'video';
 
     if (isVideo) {
-      // VIDEO CALL: separate streams to avoid mute-bleed
-      // 1. Audio element gets its own audio-only stream
+      // Audio element gets its own audio-only stream (avoids mute-bleed)
       if (remoteAudioRef.current) {
         const audioTracks = callState.remoteStream.getAudioTracks();
         if (audioTracks.length > 0) {
@@ -221,7 +185,8 @@ const GlobalCallOverlay: React.FC = () => {
           });
         }
       }
-      // 2. Video element gets the full stream (muted — video display only)
+      // Video element gets the full stream (muted — video display only)
+      // This is a PERSISTENT element — never unmounts during PiP/fullscreen switch
       if (remoteVideoRef.current) {
         remoteVideoRef.current.setAttribute('webkit-playsinline', '');
         remoteVideoRef.current.muted = true;
@@ -243,12 +208,10 @@ const GlobalCallOverlay: React.FC = () => {
   }, [callState.remoteStream, callState.status, callState.callType]);
 
   // When call status changes to connected, ensure audio is playing.
-  // Also re-create audio-only stream for video calls as a safety net.
   useEffect(() => {
     if (callState.status !== 'connected' || !callState.remoteStream) return;
 
     if (remoteAudioRef.current) {
-      // For video calls, ensure the audio element has its own separate stream
       if (callState.callType === 'video') {
         const audioTracks = callState.remoteStream.getAudioTracks();
         if (audioTracks.length > 0 && remoteAudioRef.current.srcObject !== null) {
@@ -300,17 +263,10 @@ const GlobalCallOverlay: React.FC = () => {
 
   // ── Handlers ──
 
-  /**
-   * Retry playing all media elements after a user gesture.
-   * User gestures (tap/click) unlock autoplay on ALL browsers.
-   * The <audio> element is critical — ensure it has its own stream and is not muted.
-   */
   const retryMediaPlayback = useCallback(() => {
     const state = callManagerRef.current.getState();
 
-    // Ensure audio element has content and play it
     if (remoteAudioRef.current) {
-      // For video calls, ensure audio element has its own separate audio-only stream
       if (state.callType === 'video' && state.remoteStream && !remoteAudioRef.current.srcObject) {
         const audioTracks = state.remoteStream.getAudioTracks();
         if (audioTracks.length > 0) {
@@ -324,7 +280,6 @@ const GlobalCallOverlay: React.FC = () => {
         );
       }
     }
-    // Video elements stay muted — just need play() for rendering
     if (remoteVideoRef.current?.srcObject) {
       remoteVideoRef.current.muted = true;
       remoteVideoRef.current.play().catch(() => {});
@@ -338,8 +293,6 @@ const GlobalCallOverlay: React.FC = () => {
     if (!callState.callId) return;
     try {
       await callManagerRef.current.answerCall(callState.callId, callState.callType);
-      // Answering is a user gesture — retry media playback at multiple intervals
-      // to cover the window between when tracks arrive and when play() is allowed
       setTimeout(retryMediaPlayback, 200);
       setTimeout(retryMediaPlayback, 800);
       setTimeout(retryMediaPlayback, 2000);
@@ -356,22 +309,21 @@ const GlobalCallOverlay: React.FC = () => {
     callManagerRef.current.rejectCall();
   };
 
-  // Determine if remote video should be visible:
-  // Show when connected OR when we have a remote stream with video tracks
-  // (covers the case where ICE/peer connection state events fire late)
+  // Determine if remote video should be visible
   const hasRemoteVideoTrack = callState.remoteStream
     ? callState.remoteStream.getVideoTracks().length > 0
     : false;
   const showRemoteVideo = callState.status === 'connected' || hasRemoteVideoTrack;
+  const isVideoCall = callState.callType === 'video';
 
   // Don't render anything when idle
   if (callState.status === 'idle') return null;
 
   return (
     <>
-      {/* Audio element — handles ALL remote audio for BOTH audio and video calls.
-          Positioned off-screen (not display:none — Safari won't play hidden audio).
-          NEVER muted — this is the only path for hearing the remote user. */}
+      {/* ── PERSISTENT MEDIA ELEMENTS ── never unmount during PiP/fullscreen switch */}
+
+      {/* Audio — handles ALL remote audio. Off-screen, never muted. */}
       <audio
         ref={remoteAudioRef}
         autoPlay
@@ -381,15 +333,51 @@ const GlobalCallOverlay: React.FC = () => {
         style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }}
       />
 
+      {/* Remote video — SINGLE persistent element, repositioned via CSS.
+          Never destroyed on PiP↔fullscreen switch so video never pauses. */}
+      {isVideoCall && (
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          muted
+          // @ts-ignore webkit-playsinline for older Safari
+          webkit-playsinline=""
+          style={{
+            position: 'fixed',
+            zIndex: 10000,
+            objectFit: 'cover',
+            opacity: showRemoteVideo ? 1 : 0,
+            // Smooth transition when switching between PiP and fullscreen
+            transition: 'all 0.3s ease-in-out',
+            WebkitTransform: 'translateZ(0)',
+            ...(callMinimized ? {
+              // PiP position
+              bottom: '100px',
+              right: '16px',
+              width: '140px',
+              height: '180px',
+              borderRadius: '16px',
+            } : {
+              // Fullscreen position
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              borderRadius: 0,
+            }),
+          }}
+        />
+      )}
+
       {/* ── MINIMIZED PiP MODE ── */}
       {callMinimized ? (
         <div
           className="fixed bottom-20 right-4 z-[9999] rounded-2xl overflow-hidden shadow-2xl cursor-pointer"
           style={{
-            width: callState.callType === 'video' ? '140px' : '200px',
+            width: isVideoCall ? '140px' : '200px',
             backgroundColor: '#1a1a2e',
             border: '2px solid rgba(99,102,241,0.5)',
-            // Safari iOS: force GPU compositing layer for reliable position:fixed
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)',
             WebkitBackfaceVisibility: 'hidden',
@@ -397,31 +385,21 @@ const GlobalCallOverlay: React.FC = () => {
           }}
           onClick={() => {
             setCallMinimized(false);
-            // User gesture opportunity — retry media playback (especially audio)
             retryMediaPlayback();
             setTimeout(retryMediaPlayback, 300);
           }}
         >
-          {/* PiP video — muted because audio comes from <audio> element */}
-          {callState.callType === 'video' && (
+          {/* PiP video placeholder / avatar fallback */}
+          {isVideoCall && (
             <div className="relative" style={{ height: '180px' }}>
-              <video
-                ref={remoteVideoCallbackRef}
-                autoPlay
-                playsInline
-                muted
-                // @ts-ignore webkit-playsinline for older Safari
-                webkit-playsinline=""
-                className="w-full h-full object-cover"
-                style={{ opacity: showRemoteVideo ? 1 : 0 }}
-              />
+              {/* The actual video is the persistent element above — this div is just the container */}
               {!showRemoteVideo && (
                 <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: '#6366F1' }}>
                   <span className="text-white text-2xl font-bold">{callState.peerName?.[0]?.toUpperCase() || '?'}</span>
                 </div>
               )}
               {/* Mute/video-off indicators on PiP */}
-              <div className="absolute top-1.5 left-1.5 flex gap-1">
+              <div className="absolute top-1.5 left-1.5 flex gap-1 z-10">
                 {callState.isMuted && (
                   <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
                     <MicOff size={12} className="text-white" />
@@ -457,7 +435,7 @@ const GlobalCallOverlay: React.FC = () => {
           {/* PiP bottom bar */}
           <div className="flex items-center justify-between px-2 py-1.5" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
             <span className="text-white/70 text-[10px]">
-              {callState.status === 'connected' && callState.callType === 'video' ? formatCallDuration(callState.duration) : 'Tap to expand'}
+              {callState.status === 'connected' && isVideoCall ? formatCallDuration(callState.duration) : 'Tap to expand'}
             </span>
             <button
               onClick={(e) => { e.stopPropagation(); handleEndCall(); }}
@@ -476,16 +454,15 @@ const GlobalCallOverlay: React.FC = () => {
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)',
           }}
-          // Any tap on the call screen is a user gesture — retry audio
           onTouchStart={retryMediaPlayback}
           onClick={retryMediaPlayback}
         >
           <div className="w-full h-full max-w-lg mx-auto flex flex-col items-center justify-between py-12 px-6 relative">
 
-            {/* Minimize button (top left) — only when connected/connecting */}
+            {/* Minimize button (top left) */}
             {(callState.status === 'connected' || callState.status === 'connecting') && (
               <button
-                onClick={() => setCallMinimized(true)}
+                onClick={(e) => { e.stopPropagation(); setCallMinimized(true); }}
                 className="absolute top-4 left-4 z-20 p-2.5 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
                 aria-label="Minimize call"
               >
@@ -493,22 +470,10 @@ const GlobalCallOverlay: React.FC = () => {
               </button>
             )}
 
-            {/* Remote video (full background) — muted because audio comes from <audio> element */}
-            {callState.callType === 'video' && (
-              <video
-                ref={remoteVideoCallbackRef}
-                autoPlay
-                playsInline
-                muted
-                // @ts-ignore webkit-playsinline for older Safari
-                webkit-playsinline=""
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{ opacity: showRemoteVideo ? 1 : 0 }}
-              />
-            )}
+            {/* Remote video is the PERSISTENT element above — rendered at z-10000 */}
 
             {/* Local video (picture-in-picture corner) */}
-            {callState.callType === 'video' && callState.localStream && (
+            {isVideoCall && callState.localStream && (
               <div className="absolute top-4 right-4 w-28 h-40 rounded-xl overflow-hidden shadow-xl border-2 border-white/30 z-10">
                 <video
                   ref={localVideoRef}
@@ -532,9 +497,9 @@ const GlobalCallOverlay: React.FC = () => {
             {/* Top section: call info */}
             <div className="text-center z-10 relative">
               <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold"
-                style={{ backgroundColor: callState.callType === 'video' && showRemoteVideo ? 'transparent' : '#6366F1' }}
+                style={{ backgroundColor: isVideoCall && showRemoteVideo ? 'transparent' : '#6366F1' }}
               >
-                {callState.callType !== 'video' || !showRemoteVideo ? (
+                {!isVideoCall || !showRemoteVideo ? (
                   callState.peerName?.[0]?.toUpperCase() || '?'
                 ) : null}
               </div>
@@ -639,7 +604,7 @@ const GlobalCallOverlay: React.FC = () => {
                   </div>
 
                   {/* Video toggle */}
-                  {callState.callType === 'video' && (
+                  {isVideoCall && (
                     <div className="flex flex-col items-center gap-1">
                       <button
                         onClick={() => callManagerRef.current.toggleVideo()}
@@ -658,7 +623,7 @@ const GlobalCallOverlay: React.FC = () => {
                   )}
 
                   {/* Switch camera */}
-                  {callState.callType === 'video' && (
+                  {isVideoCall && (
                     <div className="flex flex-col items-center gap-1">
                       <button
                         onClick={() => callManagerRef.current.switchCamera()}
