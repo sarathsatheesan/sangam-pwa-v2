@@ -1171,7 +1171,7 @@ function MessageSearchBar({
  * - User interaction - typing, reactions, formatting
  */
 export default function MessagesPage() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { isFeatureEnabled } = useFeatureSettings();
   const groupMessagingEnabled = isFeatureEnabled('messages_groupMessaging');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -3430,7 +3430,7 @@ export default function MessagesPage() {
     try {
       await callManagerRef.current.startCall(
         user.uid,
-        user.displayName || 'User',
+        userProfile?.name || userProfile?.preferredName || user.displayName || 'User',
         selectedUser.id,
         selectedUser.name,
         callType
