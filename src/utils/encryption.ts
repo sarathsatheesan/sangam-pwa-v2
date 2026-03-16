@@ -127,12 +127,20 @@ export async function deriveSharedKey(
   privateKey: CryptoKey,
   peerPublicKeyJwk: ExportedPublicKey
 ): Promise<CryptoKey> {
-  // Import peer's public key
+  console.log('[E2EE] Deriving shared key for peer...');
+  // Import peer's public key (Safari requires clean JWK with ext:true, no key_ops)
+  const peerJwk: JsonWebKey = {
+    kty: peerPublicKeyJwk.kty,
+    crv: peerPublicKeyJwk.crv,
+    x: peerPublicKeyJwk.x,
+    y: peerPublicKeyJwk.y,
+    ext: true,
+  };
   const peerPublicKey = await crypto.subtle.importKey(
     'jwk',
-    { ...peerPublicKeyJwk, key_ops: [] },
+    peerJwk,
     { name: 'ECDH', namedCurve: 'P-256' },
-    false, []
+    true, []
   );
 
   // Derive shared bits via ECDH
@@ -142,9 +150,9 @@ export async function deriveSharedKey(
     256
   );
 
-  // Import shared bits as HKDF base key
+  // Import shared bits as HKDF base key (Safari requires algorithm as object, not string)
   const hkdfKey = await crypto.subtle.importKey(
-    'raw', sharedBits, 'HKDF', false, ['deriveKey']
+    'raw', sharedBits, { name: 'HKDF' }, false, ['deriveKey']
   );
 
   // Derive AES-256-GCM key via HKDF
@@ -161,6 +169,7 @@ export async function deriveSharedKey(
     ['encrypt', 'decrypt']
   );
 
+  console.log('[E2EE] Shared key derived successfully');
   return aesKey;
 }
 
@@ -210,14 +219,15 @@ export async function e2eDecrypt(encryptedPayload: string, sharedKey: CryptoKey)
     const ct = base64ToArray(payload.ct);
 
     const decrypted = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv as BufferSource },
+      { name: 'AES-GCM', iv: iv as unknown as BufferSource },
       sharedKey,
-      ct as BufferSource
+      ct as unknown as BufferSource
     );
 
     return new TextDecoder().decode(decrypted);
-  } catch {
-    // JSON parse failure = plaintext, or decryption failure
+  } catch (err) {
+    // Log for debugging Safari issues
+    console.error('[E2EE] Decryption failed:', err);
     return encryptedPayload;
   }
 }
@@ -282,9 +292,9 @@ export async function unwrapGroupKeyForMember(
 ): Promise<CryptoKey> {
   const { iv, wk } = JSON.parse(wrappedPayload);
   const raw = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: base64ToArray(iv) as BufferSource },
+    { name: 'AES-GCM', iv: base64ToArray(iv) as unknown as BufferSource },
     memberSharedKey,
-    base64ToArray(wk) as BufferSource
+    base64ToArray(wk) as unknown as BufferSource
   );
   return importGroupKey(raw);
 }
@@ -319,11 +329,19 @@ export async function unwrapGroupKeyWithECDH(
 }
 
 // ─── Base64 Utility Helpers ──────────────────────────────────────────
+// Safari-safe: process in chunks to avoid call stack issues with large arrays
 
 function arrayToBase64(arr: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
-  return btoa(binary);
+  // Process in 8KB chunks to avoid call stack size limits in Safari
+  const chunks: string[] = [];
+  const chunkSize = 8192;
+  for (let i = 0; i < arr.length; i += chunkSize) {
+    const slice = arr.subarray(i, Math.min(i + chunkSize, arr.length));
+    let binary = '';
+    for (let j = 0; j < slice.length; j++) binary += String.fromCharCode(slice[j]);
+    chunks.push(binary);
+  }
+  return btoa(chunks.join(''));
 }
 
 function base64ToArray(b64: string): Uint8Array {
