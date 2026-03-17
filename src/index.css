@@ -86,6 +86,16 @@
   --aurora-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
   --aurora-shadow-3: 0 8px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.04);
   --aurora-shadow-4: 0 16px 40px rgba(0, 0, 0, 0.12), 0 6px 12px rgba(0, 0, 0, 0.04);
+
+  /* Message-specific vars */
+  --msg-own-bubble: #E0E7FF;
+  --msg-own-bubble-hover: #EEF2FF;
+  --msg-text: #111B21;
+  --msg-secondary: #667781;
+  --msg-icon: #54656F;
+  --msg-hover-bg: #F5F6F6;
+  --msg-divider: #F0F2F5;
+  --msg-system-text: #4A6E7F;
 }
 
 /* ═══════════════════════════════════════════════
@@ -119,6 +129,16 @@
   --aurora-shadow-4: 0 12px 32px rgba(0, 0, 0, 0.5);
 
   color-scheme: dark;
+
+  /* Message-specific dark overrides */
+  --msg-own-bubble: #2D2F5E;
+  --msg-own-bubble-hover: #353768;
+  --msg-text: #F0F1F5;
+  --msg-secondary: #A0A3B5;
+  --msg-icon: #8B8FA3;
+  --msg-hover-bg: #2C2D42;
+  --msg-divider: rgba(255, 255, 255, 0.08);
+  --msg-system-text: #8BAAB8;
 }
 
 @layer base {

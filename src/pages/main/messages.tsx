@@ -121,7 +121,7 @@ const WALLPAPER_PRESETS = {
     label: 'Aurora',
     description: 'Subtle aurora indigo pattern',
     style: {
-      backgroundColor: '#EEF2FF',
+      backgroundColor: 'var(--msg-own-bubble-hover)',
       backgroundImage: `url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cstyle%3E.d%7Bfill:%236366F1;opacity:0.06%7D%3C/style%3E%3C/defs%3E%3Ccircle class='d' cx='20' cy='30' r='3'/%3E%3Crect class='d' x='60' y='15' width='8' height='10' rx='2'/%3E%3Ccircle class='d' cx='110' cy='25' r='4'/%3E%3Crect class='d' x='155' y='20' width='6' height='8' rx='1'/%3E%3Ccircle class='d' cx='40' cy='80' r='3.5'/%3E%3Crect class='d' x='90' y='70' width='10' height='6' rx='2'/%3E%3Ccircle class='d' cx='140' cy='85' r='3'/%3E%3Crect class='d' x='175' y='75' width='7' height='9' rx='1.5'/%3E%3Ccircle class='d' cx='25' cy='140' r='4'/%3E%3Crect class='d' x='70' y='130' width='9' height='7' rx='2'/%3E%3Ccircle class='d' cx='120' cy='145' r='3'/%3E%3Crect class='d' x='165' y='135' width='8' height='6' rx='1'/%3E%3Ccircle class='d' cx='50' cy='185' r='3'/%3E%3Crect class='d' x='100' y='180' width='7' height='9' rx='2'/%3E%3Ccircle class='d' cx='150' cy='175' r='4'/%3E%3C/svg%3E")`,
     } as React.CSSProperties,
   },
@@ -148,7 +148,7 @@ const WALLPAPER_PRESETS = {
     label: 'Indigo Dark',
     description: 'Deep indigo night',
     style: {
-      backgroundColor: '#0D1418',
+      backgroundColor: 'var(--aurora-bg)',
       backgroundImage: `url("data:image/svg+xml,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cstyle%3E.d%7Bfill:%23ffffff;opacity:0.03%7D%3C/style%3E%3C/defs%3E%3Ccircle class='d' cx='20' cy='30' r='3'/%3E%3Crect class='d' x='60' y='15' width='8' height='10' rx='2'/%3E%3Ccircle class='d' cx='110' cy='25' r='4'/%3E%3Ccircle class='d' cx='40' cy='80' r='3.5'/%3E%3Crect class='d' x='90' y='70' width='10' height='6' rx='2'/%3E%3Ccircle class='d' cx='140' cy='85' r='3'/%3E%3Ccircle class='d' cx='25' cy='140' r='4'/%3E%3Crect class='d' x='70' y='130' width='9' height='7' rx='2'/%3E%3C/svg%3E")`,
     } as React.CSSProperties,
   },
@@ -367,7 +367,7 @@ function ChatAvatar({ user, size = 'md', showOnlineStatus = false }: { user?: Us
   const sizeClass = sizeClasses[size] || sizeClasses.md;
 
   if (!user) {
-    return <div className={`${sizeClass} rounded-full`} style={{ backgroundColor: '#DFE5E7' }} />;
+    return <div className={`${sizeClass} rounded-full`} style={{ backgroundColor: 'var(--aurora-surface-variant)' }} />;
   }
 
   const isUrl = user.avatar && (user.avatar.startsWith('http') || user.avatar.startsWith('data:'));
@@ -376,7 +376,7 @@ function ChatAvatar({ user, size = 'md', showOnlineStatus = false }: { user?: Us
   const avatarElement = isUrl ? (
     <img src={user.avatar} alt={user.name} className={`${sizeClass} rounded-full object-cover`} />
   ) : isEmoji ? (
-    <div className={`${sizeClass} rounded-full flex items-center justify-center text-lg`} style={{ backgroundColor: '#DFE5E7' }}>{user.avatar}</div>
+    <div className={`${sizeClass} rounded-full flex items-center justify-center text-lg`} style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>{user.avatar}</div>
   ) : (
     <>
       {(() => {
@@ -415,11 +415,11 @@ function ChatAvatar({ user, size = 'md', showOnlineStatus = false }: { user?: Us
  */
 function SkeletonConversation() {
   return (
-    <div className="px-4 py-3 animate-pulse flex items-center gap-3 border-b" style={{ borderColor: '#f0f0f0' }}>
-      <div className="w-12 h-12 rounded-full" style={{ backgroundColor: '#E8E8E8' }} />
+    <div className="px-4 py-3 animate-pulse flex items-center gap-3 border-b" style={{ borderColor: 'var(--msg-divider)' }}>
+      <div className="w-12 h-12 rounded-full" style={{ backgroundColor: 'var(--aurora-surface-variant)' }} />
       <div className="flex-1">
-        <div className="h-4 w-28 rounded mb-2" style={{ backgroundColor: '#E8E8E8' }} />
-        <div className="h-3 w-44 rounded" style={{ backgroundColor: '#E8E8E8' }} />
+        <div className="h-4 w-28 rounded mb-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }} />
+        <div className="h-3 w-44 rounded" style={{ backgroundColor: 'var(--aurora-surface-variant)' }} />
       </div>
     </div>
   );
@@ -550,7 +550,7 @@ function MessageContextMenu({
               onClose();
             }}
             className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm"
-            style={{ color: '#667781' }}
+            style={{ color: 'var(--msg-secondary)' }}
           >
             <Flag size={15} /> Report Message
           </button>
@@ -894,7 +894,7 @@ function VoiceMessageBubble({ duration, audioUrl, isMine }: { duration: number; 
           );
         })}
       </div>
-      <span className="text-[11px] font-mono" style={{ color: '#667781' }}>
+      <span className="text-[11px] font-mono" style={{ color: 'var(--msg-secondary)' }}>
         {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
       </span>
     </div>
@@ -2548,19 +2548,19 @@ export default function MessagesPage() {
                 >
                   <button
                     onClick={(e) => { e.stopPropagation(); setShowPenMenu(false); setShowNewMsgPicker(true); }}
-                    className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-[#F5F6F6] transition-colors"
+                    className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-[var(--msg-hover-bg)] transition-colors"
                   >
-                    <MessageSquare size={18} style={{ color: '#54656F' }} />
-                    <span className="text-sm font-medium" style={{ color: '#111B21' }}>New Message</span>
+                    <MessageSquare size={18} style={{ color: 'var(--msg-icon)' }} />
+                    <span className="text-sm font-medium" style={{ color: 'var(--msg-text)' }}>New Message</span>
                   </button>
                   {groupMessagingEnabled && (
                     <button
                       onClick={(e) => { e.stopPropagation(); setShowPenMenu(false); setShowGroupCreator(true); setGroupName(''); setSelectedGroupMembers([]); setGroupSearchTerm(''); }}
-                      className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-[#F5F6F6] transition-colors"
+                      className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-[var(--msg-hover-bg)] transition-colors"
                       style={{ borderTop: '1px solid #F0F2F5' }}
                     >
-                      <Users size={18} style={{ color: '#54656F' }} />
-                      <span className="text-sm font-medium" style={{ color: '#111B21' }}>Create Group</span>
+                      <Users size={18} style={{ color: 'var(--msg-icon)' }} />
+                      <span className="text-sm font-medium" style={{ color: 'var(--msg-text)' }}>Create Group</span>
                     </button>
                   )}
                 </div>
@@ -2627,25 +2627,25 @@ export default function MessagesPage() {
                     setViewState('room');
                   }}
                   className="w-full text-left transition-colors"
-                  style={{ backgroundColor: isSelected ? '#F0F2F5' : undefined }}
-                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--aurora-surface-variant)'; }}
+                  style={{ backgroundColor: isSelected ? 'var(--msg-divider)' : undefined }}
+                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--msg-hover-bg)'; }}
                   onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = ''; }}
                 >
                   <div className="flex items-center gap-3 px-4 py-2.5">
                     <div className="w-[45px] h-[45px] rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
                       <Users size={22} className="text-white" />
                     </div>
-                    <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: '#F0F2F5' }}>
+                    <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: 'var(--msg-divider)' }}>
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className="font-medium text-[16px]" style={{ color: '#111B21' }}>{conv.groupName || 'Group'}</span>
+                        <span className="font-medium text-[16px]" style={{ color: 'var(--msg-text)' }}>{conv.groupName || 'Group'}</span>
                         {conv.lastMessageTime && (
-                          <span className="text-xs flex-shrink-0 ml-2" style={{ color: hasUnread ? '#6366F1' : '#667781' }}>
+                          <span className="text-xs flex-shrink-0 ml-2" style={{ color: hasUnread ? '#6366F1' : 'var(--msg-secondary)' }}>
                             {getRelativeTime(conv.lastMessageTime)}
                           </span>
                         )}
                       </div>
                       <div className="flex items-center justify-between">
-                        <div className="text-[13px] truncate flex-1" style={{ color: '#667781' }}>
+                        <div className="text-[13px] truncate flex-1" style={{ color: 'var(--msg-secondary)' }}>
                           {conv.lastMessage || 'No messages'}
                         </div>
                         {hasUnread && (
@@ -2675,23 +2675,23 @@ export default function MessagesPage() {
                   setViewState('room');
                 }}
                 className="w-full text-left transition-colors"
-                style={{ backgroundColor: isSelected ? '#F0F2F5' : undefined }}
-                onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#F5F6F6'; }}
+                style={{ backgroundColor: isSelected ? 'var(--msg-divider)' : undefined }}
+                onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--msg-hover-bg)'; }}
                 onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = ''; }}
               >
                 <div className="flex items-center gap-3 px-4 py-2.5">
                   <ChatAvatar user={otherUser} size="lg" showOnlineStatus={true} />
-                  <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: '#F0F2F5' }}>
+                  <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: 'var(--msg-divider)' }}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-medium text-[16px]" style={{ color: '#111B21' }}>{otherUser.name}</span>
+                      <span className="font-medium text-[16px]" style={{ color: 'var(--msg-text)' }}>{otherUser.name}</span>
                       {conv.lastMessageTime && (
-                        <span className="text-xs flex-shrink-0 ml-2" style={{ color: hasUnread ? '#6366F1' : '#667781' }}>
+                        <span className="text-xs flex-shrink-0 ml-2" style={{ color: hasUnread ? '#6366F1' : 'var(--msg-secondary)' }}>
                           {getRelativeTime(conv.lastMessageTime)}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="text-[13px] truncate flex-1" style={{ color: isTyping ? '#6366F1' : '#667781' }}>
+                      <div className="text-[13px] truncate flex-1" style={{ color: isTyping ? '#6366F1' : 'var(--msg-secondary)' }}>
                         {isTyping ? (
                           <TypingIndicator />
                         ) : (
@@ -2715,13 +2715,13 @@ export default function MessagesPage() {
             );
           })
         ) : activeFilter === 'connects' ? (
-          <div className="p-8 text-center" style={{ color: '#667781' }}>
+          <div className="p-8 text-center" style={{ color: 'var(--msg-secondary)' }}>
             <MessageSquare size={48} className="mx-auto mb-3 opacity-40" />
             <p className="text-sm">No group chats yet</p>
             <p className="text-xs mt-1">Create a group to start chatting with multiple people</p>
           </div>
         ) : (
-          <div className="p-8 text-center" style={{ color: '#667781' }}>
+          <div className="p-8 text-center" style={{ color: 'var(--msg-secondary)' }}>
             <MessageSquare size={48} className="mx-auto mb-3 opacity-40" />
             <p className="text-sm">{searchTerm ? 'No conversations found' : 'No conversations yet'}</p>
           </div>
@@ -2735,25 +2735,25 @@ export default function MessagesPage() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <button onClick={() => setShowNewMsgPicker(false)} className="p-1">
-                  <ArrowLeft size={20} style={{ color: '#54656F' }} />
+                  <ArrowLeft size={20} style={{ color: 'var(--msg-icon)' }} />
                 </button>
-                <h2 className="text-lg font-bold" style={{ color: '#111B21' }}>New Message</h2>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--msg-text)' }}>New Message</h2>
               </div>
             </div>
             <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
-              <Search size={16} style={{ color: '#667781' }} className="flex-shrink-0" />
+              <Search size={16} style={{ color: 'var(--msg-secondary)' }} className="flex-shrink-0" />
               <input
                 type="text"
                 placeholder="Search people"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1 py-1 bg-transparent outline-none text-base placeholder-gray-400"
-                style={{ color: '#111B21' }}
+                style={{ color: 'var(--msg-text)' }}
                 autoFocus
               />
               {searchTerm && (
                 <button onClick={() => setSearchTerm('')} className="p-0.5">
-                  <X size={14} style={{ color: '#667781' }} />
+                  <X size={14} style={{ color: 'var(--msg-secondary)' }} />
                 </button>
               )}
             </div>
@@ -2769,18 +2769,18 @@ export default function MessagesPage() {
                     setShowNewMsgPicker(false);
                     setSearchTerm('');
                   }}
-                  className="w-full text-left transition-colors hover:bg-[#F5F6F6]"
+                  className="w-full text-left transition-colors hover:bg-[var(--msg-hover-bg)]"
                 >
                   <div className="flex items-center gap-3 px-4 py-2.5">
                     <ChatAvatar user={u} size="lg" showOnlineStatus={true} />
-                    <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: '#F0F2F5' }}>
-                      <span className="font-medium text-[16px]" style={{ color: '#111B21' }}>{u.name}</span>
+                    <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: 'var(--msg-divider)' }}>
+                      <span className="font-medium text-[16px]" style={{ color: 'var(--msg-text)' }}>{u.name}</span>
                     </div>
                   </div>
                 </button>
               ))
             ) : (
-              <div className="p-8 text-center" style={{ color: '#667781' }}>
+              <div className="p-8 text-center" style={{ color: 'var(--msg-secondary)' }}>
                 <p className="text-sm">{searchTerm ? 'No users found' : 'No community members available'}</p>
               </div>
             )}
@@ -2794,20 +2794,20 @@ export default function MessagesPage() {
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center gap-3 mb-3">
               <button onClick={() => { setShowGroupCreator(false); setGroupName(''); setSelectedGroupMembers([]); setGroupSearchTerm(''); }} className="p-1">
-                <ArrowLeft size={20} style={{ color: '#54656F' }} />
+                <ArrowLeft size={20} style={{ color: 'var(--msg-icon)' }} />
               </button>
-              <h2 className="text-lg font-bold" style={{ color: '#111B21' }}>Create Group</h2>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--msg-text)' }}>Create Group</h2>
             </div>
             {/* Group name input */}
             <div className="flex items-center gap-2 rounded-lg px-3 py-2 mb-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
-              <Users size={16} style={{ color: '#667781' }} className="flex-shrink-0" />
+              <Users size={16} style={{ color: 'var(--msg-secondary)' }} className="flex-shrink-0" />
               <input
                 type="text"
                 placeholder="Group name"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 className="flex-1 py-1 bg-transparent outline-none text-base placeholder-gray-400"
-                style={{ color: '#111B21' }}
+                style={{ color: 'var(--msg-text)' }}
                 autoFocus
               />
             </div>
@@ -2818,7 +2818,7 @@ export default function MessagesPage() {
                   <span
                     key={m.id}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-                    style={{ backgroundColor: '#EDE7F6', color: '#4F46E5' }}
+                    style={{ backgroundColor: 'var(--msg-own-bubble-hover)', color: '#4F46E5' }}
                   >
                     {m.name}
                     <button onClick={() => toggleGroupMember(m)} className="hover:opacity-70">
@@ -2830,14 +2830,14 @@ export default function MessagesPage() {
             )}
             {/* Search members */}
             <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
-              <Search size={16} style={{ color: '#667781' }} className="flex-shrink-0" />
+              <Search size={16} style={{ color: 'var(--msg-secondary)' }} className="flex-shrink-0" />
               <input
                 type="text"
                 placeholder="Search people to add"
                 value={groupSearchTerm}
                 onChange={(e) => setGroupSearchTerm(e.target.value)}
                 className="flex-1 py-1 bg-transparent outline-none text-base placeholder-gray-400"
-                style={{ color: '#111B21' }}
+                style={{ color: 'var(--msg-text)' }}
               />
             </div>
           </div>
@@ -2849,13 +2849,13 @@ export default function MessagesPage() {
                 <button
                   key={u.id}
                   onClick={() => toggleGroupMember(u)}
-                  className="w-full text-left transition-colors hover:bg-[#F5F6F6]"
-                  style={{ backgroundColor: isAdded ? '#EEF2FF' : undefined }}
+                  className="w-full text-left transition-colors hover:bg-[var(--msg-hover-bg)]"
+                  style={{ backgroundColor: isAdded ? 'var(--msg-own-bubble-hover)' : undefined }}
                 >
                   <div className="flex items-center gap-3 px-4 py-2.5">
                     <ChatAvatar user={u} size="lg" showOnlineStatus={true} />
-                    <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: '#F0F2F5' }}>
-                      <span className="font-medium text-[16px]" style={{ color: '#111B21' }}>{u.name}</span>
+                    <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: 'var(--msg-divider)' }}>
+                      <span className="font-medium text-[16px]" style={{ color: 'var(--msg-text)' }}>{u.name}</span>
                     </div>
                     <div className="flex-shrink-0">
                       {isAdded ? (
@@ -2863,7 +2863,7 @@ export default function MessagesPage() {
                           <Check size={14} className="text-white" />
                         </div>
                       ) : (
-                        <div className="w-6 h-6 rounded-full border-2" style={{ borderColor: '#CCD0D5' }} />
+                        <div className="w-6 h-6 rounded-full border-2" style={{ borderColor: 'var(--aurora-border)' }} />
                       )}
                     </div>
                   </div>
@@ -2980,7 +2980,7 @@ export default function MessagesPage() {
             <ClickOutsideOverlay isOpen={showChatMenu} onClose={() => setShowChatMenu(false)} />
             {showChatMenu && (
               <>
-              <div className="absolute top-10 right-0 bg-white rounded-lg shadow-xl z-50 min-w-[180px] py-1 overflow-hidden">
+              <div className="absolute top-10 right-0 bg-white dark:bg-[var(--aurora-surface)] rounded-lg shadow-xl z-50 min-w-[180px] py-1 overflow-hidden">
                 {activeGroupConv && (
                   <button
                     onClick={() => {
@@ -2988,10 +2988,10 @@ export default function MessagesPage() {
                       setEditGroupNameValue(activeGroupConv.groupName || '');
                       setShowChatMenu(false);
                     }}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition flex items-center gap-3 text-sm"
-                    style={{ color: '#111B21' }}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                    style={{ color: 'var(--msg-text)' }}
                   >
-                    <Settings size={16} style={{ color: '#667781' }} /> Group Info
+                    <Settings size={16} style={{ color: 'var(--msg-secondary)' }} /> Group Info
                   </button>
                 )}
                 <button
@@ -2999,20 +2999,20 @@ export default function MessagesPage() {
                     setShowWallpaperPicker(true);
                     setShowChatMenu(false);
                   }}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition flex items-center gap-3 text-sm"
-                  style={{ color: '#111B21' }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                  style={{ color: 'var(--msg-text)' }}
                 >
-                  <Palette size={16} style={{ color: '#667781' }} /> Wallpaper
+                  <Palette size={16} style={{ color: 'var(--msg-secondary)' }} /> Wallpaper
                 </button>
                 <button
                   onClick={() => {
                     setCompactMode(!compactMode);
                     setShowChatMenu(false);
                   }}
-                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition flex items-center gap-3 text-sm"
-                  style={{ color: '#111B21' }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                  style={{ color: 'var(--msg-text)' }}
                 >
-                  {compactMode ? <Maximize2 size={16} style={{ color: '#667781' }} /> : <Minimize2 size={16} style={{ color: '#667781' }} />}
+                  {compactMode ? <Maximize2 size={16} style={{ color: 'var(--msg-secondary)' }} /> : <Minimize2 size={16} style={{ color: 'var(--msg-secondary)' }} />}
                   {compactMode ? 'Comfortable' : 'Compact'}
                 </button>
                 {/* Block User option - only for 1:1 chats */}
@@ -3100,25 +3100,25 @@ export default function MessagesPage() {
                       className="p-2 rounded-full"
                       style={{ backgroundColor: 'var(--aurora-surface-variant)' }}
                     >
-                      <X size={16} style={{ color: '#667781' }} />
+                      <X size={16} style={{ color: 'var(--msg-secondary)' }} />
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2">
-                    <h3 className="text-xl font-semibold text-center" style={{ color: '#111B21' }}>
+                    <h3 className="text-xl font-semibold text-center" style={{ color: 'var(--msg-text)' }}>
                       {activeGroupConv.groupName || 'Group'}
                     </h3>
                     {amAdmin && (
                       <button
                         onClick={() => { setEditingGroupName(true); setEditGroupNameValue(activeGroupConv.groupName || ''); }}
-                        className="p-1.5 rounded-full hover:bg-gray-100 transition"
+                        className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[var(--aurora-surface-variant)] transition"
                       >
-                        <Edit3 size={16} style={{ color: '#667781' }} />
+                        <Edit3 size={16} style={{ color: 'var(--msg-secondary)' }} />
                       </button>
                     )}
                   </div>
                 )}
-                <p className="text-center text-sm mt-1" style={{ color: '#667781' }}>
+                <p className="text-center text-sm mt-1" style={{ color: 'var(--msg-secondary)' }}>
                   Group &middot; {activeGroupConv.participants.length} members
                 </p>
               </div>
@@ -3133,7 +3133,7 @@ export default function MessagesPage() {
                     <button
                       onClick={() => setShowAddMemberPicker(!showAddMemberPicker)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition hover:opacity-80"
-                      style={{ backgroundColor: '#EDE7F6', color: '#4F46E5' }}
+                      style={{ backgroundColor: 'var(--msg-own-bubble-hover)', color: '#4F46E5' }}
                     >
                       <UserPlus size={14} />
                       Add Member
@@ -3143,22 +3143,22 @@ export default function MessagesPage() {
 
                 {/* Add Member Picker */}
                 {showAddMemberPicker && amAdmin && (
-                  <div className="mb-3 rounded-lg overflow-hidden" style={{ border: '1px solid #E8E8E8' }}>
+                  <div className="mb-3 rounded-lg overflow-hidden" style={{ border: '1px solid var(--aurora-border)' }}>
                     <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
-                      <Search size={16} style={{ color: '#667781' }} />
+                      <Search size={16} style={{ color: 'var(--msg-secondary)' }} />
                       <input
                         type="text"
                         placeholder="Search people to add..."
                         value={addMemberSearchTerm}
                         onChange={(e) => setAddMemberSearchTerm(e.target.value)}
                         className="flex-1 py-1 bg-transparent outline-none text-base placeholder-gray-400"
-                        style={{ color: '#111B21' }}
+                        style={{ color: 'var(--msg-text)' }}
                         autoFocus
                       />
                     </div>
                     <div className="max-h-[200px] overflow-y-auto">
                       {nonMemberUsers.length === 0 ? (
-                        <div className="px-4 py-3 text-center text-sm" style={{ color: '#667781' }}>
+                        <div className="px-4 py-3 text-center text-sm" style={{ color: 'var(--msg-secondary)' }}>
                           No members to add
                         </div>
                       ) : (
@@ -3166,10 +3166,10 @@ export default function MessagesPage() {
                           <button
                             key={u.id}
                             onClick={() => addMemberToGroup(u)}
-                            className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition"
+                            className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition"
                           >
                             <ChatAvatar user={u} size="sm" showOnlineStatus={false} />
-                            <span className="flex-1 text-sm font-medium" style={{ color: '#111B21' }}>{u.name}</span>
+                            <span className="flex-1 text-sm font-medium" style={{ color: 'var(--msg-text)' }}>{u.name}</span>
                             <UserPlus size={16} style={{ color: '#6366F1' }} />
                           </button>
                         ))
@@ -3194,17 +3194,17 @@ export default function MessagesPage() {
                       {memberUser ? (
                         <ChatAvatar user={memberUser} size="lg" showOnlineStatus={true} />
                       ) : (
-                        <div className="w-[40px] h-[40px] rounded-full flex items-center justify-center" style={{ backgroundColor: '#DFE5E7' }}>
-                          <Users size={18} style={{ color: '#667781' }} />
+                        <div className="w-[40px] h-[40px] rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
+                          <Users size={18} style={{ color: 'var(--msg-secondary)' }} />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[15px] font-medium" style={{ color: '#111B21' }}>
+                          <span className="text-[15px] font-medium" style={{ color: 'var(--msg-text)' }}>
                             {isMe ? 'You' : memberUser?.name || pid.slice(0, 8)}
                           </span>
                           {isCreator && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ backgroundColor: '#FFF3E0', color: '#E65100' }}>
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ backgroundColor: 'var(--aurora-surface-variant)', color: '#E65100' }}>
                               <Crown size={10} /> Creator
                             </span>
                           )}
@@ -3221,7 +3221,7 @@ export default function MessagesPage() {
                           {amCreator && (
                             <button
                               onClick={() => toggleAdmin(pid)}
-                              className="p-1.5 rounded-full hover:bg-gray-100 transition"
+                              className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[var(--aurora-surface-variant)] transition"
                               title={isMemberAdmin ? 'Remove admin' : 'Make admin'}
                             >
                               <Shield size={16} style={{ color: isMemberAdmin ? '#1565C0' : '#B0B6B9' }} />
@@ -3246,8 +3246,8 @@ export default function MessagesPage() {
               {/* Admin info section */}
               <div className="px-4 py-3">
                 <div className="flex items-start gap-2">
-                  <Shield size={16} className="mt-0.5 flex-shrink-0" style={{ color: '#667781' }} />
-                  <p className="text-xs" style={{ color: '#667781' }}>
+                  <Shield size={16} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--msg-secondary)' }} />
+                  <p className="text-xs" style={{ color: 'var(--msg-secondary)' }}>
                     {amCreator
                       ? 'As the group creator, you can edit the group name, add/remove members, and promote members to admin. Admins can edit the group name and add/remove members.'
                       : amAdmin
@@ -3275,7 +3275,7 @@ export default function MessagesPage() {
           <div className="flex items-center justify-center h-full text-center">
             <div className="bg-white/80 rounded-lg px-6 py-4 shadow-sm">
               <MessageSquare size={40} className="mx-auto mb-2" style={{ color: '#B0B6B9' }} />
-              <p className="text-sm" style={{ color: '#667781' }}>No messages yet. Say hello!</p>
+              <p className="text-sm" style={{ color: 'var(--msg-secondary)' }}>No messages yet. Say hello!</p>
             </div>
           </div>
         ) : (
@@ -3309,7 +3309,7 @@ export default function MessagesPage() {
                             [isMine ? 'right' : 'left']: '-6px',
                             width: 0,
                             height: 0,
-                            borderTop: `8px solid ${isMine ? '#E0E7FF' : 'var(--aurora-surface)'}`,
+                            borderTop: `8px solid ${isMine ? 'var(--msg-own-bubble)' : 'var(--aurora-surface)'}`,
                             [isMine ? 'borderLeft' : 'borderRight']: '8px solid transparent',
                           }}
                         />
@@ -3317,7 +3317,7 @@ export default function MessagesPage() {
                       <div
                         className={`px-2.5 pt-1.5 pb-1 ${isFirstInGroup ? (isMine ? 'rounded-tl-lg rounded-tr-sm' : 'rounded-tr-lg rounded-tl-sm') : 'rounded-t-lg'} rounded-b-lg shadow-sm cursor-pointer select-none`}
                         style={{
-                          backgroundColor: msg.senderId === 'system' ? 'var(--aurora-surface-variant)' : isMine ? '#E0E7FF' : 'var(--aurora-surface)',
+                          backgroundColor: msg.senderId === 'system' ? 'var(--aurora-surface-variant)' : isMine ? 'var(--msg-own-bubble)' : 'var(--aurora-surface)',
                           boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)',
                         }}
                         onContextMenu={(e) => { e.preventDefault(); setContextMenuMsg(msg); }}
@@ -3367,12 +3367,12 @@ export default function MessagesPage() {
                               </div>
                             )}
                             {(msg.text || !msg.image || msg.image.startsWith('{')) && (
-                            <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? '#4A6E7F' : '#111B21' }}>
+                            <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? 'var(--msg-system-text)' : 'var(--msg-text)' }}>
                               {msg.text && renderFormattedText(msg.text)}
                               {/* Inline timestamp + read receipt (WhatsApp style) */}
                               <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
-                                {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: '#667781' }}>edited</span>}
-                                <span className="text-[10.5px]" style={{ color: '#667781' }}>
+                                {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
+                                <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>
                                   {formatMessageTime(msg.createdAt)}
                                 </span>
                                 {isMine && (
@@ -3393,7 +3393,7 @@ export default function MessagesPage() {
                             <button
                               key={emoji}
                               onClick={() => toggleReaction(msg.id, emoji)}
-                              className="text-xs px-1.5 py-0.5 rounded-full bg-white shadow-sm border border-gray-100 hover:bg-gray-50 transition"
+                              className="text-xs px-1.5 py-0.5 rounded-full bg-white dark:bg-[var(--aurora-surface)] shadow-sm border border-gray-100 dark:border-[var(--aurora-border)] hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition"
                             >
                               {emoji} {userIds.length > 1 && userIds.length}
                             </button>
@@ -3413,7 +3413,7 @@ export default function MessagesPage() {
       {/* WhatsApp-style input area */}
       <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
         {editingMessage && (
-          <div className="px-4 py-2 flex items-center justify-between border-b" style={{ backgroundColor: '#EDE7F6', borderColor: '#C7D2FE' }}>
+          <div className="px-4 py-2 flex items-center justify-between border-b" style={{ backgroundColor: 'var(--msg-own-bubble-hover)', borderColor: 'var(--aurora-border)' }}>
             <div className="text-sm" style={{ color: '#4F46E5' }}>
               <span className="font-semibold">Editing:</span> {truncateText(editingMessage.text, 40)}
             </div>
@@ -3425,7 +3425,7 @@ export default function MessagesPage() {
         {showFormatting && <FormattingToolbar onFormat={handleFormat} />}
         {/* Image preview strip */}
         {pendingImage && (
-          <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ backgroundColor: '#EDE7F6', borderColor: '#C7D2FE' }}>
+          <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ backgroundColor: 'var(--msg-own-bubble-hover)', borderColor: 'var(--aurora-border)' }}>
             <img src={pendingImage} alt="Preview" className="w-14 h-14 rounded-lg object-cover" />
             <span className="text-sm flex-1" style={{ color: '#4F46E5' }}>Image attached</span>
             <button onClick={() => setPendingImage(null)} className="p-1 rounded hover:bg-white/50" aria-label="Remove image">
@@ -3434,7 +3434,7 @@ export default function MessagesPage() {
           </div>
         )}
         {imageCompressing && (
-          <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ backgroundColor: '#FFF3E0', borderColor: '#FFE0B2' }}>
+          <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ backgroundColor: 'var(--aurora-surface-variant)', borderColor: 'var(--aurora-border)' }}>
             <Loader2 size={16} className="animate-spin" style={{ color: '#E65100' }} />
             <span className="text-sm" style={{ color: '#E65100' }}>Compressing image...</span>
           </div>
@@ -3443,10 +3443,10 @@ export default function MessagesPage() {
         <div className="px-2 sm:px-3 py-1.5 flex items-end gap-1.5 sm:gap-2">
           <div className="flex gap-0.5 flex-shrink-0 pb-1">
             <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Toggle emoji picker">
-              <Smile size={22} style={{ color: '#54656F' }} />
+              <Smile size={22} style={{ color: 'var(--msg-icon)' }} />
             </button>
             <button onClick={() => imageInputRef.current?.click()} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach image">
-              <ImagePlus size={22} style={{ color: '#54656F' }} />
+              <ImagePlus size={22} style={{ color: 'var(--msg-icon)' }} />
             </button>
           </div>
           <div className="flex-1 rounded-3xl px-3 py-2 flex items-end" style={{ backgroundColor: 'var(--aurora-surface)', minHeight: '42px' }}>
@@ -3456,7 +3456,7 @@ export default function MessagesPage() {
               onChange={handleMessageInput}
               placeholder="Type a message"
               className="flex-1 bg-transparent outline-none text-base resize-none leading-[20px] placeholder-gray-400"
-              style={{ color: '#111B21', maxHeight: '100px' }}
+              style={{ color: 'var(--msg-text)', maxHeight: '100px' }}
               rows={1}
               maxLength={MESSAGE_CONFIG.MAX_MESSAGE_LENGTH}
             />
@@ -3513,11 +3513,11 @@ export default function MessagesPage() {
   const emptyRightPanel = (
     <div className="h-full flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
       <div className="text-center">
-        <div className="w-[200px] h-[200px] mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#EDE7F6' }}>
+        <div className="w-[200px] h-[200px] mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--msg-own-bubble-hover)' }}>
           <MessageSquare size={80} style={{ color: '#6366F1' }} />
         </div>
         <h2 className="text-2xl font-light mb-3" style={{ color: '#41525D' }}>ethniCity Messages</h2>
-        <p className="text-sm max-w-[340px] mx-auto" style={{ color: '#667781' }}>
+        <p className="text-sm max-w-[340px] mx-auto" style={{ color: 'var(--msg-secondary)' }}>
           Send and receive messages with your community members. Select a conversation to start chatting.
         </p>
       </div>
@@ -3556,7 +3556,7 @@ export default function MessagesPage() {
       {/* On desktop: always show */}
       <div
         className={`${viewState === 'room' ? 'hidden md:flex' : 'flex'} flex-col h-full w-full md:w-[380px] lg:w-[420px] md:min-w-[340px] md:max-w-[420px] flex-shrink-0`}
-        style={{ borderRight: '1px solid #E8E8E8' }}
+        style={{ borderRight: '1px solid var(--aurora-border)' }}
       >
         {conversationListPanel}
       </div>
@@ -3633,7 +3633,7 @@ export default function MessagesPage() {
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between rounded-t-2xl">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Report Message</h3>
-              <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+              <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700 rounded-lg">
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
@@ -3669,7 +3669,7 @@ export default function MessagesPage() {
             <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-5 py-4 flex gap-3 rounded-b-2xl">
               <button
                 onClick={() => setShowReportModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
@@ -3702,7 +3702,7 @@ export default function MessagesPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowBlockConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
@@ -3778,7 +3778,7 @@ export default function MessagesPage() {
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">Forward to</h3>
                   <button
                     onClick={() => setLightboxForwardOpen(false)}
-                    className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700 transition-colors"
                   >
                     <X size={20} className="text-gray-500" />
                   </button>
@@ -3802,7 +3802,7 @@ export default function MessagesPage() {
                           key={conv.id}
                           onClick={() => !forwardingImage && forwardImageToConversation(conv.id)}
                           disabled={forwardingImage}
-                          className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left ${isCurrent ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''} ${forwardingImage ? 'opacity-50' : ''}`}
+                          className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700 transition-colors text-left ${isCurrent ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''} ${forwardingImage ? 'opacity-50' : ''}`}
                         >
                           {/* Avatar */}
                           <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{ backgroundColor: conv.isGroup ? '#6366F1' : '#E8E2F8' }}>
