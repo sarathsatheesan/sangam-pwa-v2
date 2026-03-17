@@ -1540,32 +1540,58 @@ export default function MessagesPage() {
               }
             } else if (selectedUser) {
               // 1:1 decryption — try v2 E2EE first, fall back to v1
-              const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
-              if (sharedKey) {
-                try {
-                  const parsed = JSON.parse(text);
-                  if (parsed.v === 2) {
-                    await decryptAllFields(sharedKey);
-                  } else {
-                    throw new Error('v1');
-                  }
-                } catch (e) {
-                  if ((e as Error).message === 'v1' || true) {
-                    try {
-                      const convKey = generateConversationKey(user.uid, selectedUser.id);
-                      text = decryptMessage(text, convKey);
-                    } catch {
-                      text = '[Encrypted]';
+              try {
+                const parsed = JSON.parse(text);
+                if (parsed.v === 2) {
+                  // V2 E2EE: derive shared key per-message using the sender's public key
+                  // stored with the message, falling back to the cached conversation key
+                  const msgSenderPubKey = (rawMsg as Record<string, unknown>).senderPublicKey as ExportedPublicKey | undefined;
+                  const msgSenderId = (rawMsg as Record<string, unknown>).senderId as string;
+                  let decryptKey: CryptoKey | null = null;
+
+                  if (msgSenderPubKey && e2ePrivateKeyRef.current) {
+                    // Derive shared key using the sender's public key from this message
+                    // This handles key rotation — always matches the key used for encryption
+                    const cacheKeyStr = `${msgSenderPubKey.x}_${msgSenderPubKey.y}`;
+                    if (e2eSharedKeysRef.current.has(cacheKeyStr)) {
+                      decryptKey = e2eSharedKeysRef.current.get(cacheKeyStr)!;
+                    } else {
+                      try {
+                        // If WE sent this message, derive using the peer's current public key
+                        // If THEY sent this message, derive using their stored public key
+                        const peerPubKey = msgSenderId === user.uid
+                          ? (await getDoc(doc(db, 'users', selectedUser.id))).data()?.e2ePublicKey as ExportedPublicKey
+                          : msgSenderPubKey;
+                        if (peerPubKey) {
+                          decryptKey = await deriveSharedKey(e2ePrivateKeyRef.current, peerPubKey);
+                          e2eSharedKeysRef.current.set(cacheKeyStr, decryptKey);
+                        }
+                      } catch (err) {
+                        console.warn('[E2EE] Per-message key derivation failed:', err);
+                      }
                     }
                   }
+
+                  // Fallback to cached conversation-level shared key
+                  if (!decryptKey) {
+                    decryptKey = e2eSharedKeysRef.current.get(selectedUser.id) || null;
+                  }
+
+                  if (decryptKey) {
+                    await decryptAllFields(decryptKey);
+                  }
+                } else {
+                  throw new Error('v1');
                 }
-              } else {
-                // No shared key — try legacy v1 decrypt
-                try {
-                  const convKey = generateConversationKey(user.uid, selectedUser.id);
-                  text = decryptMessage(text, convKey);
-                } catch {
-                  text = '[Encrypted]';
+              } catch (e) {
+                // Not a v2 payload (JSON parse failed or v1 format) — try legacy v1 decrypt
+                {
+                  try {
+                    const convKey = generateConversationKey(user.uid, selectedUser.id);
+                    text = decryptMessage(text, convKey);
+                  } catch {
+                    text = '[Encrypted]';
+                  }
                 }
               }
             }
@@ -1890,6 +1916,11 @@ export default function MessagesPage() {
         createdAt: serverTimestamp(),
         encrypted: !!shouldEncrypt,
       };
+      // Store sender's public key with v2 encrypted messages so recipients
+      // can always derive the correct shared key, even after key rotation
+      if (shouldEncrypt && e2ePublicKeyRef.current) {
+        msgData.senderPublicKey = e2ePublicKeyRef.current;
+      }
       if (imageToSend) {
         msgData.image = imageToSend;
       }
@@ -2066,14 +2097,18 @@ export default function MessagesPage() {
         }
       }
 
-      const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), {
+      const voiceMsgData: Record<string, unknown> = {
         text: encryptedText,
         senderId: user.uid,
         time: formatMessageTime(Timestamp.now()),
         createdAt: serverTimestamp(),
         encrypted: !!shouldEncryptVoice,
         voiceMessage: { duration, ...(encryptedAudioUrl ? { audioUrl: encryptedAudioUrl } : {}) },
-      });
+      };
+      if (shouldEncryptVoice && e2ePublicKeyRef.current) {
+        voiceMsgData.senderPublicKey = e2ePublicKeyRef.current;
+      }
+      const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), voiceMsgData);
       setUndoMessageId(msgRef.id);
       setShowUndoToast(true);
       const convUpdateData: Record<string, unknown> = {
@@ -3273,7 +3308,7 @@ export default function MessagesPage() {
                           <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} />
                         ) : (
                           <>
-                            {msg.image && (
+                            {msg.image && !msg.image.startsWith('{') && (
                               <div className="-mx-[9px] -mt-[6px] mb-1">
                                 <img
                                   src={msg.image}
