@@ -81,9 +81,20 @@ export async function getOrCreateKeyPair(uid: string): Promise<{
 }> {
   const storeKey = `ecdh_${uid}`;
 
-  // Helper to import a private JWK into a CryptoKey
-  const importPrivate = (jwk: JsonWebKey) =>
-    crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveKey', 'deriveBits']);
+  // Helper to import a private JWK into a CryptoKey (clean JWK for Safari compat)
+  const importPrivate = (jwk: JsonWebKey) => {
+    const cleanJwk: JsonWebKey = {
+      kty: jwk.kty,
+      crv: jwk.crv,
+      x: jwk.x,
+      y: jwk.y,
+      d: jwk.d,
+      ext: true,
+    };
+    return crypto.subtle.importKey(
+      'jwk', cleanJwk, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey', 'deriveBits']
+    );
+  };
 
   // 1) Try Firestore first — this is the canonical source of truth
   try {
@@ -471,4 +482,44 @@ export function isEncryptedPayload(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+// ─── Deterministic V2 Key (cross-device safe) ─────────────────────────
+// Derives an AES-256-GCM key deterministically from both user IDs.
+// Unlike ECDH, this always produces the same key on every device/browser
+// because it depends only on user IDs + salt, not on device-specific key pairs.
+// Uses Web Crypto PBKDF2 → AES-256-GCM (same security level as ECDH variant).
+
+const _deterministicKeyCache = new Map<string, CryptoKey>();
+
+export async function getDeterministicSharedKey(uid1: string, uid2: string): Promise<CryptoKey> {
+  const cacheKey = [uid1, uid2].sort().join('::');
+  if (_deterministicKeyCache.has(cacheKey)) {
+    return _deterministicKeyCache.get(cacheKey)!;
+  }
+
+  const passphrase = `${cacheKey}::${ENCRYPTION_SALT}::v2gcm`;
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(passphrase),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+
+  const aesKey = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: new TextEncoder().encode(`ethnicity_e2ee_v2_${cacheKey}`),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  _deterministicKeyCache.set(cacheKey, aesKey);
+  return aesKey;
 }

@@ -15,6 +15,7 @@ import {
   getOrCreateKeyPair, deriveSharedKey, e2eEncrypt, e2eDecrypt,
   generateGroupKey, exportGroupKey, wrapGroupKeyForMember,
   unwrapGroupKeyWithECDH, wrapGroupKeyForMemberWithECDH,
+  getDeterministicSharedKey,
   type ExportedPublicKey,
 } from '@/utils/encryption';
 import {
@@ -1539,59 +1540,74 @@ export default function MessagesPage() {
                 }
               }
             } else if (selectedUser) {
-              // 1:1 decryption — try v2 E2EE first, fall back to v1
+              // 1:1 decryption — try strategies in order:
+              // 1) Deterministic V2 key (new default, cross-device safe)
+              // 2) ECDH shared key (old V2 messages)
+              // 3) Legacy V1 (oldest messages)
+              let decrypted = false;
               try {
                 const parsed = JSON.parse(text);
                 if (parsed.v === 2) {
-                  // V2 E2EE: derive shared key per-message using the sender's public key
-                  // stored with the message, falling back to the cached conversation key
-                  const msgSenderPubKey = (rawMsg as Record<string, unknown>).senderPublicKey as ExportedPublicKey | undefined;
-                  const msgSenderId = (rawMsg as Record<string, unknown>).senderId as string;
-                  let decryptKey: CryptoKey | null = null;
+                  // Strategy 1: Deterministic key (works cross-device, cross-browser)
+                  try {
+                    const detKey = await getDeterministicSharedKey(user.uid, selectedUser.id);
+                    await decryptAllFields(detKey);
+                    if (!isStillEncrypted(text)) {
+                      decrypted = true;
+                    }
+                  } catch (err) {
+                    console.warn('[E2EE] Deterministic decrypt failed:', err);
+                  }
 
-                  if (msgSenderPubKey && e2ePrivateKeyRef.current) {
-                    // Derive shared key using the sender's public key from this message
-                    // This handles key rotation — always matches the key used for encryption
-                    const cacheKeyStr = `${msgSenderPubKey.x}_${msgSenderPubKey.y}`;
-                    if (e2eSharedKeysRef.current.has(cacheKeyStr)) {
-                      decryptKey = e2eSharedKeysRef.current.get(cacheKeyStr)!;
-                    } else {
+                  // Strategy 2: ECDH shared key (for old messages encrypted with ECDH)
+                  if (!decrypted) {
+                    // Reset fields for retry
+                    text = (rawMsg as Record<string, unknown>).text as string || '';
+                    image = (rawMsg as Record<string, unknown>).image as string | undefined;
+                    voiceMessage = (rawMsg as Record<string, unknown>).voiceMessage as Message['voiceMessage'];
+
+                    const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+                    if (sharedKey) {
                       try {
-                        // If WE sent this message, derive using the peer's current public key
-                        // If THEY sent this message, derive using their stored public key
+                        await decryptAllFields(sharedKey);
+                        if (!isStillEncrypted(text)) {
+                          decrypted = true;
+                        }
+                      } catch { /* ECDH decrypt failed */ }
+                    }
+                  }
+
+                  // Strategy 3: Per-message sender public key ECDH (old messages with stored key)
+                  if (!decrypted) {
+                    text = (rawMsg as Record<string, unknown>).text as string || '';
+                    image = (rawMsg as Record<string, unknown>).image as string | undefined;
+                    voiceMessage = (rawMsg as Record<string, unknown>).voiceMessage as Message['voiceMessage'];
+
+                    const msgSenderPubKey = (rawMsg as Record<string, unknown>).senderPublicKey as ExportedPublicKey | undefined;
+                    const msgSenderId = (rawMsg as Record<string, unknown>).senderId as string;
+                    if (msgSenderPubKey && e2ePrivateKeyRef.current) {
+                      try {
                         const peerPubKey = msgSenderId === user.uid
                           ? (await getDoc(doc(db, 'users', selectedUser.id))).data()?.e2ePublicKey as ExportedPublicKey
                           : msgSenderPubKey;
                         if (peerPubKey) {
-                          decryptKey = await deriveSharedKey(e2ePrivateKeyRef.current, peerPubKey);
-                          e2eSharedKeysRef.current.set(cacheKeyStr, decryptKey);
+                          const perMsgKey = await deriveSharedKey(e2ePrivateKeyRef.current, peerPubKey);
+                          await decryptAllFields(perMsgKey);
+                          if (!isStillEncrypted(text)) decrypted = true;
                         }
-                      } catch (err) {
-                        console.warn('[E2EE] Per-message key derivation failed:', err);
-                      }
+                      } catch { /* per-message ECDH failed */ }
                     }
-                  }
-
-                  // Fallback to cached conversation-level shared key
-                  if (!decryptKey) {
-                    decryptKey = e2eSharedKeysRef.current.get(selectedUser.id) || null;
-                  }
-
-                  if (decryptKey) {
-                    await decryptAllFields(decryptKey);
                   }
                 } else {
                   throw new Error('v1');
                 }
-              } catch (e) {
-                // Not a v2 payload (JSON parse failed or v1 format) — try legacy v1 decrypt
-                {
-                  try {
-                    const convKey = generateConversationKey(user.uid, selectedUser.id);
-                    text = decryptMessage(text, convKey);
-                  } catch {
-                    text = '[Encrypted]';
-                  }
+              } catch {
+                // Not a v2 payload — try legacy v1 decrypt
+                try {
+                  const convKey = generateConversationKey(user.uid, selectedUser.id);
+                  text = decryptMessage(text, convKey);
+                } catch {
+                  text = '[Encrypted]';
                 }
               }
             }
@@ -1888,18 +1904,18 @@ export default function MessagesPage() {
           }
         }
       } else if (selectedUser) {
-        // 1:1 E2EE: try v2 ECDH shared key first, fall back to v1 legacy
+        // 1:1 E2EE: use deterministic AES-256-GCM key (cross-device safe)
         shouldEncrypt = true;
-        const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
-        if (sharedKey) {
+        try {
+          const detKey = await getDeterministicSharedKey(user.uid, selectedUser.id);
           if (payload) {
-            payload = await e2eEncrypt(payload, sharedKey);
+            payload = await e2eEncrypt(payload, detKey);
           }
           if (imageToSend) {
-            imageToSend = await e2eEncrypt(imageToSend, sharedKey);
+            imageToSend = await e2eEncrypt(imageToSend, detKey);
           }
-        } else {
-          // V1 legacy: only encrypt text
+        } catch (err) {
+          console.error('[E2EE] Deterministic key encryption failed, falling back to v1:', err);
           if (payload) {
             const convKey = generateConversationKey(user.uid, selectedUser.id);
             payload = encryptMessage(payload, convKey);
@@ -2086,13 +2102,15 @@ export default function MessagesPage() {
             }
           }
         } else if (selectedUser) {
-          const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
-          if (sharedKey) {
+          try {
+            const detKey = await getDeterministicSharedKey(user.uid, selectedUser.id);
             shouldEncryptVoice = true;
-            encryptedText = await e2eEncrypt(encryptedText, sharedKey);
+            encryptedText = await e2eEncrypt(encryptedText, detKey);
             if (encryptedAudioUrl) {
-              encryptedAudioUrl = await e2eEncrypt(encryptedAudioUrl, sharedKey);
+              encryptedAudioUrl = await e2eEncrypt(encryptedAudioUrl, detKey);
             }
+          } catch (err) {
+            console.error('[E2EE] Voice deterministic key failed:', err);
           }
         }
       }
