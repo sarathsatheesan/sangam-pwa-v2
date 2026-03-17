@@ -1646,6 +1646,15 @@ export default function MessagesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUser, selectedConvId, user, encryptionEnabled, e2eKeyVersion]);
 
+  // Clear message input when switching conversations to prevent accidental cross-sends
+  useEffect(() => {
+    setMessageText('');
+    setPendingImage(null);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  }, [selectedUser?.id, selectedConvId]);
+
   // Cleanup unsubscribers on unmount
   useEffect(() => {
     return () => {
