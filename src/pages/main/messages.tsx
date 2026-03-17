@@ -3314,78 +3314,95 @@ export default function MessagesPage() {
                           }}
                         />
                       )}
-                      <div
-                        className={`px-2.5 pt-1.5 pb-1 ${isFirstInGroup ? (isMine ? 'rounded-tl-lg rounded-tr-sm' : 'rounded-tr-lg rounded-tl-sm') : 'rounded-t-lg'} rounded-b-lg shadow-sm cursor-pointer select-none`}
-                        style={{
-                          backgroundColor: msg.senderId === 'system' ? 'var(--aurora-surface-variant)' : isMine ? 'var(--msg-own-bubble)' : 'var(--aurora-surface)',
-                          boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)',
-                        }}
-                        onContextMenu={(e) => { e.preventDefault(); setContextMenuMsg(msg); }}
-                        onTouchStart={() => {
-                          longPressTimerRef.current = setTimeout(() => setContextMenuMsg(msg), 500);
-                        }}
-                        onTouchEnd={() => {
-                          if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-                        }}
-                        onTouchMove={() => {
-                          if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-                        }}
-                      >
-                        {/* Group sender name */}
-                        {activeGroupConv && !isMine && msg.senderId !== 'system' && isFirstInGroup && (
-                          <div className="text-[12px] font-semibold mb-0.5" style={{ color: '#6366F1' }}>
-                            {users.find((u) => u.id === msg.senderId)?.name || 'Unknown'}
-                          </div>
-                        )}
-                        {msg.callEvent ? (
-                          <CallEventBubble callEvent={msg.callEvent} isMine={isMine} />
-                        ) : msg.voiceMessage ? (
-                          <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} />
-                        ) : (
-                          <>
-                            {msg.image && !msg.image.startsWith('{') && (
-                              <div className={`-mx-[10px] -mt-[6px] ${msg.text ? 'mb-1' : '-mb-[4px]'} relative`}>
-                                <img
-                                  src={msg.image}
-                                  alt="Shared image"
-                                  className={`${msg.text ? 'rounded-t-[8px]' : 'rounded-[8px]'} w-full max-w-[280px] object-cover cursor-pointer`}
-                                  style={{ maxHeight: '300px', display: 'block' }}
-                                  onClick={() => setLightboxImage(msg.image!)}
-                                />
-                                {/* Overlay timestamp on image-only messages */}
-                                {!msg.text && (
-                                  <div className="absolute bottom-1 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
-                                    {msg.editedAt && <span className="text-[10.5px] italic text-white">edited</span>}
-                                    <span className="text-[10.5px] text-white">{formatMessageTime(msg.createdAt)}</span>
-                                    {isMine && (
-                                      msg.read
-                                        ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
-                                        : <CheckCheck size={14} style={{ color: '#FFFFFF' }} />
+                      {(() => {
+                        const hasImage = !!(msg.image && !msg.image.startsWith('{'));
+                        const isImageOnly = hasImage && !msg.text;
+                        const isImageWithText = hasImage && !!msg.text;
+                        const roundedClass = isFirstInGroup
+                          ? (isMine ? 'rounded-tl-lg rounded-tr-sm' : 'rounded-tr-lg rounded-tl-sm')
+                          : 'rounded-t-lg';
+                        return (
+                          <div
+                            className={`overflow-hidden ${roundedClass} rounded-b-lg shadow-sm cursor-pointer select-none`}
+                            style={{
+                              backgroundColor: msg.senderId === 'system' ? 'var(--aurora-surface-variant)' : isMine ? 'var(--msg-own-bubble)' : 'var(--aurora-surface)',
+                              boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)',
+                              WebkitMaskImage: '-webkit-radial-gradient(white, black)',
+                            }}
+                            onContextMenu={(e) => { e.preventDefault(); setContextMenuMsg(msg); }}
+                            onTouchStart={() => {
+                              longPressTimerRef.current = setTimeout(() => setContextMenuMsg(msg), 500);
+                            }}
+                            onTouchEnd={() => {
+                              if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+                            }}
+                            onTouchMove={() => {
+                              if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+                            }}
+                          >
+                            {/* Group sender name */}
+                            {activeGroupConv && !isMine && msg.senderId !== 'system' && isFirstInGroup && (
+                              <div className="text-[12px] font-semibold px-2.5 pt-1.5 mb-0.5" style={{ color: '#6366F1' }}>
+                                {users.find((u) => u.id === msg.senderId)?.name || 'Unknown'}
+                              </div>
+                            )}
+                            {msg.callEvent ? (
+                              <div className="px-2.5 pt-1.5 pb-1">
+                                <CallEventBubble callEvent={msg.callEvent} isMine={isMine} />
+                              </div>
+                            ) : msg.voiceMessage ? (
+                              <div className="px-2.5 pt-1.5 pb-1">
+                                <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} />
+                              </div>
+                            ) : (
+                              <>
+                                {hasImage && (
+                                  <div className="relative">
+                                    <img
+                                      src={msg.image}
+                                      alt="Shared image"
+                                      className="w-full max-w-[280px] object-cover cursor-pointer"
+                                      style={{ maxHeight: '300px', display: 'block' }}
+                                      onClick={() => setLightboxImage(msg.image!)}
+                                    />
+                                    {/* Overlay timestamp on image-only messages */}
+                                    {isImageOnly && (
+                                      <div className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+                                        {msg.editedAt && <span className="text-[10.5px] italic text-white">edited</span>}
+                                        <span className="text-[10.5px] text-white">{formatMessageTime(msg.createdAt)}</span>
+                                        {isMine && (
+                                          msg.read
+                                            ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
+                                            : <CheckCheck size={14} style={{ color: '#FFFFFF' }} />
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 )}
-                              </div>
-                            )}
-                            {(msg.text || !msg.image || msg.image.startsWith('{')) && (
-                            <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? 'var(--msg-system-text)' : 'var(--msg-text)' }}>
-                              {msg.text && renderFormattedText(msg.text)}
-                              {/* Inline timestamp + read receipt (WhatsApp style) */}
-                              <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
-                                {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
-                                <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>
-                                  {formatMessageTime(msg.createdAt)}
-                                </span>
-                                {isMine && (
-                                  msg.read
-                                    ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
-                                    : <CheckCheck size={14} style={{ color: '#B0B6B9' }} />
+                                {!isImageOnly && (
+                                  <div className={`px-2.5 ${isImageWithText ? 'pt-1' : 'pt-1.5'} pb-1`}>
+                                    <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? 'var(--msg-system-text)' : 'var(--msg-text)' }}>
+                                      {msg.text && renderFormattedText(msg.text)}
+                                      {/* Inline timestamp + read receipt (WhatsApp style) */}
+                                      <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
+                                        {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
+                                        <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>
+                                          {formatMessageTime(msg.createdAt)}
+                                        </span>
+                                        {isMine && (
+                                          msg.read
+                                            ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
+                                            : <CheckCheck size={14} style={{ color: '#B0B6B9' }} />
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
                                 )}
-                              </span>
-                            </div>
+                              </>
                             )}
-                          </>
-                        )}
-                      </div>
+                          </div>
+                        );
+                      })()}
                       {/* Reactions */}
                       {msg.reactions && Object.keys(msg.reactions).length > 0 && (
                         <div className={`flex gap-1 flex-wrap mt-0.5 ${isMine ? 'justify-end' : 'justify-start'}`}>
