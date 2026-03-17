@@ -1494,24 +1494,42 @@ export default function MessagesPage() {
             };
 
             // Helper to try decrypting all fields with a given key.
-            // Returns true if text was successfully decrypted.
+            // Returns true if at least one field was successfully decrypted.
             // Does NOT replace text with friendly message — caller handles that after all strategies.
             const tryDecryptAllFields = async (key: CryptoKey): Promise<boolean> => {
-              const decryptedText = await e2eDecrypt(text, key);
-              if (isStillEncrypted(decryptedText)) {
-                return false; // Key didn't work — don't touch any fields
+              let anyDecrypted = false;
+
+              // Try to decrypt text (skip if empty or not v2 JSON)
+              if (text) {
+                try {
+                  const textParsed = JSON.parse(text);
+                  if (textParsed.v === 2) {
+                    const decryptedText = await e2eDecrypt(text, key);
+                    if (!isStillEncrypted(decryptedText)) {
+                      text = decryptedText;
+                      anyDecrypted = true;
+                    }
+                  }
+                } catch { /* text is not v2 JSON — skip */ }
               }
-              // Key worked — apply decrypted values to all fields
-              text = decryptedText;
+
+              // Try to decrypt image
               if (image) {
                 try {
                   const imgParsed = JSON.parse(image);
                   if (imgParsed.v === 2) {
                     const decryptedImg = await e2eDecrypt(image, key);
-                    image = isStillEncrypted(decryptedImg) ? undefined : decryptedImg;
+                    if (!isStillEncrypted(decryptedImg)) {
+                      image = decryptedImg;
+                      anyDecrypted = true;
+                    } else {
+                      image = undefined; // Can't decrypt — hide broken image
+                    }
                   }
                 } catch { /* not encrypted or not JSON */ }
               }
+
+              // Try to decrypt voice message
               if (voiceMessage?.audioUrl) {
                 try {
                   const voiceParsed = JSON.parse(voiceMessage.audioUrl);
@@ -1519,27 +1537,29 @@ export default function MessagesPage() {
                     const decryptedAudio = await e2eDecrypt(voiceMessage.audioUrl, key);
                     if (!isStillEncrypted(decryptedAudio)) {
                       voiceMessage = { ...voiceMessage, audioUrl: decryptedAudio };
+                      anyDecrypted = true;
                     }
                   }
                 } catch { /* not encrypted or not JSON */ }
               }
-              return true;
+
+              return anyDecrypted;
             };
 
             if (isGroupConv && selectedConvId) {
               // Group decryption
               const groupKey = e2eGroupKeysRef.current.get(selectedConvId);
               if (groupKey) {
-                try {
-                  const parsed = JSON.parse(text);
-                  if (parsed.v === 2) {
-                    const ok = await tryDecryptAllFields(groupKey);
-                    if (!ok) {
-                      text = '\u{1F512} This message cannot be decrypted on this device';
-                    }
+                let groupIsV2 = false;
+                try { const p = JSON.parse(text); groupIsV2 = p.v === 2; } catch {}
+                if (!groupIsV2 && image) {
+                  try { const p = JSON.parse(image); groupIsV2 = p.v === 2; } catch {}
+                }
+                if (groupIsV2) {
+                  const ok = await tryDecryptAllFields(groupKey);
+                  if (!ok) {
+                    text = '\u{1F512} This message cannot be decrypted on this device';
                   }
-                } catch {
-                  // Not v2 — leave as-is (old unencrypted group messages)
                 }
               }
             } else if (selectedUser) {
@@ -1548,58 +1568,61 @@ export default function MessagesPage() {
               // 2) ECDH shared key (old V2 messages)
               // 3) Per-message ECDH key (old V2 messages with stored sender key)
               // 4) Legacy V1 (oldest messages)
-              let decrypted = false;
-              try {
-                const parsed = JSON.parse(text);
-                if (parsed.v === 2) {
-                  // Strategy 1: Deterministic key (works cross-device, cross-browser)
-                  try {
-                    const detKey = await getDeterministicSharedKey(user.uid, selectedUser.id);
-                    decrypted = await tryDecryptAllFields(detKey);
-                  } catch (err) {
-                    console.warn('[E2EE] Deterministic decrypt failed:', err);
-                  }
+              // Check if EITHER text or image is v2 encrypted
+              let isV2 = false;
+              try { const p = JSON.parse(text); isV2 = p.v === 2; } catch { /* not v2 text */ }
+              if (!isV2 && image) {
+                try { const p = JSON.parse(image); isV2 = p.v === 2; } catch { /* not v2 image */ }
+              }
 
-                  // Strategy 2: ECDH shared key (for old messages encrypted with ECDH)
-                  if (!decrypted) {
-                    const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
-                    if (sharedKey) {
-                      try {
-                        decrypted = await tryDecryptAllFields(sharedKey);
-                      } catch { /* ECDH decrypt failed */ }
-                    }
-                  }
+              if (isV2) {
+                let decrypted = false;
 
-                  // Strategy 3: Per-message sender public key ECDH
-                  if (!decrypted) {
-                    const msgSenderPubKey = (rawMsg as Record<string, unknown>).senderPublicKey as ExportedPublicKey | undefined;
-                    const msgSenderId = (rawMsg as Record<string, unknown>).senderId as string;
-                    if (msgSenderPubKey && e2ePrivateKeyRef.current) {
-                      try {
-                        const peerPubKey = msgSenderId === user.uid
-                          ? (await getDoc(doc(db, 'users', selectedUser.id))).data()?.e2ePublicKey as ExportedPublicKey
-                          : msgSenderPubKey;
-                        if (peerPubKey) {
-                          const perMsgKey = await deriveSharedKey(e2ePrivateKeyRef.current, peerPubKey);
-                          decrypted = await tryDecryptAllFields(perMsgKey);
-                        }
-                      } catch { /* per-message ECDH failed */ }
-                    }
-                  }
-
-                  // All V2 strategies failed — show friendly message
-                  if (!decrypted) {
-                    text = '\u{1F512} This message cannot be decrypted on this device';
-                    image = undefined;
-                  }
-                } else {
-                  throw new Error('v1');
+                // Strategy 1: Deterministic key (works cross-device, cross-browser)
+                try {
+                  const detKey = await getDeterministicSharedKey(user.uid, selectedUser.id);
+                  decrypted = await tryDecryptAllFields(detKey);
+                } catch (err) {
+                  console.warn('[E2EE] Deterministic decrypt failed:', err);
                 }
-              } catch {
+
+                // Strategy 2: ECDH shared key (for old messages encrypted with ECDH)
+                if (!decrypted) {
+                  const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
+                  if (sharedKey) {
+                    try {
+                      decrypted = await tryDecryptAllFields(sharedKey);
+                    } catch { /* ECDH decrypt failed */ }
+                  }
+                }
+
+                // Strategy 3: Per-message sender public key ECDH
+                if (!decrypted) {
+                  const msgSenderPubKey = (rawMsg as Record<string, unknown>).senderPublicKey as ExportedPublicKey | undefined;
+                  const msgSenderId = (rawMsg as Record<string, unknown>).senderId as string;
+                  if (msgSenderPubKey && e2ePrivateKeyRef.current) {
+                    try {
+                      const peerPubKey = msgSenderId === user.uid
+                        ? (await getDoc(doc(db, 'users', selectedUser.id))).data()?.e2ePublicKey as ExportedPublicKey
+                        : msgSenderPubKey;
+                      if (peerPubKey) {
+                        const perMsgKey = await deriveSharedKey(e2ePrivateKeyRef.current, peerPubKey);
+                        decrypted = await tryDecryptAllFields(perMsgKey);
+                      }
+                    } catch { /* per-message ECDH failed */ }
+                  }
+                }
+
+                // All V2 strategies failed — show friendly message
+                if (!decrypted) {
+                  text = '\u{1F512} This message cannot be decrypted on this device';
+                  image = undefined;
+                }
+              } else {
                 // Not a v2 payload — try legacy v1 decrypt
                 try {
                   const convKey = generateConversationKey(user.uid, selectedUser.id);
-                  text = decryptMessage(text, convKey);
+                  if (text) text = decryptMessage(text, convKey);
                 } catch {
                   text = '[Encrypted]';
                 }
