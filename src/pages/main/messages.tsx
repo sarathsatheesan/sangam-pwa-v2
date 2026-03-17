@@ -3344,31 +3344,45 @@ export default function MessagesPage() {
                         ) : (
                           <>
                             {msg.image && !msg.image.startsWith('{') && (
-                              <div className="-mx-[9px] -mt-[6px] mb-1">
+                              <div className={`-mx-[10px] -mt-[6px] ${msg.text ? 'mb-1' : '-mb-[4px]'} relative`}>
                                 <img
                                   src={msg.image}
                                   alt="Shared image"
-                                  className="rounded-t-[7.5px] w-full max-w-[280px] object-cover cursor-pointer"
-                                  style={{ maxHeight: '300px' }}
+                                  className={`${msg.text ? 'rounded-t-[8px]' : 'rounded-[8px]'} w-full max-w-[280px] object-cover cursor-pointer`}
+                                  style={{ maxHeight: '300px', display: 'block' }}
                                   onClick={() => setLightboxImage(msg.image!)}
                                 />
+                                {/* Overlay timestamp on image-only messages */}
+                                {!msg.text && (
+                                  <div className="absolute bottom-1 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
+                                    {msg.editedAt && <span className="text-[10.5px] italic text-white">edited</span>}
+                                    <span className="text-[10.5px] text-white">{formatMessageTime(msg.createdAt)}</span>
+                                    {isMine && (
+                                      msg.read
+                                        ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
+                                        : <CheckCheck size={14} style={{ color: '#FFFFFF' }} />
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
+                            {(msg.text || !msg.image || msg.image.startsWith('{')) && (
                             <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? '#4A6E7F' : '#111B21' }}>
                               {msg.text && renderFormattedText(msg.text)}
                               {/* Inline timestamp + read receipt (WhatsApp style) */}
                               <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
                                 {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: '#667781' }}>edited</span>}
-                                <span className="text-[10.5px]" style={{ color: msg.image && !msg.text ? '#FFFFFF' : '#667781' }}>
+                                <span className="text-[10.5px]" style={{ color: '#667781' }}>
                                   {formatMessageTime(msg.createdAt)}
                                 </span>
                                 {isMine && (
                                   msg.read
                                     ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
-                                    : <CheckCheck size={14} style={{ color: msg.image && !msg.text ? '#FFFFFF' : '#B0B6B9' }} />
+                                    : <CheckCheck size={14} style={{ color: '#B0B6B9' }} />
                                 )}
                               </span>
                             </div>
+                            )}
                           </>
                         )}
                       </div>
