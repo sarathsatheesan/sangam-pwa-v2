@@ -185,6 +185,7 @@ export default function DiscoverPage() {
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [blockTargetUser, setBlockTargetUser] = useState<{ id: string; name: string } | null>(null);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Load blocked users from Firestore
@@ -833,48 +834,51 @@ export default function DiscoverPage() {
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
               Pending Requests ({incomingRequests.length})
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
               {incomingRequests.map((person) => (
-                <div key={person.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                  <div className="h-32 bg-gradient-to-r from-yellow-400 to-orange-400 relative">
-                    <button
-                      onClick={() => setSelectedPerson(person)}
-                      className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
-                    />
-                  </div>
-                  <div className="p-4">
+                <div key={person.id} className="group bg-aurora-surface rounded-xl border border-orange-400/30 dark:border-orange-500/40 overflow-hidden cursor-pointer hover:shadow-md hover:border-orange-400/60 transition-all duration-200 flex flex-col p-3"
+                  onClick={() => setSelectedPerson(person)}
+                >
+                  {/* Top row: avatar + badge */}
+                  <div className="flex items-start justify-between mb-2">
                     <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                      <div className="w-11 h-11 rounded-full bg-yellow-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
                         {renderAvatar(person.avatar, person.name)}
                       </div>
                       {isRecentlyActive(person) && (
-                        <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                        <div className="absolute w-2.5 h-2.5 bg-green-500 rounded-full border border-white bottom-0 right-0" />
                       )}
                     </div>
-                    <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
-                    {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>}
-                    {renderHeritage(person, 'sm')}
+                    <span className="text-[7px] font-bold px-1 py-0.5 rounded-full bg-orange-100 text-orange-700">Request</span>
+                  </div>
+                  {/* Name + profession */}
+                  <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
+                  {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                  {/* Heritage + location */}
+                  <div className="mt-1.5 space-y-0.5">
+                    {renderHeritage(person)}
                     {person.showLocation && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" /> {person.city}
+                      <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
+                        <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
                       </p>
                     )}
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => handleAcceptConnection(person.id)}
-                        disabled={connectingId === person.id}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
-                      >
-                        <Check className="w-4 h-4" /> Accept
-                      </button>
-                      <button
-                        onClick={() => handleDeclineConnection(person.id)}
-                        disabled={connectingId === person.id}
-                        className="flex-1 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-white dark:text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
-                      >
-                        <X className="w-4 h-4" /> Decline
-                      </button>
-                    </div>
+                  </div>
+                  {/* Action buttons — always at bottom */}
+                  <div className="mt-auto pt-2 flex gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
+                      disabled={connectingId === person.id}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      <Check className="w-3 h-3" /> Accept
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
+                      disabled={connectingId === person.id}
+                      className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      <X className="w-3 h-3" /> Decline
+                    </button>
                   </div>
                 </div>
               ))}
@@ -888,41 +892,44 @@ export default function DiscoverPage() {
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
               Sent Requests ({sentRequests.length})
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
               {sentRequests.map((person) => (
-                <div key={person.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                  <div className="h-32 bg-gradient-to-r from-purple-400 to-blue-400 relative">
-                    <button
-                      onClick={() => setSelectedPerson(person)}
-                      className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
-                    />
-                  </div>
-                  <div className="p-4">
+                <div key={person.id} className="group bg-aurora-surface rounded-xl border border-purple-400/30 dark:border-purple-500/40 overflow-hidden cursor-pointer hover:shadow-md hover:border-purple-400/60 transition-all duration-200 flex flex-col p-3"
+                  onClick={() => setSelectedPerson(person)}
+                >
+                  {/* Top row: avatar + badge */}
+                  <div className="flex items-start justify-between mb-2">
                     <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                      <div className="w-11 h-11 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
                         {renderAvatar(person.avatar, person.name)}
                       </div>
                       {isRecentlyActive(person) && (
-                        <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                        <div className="absolute w-2.5 h-2.5 bg-green-500 rounded-full border border-white bottom-0 right-0" />
                       )}
                     </div>
-                    <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
-                    {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>}
-                    {renderHeritage(person, 'sm')}
+                    <span className="text-[7px] font-bold px-1 py-0.5 rounded-full bg-purple-100 text-purple-700">Sent</span>
+                  </div>
+                  {/* Name + profession */}
+                  <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
+                  {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                  {/* Heritage + location */}
+                  <div className="mt-1.5 space-y-0.5">
+                    {renderHeritage(person)}
                     {person.showLocation && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" /> {person.city}
+                      <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
+                        <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
                       </p>
                     )}
-                    <div className="mt-4">
-                      <button
-                        onClick={() => handleConnect(person.id)}
-                        disabled={connectingId === person.id}
-                        className="w-full bg-gray-400 hover:bg-gray-500 text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
-                      >
-                        <Clock className="w-4 h-4" /> Pending
-                      </button>
-                    </div>
+                  </div>
+                  {/* Action button — always at bottom */}
+                  <div className="mt-auto pt-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                      disabled={connectingId === person.id}
+                      className="w-full bg-gray-400 hover:bg-gray-500 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      <Clock className="w-3 h-3" /> Pending
+                    </button>
                   </div>
                 </div>
               ))}
@@ -947,62 +954,56 @@ export default function DiscoverPage() {
                     <h3 className="text-xl font-bold text-gray-800 dark:text-white">Connection Requests</h3>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {incomingRequests.map((person) => {
                     const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
                     return (
-                      <div key={`req-${person.id}`} className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col">
-                        <div
-                          className="h-20 bg-gradient-to-r from-orange-400 to-amber-400 relative cursor-pointer"
-                          onClick={() => setSelectedPerson(person)}
-                        >
-                          <MatchBadge score={score} />
-                          {isNewMember(person) && (
-                            <span className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">NEW</span>
-                          )}
-                          <div className="absolute top-2 right-2 bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <UserPlus className="w-3 h-3" /> Wants to connect
-                          </div>
-                        </div>
-                        <div className="p-3 flex flex-col flex-1">
-                          <div className="flex items-end gap-3 -mt-7">
-                            <div className="w-12 h-12 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-lg relative z-10 border-2 border-white shrink-0 shadow-sm">
+                      <div key={`req-${person.id}`} className="group bg-aurora-surface rounded-xl border border-orange-400/30 dark:border-orange-500/40 overflow-hidden cursor-pointer hover:shadow-md hover:border-orange-400/60 transition-all duration-200 flex flex-col p-3"
+                        onClick={() => setSelectedPerson(person)}
+                      >
+                        {/* Top row: avatar + match badge */}
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="relative">
+                            <div className="w-11 h-11 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
                               {renderAvatar(person.avatar, person.name)}
                             </div>
-                            <div className="min-w-0 flex-1 pb-1">
-                              <h4 className="font-bold text-[var(--aurora-text)] text-sm truncate leading-tight">{person.name}</h4>
-                              {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
-                            </div>
-                          </div>
-                          <div className="mt-2 space-y-0.5">
-                            {renderHeritage(person)}
-                            {person.showLocation && (
-                              <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
-                                <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
-                              </p>
-                            )}
-                            {getMutualConnectionCount(person.id) > 0 && (
-                              <p className="text-[11px] text-blue-600 font-medium">
-                                {getMutualConnectionCount(person.id)} mutual connections
-                              </p>
+                            {isNewMember(person) && (
+                              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none">NEW</span>
                             )}
                           </div>
-                          <div className="mt-auto pt-2.5 flex gap-1.5">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
-                              disabled={connectingId === person.id}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
-                            >
-                              <Check className="w-3.5 h-3.5" /> Accept
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
-                              disabled={connectingId === person.id}
-                              className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
-                            >
-                              <X className="w-3.5 h-3.5" /> Decline
-                            </button>
-                          </div>
+                          <MatchBadge score={score} />
+                        </div>
+                        {/* Name + profession */}
+                        <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
+                        {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                        {/* Heritage + location */}
+                        <div className="mt-1.5 space-y-0.5">
+                          {renderHeritage(person)}
+                          {person.showLocation && (
+                            <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
+                              <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
+                            </p>
+                          )}
+                          {getMutualConnectionCount(person.id) > 0 && (
+                            <p className="text-[10px] text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual</p>
+                          )}
+                        </div>
+                        {/* Action buttons — always at bottom */}
+                        <div className="mt-auto pt-2 flex gap-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
+                            disabled={connectingId === person.id}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <Check className="w-3 h-3" /> Accept
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
+                            disabled={connectingId === person.id}
+                            className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <X className="w-3 h-3" /> Decline
+                          </button>
                         </div>
                       </div>
                     );
@@ -1022,7 +1023,7 @@ export default function DiscoverPage() {
                     {pymkGroups.sameCity.map((person) => (
                       <div
                         key={person.id}
-                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
+                        className="w-44 sm:w-52 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
                       >
                         <div
                           className={`h-32 bg-gradient-to-r ${
@@ -1097,7 +1098,7 @@ export default function DiscoverPage() {
                     {pymkGroups.sameHeritage.map((person) => (
                       <div
                         key={person.id}
-                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
+                        className="w-44 sm:w-52 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
                       >
                         <div
                           className={`h-32 bg-gradient-to-r ${
@@ -1172,7 +1173,7 @@ export default function DiscoverPage() {
                     {pymkGroups.similarInterests.map((person) => (
                       <div
                         key={person.id}
-                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
+                        className="w-44 sm:w-52 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
                       >
                         <div
                           className={`h-32 bg-gradient-to-r ${
@@ -1246,7 +1247,7 @@ export default function DiscoverPage() {
           </div>
         )}
         {loading ? (
-          <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-4'}>
+          <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3' : 'space-y-4'}>
             {[...Array(9)].map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -1264,131 +1265,166 @@ export default function DiscoverPage() {
             </p>
           </div>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredPeople.map((person) => {
               const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
               const status = connections.get(person.id);
-              const isHovering = hoveringDisconnect === person.id && status === 'connected';
+              const isExpanded = expandedCardId === person.id;
 
               return (
-                <div key={person.id} className="group bg-aurora-surface rounded-2xl border border-aurora-border overflow-hidden cursor-pointer hover:shadow-lg hover:border-aurora-border/80 transition-all duration-200 flex flex-col">
-                  <div
-                    className={`h-24 bg-gradient-to-r ${
-                      HERITAGE_COLORS[
-                        Array.isArray(person.heritage) ? person.heritage[0] : person.heritage
-                      ] || 'from-gray-300 to-gray-400'
-                    } relative`}
-                    onClick={() => setSelectedPerson(person)}
-                  >
-                    <MatchBadge score={score} />
-                    {isNewMember(person) && (
-                      <span className="absolute top-2.5 left-2.5 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
-                        NEW
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-3 flex flex-col flex-1">
-                    <div className="relative flex items-end gap-3 -mt-8">
-                      <div className="w-14 h-14 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-lg relative z-10 border-3 border-white shrink-0 shadow-sm">
-                        {renderAvatar(person.avatar, person.name)}
-                      </div>
-                      <div className="min-w-0 flex-1 pb-1">
-                        <h3 className="font-bold text-[var(--aurora-text)] text-sm truncate leading-tight">{person.name}</h3>
-                        {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
-                      </div>
-                      {/* Three-dot menu */}
-                      <div className="relative pb-1">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
-                          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                          aria-label="More options"
-                        >
-                          <MoreVertical className="w-4 h-4 text-gray-400" />
-                        </button>
-                        {openMenuId === person.id && (
-                          <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-20">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <Ban className="w-4 h-4" /> Block User
-                            </button>
-                          </div>
+                <div
+                  key={person.id}
+                  className={`group bg-aurora-surface rounded-xl border overflow-hidden cursor-pointer transition-all duration-300 flex flex-col ${
+                    isExpanded
+                      ? 'border-aurora-indigo/50 shadow-lg col-span-2 sm:col-span-2 lg:col-span-2'
+                      : 'border-aurora-border hover:shadow-md hover:border-aurora-indigo/30 p-3'
+                  }`}
+                  onClick={() => setExpandedCardId(isExpanded ? null : person.id)}
+                >
+                  {isExpanded ? (
+                    <>
+                      {/* EXPANDED VIEW — larger avatar, full details, gradient header */}
+                      <div className={`h-24 bg-gradient-to-r ${
+                        HERITAGE_COLORS[Array.isArray(person.heritage) ? person.heritage[0] : person.heritage] || 'from-gray-300 to-gray-400'
+                      } relative`}>
+                        <MatchBadge score={score} />
+                        {isNewMember(person) && (
+                          <span className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">NEW</span>
                         )}
                       </div>
-                    </div>
-                    <div className="mt-2 space-y-0.5">
-                      {renderHeritage(person)}
-                      {person.showLocation && (
-                        <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
-                          <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
-                        </p>
-                      )}
-                      {getMutualConnectionCount(person.id) > 0 && (
-                        <p className="text-[11px] text-blue-600 font-medium">
-                          {getMutualConnectionCount(person.id)} mutual connections
-                        </p>
-                      )}
-                    </div>
-                    <div className="mt-auto pt-2.5 flex gap-1.5">
-                      {status === 'connected' ? (
-                        <>
+                      <div className="p-4 flex flex-col flex-1">
+                        <div className="flex items-end gap-3 -mt-8">
+                          <div className="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-xl relative z-10 border-3 border-white shrink-0 shadow-md">
+                            {renderAvatar(person.avatar, person.name)}
+                          </div>
+                          <div className="min-w-0 flex-1 pb-1">
+                            <h3 className="font-bold text-[var(--aurora-text)] text-sm truncate">{person.name}</h3>
+                            {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                          </div>
+                          <div className="relative pb-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
+                              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                            >
+                              <MoreVertical className="w-4 h-4 text-gray-400" />
+                            </button>
+                            {openMenuId === person.id && (
+                              <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-20">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                  <Ban className="w-4 h-4" /> Block User
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-3 space-y-1">
+                          {renderHeritage(person)}
+                          {person.showLocation && (
+                            <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
+                              <MapPin className="w-3 h-3 shrink-0" /> {person.city}
+                            </p>
+                          )}
+                          {getMutualConnectionCount(person.id) > 0 && (
+                            <p className="text-xs text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual connections</p>
+                          )}
+                          {person.bio && <p className="text-xs text-[var(--aurora-text-secondary)] mt-1 line-clamp-2">{person.bio}</p>}
+                        </div>
+                        <div className="mt-auto pt-3 flex gap-2">
+                          {status === 'connected' ? (
+                            <>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" /> Message
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                                className="px-3 py-1.5 rounded-lg font-medium text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 flex items-center justify-center gap-1"
+                              >
+                                <UserMinus className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          ) : status === 'pending' ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                              disabled={connectingId === person.id}
+                              className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                              <Clock className="w-3.5 h-3.5" /> Pending
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                              disabled={connectingId === person.id}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                              <UserPlus className="w-3.5 h-3.5" /> Connect
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* COMPACT VIEW — mini card */}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="relative">
+                          <div className="w-11 h-11 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                            {renderAvatar(person.avatar, person.name)}
+                          </div>
+                          {isNewMember(person) && (
+                            <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none">NEW</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MatchBadge score={score} />
+                        </div>
+                      </div>
+                      <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
+                      {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                      <div className="mt-1.5 space-y-0.5">
+                        {renderHeritage(person)}
+                        {person.showLocation && (
+                          <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
+                            <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
+                          </p>
+                        )}
+                        {getMutualConnectionCount(person.id) > 0 && (
+                          <p className="text-[10px] text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual</p>
+                        )}
+                      </div>
+                      <div className="mt-auto pt-2">
+                        {status === 'connected' ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1"
+                            className="w-full bg-green-600 hover:bg-green-700 text-white py-1 rounded-lg font-medium text-[10px] flex items-center justify-center gap-1"
                           >
-                            <MessageCircle className="w-3.5 h-3.5" /> Message
+                            <MessageCircle className="w-3 h-3" /> Message
                           </button>
+                        ) : status === 'pending' ? (
                           <button
-                            onMouseEnter={() => setHoveringDisconnect(person.id)}
-                            onMouseLeave={() => setHoveringDisconnect(null)}
-                            onTouchStart={(e) => {
-                              e.stopPropagation();
-                              if (isHovering) {
-                                handleConnect(person.id);
-                              } else {
-                                setHoveringDisconnect(person.id);
-                              }
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isHovering) handleConnect(person.id);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
                             disabled={connectingId === person.id}
-                            className={`px-2.5 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 transition-colors flex items-center justify-center gap-1 ${
-                              isHovering
-                                ? 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-300'
-                                : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
-                            }`}
-                            title={isHovering ? 'Tap to disconnect' : 'Tap to show disconnect'}
+                            className="w-full bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
                           >
-                            {isHovering ? (
-                              <><UserMinus className="w-3.5 h-3.5" /></>
-                            ) : (
-                              <><UserCheck className="w-3.5 h-3.5" /></>
-                            )}
+                            <Clock className="w-3 h-3" /> Pending
                           </button>
-                        </>
-                      ) : status === 'pending' ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                          disabled={connectingId === person.id}
-                          className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
-                          title="Tap to withdraw request"
-                        >
-                          <Clock className="w-3.5 h-3.5" /> Pending
-                        </button>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                          disabled={connectingId === person.id}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
-                        >
-                          <UserPlus className="w-3.5 h-3.5" /> Connect
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                            disabled={connectingId === person.id}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <UserPlus className="w-3 h-3" /> Connect
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
