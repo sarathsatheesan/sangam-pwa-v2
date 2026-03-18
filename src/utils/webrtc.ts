@@ -546,27 +546,8 @@ export class CallManager {
         localStream: this.localStream,
       });
 
-      // Create peer connection and add local tracks
+      // Create peer connection
       this.pc = this.createPeerConnection(callId, false);
-
-      // Safari: explicitly add transceivers before adding tracks
-      // This ensures Safari properly negotiates video receive capabilities
-      if (callType === 'video') {
-        try {
-          // Only add transceivers if they don't already exist
-          const existingTransceivers = this.pc.getTransceivers();
-          const hasAudio = existingTransceivers.some(t => t.receiver.track?.kind === 'audio');
-          const hasVideo = existingTransceivers.some(t => t.receiver.track?.kind === 'video');
-          if (!hasAudio) this.pc.addTransceiver('audio', { direction: 'sendrecv' });
-          if (!hasVideo) this.pc.addTransceiver('video', { direction: 'sendrecv' });
-        } catch (err) {
-          console.warn('[WebRTC] addTransceiver not supported, falling back to addTrack:', err);
-        }
-      }
-
-      this.localStream.getTracks().forEach((track) => {
-        this.pc!.addTrack(track, this.localStream!);
-      });
 
       // Start listening for caller ICE candidates EARLY (before setting remote desc)
       // so candidates get buffered and flushed after remote description is set
@@ -600,13 +581,22 @@ export class CallManager {
         throw new Error('No offer found in call document');
       }
 
-      // Set the offer as remote description
+      // CRITICAL: Set remote description FIRST — this creates transceivers matching
+      // the offer's m= lines. Only THEN add local tracks so they map correctly.
+      // This order is essential for Chrome ↔ Safari cross-browser video calls.
       console.log('[WebRTC] Setting offer as remote description');
       const offer = new RTCSessionDescription(callData.offer);
       await this.pc.setRemoteDescription(offer);
 
       // Now flush any ICE candidates that arrived while we were setting up
       await this.flushIceCandidates();
+
+      // Add local tracks AFTER remote description is set
+      // This ensures tracks map to the correct transceivers created from the offer
+      console.log('[WebRTC] Adding local tracks to peer connection');
+      this.localStream.getTracks().forEach((track) => {
+        this.pc!.addTrack(track, this.localStream!);
+      });
 
       // Create and send answer
       console.log('[WebRTC] Creating answer');
