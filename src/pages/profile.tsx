@@ -9,7 +9,7 @@ import { doc, updateDoc, getDoc, arrayRemove, collection, query, where, getDocs,
 import { signOut } from 'firebase/auth';
 import { downloadMyData, deleteMyData } from '@/services/dataPrivacy';
 import { AVATAR_OPTIONS, BUSINESS_TYPES } from '@/constants/config';
-import { uploadProfileImage, deleteProfileImage } from '@/utils/profileImage';
+import { compressProfileImage } from '@/utils/profileImage';
 import CountryEthnicitySelector from '@/components/CountryEthnicitySelector';
 import { validateMerchantTIN } from '@/services/merchantValidation';
 import {
@@ -1510,7 +1510,7 @@ export default function ProfilePage() {
             <div className="text-center">
               {/* Current avatar/photo preview */}
               <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-0.5 mx-auto mb-3">
-                {editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:')) ? (
+                {editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:')) ? (
                   <img src={editForm.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
                 ) : (
                   <div className="w-full h-full rounded-full bg-[var(--aurora-surface)] flex items-center justify-center text-4xl">
@@ -1528,13 +1528,18 @@ export default function ProfilePage() {
                 className="hidden"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
-                  if (!file || !user?.uid) return;
+                  if (!file) return;
+                  if (file.size > 10 * 1024 * 1024) {
+                    alert('Image too large. Please select an image under 10MB.');
+                    return;
+                  }
                   setUploadingImage(true);
                   try {
-                    const url = await uploadProfileImage(user.uid, file);
-                    setEditForm((prev) => ({ ...prev, avatar: url }));
+                    const dataUrl = await compressProfileImage(file);
+                    setEditForm((prev) => ({ ...prev, avatar: dataUrl }));
                   } catch (err) {
-                    console.error('Failed to upload image:', err);
+                    console.error('[Profile] Failed to process image:', err);
+                    alert('Failed to process image. Please try a different photo.');
                   } finally {
                     setUploadingImage(false);
                     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1549,7 +1554,7 @@ export default function ProfilePage() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImage}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    editForm.avatar?.startsWith('http')
+                    editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:'))
                       ? 'bg-aurora-indigo text-white shadow-sm'
                       : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
                   }`}
@@ -1565,12 +1570,12 @@ export default function ProfilePage() {
                   type="button"
                   onClick={() => {
                     // Switch to emoji avatar mode — set to default emoji if currently a URL
-                    if (editForm.avatar?.startsWith('http')) {
+                    if (editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:'))) {
                       setEditForm((prev) => ({ ...prev, avatar: '🧑' }));
                     }
                   }}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    !editForm.avatar?.startsWith('http')
+                    !editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:'))
                       ? 'bg-aurora-indigo text-white shadow-sm'
                       : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
                   }`}
@@ -1580,7 +1585,7 @@ export default function ProfilePage() {
               </div>
 
               {/* Show photo actions if using photo */}
-              {editForm.avatar?.startsWith('http') && (
+              {editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:')) && (
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <button
                     type="button"
@@ -1593,11 +1598,8 @@ export default function ProfilePage() {
                   <span className="text-xs text-[var(--aurora-text-muted)]">•</span>
                   <button
                     type="button"
-                    onClick={async () => {
-                      if (user?.uid) {
-                        await deleteProfileImage(user.uid);
-                        setEditForm((prev) => ({ ...prev, avatar: '🧑' }));
-                      }
+                    onClick={() => {
+                      setEditForm((prev) => ({ ...prev, avatar: '🧑' }));
                     }}
                     className="text-xs text-red-500 hover:underline"
                   >
@@ -1607,7 +1609,7 @@ export default function ProfilePage() {
               )}
 
               {/* Emoji avatar grid — only show when not using photo */}
-              {(!editForm.avatar || !editForm.avatar.startsWith('http')) && (
+              {(!editForm.avatar || !editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:')) && (
                 <div className="grid grid-cols-8 gap-2 max-w-xs mx-auto">
                   {AVATAR_OPTIONS.map((avatar) => (
                     <button
