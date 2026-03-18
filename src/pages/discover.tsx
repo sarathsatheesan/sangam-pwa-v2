@@ -103,8 +103,11 @@ const fuzzyMatch = (text: string, query: string): boolean => {
   return true;
 };
 
-const renderAvatar = (avatar: string | undefined, name: string): string => {
-  if (avatar && avatar.length === 1 && /\p{Emoji}/u.test(avatar)) {
+const renderAvatar = (avatar: string | undefined, name: string): React.ReactNode => {
+  if (avatar && (avatar.startsWith('http') || avatar.startsWith('data:'))) {
+    return <img src={avatar} alt={name} className="w-full h-full rounded-full object-cover" />;
+  }
+  if (avatar && /\p{Emoji}/u.test(avatar)) {
     return avatar;
   }
   return name.charAt(0).toUpperCase() || '👤';

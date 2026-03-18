@@ -9,6 +9,7 @@ import { doc, updateDoc, getDoc, arrayRemove, collection, query, where, getDocs,
 import { signOut } from 'firebase/auth';
 import { downloadMyData, deleteMyData } from '../../services/dataPrivacy';
 import { AVATAR_OPTIONS, BUSINESS_TYPES } from '../../constants/config';
+import { uploadProfileImage, deleteProfileImage } from '../../utils/profileImage';
 import CountryEthnicitySelector from '../../components/CountryEthnicitySelector';
 import { validateMerchantTIN } from '../../services/merchantValidation';
 import {
@@ -246,6 +247,8 @@ export default function ProfilePage() {
     tinValidationStatus: 'not_checked' as 'pending' | 'valid' | 'invalid' | 'not_checked',
     tinValidationMessage: '',
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (toastMessage) {
@@ -1502,28 +1505,125 @@ export default function ProfilePage() {
 
           {/* Modal Content */}
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
-            {/* Avatar Picker */}
+            {/* Profile Photo OR Avatar Picker */}
             <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-0.5 mx-auto mb-3">
-                <div className="w-full h-full rounded-full bg-[var(--aurora-surface)] flex items-center justify-center text-4xl">
-                  {editForm.avatar}
-                </div>
+              {/* Current avatar/photo preview */}
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-0.5 mx-auto mb-3">
+                {editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:')) ? (
+                  <img src={editForm.avatar} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-[var(--aurora-surface)] flex items-center justify-center text-4xl">
+                    {editForm.avatar || '🧑'}
+                  </div>
+                )}
               </div>
-              <div className="grid grid-cols-8 gap-2 max-w-xs mx-auto">
-                {AVATAR_OPTIONS.map((avatar) => (
+
+              {/* Hidden file input for photo upload */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !user?.uid) return;
+                  setUploadingImage(true);
+                  try {
+                    const url = await uploadProfileImage(user.uid, file);
+                    setEditForm((prev) => ({ ...prev, avatar: url }));
+                  } catch (err) {
+                    console.error('Failed to upload image:', err);
+                  } finally {
+                    setUploadingImage(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }
+                }}
+              />
+
+              {/* Toggle: Photo or Avatar */}
+              <div className="flex items-center justify-center gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    editForm.avatar?.startsWith('http')
+                      ? 'bg-aurora-indigo text-white shadow-sm'
+                      : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
+                  }`}
+                >
+                  {uploadingImage ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                  ) : (
+                    <><Camera className="w-4 h-4" /> Use Photo</>
+                  )}
+                </button>
+                <span className="text-xs text-[var(--aurora-text-muted)]">or</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Switch to emoji avatar mode — set to default emoji if currently a URL
+                    if (editForm.avatar?.startsWith('http')) {
+                      setEditForm((prev) => ({ ...prev, avatar: '🧑' }));
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    !editForm.avatar?.startsWith('http')
+                      ? 'bg-aurora-indigo text-white shadow-sm'
+                      : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
+                  }`}
+                >
+                  🧑 Use Avatar
+                </button>
+              </div>
+
+              {/* Show photo actions if using photo */}
+              {editForm.avatar?.startsWith('http') && (
+                <div className="flex items-center justify-center gap-2 mb-3">
                   <button
-                    key={avatar}
-                    onClick={() => setEditForm({ ...editForm, avatar })}
-                    className={`p-2 rounded-xl text-xl transition ${
-                      editForm.avatar === avatar
-                        ? 'bg-aurora-indigo/10 ring-2 ring-aurora-indigo'
-                        : 'hover:bg-[var(--aurora-surface-variant)]'
-                    }`}
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="text-xs text-aurora-indigo hover:underline"
                   >
-                    {avatar}
+                    Change photo
                   </button>
-                ))}
-              </div>
+                  <span className="text-xs text-[var(--aurora-text-muted)]">•</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (user?.uid) {
+                        await deleteProfileImage(user.uid);
+                        setEditForm((prev) => ({ ...prev, avatar: '🧑' }));
+                      }
+                    }}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Remove photo
+                  </button>
+                </div>
+              )}
+
+              {/* Emoji avatar grid — only show when not using photo */}
+              {(!editForm.avatar || !editForm.avatar.startsWith('http')) && (
+                <div className="grid grid-cols-8 gap-2 max-w-xs mx-auto">
+                  {AVATAR_OPTIONS.map((avatar) => (
+                    <button
+                      key={avatar}
+                      type="button"
+                      onClick={() => setEditForm((prev) => ({ ...prev, avatar }))}
+                      className={`p-2 rounded-xl text-xl transition ${
+                        editForm.avatar === avatar
+                          ? 'bg-aurora-indigo/10 ring-2 ring-aurora-indigo'
+                          : 'hover:bg-[var(--aurora-surface-variant)]'
+                      }`}
+                    >
+                      {avatar}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Text fields */}
