@@ -146,12 +146,23 @@ const GlobalCallOverlay: React.FC = () => {
     return unsub;
   }, [user?.uid]);
 
-  // Attach local media stream to video element
+  // Attach local media stream to video element (camera flip triggers this via new stream ref)
   useEffect(() => {
     if (localVideoRef.current && callState.localStream) {
       localVideoRef.current.setAttribute('webkit-playsinline', '');
+      localVideoRef.current.setAttribute('playsinline', '');
       localVideoRef.current.srcObject = callState.localStream;
       safariSafePlay(localVideoRef.current);
+      // iOS Safari sometimes needs a delayed retry after camera switch
+      const retryTimer = setTimeout(() => {
+        if (localVideoRef.current && callState.localStream) {
+          if (localVideoRef.current.srcObject !== callState.localStream) {
+            localVideoRef.current.srcObject = callState.localStream;
+          }
+          safariSafePlay(localVideoRef.current);
+        }
+      }, 500);
+      return () => clearTimeout(retryTimer);
     }
   }, [callState.localStream]);
 
@@ -266,25 +277,43 @@ const GlobalCallOverlay: React.FC = () => {
   const retryMediaPlayback = useCallback(() => {
     const state = callManagerRef.current.getState();
 
-    if (remoteAudioRef.current) {
-      if (state.callType === 'video' && state.remoteStream && !remoteAudioRef.current.srcObject) {
+    // Remote audio
+    if (remoteAudioRef.current && state.remoteStream) {
+      if (state.callType === 'video') {
+        // For video calls, always ensure audio-only stream is attached
         const audioTracks = state.remoteStream.getAudioTracks();
         if (audioTracks.length > 0) {
-          remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
+          const currentSrc = remoteAudioRef.current.srcObject as MediaStream | null;
+          const currentTrackIds = currentSrc?.getAudioTracks().map(t => t.id) || [];
+          const newTrackIds = audioTracks.map(t => t.id);
+          // Re-attach if tracks changed
+          if (currentTrackIds.join(',') !== newTrackIds.join(',')) {
+            remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
+          }
         }
+      } else if (!remoteAudioRef.current.srcObject) {
+        remoteAudioRef.current.srcObject = state.remoteStream;
       }
-      if (remoteAudioRef.current.srcObject) {
-        remoteAudioRef.current.muted = false;
-        remoteAudioRef.current.play().catch((err) =>
-          console.warn('[WebRTC] Audio retry play failed:', err)
-        );
-      }
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.play().catch((err) =>
+        console.warn('[WebRTC] Audio retry play failed:', err)
+      );
     }
-    if (remoteVideoRef.current?.srcObject) {
+
+    // Remote video — re-attach srcObject if needed (Safari can drop it)
+    if (remoteVideoRef.current && state.remoteStream && state.callType === 'video') {
+      if (remoteVideoRef.current.srcObject !== state.remoteStream) {
+        remoteVideoRef.current.srcObject = state.remoteStream;
+      }
       remoteVideoRef.current.muted = true;
       remoteVideoRef.current.play().catch(() => {});
     }
-    if (localVideoRef.current?.srcObject) {
+
+    // Local video — re-attach srcObject if needed (camera flip can break it)
+    if (localVideoRef.current && state.localStream) {
+      if (localVideoRef.current.srcObject !== state.localStream) {
+        localVideoRef.current.srcObject = state.localStream;
+      }
       localVideoRef.current.play().catch(() => {});
     }
   }, []);
@@ -341,8 +370,10 @@ const GlobalCallOverlay: React.FC = () => {
           autoPlay
           playsInline
           muted
-          // @ts-ignore webkit-playsinline for older Safari
+          // @ts-ignore webkit-playsinline for older Safari/iOS
           webkit-playsinline=""
+          // @ts-ignore playsinline attribute for iOS Safari
+          playsinline=""
           style={{
             position: 'fixed',
             zIndex: 10000,
@@ -452,14 +483,19 @@ const GlobalCallOverlay: React.FC = () => {
         <div
           className="fixed inset-0 z-[10001] flex items-center justify-center"
           style={{
-            backgroundColor: 'rgba(0,0,0,0.92)',
+            // Transparent for video calls so remote video at z-10000 shows through
+            backgroundColor: isVideoCall && showRemoteVideo ? 'transparent' : 'rgba(0,0,0,0.92)',
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)',
           }}
           onTouchStart={retryMediaPlayback}
           onClick={retryMediaPlayback}
         >
-          <div className="w-full h-full max-w-lg mx-auto flex flex-col items-center justify-between py-12 px-6 relative">
+          {/* Dark backdrop for video calls — below content, above remote video */}
+          {isVideoCall && (
+            <div className="absolute inset-0 bg-black/40" style={{ zIndex: 0 }} />
+          )}
+          <div className="w-full h-full max-w-lg mx-auto flex flex-col items-center justify-between py-12 px-6 relative" style={{ zIndex: 1 }}>
 
             {/* Minimize button (top left) */}
             {(callState.status === 'connected' || callState.status === 'connecting') && (
@@ -481,11 +517,13 @@ const GlobalCallOverlay: React.FC = () => {
                   ref={localVideoRef}
                   autoPlay
                   playsInline
-                  // @ts-ignore webkit-playsinline for older Safari
+                  // @ts-ignore webkit-playsinline for older Safari/iOS
                   webkit-playsinline=""
+                  // @ts-ignore playsinline attribute for iOS Safari
+                  playsinline=""
                   muted
                   className="w-full h-full object-cover"
-                  style={{ transform: 'scaleX(-1)' }}
+                  style={{ transform: 'scaleX(-1)', WebkitTransform: 'scaleX(-1) translateZ(0)' }}
                 />
                 {callState.isVideoOff && (
                   <div className="absolute inset-0 bg-gray-900/80 flex flex-col items-center justify-center">

@@ -160,7 +160,20 @@ export class CallManager {
         facingMode: 'user',
       } : false,
     };
-    return navigator.mediaDevices.getUserMedia(constraints);
+
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (err) {
+      // iOS Safari can fail with high resolution constraints — retry with basic constraints
+      if (callType === 'video') {
+        console.warn('[WebRTC] getUserMedia failed with ideal constraints, retrying with basic:', err);
+        return navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+          video: { facingMode: 'user' },
+        });
+      }
+      throw err;
+    }
   }
 
   private stopMedia() {
@@ -582,27 +595,71 @@ export class CallManager {
     const videoTrack = this.localStream.getVideoTracks()[0];
     if (!videoTrack) return;
 
-    // Use tracked facing mode (getSettings().facingMode is unreliable on many devices)
     const newFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
     console.log('[WebRTC] Switching camera from', this.currentFacingMode, 'to', newFacingMode);
 
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { exact: newFacingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
-      const newVideoTrack = newStream.getVideoTracks()[0];
+    // Helper: attempt to get camera with given constraints
+    const tryGetCamera = async (constraints: MediaStreamConstraints): Promise<MediaStreamTrack | null> => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        return stream.getVideoTracks()[0] || null;
+      } catch {
+        return null;
+      }
+    };
 
+    // Try multiple constraint strategies (iOS Safari is picky about facingMode)
+    let newVideoTrack: MediaStreamTrack | null = null;
+
+    // Strategy 1: exact facingMode (works on most Android devices)
+    newVideoTrack = await tryGetCamera({
+      video: { facingMode: { exact: newFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+
+    // Strategy 2: ideal facingMode (works on iOS Safari)
+    if (!newVideoTrack) {
+      newVideoTrack = await tryGetCamera({
+        video: { facingMode: { ideal: newFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+    }
+
+    // Strategy 3: plain facingMode string (broadest compatibility)
+    if (!newVideoTrack) {
+      newVideoTrack = await tryGetCamera({
+        video: { facingMode: newFacingMode },
+      });
+    }
+
+    // Strategy 4: enumerate devices and pick a different camera by deviceId
+    if (!newVideoTrack) {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+        const currentDeviceId = videoTrack.getSettings().deviceId;
+        const otherDevice = videoDevices.find((d) => d.deviceId !== currentDeviceId);
+        if (otherDevice) {
+          newVideoTrack = await tryGetCamera({
+            video: { deviceId: { exact: otherDevice.deviceId } },
+          });
+        }
+      } catch {
+        // enumerateDevices not available
+      }
+    }
+
+    if (!newVideoTrack) {
+      console.warn('[WebRTC] Could not switch camera — device may only have one camera');
+      return;
+    }
+
+    try {
       // Replace the track on the RTCPeerConnection sender
       const sender = this.pc.getSenders().find((s) => s.track?.kind === 'video');
       if (sender) {
         await sender.replaceTrack(newVideoTrack);
       }
 
-      // Update the local stream
+      // Stop old track and update local stream
       this.localStream.removeTrack(videoTrack);
       videoTrack.stop();
       this.localStream.addTrack(newVideoTrack);
@@ -612,26 +669,11 @@ export class CallManager {
       const updatedStream = new MediaStream(this.localStream.getTracks());
       this.localStream = updatedStream;
       this.setState({ localStream: updatedStream });
+      console.log('[WebRTC] Camera switched successfully to', newFacingMode);
     } catch (err) {
-      console.error('[WebRTC] Failed to switch camera:', err);
-      // If { exact } fails (device has only one camera), try without exact
-      try {
-        const fallback = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: newFacingMode },
-        });
-        const newVideoTrack = fallback.getVideoTracks()[0];
-        const sender = this.pc!.getSenders().find((s) => s.track?.kind === 'video');
-        if (sender) await sender.replaceTrack(newVideoTrack);
-        this.localStream!.removeTrack(videoTrack);
-        videoTrack.stop();
-        this.localStream!.addTrack(newVideoTrack);
-        this.currentFacingMode = newFacingMode;
-        const updatedStream = new MediaStream(this.localStream!.getTracks());
-        this.localStream = updatedStream;
-        this.setState({ localStream: updatedStream });
-      } catch {
-        console.warn('[WebRTC] Device may only have one camera');
-      }
+      console.error('[WebRTC] Failed to replace track after getting new camera:', err);
+      // Clean up the new track we couldn't use
+      newVideoTrack.stop();
     }
   }
 
