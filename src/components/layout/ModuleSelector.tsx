@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useIncomingRequestCount } from '../../hooks/useIncomingRequests';
 import clsx from 'clsx';
 
 interface Module {
@@ -97,6 +98,7 @@ export const ModuleSelector: React.FC = () => {
   const location = useLocation();
   const { isFeatureEnabled } = useFeatureSettings();
   const { isAdmin } = useAuth();
+  const incomingRequestCount = useIncomingRequestCount();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftScroll, setShowLeftScroll] = useState(false);
   const [showRightScroll, setShowRightScroll] = useState(false);
@@ -166,21 +168,31 @@ export const ModuleSelector: React.FC = () => {
             scrollBehavior: 'smooth',
           }}
         >
-          {enabledModules.map((module) => (
-            <Link
-              key={module.path}
-              to={module.path}
-              className={clsx(
-                'inline-flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all duration-200',
-                isActive(module.path)
-                  ? 'aurora-gradient text-white shadow-aurora-glow'
-                  : 'text-aurora-text-secondary hover:bg-gray-50 hover:text-aurora-text'
-              )}
-            >
-              {module.icon}
-              <span>{module.label}</span>
-            </Link>
-          ))}
+          {enabledModules.map((module) => {
+            const showBadge = module.path === '/discover' && incomingRequestCount > 0;
+            return (
+              <Link
+                key={module.path}
+                to={module.path}
+                className={clsx(
+                  'inline-flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all duration-200 relative',
+                  isActive(module.path)
+                    ? 'aurora-gradient text-white shadow-aurora-glow'
+                    : 'text-aurora-text-secondary hover:bg-gray-50 hover:text-aurora-text'
+                )}
+              >
+                <span className="relative">
+                  {module.icon}
+                  {showBadge && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 animate-pulse shadow-sm">
+                      {incomingRequestCount > 9 ? '9+' : incomingRequestCount}
+                    </span>
+                  )}
+                </span>
+                <span>{module.label}</span>
+              </Link>
+            );
+          })}
         </div>
 
         {/* Right scroll button */}

@@ -933,6 +933,83 @@ export default function DiscoverPage() {
         {/* PYMK Carousels */}
         {activeTab === 'discover' && !loading && (
           <>
+            {/* Connection Requests — prominent section at top */}
+            {incomingRequests.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <UserPlus className="w-5 h-5 text-orange-500" />
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
+                        {incomingRequests.length}
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Connection Requests</h3>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {incomingRequests.map((person) => {
+                    const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
+                    return (
+                      <div key={`req-${person.id}`} className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col">
+                        <div
+                          className="h-20 bg-gradient-to-r from-orange-400 to-amber-400 relative cursor-pointer"
+                          onClick={() => setSelectedPerson(person)}
+                        >
+                          <MatchBadge score={score} />
+                          {isNewMember(person) && (
+                            <span className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">NEW</span>
+                          )}
+                          <div className="absolute top-2 right-2 bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <UserPlus className="w-3 h-3" /> Wants to connect
+                          </div>
+                        </div>
+                        <div className="p-3 flex flex-col flex-1">
+                          <div className="flex items-end gap-3 -mt-7">
+                            <div className="w-12 h-12 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-lg relative z-10 border-2 border-white shrink-0 shadow-sm">
+                              {renderAvatar(person.avatar, person.name)}
+                            </div>
+                            <div className="min-w-0 flex-1 pb-1">
+                              <h4 className="font-bold text-[var(--aurora-text)] text-sm truncate leading-tight">{person.name}</h4>
+                              {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                            </div>
+                          </div>
+                          <div className="mt-2 space-y-0.5">
+                            {renderHeritage(person)}
+                            {person.showLocation && (
+                              <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
+                                <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
+                              </p>
+                            )}
+                            {getMutualConnectionCount(person.id) > 0 && (
+                              <p className="text-[11px] text-blue-600 font-medium">
+                                {getMutualConnectionCount(person.id)} mutual connections
+                              </p>
+                            )}
+                          </div>
+                          <div className="mt-auto pt-2.5 flex gap-1.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
+                              disabled={connectingId === person.id}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Accept
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
+                              disabled={connectingId === person.id}
+                              className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                              <X className="w-3.5 h-3.5" /> Decline
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {pymkGroups.sameCity.length >= 1 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
