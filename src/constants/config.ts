@@ -146,6 +146,906 @@ export const ETHNICITY_KEYWORDS: Record<string, string[]> = {
   nigerian: ['Nigerian'], ghanaian: ['Ghanaian'],
 };
 
+// Comprehensive country-ethnicity mapping by region (36 unique Indian ethnicities + international data)
+export const COUNTRY_ETHNICITY_MAP: { region: string; countries: { name: string; ethnicities: string[] }[] }[] = [
+  {
+    region: 'South Asia',
+    countries: [
+      {
+        name: 'India',
+        ethnicities: [
+          'Telugu / Andhra',
+          'Arunachali',
+          'Assamese',
+          'Bihari',
+          'Chhattisgarhi',
+          'Goan',
+          'Gujarati',
+          'Haryanvi',
+          'Himachali / Pahari',
+          'Jharkhandi',
+          'Kannadiga',
+          'Malayali',
+          'Madhya Pradeshi',
+          'Marathi / Maharashtrian',
+          'Meitei / Manipuri',
+          'Khasi',
+          'Garo',
+          'Mizo',
+          'Naga',
+          'Odia',
+          'Punjabi',
+          'Rajasthani',
+          'Sikkimese',
+          'Tamil',
+          'Telugu / Telangana',
+          'Tripuri',
+          'Hindi-speaking',
+          'Uttarakhandi',
+          'Bengali',
+          'Nicobarese',
+          'Kashmiri',
+          'Dogra',
+          'Ladakhi',
+          'Lakshadweep Muslim',
+          'Sindhi',
+          'Nepali / Indian',
+        ],
+      },
+      {
+        name: 'Pakistan',
+        ethnicities: ['Punjabi', 'Pashtun', 'Sindhi', 'Muhajir / Urdu-speaking', 'Saraiki', 'Baloch'],
+      },
+      {
+        name: 'Bangladesh',
+        ethnicities: ['Bengali'],
+      },
+      {
+        name: 'Sri Lanka',
+        ethnicities: ['Sinhalese', 'Tamil', 'Moor / Sri Lankan Muslim'],
+      },
+      {
+        name: 'Nepal',
+        ethnicities: ['Chhetri', 'Brahmin-Hill', 'Magar', 'Tharu', 'Tamang', 'Newar', 'Kami'],
+      },
+      {
+        name: 'Bhutan',
+        ethnicities: ['Drukpa / Ngalop', 'Lhotshampka / Nepali-speaking', 'Sharchop'],
+      },
+      {
+        name: 'Maldives',
+        ethnicities: ['Dhivehi / Maldivian'],
+      },
+      {
+        name: 'Afghanistan',
+        ethnicities: ['Pashtun', 'Tajik', 'Hazara', 'Uzbek', 'Aimak'],
+      },
+    ],
+  },
+  {
+    region: 'East Asia',
+    countries: [
+      {
+        name: 'China',
+        ethnicities: ['Han Chinese', 'Zhuang'],
+      },
+      {
+        name: 'Japan',
+        ethnicities: ['Yamato / Japanese'],
+      },
+      {
+        name: 'South Korea',
+        ethnicities: ['Korean'],
+      },
+      {
+        name: 'North Korea',
+        ethnicities: ['Korean'],
+      },
+      {
+        name: 'Taiwan',
+        ethnicities: ['Hoklo / Min-speaking', 'Hakka', 'Mainlander Han'],
+      },
+      {
+        name: 'Mongolia',
+        ethnicities: ['Khalkha Mongol', 'Kazakh'],
+      },
+      {
+        name: 'Hong Kong',
+        ethnicities: ['Chinese'],
+      },
+      {
+        name: 'Macau',
+        ethnicities: ['Chinese', 'Macanese/Portuguese'],
+      },
+      {
+        name: 'Tibet',
+        ethnicities: ['Tibetan', 'Han Chinese'],
+      },
+    ],
+  },
+  {
+    region: 'Southeast Asia',
+    countries: [
+      {
+        name: 'Philippines',
+        ethnicities: ['Tagalog', 'Cebuano', 'Iloko', 'Bisaya', 'Hiligaynon', 'Bikol', 'Waray'],
+      },
+      {
+        name: 'Vietnam',
+        ethnicities: ['Kinh / Vietnamese', 'Tay'],
+      },
+      {
+        name: 'Indonesia',
+        ethnicities: ['Javanese', 'Sundanese', 'Malay', 'Madurese'],
+      },
+      {
+        name: 'Thailand',
+        ethnicities: ['Thai / Central Thai', 'Isan / Lao-Thai', 'Northern Thai / Lanna', 'Southern Thai', 'Chinese-Thai'],
+      },
+      {
+        name: 'Malaysia',
+        ethnicities: ['Malay / Bumiputra', 'Chinese', 'Indian', 'Indigenous Sabah/Sarawak'],
+      },
+      {
+        name: 'Myanmar',
+        ethnicities: ['Bamar / Burman', 'Shan', 'Karen', 'Rakhine'],
+      },
+      {
+        name: 'Cambodia',
+        ethnicities: ['Khmer'],
+      },
+      {
+        name: 'Laos',
+        ethnicities: ['Lao / Lowland Lao', 'Khmou', 'Hmong', 'Phouthay'],
+      },
+      {
+        name: 'Singapore',
+        ethnicities: ['Chinese', 'Malay', 'Indian'],
+      },
+      {
+        name: 'Brunei',
+        ethnicities: ['Malay', 'Chinese', 'Indigenous'],
+      },
+      {
+        name: 'Timor-Leste',
+        ethnicities: ['Tetum', 'Mambai', 'Makasae', 'Fataluku', 'Kemak', 'Bunak', 'Tokodede'],
+      },
+    ],
+  },
+  {
+    region: 'Central Asia',
+    countries: [
+      {
+        name: 'Kazakhstan',
+        ethnicities: ['Kazakh', 'Russian', 'Uzbek'],
+      },
+      {
+        name: 'Uzbekistan',
+        ethnicities: ['Uzbek', 'Tajik', 'Russian'],
+      },
+      {
+        name: 'Tajikistan',
+        ethnicities: ['Tajik', 'Uzbek'],
+      },
+      {
+        name: 'Kyrgyzstan',
+        ethnicities: ['Kyrgyz', 'Uzbek', 'Russian'],
+      },
+      {
+        name: 'Turkmenistan',
+        ethnicities: ['Turkmen', 'Uzbek', 'Russian'],
+      },
+    ],
+  },
+  {
+    region: 'Middle East',
+    countries: [
+      {
+        name: 'Lebanon',
+        ethnicities: ['Arab', 'Armenian'],
+      },
+      {
+        name: 'Syria',
+        ethnicities: ['Arab', 'Kurdish'],
+      },
+      {
+        name: 'Iraq',
+        ethnicities: ['Arab', 'Kurdish', 'Turkmen'],
+      },
+      {
+        name: 'Iran',
+        ethnicities: ['Persian', 'Azerbaijani', 'Kurdish', 'Lur', 'Baloch', 'Arab'],
+      },
+      {
+        name: 'Turkey',
+        ethnicities: ['Turkish', 'Kurdish'],
+      },
+      {
+        name: 'Palestine',
+        ethnicities: ['Palestinian Arab'],
+      },
+      {
+        name: 'Israel',
+        ethnicities: ['Jewish', 'Arab', 'Druze'],
+      },
+      {
+        name: 'Saudi Arabia',
+        ethnicities: ['Arab Saudi', 'South Asian migrants', 'Other Arab', 'Southeast Asian migrants'],
+      },
+      {
+        name: 'UAE',
+        ethnicities: ['Emirati Arab', 'Indian', 'Pakistani', 'Bangladeshi', 'Filipino', 'Other Arab'],
+      },
+      {
+        name: 'Kuwait',
+        ethnicities: ['Kuwaiti Arab', 'Other Arab', 'South Asian'],
+      },
+      {
+        name: 'Qatar',
+        ethnicities: ['Qatari Arab', 'Indian', 'Nepali', 'Other Arab', 'Filipino', 'Bangladeshi'],
+      },
+      {
+        name: 'Bahrain',
+        ethnicities: ['Bahraini Arab', 'South Asian', 'Other Arab'],
+      },
+      {
+        name: 'Oman',
+        ethnicities: ['Omani Arab', 'South Asian', 'Other Arab'],
+      },
+      {
+        name: 'Yemen',
+        ethnicities: ['Yemeni Arab'],
+      },
+      {
+        name: 'Jordan',
+        ethnicities: ['Arab Jordanian', 'Palestinian', 'Syrian'],
+      },
+    ],
+  },
+  {
+    region: 'North Africa',
+    countries: [
+      {
+        name: 'Egypt',
+        ethnicities: ['Egyptian Arab', 'Nubian'],
+      },
+      {
+        name: 'Morocco',
+        ethnicities: ['Arab', 'Berber / Amazigh'],
+      },
+      {
+        name: 'Algeria',
+        ethnicities: ['Arab', 'Berber / Amazigh'],
+      },
+      {
+        name: 'Tunisia',
+        ethnicities: ['Arab', 'Berber / Amazigh'],
+      },
+      {
+        name: 'Libya',
+        ethnicities: ['Arab', 'Berber / Amazigh'],
+      },
+      {
+        name: 'Sudan',
+        ethnicities: ['Sudanese Arab', 'Fur', 'Beja', 'Nuba', 'Nubian'],
+      },
+    ],
+  },
+  {
+    region: 'West Africa',
+    countries: [
+      {
+        name: 'Nigeria',
+        ethnicities: ['Hausa', 'Yoruba', 'Igbo', 'Fulani', 'Ijaw', 'Kanuri', 'Tiv'],
+      },
+      {
+        name: 'Ghana',
+        ethnicities: ['Akan / Ashanti', 'Mole-Dagbani', 'Ewe', 'Ga-Adangme', 'Guan'],
+      },
+      {
+        name: 'Senegal',
+        ethnicities: ['Wolof', 'Fulani / Peul', 'Serer', 'Jola', 'Mandinka'],
+      },
+      {
+        name: 'Ivory Coast',
+        ethnicities: ['Akan', 'Kru', 'Northern Mandé', 'Gur / Senoufo', 'Southern Mandé'],
+      },
+      {
+        name: 'Mali',
+        ethnicities: ['Bambara', 'Fulani', 'Soninke', 'Senufo', 'Dogon', 'Malinké', 'Tuareg'],
+      },
+      {
+        name: 'Sierra Leone',
+        ethnicities: ['Temne', 'Mende', 'Limba', 'Kono'],
+      },
+      {
+        name: 'Liberia',
+        ethnicities: ['Kpelle', 'Bassa', 'Grebo', 'Gio', 'Mano', 'Kru', 'Lorma'],
+      },
+      {
+        name: 'Guinea',
+        ethnicities: ['Fulani', 'Mandinka', 'Susu', 'Kissi'],
+      },
+      {
+        name: 'Togo',
+        ethnicities: ['Ewe', 'Kabye', 'Tem', 'Mina'],
+      },
+      {
+        name: 'Benin',
+        ethnicities: ['Fon', 'Yoruba', 'Bariba', 'Fulani', 'Somba', 'Adja'],
+      },
+      {
+        name: 'Burkina Faso',
+        ethnicities: ['Mossi', 'Fulani', 'Gourounsi', 'Bobo', 'Mande'],
+      },
+      {
+        name: 'Gambia',
+        ethnicities: ['Mandinka', 'Fula', 'Wolof', 'Jola', 'Serahuli'],
+      },
+      {
+        name: 'Cape Verde',
+        ethnicities: ['Creole / Mixed', 'African'],
+      },
+      {
+        name: 'Niger',
+        ethnicities: ['Hausa', 'Zarma-Songhai', 'Fulani', 'Tuareg', 'Kanuri'],
+      },
+      {
+        name: 'Mauritania',
+        ethnicities: ['Arab-Berber / Moor', 'Fulani', 'Soninke', 'Wolof'],
+      },
+      {
+        name: 'Guinea-Bissau',
+        ethnicities: ['Balanta', 'Fula', 'Mandinka', 'Papel', 'Manjago', 'Beafada'],
+      },
+    ],
+  },
+  {
+    region: 'East Africa',
+    countries: [
+      {
+        name: 'Ethiopia',
+        ethnicities: ['Oromo', 'Amhara', 'Somali', 'Tigray', 'Sidama'],
+      },
+      {
+        name: 'Kenya',
+        ethnicities: ['Kikuyu', 'Luhya', 'Kalenjin', 'Luo', 'Kamba', 'Somali', 'Kisii', 'Meru'],
+      },
+      {
+        name: 'Somalia',
+        ethnicities: ['Somali', 'Bantu'],
+      },
+      {
+        name: 'Tanzania',
+        ethnicities: ['Sukuma', 'Nyamwezi', 'Chaga', 'Haya'],
+      },
+      {
+        name: 'Uganda',
+        ethnicities: ['Baganda', 'Banyankore', 'Basoga', 'Bakiga', 'Iteso', 'Langi', 'Acholi'],
+      },
+      {
+        name: 'Rwanda',
+        ethnicities: ['Hutu', 'Tutsi'],
+      },
+      {
+        name: 'Eritrea',
+        ethnicities: ['Tigrinya', 'Tigre', 'Saho', 'Afar'],
+      },
+      {
+        name: 'Burundi',
+        ethnicities: ['Hutu', 'Tutsi'],
+      },
+      {
+        name: 'South Sudan',
+        ethnicities: ['Dinka', 'Nuer', 'Shilluk', 'Bari'],
+      },
+      {
+        name: 'Djibouti',
+        ethnicities: ['Somali / Issa', 'Afar'],
+      },
+      {
+        name: 'Madagascar',
+        ethnicities: ['Merina', 'Betsimisaraka', 'Betsileo', 'Sakalava', 'Tsimihety', 'Antaisaka'],
+      },
+    ],
+  },
+  {
+    region: 'Southern Africa',
+    countries: [
+      {
+        name: 'South Africa',
+        ethnicities: ['Zulu', 'Xhosa', 'Sotho', 'Tswana', 'Coloured / Mixed', 'White / European', 'Tsonga', 'Swazi', 'Indian/Asian'],
+      },
+      {
+        name: 'Zimbabwe',
+        ethnicities: ['Shona', 'Ndebele', 'White'],
+      },
+      {
+        name: 'Botswana',
+        ethnicities: ['Tswana', 'Kalanga'],
+      },
+      {
+        name: 'Namibia',
+        ethnicities: ['Ovambo', 'Kavango', 'Herero', 'Damara', 'White Namibian', 'Nama', 'Coloured'],
+      },
+      {
+        name: 'Mozambique',
+        ethnicities: ['Makhuwa', 'Tsonga', 'Lomwe', 'Sena', 'Shona', 'Chuwabu'],
+      },
+      {
+        name: 'Zambia',
+        ethnicities: ['Bemba', 'Tonga', 'Chewa', 'Lozi', 'Nsenga', 'Lunda', 'Kaonde'],
+      },
+      {
+        name: 'Malawi',
+        ethnicities: ['Chewa', 'Tumbuka', 'Lomwe', 'Yao', 'Ngoni', 'Sena'],
+      },
+      {
+        name: 'Eswatini (Swaziland)',
+        ethnicities: ['Swazi', 'Zulu'],
+      },
+      {
+        name: 'Lesotho',
+        ethnicities: ['Sotho / Basotho'],
+      },
+      {
+        name: 'Angola',
+        ethnicities: ['Ovimbundu', 'Mbundu / Kimbundu', 'Kikongo', 'Lunda-Chokwe', 'Nyaneka-Humbe'],
+      },
+    ],
+  },
+  {
+    region: 'Central Africa',
+    countries: [
+      {
+        name: 'DR Congo',
+        ethnicities: ['Luba', 'Mongo', 'Kongo', 'Azande', 'Banyarwanda'],
+      },
+      {
+        name: 'Cameroon',
+        ethnicities: ['Bamileke', 'Fang', 'Fulani', 'Duala', 'Ewondo', 'Kirdi'],
+      },
+      {
+        name: 'Republic of Congo',
+        ethnicities: ['Kongo', 'Teke', 'Mboshi', 'Sangha'],
+      },
+      {
+        name: 'Chad',
+        ethnicities: ['Sara', 'Arab', 'Kanem-Bornu', 'Wadai / Maba', 'Gorane / Toubou', 'Tandjile'],
+      },
+      {
+        name: 'Gabon',
+        ethnicities: ['Fang', 'Mpongwe', 'Mbere', 'Punu'],
+      },
+      {
+        name: 'Central African Republic',
+        ethnicities: ['Gbaya', 'Banda', 'Mandjia', 'Sara', 'Mbaka'],
+      },
+      {
+        name: 'Equatorial Guinea',
+        ethnicities: ['Fang', 'Bubi'],
+      },
+    ],
+  },
+  {
+    region: 'Hispanic or Latino',
+    countries: [
+      {
+        name: 'Hispanic or Latino',
+        ethnicities: ['Mexican', 'Mexican American', 'Chicano', 'Puerto Rican', 'Cuban', 'Dominican', 'Salvadoran', 'Colombian', 'Guatemalan', 'Honduran', 'Ecuadorian', 'Peruvian', 'Venezuelan', 'Nicaraguan', 'Argentine', 'Chilean', 'Brazilian', 'Costa Rican', 'Panamanian', 'Bolivian', 'Uruguayan', 'Paraguayan', 'Spanish (from Spain)', 'Other Hispanic or Latino'],
+      },
+    ],
+  },
+  {
+    region: 'Mexico & Central America',
+    countries: [
+      {
+        name: 'Mexico',
+        ethnicities: ['Mestizo', 'Amerindian', 'European-descended'],
+      },
+      {
+        name: 'Guatemala',
+        ethnicities: ['Ladino / Mestizo', 'K\'iche\'', 'Q\'eqchi\'', 'Kaqchikel', 'Mam'],
+      },
+      {
+        name: 'Honduras',
+        ethnicities: ['Mestizo', 'Amerindian'],
+      },
+      {
+        name: 'El Salvador',
+        ethnicities: ['Mestizo', 'European-descended'],
+      },
+      {
+        name: 'Nicaragua',
+        ethnicities: ['Mestizo', 'European-descended', 'Afro-Caribbean'],
+      },
+      {
+        name: 'Costa Rica',
+        ethnicities: ['Mestizo', 'European-descended', 'Mulatto', 'Amerindian'],
+      },
+      {
+        name: 'Panama',
+        ethnicities: ['Mestizo', 'Afro-Panamanian', 'European-descended', 'Amerindian'],
+      },
+      {
+        name: 'Belize',
+        ethnicities: ['Mestizo', 'Creole', 'Maya', 'Garifuna'],
+      },
+    ],
+  },
+  {
+    region: 'Caribbean',
+    countries: [
+      {
+        name: 'Cuba',
+        ethnicities: ['Mestizo / Mulatto', 'European-descended', 'Afro-Cuban'],
+      },
+      {
+        name: 'Dominican Republic',
+        ethnicities: ['Mestizo / Mixed', 'European-descended', 'Afro-Dominican'],
+      },
+      {
+        name: 'Puerto Rico',
+        ethnicities: ['Mixed / Mestizo', 'European-descended', 'Afro-Puerto Rican'],
+      },
+      {
+        name: 'Jamaica',
+        ethnicities: ['Afro-Jamaican', 'Mixed', 'East Indian'],
+      },
+      {
+        name: 'Haiti',
+        ethnicities: ['Afro-Haitian', 'Mulatto'],
+      },
+      {
+        name: 'Trinidad and Tobago',
+        ethnicities: ['East Indian', 'African-descended', 'Mixed', 'European'],
+      },
+      {
+        name: 'Bahamas',
+        ethnicities: ['Afro-Bahamian', 'European-descended'],
+      },
+      {
+        name: 'Barbados',
+        ethnicities: ['Afro-Barbadian'],
+      },
+      {
+        name: 'Guyana',
+        ethnicities: ['Indo-Guyanese', 'Afro-Guyanese', 'Mixed', 'Amerindian'],
+      },
+      {
+        name: 'Suriname',
+        ethnicities: ['Hindustani / East Indian', 'Creole', 'Maroon', 'Javanese', 'Mixed', 'Amerindian'],
+      },
+    ],
+  },
+  {
+    region: 'South America',
+    countries: [
+      {
+        name: 'Brazil',
+        ethnicities: ['Pardo / Mixed', 'European-descended', 'Afro-Brazilian'],
+      },
+      {
+        name: 'Colombia',
+        ethnicities: ['Mestizo', 'European-descended', 'Afro-Colombian', 'Mulatto'],
+      },
+      {
+        name: 'Argentina',
+        ethnicities: ['European-descended', 'Mestizo'],
+      },
+      {
+        name: 'Peru',
+        ethnicities: ['Mestizo', 'Quechua', 'European-descended', 'Aymara'],
+      },
+      {
+        name: 'Venezuela',
+        ethnicities: ['Mestizo / Pardo', 'European-descended'],
+      },
+      {
+        name: 'Chile',
+        ethnicities: ['European-descended / Mestizo', 'Mapuche'],
+      },
+      {
+        name: 'Ecuador',
+        ethnicities: ['Mestizo', 'Amerindian', 'European-descended', 'Afro-Ecuadorian', 'Montubio'],
+      },
+      {
+        name: 'Bolivia',
+        ethnicities: ['Mestizo', 'Quechua', 'Aymara'],
+      },
+      {
+        name: 'Paraguay',
+        ethnicities: ['Mestizo'],
+      },
+      {
+        name: 'Uruguay',
+        ethnicities: ['European-descended', 'Mestizo'],
+      },
+    ],
+  },
+  {
+    region: 'Western Europe',
+    countries: [
+      {
+        name: 'England',
+        ethnicities: ['White British', 'South Asian', 'Black / African-Caribbean'],
+      },
+      {
+        name: 'Scotland',
+        ethnicities: ['White Scottish', 'Other White British'],
+      },
+      {
+        name: 'Wales',
+        ethnicities: ['White Welsh / British'],
+      },
+      {
+        name: 'Ireland',
+        ethnicities: ['Irish', 'Other White', 'Polish'],
+      },
+      {
+        name: 'France',
+        ethnicities: ['French', 'North African Arab', 'Sub-Saharan African'],
+      },
+      {
+        name: 'Germany',
+        ethnicities: ['German', 'Turkish'],
+      },
+      {
+        name: 'Netherlands',
+        ethnicities: ['Dutch', 'Turkish', 'Moroccan', 'Indonesian-Surinamese'],
+      },
+      {
+        name: 'Belgium',
+        ethnicities: ['Flemish', 'Walloon', 'Other'],
+      },
+      {
+        name: 'Switzerland',
+        ethnicities: ['German-Swiss', 'French-Swiss', 'Italian-Swiss'],
+      },
+      {
+        name: 'Austria',
+        ethnicities: ['Austrian German', 'Turkish'],
+      },
+      {
+        name: 'Luxembourg',
+        ethnicities: ['Luxembourger', 'Portuguese', 'French', 'Belgian'],
+      },
+    ],
+  },
+  {
+    region: 'Southern Europe',
+    countries: [
+      {
+        name: 'Italy',
+        ethnicities: ['Italian'],
+      },
+      {
+        name: 'Spain',
+        ethnicities: ['Castilian / Spanish', 'Catalan', 'Galician', 'Basque'],
+      },
+      {
+        name: 'Portugal',
+        ethnicities: ['Portuguese'],
+      },
+      {
+        name: 'Greece',
+        ethnicities: ['Greek', 'Albanian'],
+      },
+      {
+        name: 'Croatia',
+        ethnicities: ['Croat'],
+      },
+      {
+        name: 'Serbia',
+        ethnicities: ['Serb', 'Hungarian'],
+      },
+      {
+        name: 'Albania',
+        ethnicities: ['Albanian', 'Greek'],
+      },
+      {
+        name: 'Malta',
+        ethnicities: ['Maltese'],
+      },
+      {
+        name: 'Bosnia & Herzegovina',
+        ethnicities: ['Bosniak', 'Serb', 'Croat'],
+      },
+      {
+        name: 'Montenegro',
+        ethnicities: ['Montenegrin', 'Serb', 'Bosniak', 'Albanian'],
+      },
+      {
+        name: 'Slovenia',
+        ethnicities: ['Slovene', 'Serb', 'Croat'],
+      },
+      {
+        name: 'North Macedonia',
+        ethnicities: ['Macedonian', 'Albanian', 'Turkish'],
+      },
+      {
+        name: 'Cyprus',
+        ethnicities: ['Greek Cypriot', 'Turkish Cypriot'],
+      },
+    ],
+  },
+  {
+    region: 'Eastern Europe',
+    countries: [
+      {
+        name: 'Russia',
+        ethnicities: ['Russian', 'Tatar'],
+      },
+      {
+        name: 'Poland',
+        ethnicities: ['Polish'],
+      },
+      {
+        name: 'Ukraine',
+        ethnicities: ['Ukrainian', 'Russian'],
+      },
+      {
+        name: 'Romania',
+        ethnicities: ['Romanian', 'Hungarian'],
+      },
+      {
+        name: 'Czech Republic',
+        ethnicities: ['Czech'],
+      },
+      {
+        name: 'Hungary',
+        ethnicities: ['Hungarian / Magyar', 'Roma'],
+      },
+      {
+        name: 'Bulgaria',
+        ethnicities: ['Bulgarian', 'Turkish'],
+      },
+      {
+        name: 'Slovakia',
+        ethnicities: ['Slovak', 'Hungarian', 'Roma'],
+      },
+      {
+        name: 'Belarus',
+        ethnicities: ['Belarusian', 'Russian'],
+      },
+      {
+        name: 'Moldova',
+        ethnicities: ['Moldovan / Romanian', 'Ukrainian', 'Russian', 'Gagauz'],
+      },
+      {
+        name: 'Georgia',
+        ethnicities: ['Georgian', 'Azerbaijani', 'Armenian'],
+      },
+      {
+        name: 'Armenia',
+        ethnicities: ['Armenian'],
+      },
+    ],
+  },
+  {
+    region: 'Northern Europe',
+    countries: [
+      {
+        name: 'Sweden',
+        ethnicities: ['Swedish', 'Finnish-origin'],
+      },
+      {
+        name: 'Norway',
+        ethnicities: ['Norwegian'],
+      },
+      {
+        name: 'Denmark',
+        ethnicities: ['Danish', 'Turkish'],
+      },
+      {
+        name: 'Finland',
+        ethnicities: ['Finnish', 'Swedish-speaking Finn'],
+      },
+      {
+        name: 'Iceland',
+        ethnicities: ['Icelandic', 'Polish'],
+      },
+      {
+        name: 'Estonia',
+        ethnicities: ['Estonian', 'Russian'],
+      },
+      {
+        name: 'Latvia',
+        ethnicities: ['Latvian', 'Russian'],
+      },
+      {
+        name: 'Lithuania',
+        ethnicities: ['Lithuanian', 'Polish', 'Russian'],
+      },
+    ],
+  },
+  {
+    region: 'Oceania & Pacific',
+    countries: [
+      {
+        name: 'Australia',
+        ethnicities: ['Anglo-Australian', 'Other European', 'Asian', 'Aboriginal / Torres Strait Islander'],
+      },
+      {
+        name: 'New Zealand',
+        ethnicities: ['European / Pakeha', 'Maori', 'Asian'],
+      },
+      {
+        name: 'Fiji',
+        ethnicities: ['iTaukei / Indigenous Fijian', 'Indo-Fijian'],
+      },
+      {
+        name: 'Papua New Guinea',
+        ethnicities: ['Enga', 'Chimbu', 'Hagen / Western Highlands', 'Sepik peoples'],
+      },
+      {
+        name: 'Samoa',
+        ethnicities: ['Samoan'],
+      },
+      {
+        name: 'Tonga',
+        ethnicities: ['Tongan'],
+      },
+      {
+        name: 'Solomon Islands',
+        ethnicities: ['Melanesian'],
+      },
+      {
+        name: 'Vanuatu',
+        ethnicities: ['Ni-Vanuatu / Melanesian'],
+      },
+      {
+        name: 'Palau',
+        ethnicities: ['Palauan', 'Filipino', 'Chinese'],
+      },
+      {
+        name: 'Marshall Islands',
+        ethnicities: ['Marshallese'],
+      },
+      {
+        name: 'Guam',
+        ethnicities: ['Chamorro', 'Filipino', 'White American', 'Chuukese', 'Other Pacific Islander'],
+      },
+      {
+        name: 'Micronesia',
+        ethnicities: ['Chuukese', 'Pohnpeian', 'Kosraean', 'Yapese'],
+      },
+    ],
+  },
+  {
+    region: 'Indigenous & Native Peoples',
+    countries: [
+      {
+        name: 'Native American (United States)',
+        ethnicities: ['Navajo', 'Cherokee', 'Sioux / Lakota', 'Chippewa / Ojibwe'],
+      },
+      {
+        name: 'First Nations / Inuit / Métis (Canada)',
+        ethnicities: ['First Nations', 'Métis', 'Inuit', 'Cree', 'Ojibwe', 'Dene', 'Blackfoot', 'Mi\'kmaq', 'Mohawk'],
+      },
+      {
+        name: 'Aboriginal Australian',
+        ethnicities: ['Aboriginal', 'Torres Strait Islander'],
+      },
+      {
+        name: 'Maori (New Zealand)',
+        ethnicities: ['Maori', 'Ngapuhi', 'Ngati Porou', 'Waikato-Tainui', 'Ngai Tahu', 'Tuhoe'],
+      },
+      {
+        name: 'Sámi (Scandinavia)',
+        ethnicities: ['Northern Sámi', 'Lule Sámi', 'Southern Sámi'],
+      },
+      {
+        name: 'Ainu (Japan)',
+        ethnicities: ['Ainu'],
+      },
+    ],
+  },
+];
+
+// Flat helper: all country names and ethnicities from COUNTRY_ETHNICITY_MAP
+export const ALL_COUNTRY_ETHNICITIES: string[] = COUNTRY_ETHNICITY_MAP.flatMap(r => r.countries.flatMap(c => [c.name, ...c.ethnicities]));
+
 export const POST_TYPES = ['community', 'question', 'recommendation', 'event', 'news'];
 
 export const BUSINESS_CATEGORIES = [
