@@ -778,10 +778,15 @@ export class CallManager {
 
   async endCall(reason: string = 'ended'): Promise<void> {
     const { callId, status, callType, peerId, peerName, isCaller, duration } = this.state;
+    console.log('[WebRTC] endCall called, reason:', reason, 'status:', status, 'endingCall:', this.endingCall);
 
-    if (status === 'idle' || status === 'ended') return;
-    // Prevent re-entrant calls (UI click + Firestore snapshot echo + timeout)
-    if (this.endingCall) return;
+    if (status === 'idle') return;
+    // If already ending but user clicked again, force through
+    if (this.endingCall && status !== 'ended') {
+      console.log('[WebRTC] Force ending call (endingCall was stuck)');
+    } else if (this.endingCall) {
+      return;
+    }
     this.endingCall = true;
 
     // Update Firestore call status
