@@ -743,7 +743,11 @@ const SettingsPage: React.FC = () => {
       <div className="divide-y divide-aurora-border">
         <div className="px-4 py-4 bg-aurora-surface">
           <div className="flex items-center gap-3">
-            <span className="text-3xl">{userProfile?.avatar || '🧑'}</span>
+            {userProfile?.avatar && (userProfile.avatar.startsWith('http') || userProfile.avatar.startsWith('data:')) ? (
+              <img src={userProfile.avatar} alt={userProfile.name || 'Profile'} className="w-10 h-10 rounded-full object-cover shrink-0" />
+            ) : (
+              <span className="text-3xl">{userProfile?.avatar || '🧑'}</span>
+            )}
             <div>
               <p className="font-semibold text-aurora-text">{userProfile?.name || 'User'}</p>
               <p className="text-sm text-aurora-text-muted">{userProfile?.email || user?.email}</p>

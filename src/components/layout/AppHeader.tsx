@@ -183,7 +183,7 @@ export const AppHeader: React.FC = () => {
             {user && (
               <>
                 <span className="text-gray-300 text-lg font-light">|</span>
-                {userProfile?.avatar && userProfile.avatar.startsWith('http') ? (
+                {userProfile?.avatar && (userProfile.avatar.startsWith('http') || userProfile.avatar.startsWith('data:')) ? (
                   <img
                     src={userProfile.avatar}
                     alt={userProfile.name}
@@ -275,7 +275,11 @@ export const AppHeader: React.FC = () => {
               {user && userProfile && (
                 <div className="px-4 py-3 border-b border-aurora-border bg-aurora-surface-variant">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{userProfile.avatar || '🧑'}</span>
+                    {userProfile.avatar && (userProfile.avatar.startsWith('http') || userProfile.avatar.startsWith('data:')) ? (
+                      <img src={userProfile.avatar} alt={userProfile.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <span className="text-2xl">{userProfile.avatar || '🧑'}</span>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-aurora-text truncate">{userProfile.name || 'User'}</p>
                       <p className="text-xs text-aurora-text-muted truncate">{userProfile.email || user.email}</p>

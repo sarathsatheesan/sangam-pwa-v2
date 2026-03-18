@@ -879,9 +879,13 @@ export default function ProfilePage() {
             {/* Avatar */}
             <div className="relative">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-0.5">
-                <div className="w-full h-full rounded-full bg-[var(--aurora-surface)] flex items-center justify-center text-4xl">
-                  {userProfile?.avatar || '🧑'}
-                </div>
+                {userProfile?.avatar && (userProfile.avatar.startsWith('http') || userProfile.avatar.startsWith('data:')) ? (
+                  <img src={userProfile.avatar} alt={userProfile.name || 'Profile'} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-[var(--aurora-surface)] flex items-center justify-center text-4xl">
+                    {userProfile?.avatar || '🧑'}
+                  </div>
+                )}
               </div>
               {userProfile?.accountType === 'business' && (
                 <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 bg-aurora-indigo rounded-full flex items-center justify-center border-2 border-[var(--aurora-surface)]">
