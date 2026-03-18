@@ -148,32 +148,93 @@ export class CallManager {
   // ── Media Helpers ────────────────────────────────────────────────
 
   private async getMedia(callType: CallType): Promise<MediaStream> {
-    const constraints: MediaStreamConstraints = {
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-      video: callType === 'video' ? {
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
-        facingMode: 'user',
-      } : false,
+    // Timeout wrapper — getUserMedia can hang on some devices/browsers
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+        ),
+      ]);
     };
 
-    try {
-      return await navigator.mediaDevices.getUserMedia(constraints);
-    } catch (err) {
-      // iOS Safari can fail with high resolution constraints — retry with basic constraints
-      if (callType === 'video') {
-        console.warn('[WebRTC] getUserMedia failed with ideal constraints, retrying with basic:', err);
-        return navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
-          video: { facingMode: 'user' },
-        });
+    if (callType === 'video') {
+      // Pre-check: query camera permission status (Chrome/Edge/Firefox support this)
+      // This avoids calling getUserMedia when permission is definitely denied
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const camPerm = await navigator.permissions.query({ name: 'camera' as PermissionName });
+          console.log('[WebRTC] Camera permission status:', camPerm.state);
+          if (camPerm.state === 'denied') {
+            throw new Error('Camera permission denied. Please allow camera access in your browser settings (click the lock icon in the address bar).');
+          }
+        }
+      } catch (err) {
+        // permissions.query may throw on some browsers (Safari) — that's OK, continue
+        if (err instanceof Error && err.message.includes('denied')) throw err;
+        console.log('[WebRTC] permissions.query not available, proceeding with getUserMedia');
       }
-      throw err;
+
+      // Strategy 1: Full constraints (HD video + audio)
+      try {
+        console.log('[WebRTC] Requesting video+audio with HD constraints');
+        return await withTimeout(
+          navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            video: { width: { ideal: 1280, max: 1920 }, height: { ideal: 720, max: 1080 }, facingMode: 'user' },
+          }),
+          10000,
+          'getUserMedia (HD video)'
+        );
+      } catch (err) {
+        console.warn('[WebRTC] HD video constraints failed:', err);
+        // If permission denied, don't retry — throw immediately
+        if (err instanceof Error && (err.message.includes('NotAllowed') || err.message.includes('Permission'))) {
+          throw new Error('Camera permission denied. Please allow camera access in your browser settings (click the lock icon in the address bar).');
+        }
+      }
+
+      // Strategy 2: Basic video constraints (iOS Safari friendly)
+      try {
+        console.log('[WebRTC] Retrying with basic video constraints');
+        return await withTimeout(
+          navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true },
+            video: { facingMode: 'user' },
+          }),
+          10000,
+          'getUserMedia (basic video)'
+        );
+      } catch (err) {
+        console.warn('[WebRTC] Basic video constraints failed:', err);
+        if (err instanceof Error && (err.message.includes('NotAllowed') || err.message.includes('Permission'))) {
+          throw new Error('Camera permission denied. Please allow camera access in your browser settings (click the lock icon in the address bar).');
+        }
+      }
+
+      // Strategy 3: Just video: true (minimum viable)
+      try {
+        console.log('[WebRTC] Retrying with video: true');
+        return await withTimeout(
+          navigator.mediaDevices.getUserMedia({ audio: true, video: true }),
+          10000,
+          'getUserMedia (video: true)'
+        );
+      } catch (err) {
+        console.error('[WebRTC] All video strategies failed:', err);
+        throw new Error('Camera access failed. Please check camera permissions in your browser settings (click the lock icon in the address bar).');
+      }
     }
+
+    // Audio only
+    return withTimeout(
+      navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      }),
+      10000,
+      'getUserMedia (audio)'
+    );
   }
 
   private stopMedia() {
@@ -235,22 +296,43 @@ export class CallManager {
     // Set up remote stream — use event.track directly (more reliable than event.streams)
     this.remoteStream = new MediaStream();
     pc.ontrack = (event) => {
-      console.log('[WebRTC] ontrack fired, kind:', event.track.kind, 'readyState:', event.track.readyState);
+      console.log('[WebRTC] ontrack fired, kind:', event.track.kind, 'readyState:', event.track.readyState, 'muted:', event.track.muted);
+
+      // Add track to the remote stream
       this.remoteStream!.addTrack(event.track);
+
       // Create a new MediaStream reference so React detects the state change
-      // (adding tracks to the same object doesn't trigger re-renders)
       const newStream = new MediaStream(this.remoteStream!.getTracks());
       this.remoteStream = newStream;
       this.setState({ remoteStream: newStream });
 
-      // Safari: tracks can arrive in 'live' state but not fire 'unmute' events
-      // Listen for track unmute/ended to re-trigger state update
+      // Safari/iOS: tracks can arrive muted and need onunmute to trigger re-render
       event.track.onunmute = () => {
         console.log('[WebRTC] Track unmuted:', event.track.kind);
         const refreshedStream = new MediaStream(this.remoteStream!.getTracks());
         this.remoteStream = refreshedStream;
         this.setState({ remoteStream: refreshedStream });
       };
+
+      // Safari/iOS: tracks may also arrive live but with no unmute event
+      // Force a delayed re-notify to ensure the UI picks up the track
+      setTimeout(() => {
+        if (this.remoteStream && event.track.readyState === 'live') {
+          console.log('[WebRTC] Delayed track re-notify:', event.track.kind);
+          const delayedStream = new MediaStream(this.remoteStream.getTracks());
+          this.remoteStream = delayedStream;
+          this.setState({ remoteStream: delayedStream });
+        }
+      }, 1000);
+
+      // Another retry at 3 seconds (Safari can be very slow to unmute video tracks)
+      setTimeout(() => {
+        if (this.remoteStream && event.track.readyState === 'live') {
+          const laterStream = new MediaStream(this.remoteStream.getTracks());
+          this.remoteStream = laterStream;
+          this.setState({ remoteStream: laterStream });
+        }
+      }, 3000);
     };
 
     // Send ICE candidates to Firestore
@@ -325,13 +407,22 @@ export class CallManager {
     peerName: string,
     callType: CallType
   ): Promise<void> {
+    console.log('[WebRTC] startCall called, type:', callType, 'current status:', this.state.status);
     if (this.state.status !== 'idle') {
+      console.error('[WebRTC] Cannot start call — status is:', this.state.status);
       throw new Error('Already in a call');
     }
 
     try {
+      // Check if mediaDevices API is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera/microphone not available. Please use HTTPS or a supported browser.');
+      }
+
       // Get media first so user sees permission prompt before call starts
+      console.log('[WebRTC] Requesting media for', callType, 'call...');
       this.localStream = await this.getMedia(callType);
+      console.log('[WebRTC] Media obtained, tracks:', this.localStream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
 
       // Create call document
       const callDocRef = doc(collection(db, 'calls'));
@@ -457,6 +548,22 @@ export class CallManager {
 
       // Create peer connection and add local tracks
       this.pc = this.createPeerConnection(callId, false);
+
+      // Safari: explicitly add transceivers before adding tracks
+      // This ensures Safari properly negotiates video receive capabilities
+      if (callType === 'video') {
+        try {
+          // Only add transceivers if they don't already exist
+          const existingTransceivers = this.pc.getTransceivers();
+          const hasAudio = existingTransceivers.some(t => t.receiver.track?.kind === 'audio');
+          const hasVideo = existingTransceivers.some(t => t.receiver.track?.kind === 'video');
+          if (!hasAudio) this.pc.addTransceiver('audio', { direction: 'sendrecv' });
+          if (!hasVideo) this.pc.addTransceiver('video', { direction: 'sendrecv' });
+        } catch (err) {
+          console.warn('[WebRTC] addTransceiver not supported, falling back to addTrack:', err);
+        }
+      }
+
       this.localStream.getTracks().forEach((track) => {
         this.pc!.addTrack(track, this.localStream!);
       });

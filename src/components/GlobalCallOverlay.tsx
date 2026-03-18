@@ -218,30 +218,62 @@ const GlobalCallOverlay: React.FC = () => {
     }
   }, [callState.remoteStream, callState.status, callState.callType]);
 
-  // When call status changes to connected, ensure audio is playing.
+  // When call status changes to connected, ensure all media is playing.
+  // Safari/iOS is particularly slow to establish video playback.
   useEffect(() => {
     if (callState.status !== 'connected' || !callState.remoteStream) return;
 
-    if (remoteAudioRef.current) {
-      if (callState.callType === 'video') {
-        const audioTracks = callState.remoteStream.getAudioTracks();
-        if (audioTracks.length > 0 && remoteAudioRef.current.srcObject !== null) {
-          // Stream already set — just retry play
-        } else if (audioTracks.length > 0) {
-          remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
-        }
-      }
-      remoteAudioRef.current.muted = false;
-      remoteAudioRef.current.play().catch((err) => {
-        console.warn('[WebRTC] Connected but audio play failed, will retry:', err);
-        setTimeout(() => {
-          if (remoteAudioRef.current?.srcObject) {
-            remoteAudioRef.current.muted = false;
-            remoteAudioRef.current.play().catch(() => {});
+    const ensurePlayback = () => {
+      // Audio
+      if (remoteAudioRef.current) {
+        if (callState.callType === 'video') {
+          const audioTracks = callState.remoteStream!.getAudioTracks();
+          if (audioTracks.length > 0) {
+            const currentSrc = remoteAudioRef.current.srcObject as MediaStream | null;
+            if (!currentSrc || currentSrc.getAudioTracks().length === 0) {
+              remoteAudioRef.current.srcObject = new MediaStream(audioTracks);
+            }
           }
-        }, 500);
-      });
-    }
+        } else if (!remoteAudioRef.current.srcObject) {
+          remoteAudioRef.current.srcObject = callState.remoteStream!;
+        }
+        remoteAudioRef.current.muted = false;
+        remoteAudioRef.current.play().catch(() => {});
+      }
+
+      // Video — force re-attach on connected (Safari may have missed ontrack)
+      if (callState.callType === 'video' && remoteVideoRef.current && callState.remoteStream) {
+        const videoTracks = callState.remoteStream.getVideoTracks();
+        console.log('[WebRTC] ensurePlayback: video tracks:', videoTracks.length, videoTracks.map(t => `${t.readyState}:muted=${t.muted}`).join(', '));
+        if (remoteVideoRef.current.srcObject !== callState.remoteStream) {
+          remoteVideoRef.current.srcObject = callState.remoteStream;
+        }
+        remoteVideoRef.current.muted = true;
+        remoteVideoRef.current.play().catch(() => {});
+      }
+
+      // Local video
+      if (localVideoRef.current && callState.localStream) {
+        if (localVideoRef.current.srcObject !== callState.localStream) {
+          localVideoRef.current.srcObject = callState.localStream;
+        }
+        localVideoRef.current.play().catch(() => {});
+      }
+    };
+
+    // Run immediately and retry multiple times for Safari
+    ensurePlayback();
+    const t1 = setTimeout(ensurePlayback, 500);
+    const t2 = setTimeout(ensurePlayback, 1500);
+    const t3 = setTimeout(ensurePlayback, 3000);
+    const t4 = setTimeout(ensurePlayback, 5000);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
   }, [callState.status, callState.remoteStream, callState.callType]);
 
   // Reset minimized state when call ends

@@ -3552,7 +3552,11 @@ export default function MessagesPage() {
 
   // === Call Helper Functions ===
   const initiateCall = async (callType: CallType) => {
-    if (!user?.uid || !selectedUser) return;
+    console.log('[Call] initiateCall triggered, type:', callType, 'status:', callManagerRef.current.getState().status);
+    if (!user?.uid || !selectedUser) {
+      console.warn('[Call] No user or selectedUser, aborting');
+      return;
+    }
     try {
       await callManagerRef.current.startCall(
         user.uid,
@@ -3562,12 +3566,21 @@ export default function MessagesPage() {
         callType
       );
     } catch (err) {
-      showNotif(
-        err instanceof Error && err.message.includes('Permission')
-          ? `${callType === 'video' ? 'Camera and microphone' : 'Microphone'} access is required for calls`
-          : 'Failed to start call',
-        'error'
-      );
+      console.error('[Call] Failed to initiate call:', err);
+      const msg = err instanceof Error ? err.message : '';
+      let errorText = 'Failed to start call. Please try again.';
+      if (msg.includes('Permission') || msg.includes('NotAllowed')) {
+        errorText = callType === 'video'
+          ? 'Camera and microphone access is required. Please allow access in your browser settings.'
+          : 'Microphone access is required. Please allow access in your browser settings.';
+      } else if (msg.includes('Camera access failed') || msg.includes('NotFound') || msg.includes('NotReadable')) {
+        errorText = 'Camera not available. Please check your camera is not in use by another app.';
+      } else if (msg.includes('timed out')) {
+        errorText = 'Camera took too long to respond. Please close other apps using the camera and try again.';
+      } else if (msg.includes('Already in a call')) {
+        errorText = 'You are already in a call. Please end the current call first.';
+      }
+      showNotif(errorText, 'error');
     }
   };
 
