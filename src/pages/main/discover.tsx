@@ -1269,162 +1269,87 @@ export default function DiscoverPage() {
             {filteredPeople.map((person) => {
               const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
               const status = connections.get(person.id);
-              const isExpanded = expandedCardId === person.id;
 
               return (
                 <div
                   key={person.id}
-                  className={`group bg-aurora-surface rounded-xl border overflow-hidden cursor-pointer transition-all duration-300 flex flex-col ${
-                    isExpanded
-                      ? 'border-aurora-indigo/50 shadow-lg col-span-2 sm:col-span-2 lg:col-span-2'
-                      : 'border-aurora-border hover:shadow-md hover:border-aurora-indigo/30 p-3'
-                  }`}
-                  onClick={() => setExpandedCardId(isExpanded ? null : person.id)}
+                  className="group bg-aurora-surface rounded-xl border border-aurora-border overflow-hidden cursor-pointer hover:shadow-md hover:border-aurora-indigo/30 transition-all duration-200 flex flex-col p-3"
+                  onClick={() => setSelectedPerson(person)}
                 >
-                  {isExpanded ? (
-                    <>
-                      {/* EXPANDED VIEW — larger avatar, full details, gradient header */}
-                      <div className={`h-24 bg-gradient-to-r ${
-                        HERITAGE_COLORS[Array.isArray(person.heritage) ? person.heritage[0] : person.heritage] || 'from-gray-300 to-gray-400'
-                      } relative`}>
-                        <MatchBadge score={score} />
-                        {isNewMember(person) && (
-                          <span className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">NEW</span>
-                        )}
+                  {/* Top row: avatar + match badge */}
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="relative">
+                      <div className="w-11 h-11 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
+                        {renderAvatar(person.avatar, person.name)}
                       </div>
-                      <div className="p-4 flex flex-col flex-1">
-                        <div className="flex items-end gap-3 -mt-8">
-                          <div className="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-xl relative z-10 border-3 border-white shrink-0 shadow-md">
-                            {renderAvatar(person.avatar, person.name)}
-                          </div>
-                          <div className="min-w-0 flex-1 pb-1">
-                            <h3 className="font-bold text-[var(--aurora-text)] text-sm truncate">{person.name}</h3>
-                            {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
-                          </div>
-                          <div className="relative pb-1">
+                      {isNewMember(person) && (
+                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none">NEW</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <MatchBadge score={score} />
+                      <div className="relative">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
+                          className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                        >
+                          <MoreVertical className="w-3.5 h-3.5 text-gray-400" />
+                        </button>
+                        {openMenuId === person.id && (
+                          <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[120px] z-20">
                             <button
-                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
-                              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                              onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
-                              <MoreVertical className="w-4 h-4 text-gray-400" />
+                              <Ban className="w-3 h-3" /> Block
                             </button>
-                            {openMenuId === person.id && (
-                              <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-20">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                >
-                                  <Ban className="w-4 h-4" /> Block User
-                                </button>
-                              </div>
-                            )}
                           </div>
-                        </div>
-                        <div className="mt-3 space-y-1">
-                          {renderHeritage(person)}
-                          {person.showLocation && (
-                            <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
-                              <MapPin className="w-3 h-3 shrink-0" /> {person.city}
-                            </p>
-                          )}
-                          {getMutualConnectionCount(person.id) > 0 && (
-                            <p className="text-xs text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual connections</p>
-                          )}
-                          {person.bio && <p className="text-xs text-[var(--aurora-text-secondary)] mt-1 line-clamp-2">{person.bio}</p>}
-                        </div>
-                        <div className="mt-auto pt-3 flex gap-2">
-                          {status === 'connected' ? (
-                            <>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5" /> Message
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                                className="px-3 py-1.5 rounded-lg font-medium text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 flex items-center justify-center gap-1"
-                              >
-                                <UserMinus className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          ) : status === 'pending' ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                              disabled={connectingId === person.id}
-                              className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
-                            >
-                              <Clock className="w-3.5 h-3.5" /> Pending
-                            </button>
-                          ) : (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                              disabled={connectingId === person.id}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
-                            >
-                              <UserPlus className="w-3.5 h-3.5" /> Connect
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* COMPACT VIEW — mini card */}
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="relative">
-                          <div className="w-11 h-11 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                            {renderAvatar(person.avatar, person.name)}
-                          </div>
-                          {isNewMember(person) && (
-                            <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none">NEW</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MatchBadge score={score} />
-                        </div>
-                      </div>
-                      <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
-                      {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
-                      <div className="mt-1.5 space-y-0.5">
-                        {renderHeritage(person)}
-                        {person.showLocation && (
-                          <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
-                            <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
-                          </p>
-                        )}
-                        {getMutualConnectionCount(person.id) > 0 && (
-                          <p className="text-[10px] text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual</p>
                         )}
                       </div>
-                      <div className="mt-auto pt-2">
-                        {status === 'connected' ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white py-1 rounded-lg font-medium text-[10px] flex items-center justify-center gap-1"
-                          >
-                            <MessageCircle className="w-3 h-3" /> Message
-                          </button>
-                        ) : status === 'pending' ? (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                            disabled={connectingId === person.id}
-                            className="w-full bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
-                          >
-                            <Clock className="w-3 h-3" /> Pending
-                          </button>
-                        ) : (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                            disabled={connectingId === person.id}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
-                          >
-                            <UserPlus className="w-3 h-3" /> Connect
-                          </button>
-                        )}
-                      </div>
-                    </>
-                  )}
+                    </div>
+                  </div>
+                  {/* Name + profession */}
+                  <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
+                  {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                  {/* Heritage + location */}
+                  <div className="mt-1.5 space-y-0.5">
+                    {renderHeritage(person)}
+                    {person.showLocation && (
+                      <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
+                        <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
+                      </p>
+                    )}
+                    {getMutualConnectionCount(person.id) > 0 && (
+                      <p className="text-[10px] text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual</p>
+                    )}
+                  </div>
+                  {/* Action button — always at bottom */}
+                  <div className="mt-auto pt-2">
+                    {status === 'connected' ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white py-1 rounded-lg font-medium text-[10px] flex items-center justify-center gap-1"
+                      >
+                        <MessageCircle className="w-3 h-3" /> Message
+                      </button>
+                    ) : status === 'pending' ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                        disabled={connectingId === person.id}
+                        className="w-full bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <Clock className="w-3 h-3" /> Pending
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                        disabled={connectingId === person.id}
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                      >
+                        <UserPlus className="w-3 h-3" /> Connect
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
