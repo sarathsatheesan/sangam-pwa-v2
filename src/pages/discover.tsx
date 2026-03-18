@@ -1547,26 +1547,51 @@ export default function DiscoverPage() {
                 {selectedPerson.name}
               </h2>
 
-              {isNewMember(selectedPerson) && (
-                <div className="text-center mb-2">
+              {/* Badges row: New Member + Match Score */}
+              <div className="flex items-center justify-center gap-2 mb-2 flex-wrap">
+                {isNewMember(selectedPerson) && (
                   <span className="inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded">
                     New Member
                   </span>
-                </div>
-              )}
+                )}
+                {(() => {
+                  const matchScore = computeMatchScore(selectedPerson, userProfile, getMutualConnectionCount(selectedPerson.id));
+                  return matchScore > 0 ? (
+                    <span className="inline-block bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-bold px-3 py-1 rounded">
+                      {matchScore}% Match
+                    </span>
+                  ) : null;
+                })()}
+              </div>
 
               {selectedPerson.profession && <p className="text-gray-600 dark:text-gray-300 text-center mb-1">{selectedPerson.profession}</p>}
 
+              {/* Heritage / Ethnicity */}
+              <div className="flex items-center justify-center mb-1">
+                {renderHeritage(selectedPerson)}
+              </div>
+
               {selectedPerson.showLocation && (
-                <p className="text-gray-500 dark:text-gray-400 text-center flex items-center justify-center gap-1 mb-4">
+                <p className="text-gray-500 dark:text-gray-400 text-center flex items-center justify-center gap-1 mb-1">
                   <MapPin className="w-4 h-4" /> {selectedPerson.city}
                 </p>
               )}
 
+              {getMutualConnectionCount(selectedPerson.id) > 0 && (
+                <p className="text-center text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">
+                  {getMutualConnectionCount(selectedPerson.id)} mutual connections
+                </p>
+              )}
+
+              <div className="mb-4" />
+
+              {/* Bio */}
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
-                <p className="text-gray-700 dark:text-gray-200">{selectedPerson.bio || 'No bio provided'}</p>
+                <h3 className="font-bold text-gray-800 dark:text-white mb-1 text-sm">About</h3>
+                <p className="text-gray-700 dark:text-gray-200 text-sm">{selectedPerson.bio || 'No bio provided'}</p>
               </div>
 
+              {/* Interests */}
               {selectedPerson.interests && selectedPerson.interests.length > 0 && (
                 <div className="mb-4">
                   <h3 className="font-bold text-gray-800 dark:text-white mb-2 text-sm">Interests</h3>
@@ -1580,15 +1605,6 @@ export default function DiscoverPage() {
                       </span>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {getMutualConnectionCount(selectedPerson.id) > 0 && (
-                <div className="mb-4 pb-4 border-b">
-                  <h3 className="font-bold text-gray-800 dark:text-white mb-2 text-sm">
-                    {getMutualConnectionCount(selectedPerson.id)} Mutual Connections
-                  </h3>
-                  <p className="text-xs text-gray-600 dark:text-gray-300">You both know these people</p>
                 </div>
               )}
 
