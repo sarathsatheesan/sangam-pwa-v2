@@ -1039,7 +1039,7 @@ export default function ProfilePage() {
                         className={`px-4 py-2.5 flex items-center gap-3 ${idx < blockedUsers.length - 1 ? 'border-b border-[var(--aurora-border)]/50' : ''}`}
                       >
                         <div className="w-7 h-7 rounded-full bg-[var(--aurora-surface)] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                          {blockedUser.avatar && blockedUser.avatar.startsWith('http') ? (
+                          {blockedUser.avatar && (blockedUser.avatar.startsWith('http') || blockedUser.avatar.startsWith('data:')) ? (
                             <img src={blockedUser.avatar} alt={blockedUser.name} className="w-7 h-7 rounded-full object-cover" />
                           ) : (
                             <span className="text-xs">{blockedUser.avatar || blockedUser.name?.charAt(0) || '👤'}</span>
@@ -1551,44 +1551,48 @@ export default function ProfilePage() {
               />
 
               {/* Toggle: Photo or Avatar */}
-              <div className="flex items-center justify-center gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImage}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:'))
-                      ? 'bg-aurora-indigo text-white shadow-sm'
-                      : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
-                  }`}
-                >
-                  {uploadingImage ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
-                  ) : (
-                    <><Camera className="w-4 h-4" /> Use Photo</>
-                  )}
-                </button>
-                <span className="text-xs text-[var(--aurora-text-muted)]">or</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Switch to emoji avatar mode — set to default emoji if currently a URL
-                    if (editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:'))) {
-                      setEditForm((prev) => ({ ...prev, avatar: '🧑' }));
-                    }
-                  }}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    !editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:'))
-                      ? 'bg-aurora-indigo text-white shadow-sm'
-                      : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
-                  }`}
-                >
-                  🧑 Use Avatar
-                </button>
-              </div>
+              {(() => {
+                const isImageAvatar = !!(editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:')));
+                return (
+                  <div className="flex items-center justify-center gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                        isImageAvatar
+                          ? 'bg-aurora-indigo text-white shadow-sm'
+                          : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
+                      }`}
+                    >
+                      {uploadingImage ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
+                      ) : (
+                        <><Camera className="w-4 h-4" /> Use Photo</>
+                      )}
+                    </button>
+                    <span className="text-xs text-[var(--aurora-text-muted)]">or</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isImageAvatar) {
+                          setEditForm((prev) => ({ ...prev, avatar: '🧑' }));
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                        !isImageAvatar
+                          ? 'bg-aurora-indigo text-white shadow-sm'
+                          : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
+                      }`}
+                    >
+                      🧑 Use Avatar
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* Show photo actions if using photo */}
-              {editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:') || editForm.avatar.startsWith('data:')) && (
+              {editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:')) && (
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <button
                     type="button"
@@ -1612,7 +1616,7 @@ export default function ProfilePage() {
               )}
 
               {/* Emoji avatar grid — only show when not using photo */}
-              {(!editForm.avatar || !editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:')) && (
+              {(!editForm.avatar || !(editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:'))) && (
                 <div className="grid grid-cols-8 gap-2 max-w-xs mx-auto">
                   {AVATAR_OPTIONS.map((avatar) => (
                     <button

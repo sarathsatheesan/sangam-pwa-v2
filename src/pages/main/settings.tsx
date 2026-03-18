@@ -894,7 +894,7 @@ const SettingsPage: React.FC = () => {
             {blockedUsers.map((blockedUser) => (
               <div key={blockedUser.uid} className="flex items-center gap-3 px-4 py-3.5">
                 <div className="w-10 h-10 rounded-full bg-aurora-surface-variant flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  {blockedUser.avatar && blockedUser.avatar.startsWith('http') ? (
+                  {blockedUser.avatar && blockedUser.avatar.startsWith('http') || blockedUser.avatar.startsWith('data:') ? (
                     <img src={blockedUser.avatar} alt={blockedUser.name} className="w-10 h-10 rounded-full object-cover" />
                   ) : (
                     <span className="text-lg">{blockedUser.avatar || blockedUser.name?.charAt(0) || '👤'}</span>

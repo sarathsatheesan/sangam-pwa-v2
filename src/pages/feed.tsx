@@ -1231,7 +1231,7 @@ export default function FeedPage() {
 
   const renderAvatar = (avatar: string, name: string, size: 'sm' | 'md' | 'lg' = 'md') => {
     const sizeClasses = { sm: 'w-8 h-8 text-sm', md: 'w-10 h-10 text-lg', lg: 'w-12 h-12 text-xl' };
-    if (avatar && avatar.startsWith('http')) {
+    if (avatar && (avatar.startsWith('http') || avatar.startsWith('data:'))) {
       return <img src={avatar} alt={name} className={`${sizeClasses[size]} rounded-full object-cover`} />;
     }
     return (

@@ -276,7 +276,7 @@ function Avatar({
   const bgColors = ['bg-indigo-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-fuchsia-500', 'bg-teal-500'];
   const bgColor = bgColors[initial.charCodeAt(0) % bgColors.length];
 
-  if (avatar && avatar.startsWith('http')) {
+  if (avatar && (avatar.startsWith('http') || avatar.startsWith('data:'))) {
     return <img src={avatar} alt="" className={`${dims} rounded-full object-cover`} />;
   }
 
