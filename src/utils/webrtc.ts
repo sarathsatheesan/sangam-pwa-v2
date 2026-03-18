@@ -19,25 +19,20 @@ import { db } from '@/services/firebase';
 
 // ─── Configuration ───────────────────────────────────────────────────
 
+// Pure peer-to-peer: STUN servers only (no TURN relay)
+// STUN helps discover public IP for NAT traversal — no media is relayed
+// All audio/video flows directly between devices with SRTP encryption
 const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  // Free TURN servers for NAT traversal (needed for symmetric NATs / mobile networks)
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
+  { urls: [
+    'stun:stun.l.google.com:19302',
+    'stun:stun1.l.google.com:19302',
+    'stun:stun2.l.google.com:19302',
+    'stun:stun3.l.google.com:19302',
+    'stun:stun4.l.google.com:19302',
+  ]},
+  // Additional STUN servers for reliability
+  { urls: 'stun:stun.services.mozilla.com:3478' },
+  { urls: 'stun:stun.stunprotocol.org:3478' },
 ];
 
 const CALL_TIMEOUT_MS = 45_000; // 45 seconds to answer
@@ -381,6 +376,13 @@ export class CallManager {
         // ICE failed — try to restart
         console.warn('[WebRTC] ICE failed, ending call');
         this.endCall('connection_lost');
+      } else if (pc.iceConnectionState === 'checking') {
+        // Set a timeout — if still checking after 15 seconds, connection likely failed
+        setTimeout(() => {
+          if (this.pc && this.pc.iceConnectionState === 'checking') {
+            console.warn('[WebRTC] ICE still checking after 15s — connection may fail');
+          }
+        }, 15000);
       } else if (pc.iceConnectionState === 'disconnected') {
         // Give it a moment to recover
         setTimeout(() => {
