@@ -95,6 +95,10 @@ export class CallManager {
   private remoteDescriptionSet = false;
   // Guard against endCall being called multiple times concurrently
   private endingCall = false;
+  // Track which callId we already fired the ended event for (prevent duplicate messages)
+  private lastEndedCallId: string | null = null;
+  // Track ICE restart attempts (one retry per call)
+  private iceRestartAttempted = false;
   // Track current camera facing mode (getSettings() is unreliable on some devices)
   private currentFacingMode: 'user' | 'environment' = 'user';
   // Adaptive bitrate monitoring
@@ -284,9 +288,11 @@ export class CallManager {
   private createPeerConnection(callId: string, isCaller: boolean): RTCPeerConnection {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-    // Reset ICE buffer for new connection
+    // Reset ICE buffer and restart flag for new connection
     this.pendingIceCandidates = [];
     this.remoteDescriptionSet = false;
+    this.iceRestartAttempted = false;
+    this.lastEndedCallId = null;
 
     // Set up remote stream — use event.track directly (more reliable than event.streams)
     this.remoteStream = new MediaStream();
@@ -373,21 +379,66 @@ export class CallManager {
         this.startAdaptiveBitrate();
         this.stopRingtone();
       } else if (pc.iceConnectionState === 'failed') {
-        // ICE failed — try to restart
-        console.warn('[WebRTC] ICE failed, ending call');
-        this.endCall('connection_lost');
-      } else if (pc.iceConnectionState === 'checking') {
-        // Set a timeout — if still checking after 15 seconds, connection likely failed
-        setTimeout(() => {
-          if (this.pc && this.pc.iceConnectionState === 'checking') {
-            console.warn('[WebRTC] ICE still checking after 15s — connection may fail');
+        // ICE failed — attempt ICE restart before giving up
+        // ICE restart tries new candidate pairs which can succeed when first attempt fails
+        if (!this.iceRestartAttempted && this.pc) {
+          console.warn('[WebRTC] ICE failed, attempting ICE restart...');
+          this.iceRestartAttempted = true;
+          try {
+            this.pc.restartIce();
+            // If we're the caller, create a new offer with iceRestart flag
+            if (this.state.isCaller && this.state.callId) {
+              const pcRef = this.pc;
+              const callId = this.state.callId;
+              pcRef.createOffer({ iceRestart: true }).then((offer) => {
+                pcRef.setLocalDescription(offer).then(() => {
+                  updateDoc(doc(db, 'calls', callId), {
+                    offer: { type: offer.type, sdp: offer.sdp },
+                  }).then(() => {
+                    console.log('[WebRTC] ICE restart offer sent');
+                  });
+                });
+              }).catch((err) => {
+                console.error('[WebRTC] ICE restart offer failed:', err);
+                this.endCall('connection_lost');
+              });
+            }
+          } catch (err) {
+            console.error('[WebRTC] ICE restart failed:', err);
+            this.endCall('connection_lost');
           }
-        }, 15000);
+        } else {
+          console.warn('[WebRTC] ICE failed after restart attempt, ending call');
+          this.endCall('connection_lost');
+        }
+      } else if (pc.iceConnectionState === 'checking') {
+        // Set a timeout — if still checking after 20 seconds, try ICE restart
+        setTimeout(() => {
+          if (this.pc && this.pc.iceConnectionState === 'checking' && !this.iceRestartAttempted) {
+            console.warn('[WebRTC] ICE still checking after 20s, attempting restart...');
+            this.iceRestartAttempted = true;
+            try {
+              this.pc.restartIce();
+            } catch {
+              // restartIce not supported — just wait
+            }
+          }
+        }, 20000);
       } else if (pc.iceConnectionState === 'disconnected') {
-        // Give it a moment to recover
+        // Give it a moment to recover, then try restart
         setTimeout(() => {
           if (this.pc && this.pc.iceConnectionState === 'disconnected') {
-            this.endCall('connection_lost');
+            if (!this.iceRestartAttempted) {
+              console.warn('[WebRTC] Disconnected, attempting ICE restart...');
+              this.iceRestartAttempted = true;
+              try {
+                this.pc.restartIce();
+              } catch {
+                this.endCall('connection_lost');
+              }
+            } else {
+              this.endCall('connection_lost');
+            }
           }
         }, 5000);
       }
@@ -782,11 +833,11 @@ export class CallManager {
     const { callId, status, callType, peerId, peerName, isCaller, duration } = this.state;
     console.log('[WebRTC] endCall called, reason:', reason, 'status:', status, 'endingCall:', this.endingCall);
 
-    if (status === 'idle') return;
-    // If already ending but user clicked again, force through
-    if (this.endingCall && status !== 'ended') {
-      console.log('[WebRTC] Force ending call (endingCall was stuck)');
-    } else if (this.endingCall) {
+    // Already idle or ended — do nothing
+    if (status === 'idle' || status === 'ended') return;
+    // Already processing endCall for this call — skip
+    if (this.endingCall) {
+      console.log('[WebRTC] endCall already in progress, skipping');
       return;
     }
     this.endingCall = true;
@@ -807,8 +858,9 @@ export class CallManager {
       }
     }
 
-    // Fire call-ended event for chat message logging
-    if (callId && peerId) {
+    // Fire call-ended event ONCE per callId (prevent duplicate chat messages)
+    if (callId && peerId && callId !== this.lastEndedCallId) {
+      this.lastEndedCallId = callId;
       const event: CallEndedEvent = {
         callId,
         callType,
