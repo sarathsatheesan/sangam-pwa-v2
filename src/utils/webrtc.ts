@@ -748,53 +748,51 @@ export class CallManager {
     const newFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
     console.log('[WebRTC] Switching camera from', this.currentFacingMode, 'to', newFacingMode);
 
-    // Helper: attempt to get camera with given constraints
     const tryGetCamera = async (constraints: MediaStreamConstraints): Promise<MediaStreamTrack | null> => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         return stream.getVideoTracks()[0] || null;
-      } catch {
-        return null;
-      }
+      } catch { return null; }
     };
 
-    // Try multiple constraint strategies (iOS Safari is picky about facingMode)
     let newVideoTrack: MediaStreamTrack | null = null;
 
-    // Strategy 1: exact facingMode (works on most Android devices)
-    newVideoTrack = await tryGetCamera({
-      video: { facingMode: { exact: newFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-    });
+    // Strategy 1 (BEST for Chrome desktop): enumerate devices and pick a different camera
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((d) => d.kind === 'videoinput' && d.deviceId);
+      if (videoDevices.length > 1) {
+        const currentDeviceId = videoTrack.getSettings().deviceId || '';
+        // Find next camera in the list (cycle through)
+        const currentIdx = videoDevices.findIndex((d) => d.deviceId === currentDeviceId);
+        const nextIdx = (currentIdx + 1) % videoDevices.length;
+        const nextDevice = videoDevices[nextIdx];
+        if (nextDevice && nextDevice.deviceId !== currentDeviceId) {
+          console.log('[WebRTC] Switching to device:', nextDevice.label || nextDevice.deviceId);
+          newVideoTrack = await tryGetCamera({
+            video: { deviceId: { exact: nextDevice.deviceId } },
+          });
+        }
+      }
+    } catch { /* enumerateDevices not available */ }
 
-    // Strategy 2: ideal facingMode (works on iOS Safari)
+    // Strategy 2: exact facingMode (Android)
+    if (!newVideoTrack) {
+      newVideoTrack = await tryGetCamera({
+        video: { facingMode: { exact: newFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+    }
+
+    // Strategy 3: ideal facingMode (iOS Safari)
     if (!newVideoTrack) {
       newVideoTrack = await tryGetCamera({
         video: { facingMode: { ideal: newFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
       });
     }
 
-    // Strategy 3: plain facingMode string (broadest compatibility)
+    // Strategy 4: plain facingMode
     if (!newVideoTrack) {
-      newVideoTrack = await tryGetCamera({
-        video: { facingMode: newFacingMode },
-      });
-    }
-
-    // Strategy 4: enumerate devices and pick a different camera by deviceId
-    if (!newVideoTrack) {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter((d) => d.kind === 'videoinput');
-        const currentDeviceId = videoTrack.getSettings().deviceId;
-        const otherDevice = videoDevices.find((d) => d.deviceId !== currentDeviceId);
-        if (otherDevice) {
-          newVideoTrack = await tryGetCamera({
-            video: { deviceId: { exact: otherDevice.deviceId } },
-          });
-        }
-      } catch {
-        // enumerateDevices not available
-      }
+      newVideoTrack = await tryGetCamera({ video: { facingMode: newFacingMode } });
     }
 
     if (!newVideoTrack) {
