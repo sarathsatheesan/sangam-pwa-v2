@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
+import { useIncomingRequestCount } from '../../hooks/useIncomingRequests';
 
 interface ModuleTile {
   path: string;
@@ -50,6 +51,7 @@ const gradientColors: Record<string, string> = {
 const HomePage: React.FC = () => {
   const { user, userProfile, isAdmin } = useAuth();
   const { isFeatureEnabled } = useFeatureSettings();
+  const incomingRequestCount = useIncomingRequestCount();
 
   const enabledTiles = tiles.filter((t) => {
     if (t.feature === 'always') return true;
@@ -102,8 +104,13 @@ const HomePage: React.FC = () => {
                 )}
 
                 {/* Icon */}
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-2.5" style={{ background: 'var(--aurora-surface-variant, #F5F6FA)' }}>
+                <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl mb-2.5" style={{ background: 'var(--aurora-surface-variant, #F5F6FA)' }}>
                   {tile.emoji}
+                  {tile.path === '/discover' && incomingRequestCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 animate-pulse shadow-sm">
+                      {incomingRequestCount > 9 ? '9+' : incomingRequestCount}
+                    </span>
+                  )}
                 </div>
 
                 {/* Label */}
