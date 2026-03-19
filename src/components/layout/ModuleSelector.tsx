@@ -99,13 +99,13 @@ export const ModuleSelector: React.FC = () => {
   const location = useLocation();
   const { isFeatureEnabled } = useFeatureSettings();
   const { isAdmin } = useAuth();
-
-  // Hide module selector on home/landing page (tiles replace it)
-  if (location.pathname === '/home') return null;
   const incomingRequestCount = useIncomingRequestCount();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pillRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
   const [showLeftScroll, setShowLeftScroll] = useState(false);
   const [showRightScroll, setShowRightScroll] = useState(false);
+
+  const isHome = location.pathname === '/home';
 
   // Filter enabled modules (profile always shows, admin only for admins)
   const enabledModules = modules.filter((m) => {
@@ -114,8 +114,13 @@ export const ModuleSelector: React.FC = () => {
     return isFeatureEnabled(m.feature);
   });
 
+  const isActive = (path: string) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
+
   // Check scroll position
   useEffect(() => {
+    if (isHome) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -134,7 +139,28 @@ export const ModuleSelector: React.FC = () => {
       container.removeEventListener('scroll', checkScroll);
       window.removeEventListener('resize', checkScroll);
     };
-  }, []);
+  }, [isHome]);
+
+  // Auto-scroll the active pill into view when route changes
+  useEffect(() => {
+    if (isHome) return;
+    const activeModule = enabledModules.find((m) => isActive(m.path));
+    if (!activeModule) return;
+    const pillEl = pillRefs.current.get(activeModule.path);
+    if (pillEl && scrollContainerRef.current) {
+      // Use a short delay to ensure the DOM has settled (e.g. after navigation)
+      requestAnimationFrame(() => {
+        pillEl.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center',
+        });
+      });
+    }
+  }, [location.pathname]);
+
+  // Hide module selector on home/landing page (tiles replace it)
+  if (isHome) return null;
 
   const scroll = (direction: 'left' | 'right') => {
     const container = scrollContainerRef.current;
@@ -144,10 +170,6 @@ export const ModuleSelector: React.FC = () => {
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth',
     });
-  };
-
-  const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
   return (
@@ -186,6 +208,9 @@ export const ModuleSelector: React.FC = () => {
               <Link
                 key={module.path}
                 to={module.path}
+                ref={(el) => {
+                  if (el) pillRefs.current.set(module.path, el);
+                }}
                 className={clsx(
                   'inline-flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all duration-200 relative',
                   isActive(module.path)
