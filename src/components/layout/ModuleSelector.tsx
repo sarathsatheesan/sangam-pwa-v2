@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Home,
+  LayoutGrid,
   Users,
   Briefcase,
   Building2,
@@ -98,6 +99,9 @@ export const ModuleSelector: React.FC = () => {
   const location = useLocation();
   const { isFeatureEnabled } = useFeatureSettings();
   const { isAdmin } = useAuth();
+
+  // Hide module selector on home/landing page (tiles replace it)
+  if (location.pathname === '/home') return null;
   const incomingRequestCount = useIncomingRequestCount();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftScroll, setShowLeftScroll] = useState(false);
@@ -168,6 +172,14 @@ export const ModuleSelector: React.FC = () => {
             scrollBehavior: 'smooth',
           }}
         >
+          {/* Home button — always first */}
+          <Link
+            to="/home"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all duration-200 text-aurora-text-secondary hover:bg-gray-50 hover:text-aurora-text"
+          >
+            <LayoutGrid size={18} />
+            <span>Home</span>
+          </Link>
           {enabledModules.map((module) => {
             const showBadge = module.path === '/discover' && incomingRequestCount > 0;
             return (

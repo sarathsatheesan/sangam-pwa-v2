@@ -29,6 +29,7 @@ const ProfilePage = lazy(() => import('./pages/profile'));
 const AdminPage = lazy(() => import('./pages/admin'));
 const MarketplacePage = lazy(() => import('./pages/marketplace'));
 const SettingsPage = lazy(() => import('./pages/settings'));
+const HomePage = lazy(() => import('./pages/main/home'));
 
 // Loading spinner component
 const LoadingSpinner = () => (
@@ -79,7 +80,8 @@ function App() {
                 {/* Private Routes with MainLayout */}
                 <Route element={<PrivateRoute />}>
                   <Route element={<Suspense fallback={<LoadingSpinner />}><MainLayout /></Suspense>}>
-                    <Route index element={<Navigate to="/feed" replace />} />
+                    <Route index element={<Navigate to="/home" replace />} />
+                    <Route path="/home" element={<Suspense fallback={<LoadingSpinner />}><HomePage /></Suspense>} />
                     <Route path="/feed" element={<Suspense fallback={<LoadingSpinner />}><FeedPage /></Suspense>} />
                     <Route path="/discover" element={<Suspense fallback={<LoadingSpinner />}><DiscoverPage /></Suspense>} />
                     <Route path="/business" element={<Suspense fallback={<LoadingSpinner />}><BusinessPage /></Suspense>} />
@@ -96,7 +98,7 @@ function App() {
                 </Route>
 
                 {/* Catch-all redirect */}
-                <Route path="*" element={<Navigate to="/feed" replace />} />
+                <Route path="*" element={<Navigate to="/home" replace />} />
               </Routes>
             </ToastProvider>
           </LocationProvider>
