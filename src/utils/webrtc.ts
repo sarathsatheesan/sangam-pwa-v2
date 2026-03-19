@@ -19,20 +19,25 @@ import { db } from '@/services/firebase';
 
 // ─── Configuration ───────────────────────────────────────────────────
 
-// Pure peer-to-peer: STUN servers only (no TURN relay)
-// STUN helps discover public IP for NAT traversal — no media is relayed
-// All audio/video flows directly between devices with SRTP encryption
 const ICE_SERVERS: RTCIceServer[] = [
-  { urls: [
-    'stun:stun.l.google.com:19302',
-    'stun:stun1.l.google.com:19302',
-    'stun:stun2.l.google.com:19302',
-    'stun:stun3.l.google.com:19302',
-    'stun:stun4.l.google.com:19302',
-  ]},
-  // Additional STUN servers for reliability
-  { urls: 'stun:stun.services.mozilla.com:3478' },
-  { urls: 'stun:stun.stunprotocol.org:3478' },
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  // Free TURN servers for NAT traversal (needed for symmetric NATs / mobile networks)
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 const CALL_TIMEOUT_MS = 45_000; // 45 seconds to answer
@@ -95,10 +100,6 @@ export class CallManager {
   private remoteDescriptionSet = false;
   // Guard against endCall being called multiple times concurrently
   private endingCall = false;
-  // Track which callId we already fired the ended event for (prevent duplicate messages)
-  private lastEndedCallId: string | null = null;
-  // Track ICE restart attempts (one retry per call)
-  private iceRestartAttempted = false;
   // Track current camera facing mode (getSettings() is unreliable on some devices)
   private currentFacingMode: 'user' | 'environment' = 'user';
   // Adaptive bitrate monitoring
@@ -147,93 +148,19 @@ export class CallManager {
   // ── Media Helpers ────────────────────────────────────────────────
 
   private async getMedia(callType: CallType): Promise<MediaStream> {
-    // Timeout wrapper — getUserMedia can hang on some devices/browsers
-    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-        ),
-      ]);
+    const constraints: MediaStreamConstraints = {
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: callType === 'video' ? {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        facingMode: 'user',
+      } : false,
     };
-
-    if (callType === 'video') {
-      // Pre-check: query camera permission status (Chrome/Edge/Firefox support this)
-      // This avoids calling getUserMedia when permission is definitely denied
-      try {
-        if (navigator.permissions && navigator.permissions.query) {
-          const camPerm = await navigator.permissions.query({ name: 'camera' as PermissionName });
-          console.log('[WebRTC] Camera permission status:', camPerm.state);
-          if (camPerm.state === 'denied') {
-            throw new Error('Camera permission denied. Please allow camera access in your browser settings (click the lock icon in the address bar).');
-          }
-        }
-      } catch (err) {
-        // permissions.query may throw on some browsers (Safari) — that's OK, continue
-        if (err instanceof Error && err.message.includes('denied')) throw err;
-        console.log('[WebRTC] permissions.query not available, proceeding with getUserMedia');
-      }
-
-      // Strategy 1: Full constraints (HD video + audio)
-      try {
-        console.log('[WebRTC] Requesting video+audio with HD constraints');
-        return await withTimeout(
-          navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-            video: { width: { ideal: 1280, max: 1920 }, height: { ideal: 720, max: 1080 }, facingMode: 'user' },
-          }),
-          10000,
-          'getUserMedia (HD video)'
-        );
-      } catch (err) {
-        console.warn('[WebRTC] HD video constraints failed:', err);
-        // If permission denied, don't retry — throw immediately
-        if (err instanceof Error && (err.message.includes('NotAllowed') || err.message.includes('Permission'))) {
-          throw new Error('Camera permission denied. Please allow camera access in your browser settings (click the lock icon in the address bar).');
-        }
-      }
-
-      // Strategy 2: Basic video constraints (iOS Safari friendly)
-      try {
-        console.log('[WebRTC] Retrying with basic video constraints');
-        return await withTimeout(
-          navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true },
-            video: { facingMode: 'user' },
-          }),
-          10000,
-          'getUserMedia (basic video)'
-        );
-      } catch (err) {
-        console.warn('[WebRTC] Basic video constraints failed:', err);
-        if (err instanceof Error && (err.message.includes('NotAllowed') || err.message.includes('Permission'))) {
-          throw new Error('Camera permission denied. Please allow camera access in your browser settings (click the lock icon in the address bar).');
-        }
-      }
-
-      // Strategy 3: Just video: true (minimum viable)
-      try {
-        console.log('[WebRTC] Retrying with video: true');
-        return await withTimeout(
-          navigator.mediaDevices.getUserMedia({ audio: true, video: true }),
-          10000,
-          'getUserMedia (video: true)'
-        );
-      } catch (err) {
-        console.error('[WebRTC] All video strategies failed:', err);
-        throw new Error('Camera access failed. Please check camera permissions in your browser settings (click the lock icon in the address bar).');
-      }
-    }
-
-    // Audio only
-    return withTimeout(
-      navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: false,
-      }),
-      10000,
-      'getUserMedia (audio)'
-    );
+    return navigator.mediaDevices.getUserMedia(constraints);
   }
 
   private stopMedia() {
@@ -288,52 +215,29 @@ export class CallManager {
   private createPeerConnection(callId: string, isCaller: boolean): RTCPeerConnection {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
-    // Reset ICE buffer and restart flag for new connection
+    // Reset ICE buffer for new connection
     this.pendingIceCandidates = [];
     this.remoteDescriptionSet = false;
-    this.iceRestartAttempted = false;
-    this.lastEndedCallId = null;
 
     // Set up remote stream — use event.track directly (more reliable than event.streams)
     this.remoteStream = new MediaStream();
     pc.ontrack = (event) => {
-      console.log('[WebRTC] ontrack fired, kind:', event.track.kind, 'readyState:', event.track.readyState, 'muted:', event.track.muted);
-
-      // Add track to the remote stream
+      console.log('[WebRTC] ontrack fired, kind:', event.track.kind, 'readyState:', event.track.readyState);
       this.remoteStream!.addTrack(event.track);
-
       // Create a new MediaStream reference so React detects the state change
+      // (adding tracks to the same object doesn't trigger re-renders)
       const newStream = new MediaStream(this.remoteStream!.getTracks());
       this.remoteStream = newStream;
       this.setState({ remoteStream: newStream });
 
-      // Safari/iOS: tracks can arrive muted and need onunmute to trigger re-render
+      // Safari: tracks can arrive in 'live' state but not fire 'unmute' events
+      // Listen for track unmute/ended to re-trigger state update
       event.track.onunmute = () => {
         console.log('[WebRTC] Track unmuted:', event.track.kind);
         const refreshedStream = new MediaStream(this.remoteStream!.getTracks());
         this.remoteStream = refreshedStream;
         this.setState({ remoteStream: refreshedStream });
       };
-
-      // Safari/iOS: tracks may also arrive live but with no unmute event
-      // Force a delayed re-notify to ensure the UI picks up the track
-      setTimeout(() => {
-        if (this.remoteStream && event.track.readyState === 'live') {
-          console.log('[WebRTC] Delayed track re-notify:', event.track.kind);
-          const delayedStream = new MediaStream(this.remoteStream.getTracks());
-          this.remoteStream = delayedStream;
-          this.setState({ remoteStream: delayedStream });
-        }
-      }, 1000);
-
-      // Another retry at 3 seconds (Safari can be very slow to unmute video tracks)
-      setTimeout(() => {
-        if (this.remoteStream && event.track.readyState === 'live') {
-          const laterStream = new MediaStream(this.remoteStream.getTracks());
-          this.remoteStream = laterStream;
-          this.setState({ remoteStream: laterStream });
-        }
-      }, 3000);
     };
 
     // Send ICE candidates to Firestore
@@ -379,66 +283,14 @@ export class CallManager {
         this.startAdaptiveBitrate();
         this.stopRingtone();
       } else if (pc.iceConnectionState === 'failed') {
-        // ICE failed — attempt ICE restart before giving up
-        // ICE restart tries new candidate pairs which can succeed when first attempt fails
-        if (!this.iceRestartAttempted && this.pc) {
-          console.warn('[WebRTC] ICE failed, attempting ICE restart...');
-          this.iceRestartAttempted = true;
-          try {
-            this.pc.restartIce();
-            // If we're the caller, create a new offer with iceRestart flag
-            if (this.state.isCaller && this.state.callId) {
-              const pcRef = this.pc;
-              const callId = this.state.callId;
-              pcRef.createOffer({ iceRestart: true }).then((offer) => {
-                pcRef.setLocalDescription(offer).then(() => {
-                  updateDoc(doc(db, 'calls', callId), {
-                    offer: { type: offer.type, sdp: offer.sdp },
-                  }).then(() => {
-                    console.log('[WebRTC] ICE restart offer sent');
-                  });
-                });
-              }).catch((err) => {
-                console.error('[WebRTC] ICE restart offer failed:', err);
-                this.endCall('connection_lost');
-              });
-            }
-          } catch (err) {
-            console.error('[WebRTC] ICE restart failed:', err);
-            this.endCall('connection_lost');
-          }
-        } else {
-          console.warn('[WebRTC] ICE failed after restart attempt, ending call');
-          this.endCall('connection_lost');
-        }
-      } else if (pc.iceConnectionState === 'checking') {
-        // Set a timeout — if still checking after 20 seconds, try ICE restart
-        setTimeout(() => {
-          if (this.pc && this.pc.iceConnectionState === 'checking' && !this.iceRestartAttempted) {
-            console.warn('[WebRTC] ICE still checking after 20s, attempting restart...');
-            this.iceRestartAttempted = true;
-            try {
-              this.pc.restartIce();
-            } catch {
-              // restartIce not supported — just wait
-            }
-          }
-        }, 20000);
+        // ICE failed — try to restart
+        console.warn('[WebRTC] ICE failed, ending call');
+        this.endCall('connection_lost');
       } else if (pc.iceConnectionState === 'disconnected') {
-        // Give it a moment to recover, then try restart
+        // Give it a moment to recover
         setTimeout(() => {
           if (this.pc && this.pc.iceConnectionState === 'disconnected') {
-            if (!this.iceRestartAttempted) {
-              console.warn('[WebRTC] Disconnected, attempting ICE restart...');
-              this.iceRestartAttempted = true;
-              try {
-                this.pc.restartIce();
-              } catch {
-                this.endCall('connection_lost');
-              }
-            } else {
-              this.endCall('connection_lost');
-            }
+            this.endCall('connection_lost');
           }
         }, 5000);
       }
@@ -460,22 +312,13 @@ export class CallManager {
     peerName: string,
     callType: CallType
   ): Promise<void> {
-    console.log('[WebRTC] startCall called, type:', callType, 'current status:', this.state.status);
     if (this.state.status !== 'idle') {
-      console.error('[WebRTC] Cannot start call — status is:', this.state.status);
       throw new Error('Already in a call');
     }
 
     try {
-      // Check if mediaDevices API is available
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera/microphone not available. Please use HTTPS or a supported browser.');
-      }
-
       // Get media first so user sees permission prompt before call starts
-      console.log('[WebRTC] Requesting media for', callType, 'call...');
       this.localStream = await this.getMedia(callType);
-      console.log('[WebRTC] Media obtained, tracks:', this.localStream.getTracks().map(t => `${t.kind}:${t.readyState}`).join(', '));
 
       // Create call document
       const callDocRef = doc(collection(db, 'calls'));
@@ -599,8 +442,11 @@ export class CallManager {
         localStream: this.localStream,
       });
 
-      // Create peer connection
+      // Create peer connection and add local tracks
       this.pc = this.createPeerConnection(callId, false);
+      this.localStream.getTracks().forEach((track) => {
+        this.pc!.addTrack(track, this.localStream!);
+      });
 
       // Start listening for caller ICE candidates EARLY (before setting remote desc)
       // so candidates get buffered and flushed after remote description is set
@@ -634,22 +480,13 @@ export class CallManager {
         throw new Error('No offer found in call document');
       }
 
-      // CRITICAL: Set remote description FIRST — this creates transceivers matching
-      // the offer's m= lines. Only THEN add local tracks so they map correctly.
-      // This order is essential for Chrome ↔ Safari cross-browser video calls.
+      // Set the offer as remote description
       console.log('[WebRTC] Setting offer as remote description');
       const offer = new RTCSessionDescription(callData.offer);
       await this.pc.setRemoteDescription(offer);
 
       // Now flush any ICE candidates that arrived while we were setting up
       await this.flushIceCandidates();
-
-      // Add local tracks AFTER remote description is set
-      // This ensures tracks map to the correct transceivers created from the offer
-      console.log('[WebRTC] Adding local tracks to peer connection');
-      this.localStream.getTracks().forEach((track) => {
-        this.pc!.addTrack(track, this.localStream!);
-      });
 
       // Create and send answer
       console.log('[WebRTC] Creating answer');
@@ -745,69 +582,27 @@ export class CallManager {
     const videoTrack = this.localStream.getVideoTracks()[0];
     if (!videoTrack) return;
 
+    // Use tracked facing mode (getSettings().facingMode is unreliable on many devices)
     const newFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
     console.log('[WebRTC] Switching camera from', this.currentFacingMode, 'to', newFacingMode);
 
-    const tryGetCamera = async (constraints: MediaStreamConstraints): Promise<MediaStreamTrack | null> => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        return stream.getVideoTracks()[0] || null;
-      } catch { return null; }
-    };
-
-    let newVideoTrack: MediaStreamTrack | null = null;
-
-    // Strategy 1 (BEST for Chrome desktop): enumerate devices and pick a different camera
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter((d) => d.kind === 'videoinput' && d.deviceId);
-      if (videoDevices.length > 1) {
-        const currentDeviceId = videoTrack.getSettings().deviceId || '';
-        // Find next camera in the list (cycle through)
-        const currentIdx = videoDevices.findIndex((d) => d.deviceId === currentDeviceId);
-        const nextIdx = (currentIdx + 1) % videoDevices.length;
-        const nextDevice = videoDevices[nextIdx];
-        if (nextDevice && nextDevice.deviceId !== currentDeviceId) {
-          console.log('[WebRTC] Switching to device:', nextDevice.label || nextDevice.deviceId);
-          newVideoTrack = await tryGetCamera({
-            video: { deviceId: { exact: nextDevice.deviceId } },
-          });
-        }
-      }
-    } catch { /* enumerateDevices not available */ }
-
-    // Strategy 2: exact facingMode (Android)
-    if (!newVideoTrack) {
-      newVideoTrack = await tryGetCamera({
-        video: { facingMode: { exact: newFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { exact: newFacingMode },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
-    }
+      const newVideoTrack = newStream.getVideoTracks()[0];
 
-    // Strategy 3: ideal facingMode (iOS Safari)
-    if (!newVideoTrack) {
-      newVideoTrack = await tryGetCamera({
-        video: { facingMode: { ideal: newFacingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
-    }
-
-    // Strategy 4: plain facingMode
-    if (!newVideoTrack) {
-      newVideoTrack = await tryGetCamera({ video: { facingMode: newFacingMode } });
-    }
-
-    if (!newVideoTrack) {
-      console.warn('[WebRTC] Could not switch camera — device may only have one camera');
-      return;
-    }
-
-    try {
       // Replace the track on the RTCPeerConnection sender
       const sender = this.pc.getSenders().find((s) => s.track?.kind === 'video');
       if (sender) {
         await sender.replaceTrack(newVideoTrack);
       }
 
-      // Stop old track and update local stream
+      // Update the local stream
       this.localStream.removeTrack(videoTrack);
       videoTrack.stop();
       this.localStream.addTrack(newVideoTrack);
@@ -817,11 +612,26 @@ export class CallManager {
       const updatedStream = new MediaStream(this.localStream.getTracks());
       this.localStream = updatedStream;
       this.setState({ localStream: updatedStream });
-      console.log('[WebRTC] Camera switched successfully to', newFacingMode);
     } catch (err) {
-      console.error('[WebRTC] Failed to replace track after getting new camera:', err);
-      // Clean up the new track we couldn't use
-      newVideoTrack.stop();
+      console.error('[WebRTC] Failed to switch camera:', err);
+      // If { exact } fails (device has only one camera), try without exact
+      try {
+        const fallback = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: newFacingMode },
+        });
+        const newVideoTrack = fallback.getVideoTracks()[0];
+        const sender = this.pc!.getSenders().find((s) => s.track?.kind === 'video');
+        if (sender) await sender.replaceTrack(newVideoTrack);
+        this.localStream!.removeTrack(videoTrack);
+        videoTrack.stop();
+        this.localStream!.addTrack(newVideoTrack);
+        this.currentFacingMode = newFacingMode;
+        const updatedStream = new MediaStream(this.localStream!.getTracks());
+        this.localStream = updatedStream;
+        this.setState({ localStream: updatedStream });
+      } catch {
+        console.warn('[WebRTC] Device may only have one camera');
+      }
     }
   }
 
@@ -829,15 +639,10 @@ export class CallManager {
 
   async endCall(reason: string = 'ended'): Promise<void> {
     const { callId, status, callType, peerId, peerName, isCaller, duration } = this.state;
-    console.log('[WebRTC] endCall called, reason:', reason, 'status:', status, 'endingCall:', this.endingCall);
 
-    // Already idle or ended — do nothing
     if (status === 'idle' || status === 'ended') return;
-    // Already processing endCall for this call — skip
-    if (this.endingCall) {
-      console.log('[WebRTC] endCall already in progress, skipping');
-      return;
-    }
+    // Prevent re-entrant calls (UI click + Firestore snapshot echo + timeout)
+    if (this.endingCall) return;
     this.endingCall = true;
 
     // Update Firestore call status
@@ -856,9 +661,8 @@ export class CallManager {
       }
     }
 
-    // Fire call-ended event ONCE per callId (prevent duplicate chat messages)
-    if (callId && peerId && callId !== this.lastEndedCallId) {
-      this.lastEndedCallId = callId;
+    // Fire call-ended event for chat message logging
+    if (callId && peerId) {
       const event: CallEndedEvent = {
         callId,
         callType,
