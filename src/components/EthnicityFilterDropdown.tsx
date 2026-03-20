@@ -209,7 +209,7 @@ const EthnicityFilterDropdown: React.FC<EthnicityFilterDropdownProps> = ({
         }`}
       >
         <Globe size={12} />
-        <span>ethniCity</span>
+        <span>EthniZity</span>
         {selected.length > 0 && (
           <span className="bg-aurora-indigo text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
             {selected.length}

@@ -1790,7 +1790,7 @@ export default function ProfilePage() {
 
             {/* Heritage */}
             <div>
-              <label className="block text-xs font-bold text-[var(--aurora-text-muted)] mb-2 uppercase tracking-wider">Heritage / ethniCity</label>
+              <label className="block text-xs font-bold text-[var(--aurora-text-muted)] mb-2 uppercase tracking-wider">Heritage / EthniZity</label>
               <CountryEthnicitySelector
                 selected={editForm.heritage}
                 onChange={(val) => setEditForm((prev) => ({ ...prev, heritage: val }))}
