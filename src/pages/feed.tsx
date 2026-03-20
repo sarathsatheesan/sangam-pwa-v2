@@ -1349,7 +1349,7 @@ export default function FeedPage() {
       {/* ─── Sticky Search + Sort Header ─── */}
       <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
 
-      {/* ─── Search & Ethnicity Filter ─── */}
+      {/* ─── Search & EthniZity Filter ─── */}
       <div
         className="relative border-b border-aurora-border z-30"
         style={{
@@ -1543,7 +1543,7 @@ export default function FeedPage() {
               {selectedHeritage.length > 0 || sortMode !== 'recent' || showSavedOnly ? 'No Posts Found' : 'No Posts Yet'}
             </h3>
             <p className="text-sm text-aurora-text-secondary max-w-xs mx-auto">
-              {selectedHeritage.length > 0 ? `No posts matching selected ethnicity. ` : ''}
+              {selectedHeritage.length > 0 ? `No posts matching selected EthniZity. ` : ''}
               {sortMode !== 'recent' ? `Try changing the sort mode. ` : ''}
               {selectedHeritage.length === 0 && sortMode === 'recent' && !showSavedOnly ? 'Be the first to share something with the community!' : ''}
             </p>

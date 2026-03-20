@@ -890,7 +890,7 @@ export default function EventsPage() {
         if (range) matchesDate = isDateInRange(event.fullDate, range);
       }
 
-      // Heritage/Ethnicity filter
+      // Heritage/EthniZity filter
       const matchesHeritage = selectedHeritage.length === 0 || (event.heritage && event.heritage.some((h) => selectedHeritage.includes(h)));
 
       return matchesSearch && matchesFilter && matchesDate && matchesHeritage;
@@ -1319,7 +1319,7 @@ export default function EventsPage() {
       {/* ── Search & Filter Bar ── */}
       <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-orange-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
-          {/* Search + Ethnicity Filter on same row */}
+          {/* Search + EthniZity Filter on same row */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
@@ -1342,7 +1342,7 @@ export default function EventsPage() {
               )}
             </div>
 
-            {/* Ethnicity Filter Dropdown */}
+            {/* EthniZity Filter Dropdown */}
             <div className="relative shrink-0">
               <EthnicityFilterDropdown
                 selected={selectedHeritage}

@@ -245,7 +245,7 @@ const CountryEthnicitySelector: React.FC<CountryEthnicitySelectorProps> = ({
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-aurora-text-muted" />
         <input
           type="text"
-          placeholder="Search country or ethnicity..."
+          placeholder="Search country or EthniZity..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-9 pr-8 py-2.5 border border-aurora-border rounded-xl text-sm text-aurora-text placeholder-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 bg-transparent"

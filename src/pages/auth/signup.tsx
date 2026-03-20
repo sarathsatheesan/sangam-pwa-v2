@@ -648,7 +648,7 @@ export const SignupPage: React.FC = () => {
 
       <div className="mb-8">
         <label className="block text-sm font-semibold text-aurora-text mb-3">Your Heritage</label>
-        <p className="text-xs text-aurora-text-secondary mb-3">Select your country and ethnicity</p>
+        <p className="text-xs text-aurora-text-secondary mb-3">Select your country and EthniZity</p>
 
         <CountryEthnicitySelector
           selected={formData.heritage}

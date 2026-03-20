@@ -1,12 +1,35 @@
 # Sangam PWA v2 (ethniCity) — Session Handoff Note
 
-**Date:** March 19, 2026
+<!--
+  HOW TO USE THIS FILE
+  ====================
+  This is the MASTER handoff note. Paste this entire file into a new session
+  to get Claude up to speed on the project state.
+
+  For detailed session-by-session history (including rationale, gotchas, and
+  decisions), see the individual session notes in docs/handoff/:
+    - docs/handoff/SESSION_01.md — Initial build (all 13 pages, infra, E2EE, WebRTC)
+    - docs/handoff/SESSION_02.md — macOS build fix, nav pill auto-scroll, Discover badge
+
+  Each session note includes inline comments explaining WHY decisions were made,
+  not just WHAT was done. Read them before changing architecture or revisiting
+  previously-fixed bugs.
+-->
+
+**Date:** March 19, 2026 (Last updated: Session 2)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** `3e65526` — Add post-login landing page with module tiles
+**Latest Commit:** `1fcfea4` — Add incoming request count badge to Discover tile on home page
+**Deployed to:** Firebase Hosting (site: `mithr-1e5f4`)
+**Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`
 
 ---
 
-## 1. What We Were Building
+<!-- ================================================================
+     SECTION 1: PROJECT OVERVIEW
+     Read this first to understand what ethniCity is and the tech stack.
+     ================================================================ -->
+## 1. What We Were Building / Working On
 
 **ethniCity** (internally "Sangam PWA") is a Progressive Web App for diaspora/ethnic communities to connect, network, and share resources. It's a multi-module platform with social feeds, people discovery, business directories, housing listings, events, travel companions, forums, messaging with end-to-end encryption, and real-time audio/video calling.
 
@@ -23,47 +46,62 @@
 
 **Design System:** "Aurora" theme using CSS variables (`var(--aurora-*)`), with primary colors Delta Navy (#0032A0) and Delta Red (#C8102E) on a #F5F7FA background.
 
----
-
-## 2. Key Decisions Made and Why
-
-### Architecture
-- **Single-file pages** — Each module (feed, discover, business, etc.) is a single large TSX file containing all its components, state, and Firestore logic. This was chosen for simplicity and rapid iteration, not for long-term scalability. Refactoring into smaller components is a future task.
-- **Lazy loading everything** — All routes use `React.lazy()` + `Suspense` in `App.tsx` for code splitting. Firebase and vendor libs are also split into separate chunks via `manualChunks` in Vite config.
-- **Feature flags via Firestore** — `FeatureSettingsContext` reads `appConfig/settings` from Firestore to toggle modules on/off. The ModuleSelector and Home page both respect these flags.
-
-### Encryption
-- **E2EE with ECDH P-256 + AES-256-GCM (v2)** — Full Web Crypto API implementation. Key pairs are synced across devices via Firestore (Firestore is the source of truth, IndexedDB is offline cache).
-- **Deterministic shared key fallback** — `getDeterministicSharedKey()` uses PBKDF2 to derive keys from user IDs + salt. Added because ECDH key exchange was failing across devices/browsers (Safari issues). This is the primary decryption method now.
-- **Legacy v1 still supported** — Old messages used CryptoJS AES-CBC. The `decryptMessage()` function detects v1 vs v2 payloads and handles both.
-- **Group chat encryption** — Infrastructure is built (generateGroupKey, wrapGroupKeyForMember, etc.) but group chats themselves are not fully implemented yet.
-
-### Calling System (WebRTC)
-- **Pure P2P with STUN + TURN** — Uses Google STUN servers and openrelay.metered.ca TURN servers. Firestore documents handle signaling (SDP offer/answer + ICE candidates).
-- **Global call overlay** — `GlobalCallOverlay.tsx` renders the call UI at the app level so it persists across module navigation (PiP mode).
-- **Caller-only writes call events** — To prevent duplicate "call ended" messages in chat, only the caller writes the call event message. This was a major bug that took several iterations to fix.
-
-### Profile Images
-- **Base64 in Firestore** — Profile photos are compressed and stored as base64 data URLs directly in Firestore user documents (not Firebase Storage). Chosen to avoid Storage timeout issues and simplify rendering. Works but has Firestore document size implications at scale.
-
-### Ethnicity/Heritage System
-- **2-tier Country > Ethnicity selector** — 175+ countries with scoped ethnicity keys. `CountryEthnicitySelector.tsx` and `EthnicityFilterDropdown.tsx` are reusable across all modules.
-
-### Post-login Flow
-- **Home page with module tiles** — After login, users land on `/home` which shows a responsive grid of module tiles (not directly into feed). Each tile respects feature flags.
+**This session focused on:** Environment setup, dependency fixes, and two UX improvements to the navigation/landing page.
 
 ---
 
+<!-- ================================================================
+     SECTION 2: KEY DECISIONS
+     These decisions are foundational. Read before making architectural
+     changes. Each decision includes the reasoning so you don't
+     accidentally revert something that was done intentionally.
+     For session-specific decision details, see docs/handoff/SESSION_*.md
+     ================================================================ -->
+## 2. Decisions Made and Why
+
+### Environment / Build Fixes (this session)
+- **Removed `@rollup/rollup-linux-arm64-gnu` from package.json** — This Linux-only dependency was preventing `npm install` on macOS (Darwin). It was likely added when the project was previously edited in a Linux VM. Removed with `npm remove` and fresh `npm install` succeeded. Commit: `d5bea05`.
+- **`gh` CLI not available in Cowork VM** — GitHub CLI couldn't be installed due to network restrictions in the sandbox. Workaround: use `git` commands directly for push/pull, and Chrome browser for GitHub web UI if needed. Not a blocker.
+- **npm vulnerabilities left as-is (30 total: 7 low, 19 moderate, 4 high)** — All are in transitive dependencies (firebase-tools, jimp/file-type, vite-plugin-pwa/workbox chain). None affect the production app or end users. `npm audit fix` found no non-breaking fixes. `npm audit fix --force` would require major version bumps to vite-plugin-pwa, firebase-tools, and jimp — deferred to a dedicated maintenance session to avoid breakage.
+
+### UX Improvements (this session)
+- **Auto-scroll active pill in ModuleSelector** — When navigating to a module (e.g., clicking a tile on Home), the corresponding pill in the sticky nav bar now smoothly scrolls into view, centered horizontally. Uses `scrollIntoView({ behavior: 'smooth', inline: 'center' })` with `requestAnimationFrame` for DOM settlement. A `pillRefs` Map stores refs to each pill element. Also fixed a **React hooks rule violation**: the original code had an early return (`if (pathname === '/home') return null`) before `useEffect` calls. Moved the guard after all hooks using an `isHome` flag. Commit: `185f038`.
+- **Incoming request badge on Discover tile (Home page)** — The `useIncomingRequestCount()` hook (real-time Firestore listener on the `connections` collection) was already used in ModuleSelector. Now also imported into `home.tsx` to show a red pulsing badge on the Discover tile when pending connection requests exist. Same visual style as the nav pill badge (red circle, 9+ cap, pulse animation). Commit: `1fcfea4`.
+
+### Architecture Decisions (carried from prior sessions)
+- **Single-file pages** — Each module is a single large TSX file. Chosen for rapid iteration, not long-term scalability.
+- **Lazy loading all routes** via `React.lazy()` + `Suspense` in `App.tsx`.
+- **Feature flags via Firestore** — `FeatureSettingsContext` reads `appConfig/settings` to toggle modules.
+- **E2EE with ECDH P-256 + AES-256-GCM (v2)** with deterministic shared key fallback (PBKDF2). Legacy v1 (CryptoJS AES-CBC) still supported.
+- **WebRTC P2P calls** with STUN + free TURN servers (openrelay.metered.ca). Caller-only writes call events to prevent duplicates.
+- **Profile images as base64 in Firestore** (not Firebase Storage).
+- **2-tier Country > Ethnicity selector** (175+ countries).
+
+---
+
+<!-- ================================================================
+     SECTION 3: COMPLETED WORK
+     Cumulative across all sessions. Check session notes for details
+     on what was done in each specific session.
+     ================================================================ -->
 ## 3. What Was Completed
 
-### Core Pages (all functional with Firestore CRUD)
+### This Session
+| Task | File(s) Changed | Commit |
+|------|-----------------|--------|
+| Fixed macOS build (removed Linux rollup dep) | `package.json` | `d5bea05` |
+| Auto-scroll active pill into view on module entry | `src/components/layout/ModuleSelector.tsx` | `185f038` |
+| Fixed React hooks ordering violation in ModuleSelector | `src/components/layout/ModuleSelector.tsx` | `185f038` |
+| Added incoming request count badge to Discover tile on Home page | `src/pages/main/home.tsx` | `1fcfea4` |
+
+### Previously Completed (all functional with Firestore CRUD)
 | Page | File | Lines | Status |
 |------|------|-------|--------|
-| Home (landing) | `src/pages/main/home.tsx` | 127 | Done |
+| Home (landing) | `src/pages/main/home.tsx` | ~127 | Done |
 | Feed | `src/pages/feed.tsx` | — | Done |
 | Discover | `src/pages/discover.tsx` | 1,735 | Done |
 | Business | `src/pages/business.tsx` | — | Done |
-| Housing | `src/pages/housing.tsx` | ~1,776 | Done + 7 enhancements |
+| Housing | `src/pages/housing.tsx` | ~1,776 | Done + 7 enhancements (state only) |
 | Events | `src/pages/events.tsx` | — | Done |
 | Travel | `src/pages/travel.tsx` | — | Done |
 | Forum | `src/pages/forum.tsx` | 2,354 | Done |
@@ -99,20 +137,27 @@
 - `UserSettingsContext` — User preferences
 - `CulturalThemeContext` — Cultural theme customization
 
+### Hooks
+- `useIncomingRequestCount` — Real-time Firestore listener for pending connection requests where current user is the recipient. Used in ModuleSelector nav pills AND Home page Discover tile.
+
 ---
 
+<!-- ================================================================
+     SECTION 4: IN PROGRESS / HALF-DONE
+     These items have partial work done. Don't start from scratch —
+     check the existing code first. The housing enhancements in
+     particular have all state management done, just need JSX.
+     ================================================================ -->
 ## 4. What's In Progress / Half-Done
 
 ### Call System (mostly working, but fragile)
-- Audio and video calls work between Chrome-Chrome and Chrome-Safari, but there are edge cases:
-  - Camera flip on Chrome uses `deviceId` cycling (works but not elegant)
-  - Safari video rendering required special handling (multiple commits fixing this)
-  - The last 10+ commits were iterating on call bugs: duplicate messages, z-index overlays, audio not audible, video not visible, etc.
-  - **Most recent fix** (commit `17f2a6c`): Raised call overlay z-index above video, added semi-transparent bg for video calls
+- Audio and video calls work Chrome-Chrome and Chrome-Safari, but edge cases remain
+- Camera flip on Chrome uses `deviceId` cycling (works but not elegant)
+- Safari video rendering required special handling
 - The TURN servers used (`openrelay.metered.ca`) are free/public and may be unreliable in production
 
-### Housing Page Enhancements (state ready, UI partially done)
-7 enhancements were added to housing.tsx at the state/data level:
+### Housing Page Enhancements (state ready, UI NOT wired up)
+7 enhancements were added to `housing.tsx` at the state/data level:
 1. Listing status management (Active/Pending/Under Contract/Sold/Rented)
 2. Monthly payment estimator (calculator states exist)
 3. Neighborhood info & scores (walkScore, transitScore)
@@ -121,45 +166,81 @@
 6. Similar listings carousel (useMemo logic done)
 7. Saved listings tab & recent views (localStorage sync works)
 
-**The state management and Firestore mapping is done, but some JSX/UI rendering for these features may still need wiring up.**
+**The state management and Firestore mapping is done, but the JSX/UI rendering for these features still needs wiring up.** This is the most concrete "pick up and build" task.
 
 ### Group Chat Encryption
-- Encryption infrastructure exists in `src/utils/encryption.ts` (generateGroupKey, wrapGroupKeyForMember, etc.)
+- Encryption infrastructure exists in `src/utils/encryption.ts`
 - Actual group chat UI and key distribution flow are not implemented
 
-### Image Handling in Messages
-- Image messages with E2EE work but had decryption issues that were fixed (commits `7014b61`, `808e045`)
-- Image lightbox viewer exists in feed (`4975278`) and messages (`2a015db`)
+### npm Vulnerabilities (30 — deferred)
+- `serialize-javascript` (HIGH) in vite-plugin-pwa chain — build-time only
+- `file-type` (MODERATE) in jimp — server-side image parsing, not applicable
+- `@tootallnate/once` (LOW) in firebase-tools — CLI only
+- All require `npm audit fix --force` (breaking major version bumps). Safe to defer.
 
 ---
 
+<!-- ================================================================
+     SECTION 5: NEXT STEPS
+     Prioritized list. High priority items are the most impactful
+     and/or have the most groundwork already done.
+     ================================================================ -->
 ## 5. Exact Next Steps
 
 ### High Priority
-1. **Stabilize the call system** — Test audio/video calls across Safari iOS, Chrome Android, Chrome Desktop. The TURN servers may need to be replaced with a paid provider (like Twilio or daily.co) for reliability.
-2. **Wire up Housing UI for the 7 enhancements** — The state is ready; add JSX for status badges, calculator tab, neighborhood scores, comments section, similar listings carousel, and saved/recent tabs.
+1. **Wire up Housing UI for the 7 enhancements** — The state is ready; add JSX for status badges, calculator tab, neighborhood scores, comments section, similar listings carousel, and saved/recent tabs.
+2. **Stabilize the call system** — Test audio/video calls across Safari iOS, Chrome Android, Chrome Desktop. The TURN servers may need to be replaced with a paid provider (like Twilio or daily.co) for reliability.
 3. **Test E2EE thoroughly** — Especially the deterministic key fallback vs. ECDH. Make sure messages decrypt correctly across all browser/device combinations.
 
 ### Medium Priority
 4. **Refactor large page files** — Messages (3,884 lines), Admin (2,759 lines), Marketplace (2,436 lines), Forum (2,354 lines) should be broken into smaller components.
-5. **Add image upload to all modules** — Currently only profile photos and feed support images. Housing, Business, Marketplace, Events would benefit from photo uploads.
+5. **Add image upload to all modules** — Currently only profile photos and feed support images.
 6. **Implement group chats** — The encryption layer is ready. Need UI for group creation, member management, and key distribution.
-7. **Add pagination** — Most pages currently use `limit()` on Firestore queries. Implement infinite scroll or cursor-based pagination.
+7. **Add pagination** — Most pages use `limit()` on Firestore queries. Implement infinite scroll or cursor-based pagination.
 
 ### Lower Priority
-8. **Push notifications** — Firebase Cloud Messaging integration for real-time notifications (new messages, connection requests, event RSVPs)
+8. **Push notifications** — Firebase Cloud Messaging integration
 9. **Map integration** — For housing listings and event locations
-10. **Content moderation** — The utility exists but isn't wired into all submission flows
-11. **Testing** — No tests exist currently. Add unit tests for encryption utils and integration tests for key flows.
+10. **Content moderation** — Utility exists but isn't wired into all submission flows
+11. **Testing** — No tests exist. Add unit tests for encryption utils and integration tests.
+12. **npm vulnerability maintenance** — Upgrade vite-plugin-pwa, firebase-tools, jimp to latest majors (test for breakage)
 
 ---
 
+<!-- ================================================================
+     SECTION 6: CONTEXT, CONSTRAINTS & KEY FILES
+     Read this before writing any code. Contains build commands,
+     critical file locations, known gotchas, and constraints that
+     will save you hours of debugging.
+     ================================================================ -->
 ## 6. Important Context, Constraints & Files
+
+### Build & Deploy Commands (from project root on Mac)
+<!-- GOTCHA: Do NOT use `npx tsc` — it installs the wrong package (tsc@2.0.4).
+     Always use the local binary path. See SESSION_02.md for full details. -->
+```bash
+# Build
+./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build
+
+# Deploy to Firebase Hosting
+npx firebase deploy --only hosting
+
+# Git push
+git add <files> && git commit -m "message" && git push origin main
+
+# All-in-one
+./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build && npx firebase deploy --only hosting && git add -A && git commit -m "message" && git push origin main
+```
+
+**Important:** Do NOT use `npx tsc` — it tries to install the wrong package (`tsc@2.0.4` instead of TypeScript). Always use `./node_modules/.bin/tsc`.
 
 ### Critical Files to Know
 | File | Why It Matters |
 |------|---------------|
 | `src/App.tsx` | All routing, context providers, lazy loading |
+| `src/components/layout/ModuleSelector.tsx` | Nav pill bar — now includes auto-scroll to active pill + request badge |
+| `src/pages/main/home.tsx` | Landing page with module tiles — now includes Discover request badge |
+| `src/hooks/useIncomingRequests.ts` | Real-time pending request count (Firestore listener) |
 | `src/utils/encryption.ts` | Full E2EE implementation (v1 + v2 + group) |
 | `src/utils/webrtc.ts` | CallManager class, WebRTC signaling |
 | `src/components/GlobalCallOverlay.tsx` | Call UI (global, persists across nav) |
@@ -170,11 +251,13 @@
 | `vite.config.ts` | Build config, PWA manifest, code splitting |
 
 ### Constraints
-- **No Firebase Storage for profile images** — Using base64 in Firestore. This works but watch document size limits (1MB max per Firestore doc).
-- **Free TURN servers** — The openrelay.metered.ca servers are public and could go down. Budget for a paid TURN provider.
-- **Single-file page architecture** — Works for now but will become painful as features grow. Plan for component extraction.
-- **No backend/Cloud Functions** — Everything runs client-side. This means security rules are critical and some operations (like content moderation webhooks, push notifications) will eventually need Cloud Functions.
-- **PWA-first** — App is designed as installable PWA. Test on mobile Safari (Add to Home Screen) and Chrome (install prompt).
+- **No Firebase Storage for profile images** — Using base64 in Firestore (1MB doc limit)
+- **Free TURN servers** — openrelay.metered.ca may be unreliable. Budget for a paid provider.
+- **Single-file page architecture** — Works but painful as features grow
+- **No backend/Cloud Functions** — Everything client-side. Security rules are critical.
+- **PWA-first** — Test on mobile Safari (Add to Home Screen) and Chrome (install prompt)
+- **`gh` CLI unavailable in Cowork VM** — Use `git` commands directly or Chrome browser for GitHub
+- **`npx tsc` is broken** — Always use `./node_modules/.bin/tsc` to avoid installing wrong package
 
 ### Auth Flow
 1. `/auth/login` → Email/password or Google sign-in
@@ -186,10 +269,30 @@
 ### Firestore Collections
 `users`, `posts` (+ subcollection `comments`), `businesses`, `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`
 
-### Migration Scripts in Repo Root
-- `migrate-social-to-community.cjs` — Renames social references to community
-- `enhance_housing.py`, `add_popular_sort.py`, `add_status_filter.py`, `fix_similar_listings.py` — Python scripts used to patch housing.tsx
+### Recent Commit History
+```
+1fcfea4 Add incoming request count badge to Discover tile on home page
+185f038 Auto-scroll active pill into view in ModuleSelector nav bar
+d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
+3e65526 Add post-login landing page with module tiles
+17f2a6c Fix call UI: raise overlay z-index above video
+5e52d03 Revert call system to last working state, fix only duplicate messages
+363fddd Fix video calls: render video inside containers, Chrome camera flip
+76194be Fix duplicate call event messages: track lastEndedCallId
+bcff52f Fix calls: replace dead TURN server with pure P2P STUN
+62a1727 Fix calls: audio not audible, video not visible, caller disconnect stuck
+```
 
 ---
 
-*Generated March 19, 2026 — for continuing development in a new session.*
+<!--
+  MAINTENANCE NOTE
+  ================
+  When starting a new session:
+  1. Paste this entire HANDOFF_NOTE.md into the new session
+  2. At the end of the session, update this file AND create a new docs/handoff/SESSION_XX.md
+  3. The session file should include inline comments explaining WHY, not just WHAT
+  4. Update the session list in the header comment and the "Session history" field
+-->
+
+*Generated March 19, 2026 (Session 2) — for continuing development in a new session.*

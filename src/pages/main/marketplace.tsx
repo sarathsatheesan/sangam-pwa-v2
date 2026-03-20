@@ -1340,7 +1340,7 @@ export default function MarketplacePage() {
               )}
             </div>
 
-            {/* Ethnicity Dropdown - New Component */}
+            {/* EthniZity Dropdown - New Component */}
             <EthnicityFilterDropdown
               selected={selectedHeritage}
               onChange={setSelectedHeritage}

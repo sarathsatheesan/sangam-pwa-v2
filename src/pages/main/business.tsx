@@ -1131,7 +1131,7 @@ export default function BusinessPage() {
                 )}
               </div>
 
-              {/* Ethnicity Dropdown */}
+              {/* EthniZity Dropdown */}
               <EthnicityFilterDropdown
                 selected={selectedHeritage}
                 onChange={setSelectedHeritage}
