@@ -52,7 +52,7 @@ export const SelectEthnicityPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Ethnicity Selector */}
+      {/* EthniZity Selector */}
       <div className="flex-1 max-w-2xl w-full mx-auto px-6 pb-6">
         <CountryEthnicitySelector
           selected={selectedEthnicity}

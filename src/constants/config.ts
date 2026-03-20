@@ -84,7 +84,7 @@ export const ETHNICITY_HIERARCHY: { region: string; subregions: { name: string; 
   ]},
   { region: 'Multiracial & Other', subregions: [
     { name: 'Multiracial', ethnicities: ['Two or More Races', 'Multiracial', 'Biracial'] },
-    { name: 'Not Listed', ethnicities: ['Other / Ethnicity not listed'] },
+    { name: 'Not Listed', ethnicities: ['Other / EthniZity not listed'] },
   ]},
   { region: 'Prefer Not to Say', subregions: [
     { name: 'Privacy', ethnicities: ['Prefer not to say', 'Decline to self-identify'] },

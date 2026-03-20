@@ -659,7 +659,7 @@ const SettingsPage: React.FC = () => {
         <div className="space-y-3 text-sm text-aurora-text-secondary text-center">
           <div className="flex items-center gap-2 justify-center"><img src="/ethnicity-logo.svg" alt="ethniCity" className="w-8 h-8" /><p className="text-lg font-bold"><span style={{ color: '#c96830' }}>ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">City</span></p></div>
           <p className="text-aurora-text-muted">Version 2.0.0 (PWA)</p>
-          <p>ethniCity — where ethnicity meets city — is a community platform built to connect, empower, and celebrate diverse cultures across the globe.</p>
+          <p>ethniCity — where EthniZity meets city — is a community platform built to connect, empower, and celebrate diverse cultures across the globe.</p>
           <p>Whether you're an individual looking to connect with your community or a business owner wanting to reach local customers, ethniCity brings everyone together.</p>
           <p className="text-xs text-aurora-text-muted pt-2">&copy; 2026 ethniCity. All rights reserved.</p>
         </div>
@@ -791,7 +791,7 @@ const SettingsPage: React.FC = () => {
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
-              a.download = `ethnicity-data-${user.uid.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.json`;
+              a.download = `ethnizity-data-${user.uid.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}.json`;
               document.body.appendChild(a);
               a.click();
               document.body.removeChild(a);
