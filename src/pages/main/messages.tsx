@@ -647,6 +647,9 @@ function EmojiPicker({ onSelect, onClose, recentEmojis }: { onSelect: (emoji: st
   };
 
   return (
+    <>
+    {/* Invisible backdrop — onClick for desktop, onTouchStart for iOS Safari/mobile */}
+    <div className="fixed inset-0 z-30" onClick={onClose} onTouchStart={onClose} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} />
     <div className="absolute bottom-16 left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[360px] bg-white dark:bg-[var(--aurora-surface)] rounded-lg shadow-lg border border-[var(--aurora-border)] z-40 flex flex-col overflow-hidden">
       {/* Search */}
       <div className="px-2 pt-2">
@@ -660,17 +663,18 @@ function EmojiPicker({ onSelect, onClose, recentEmojis }: { onSelect: (emoji: st
       </div>
       {/* Category tabs */}
       {!searchQuery && (
-        <div className="flex gap-0.5 px-1.5 pt-1.5 pb-1 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1 px-2 pt-2 pb-1 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              title={cat}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0 transition ${
-                activeCategory === cat ? 'bg-aurora-indigo/15 ring-1 ring-aurora-indigo/30' : 'hover:bg-[var(--aurora-input)]'
+              className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                activeCategory === cat
+                  ? 'bg-indigo-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {categoryIcons[cat] || '📦'}
+              {cat}
             </button>
           ))}
         </div>
@@ -695,6 +699,7 @@ function EmojiPicker({ onSelect, onClose, recentEmojis }: { onSelect: (emoji: st
         )}
       </div>
     </div>
+    </>
   );
 }
 
