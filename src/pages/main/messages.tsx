@@ -7,7 +7,7 @@ import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
   onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion, writeBatch,
 } from 'firebase/firestore';
-import { db } from '@/services/firebase';
+import { db, initMessaging, getToken, onMessage } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
@@ -2338,6 +2338,45 @@ export default function MessagesPage() {
     setNotificationType(type);
     setShowNotification(true);
   }, []);
+
+  // ===== PUSH NOTIFICATIONS (FCM) =====
+  useEffect(() => {
+    if (!user?.uid) return;
+    const setupPushNotifications = async () => {
+      try {
+        const messaging = await initMessaging();
+        if (!messaging) return; // FCM not supported (e.g. iOS Safari webview)
+        const permission = Notification.permission === 'granted'
+          ? 'granted'
+          : await Notification.requestPermission();
+        if (permission !== 'granted') return;
+        const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const token = await getToken(messaging, {
+          vapidKey: 'PENDING_VAPID_KEY',
+          serviceWorkerRegistration: swRegistration,
+        });
+        if (token) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            fcmTokens: arrayUnion(token),
+          });
+        }
+        // Listen for foreground messages
+        const unsubscribe = onMessage(messaging, (payload) => {
+          const senderId = payload.data?.senderId;
+          if (senderId === user.uid) return; // Don't notify for own messages
+          const title = payload.notification?.title || 'New Message';
+          const body = payload.notification?.body || '';
+          showNotif(`${title}: ${body}`, 'info');
+        });
+        return unsubscribe;
+      } catch (err) {
+        console.error('Error setting up push notifications:', err);
+      }
+    };
+    let unsubForeground: (() => void) | undefined;
+    setupPushNotifications().then((unsub) => { unsubForeground = unsub; });
+    return () => { if (unsubForeground) unsubForeground(); };
+  }, [user?.uid, showNotif]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
