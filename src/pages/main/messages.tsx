@@ -478,10 +478,10 @@ function QuickReactionBar({ onReact, onClose }: { onReact: (emoji: string) => vo
   const reactions = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose} onTouchStart={onClose} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
       <div
         className="flex gap-2 p-3 rounded-full bg-white dark:bg-[var(--aurora-surface)] shadow-lg"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
       >
         {reactions.map((emoji) => (
           <button
@@ -840,10 +840,10 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number, audioB
   const secs = seconds % 60;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={handleCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={handleCancel} onTouchStart={handleCancel} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
       <div
         className="bg-white dark:bg-[var(--aurora-surface)] rounded-lg p-6 flex flex-col items-center gap-4"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
       >
         {recError ? (
           <div className="text-red-500 text-sm text-center max-w-[250px]">{recError}</div>
@@ -1052,10 +1052,10 @@ function WallpaperPicker({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose} onTouchStart={onClose} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
       <div
         className="bg-white dark:bg-[var(--aurora-surface)] rounded-lg p-4 sm:p-6 max-w-[90vw] sm:max-w-md"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-bold mb-4">Chat Wallpaper</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -2629,7 +2629,8 @@ export default function MessagesPage() {
       const newPinned = !msg.pinned;
       await updateDoc(doc(db, 'conversations', selectedConvId, 'messages', msg.id), { pinned: newPinned });
       showNotif(newPinned ? 'Message pinned' : 'Message unpinned', 'info');
-    } catch {
+    } catch (err) {
+      console.error('Failed to pin message:', err);
       showNotif('Failed to pin message', 'error');
     }
   };
@@ -2641,7 +2642,8 @@ export default function MessagesPage() {
       const newStarred = !msg.starred;
       await updateDoc(doc(db, 'conversations', selectedConvId, 'messages', msg.id), { starred: newStarred });
       showNotif(newStarred ? 'Message starred' : 'Message unstarred', 'info');
-    } catch {
+    } catch (err) {
+      console.error('Failed to star message:', err);
       showNotif('Failed to star message', 'error');
     }
   };
@@ -2770,7 +2772,7 @@ export default function MessagesPage() {
             {/* Pen dropdown menu */}
             {showPenMenu && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowPenMenu(false)} />
+                <div className="fixed inset-0 z-40" onClick={() => setShowPenMenu(false)} onTouchStart={() => setShowPenMenu(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} />
                 <div
                   className="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-lg overflow-hidden z-50"
                   style={{ backgroundColor: 'var(--aurora-surface)', border: '1px solid var(--aurora-border)' }}
@@ -3343,6 +3345,13 @@ export default function MessagesPage() {
       {/* Pinned messages banner */}
       {pinnedMessages.length > 0 && showPinnedBanner && (
         <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800/30" style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => {
+          const lastPinned = pinnedMessages[pinnedMessages.length - 1];
+          const idx = messages.findIndex(m => m.id === lastPinned.id);
+          if (idx >= 0 && messagesContainerRef.current) {
+            const elem = messagesContainerRef.current.children[idx] as HTMLElement;
+            elem?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }} onTouchStart={() => {
           const lastPinned = pinnedMessages[pinnedMessages.length - 1];
           const idx = messages.findIndex(m => m.id === lastPinned.id);
           if (idx >= 0 && messagesContainerRef.current) {
@@ -4105,8 +4114,8 @@ export default function MessagesPage() {
         />
       )}
       {showDeleteMsgConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={() => { setShowDeleteMsgConfirm(false); setDeleteMsgId(null); }}>
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mx-4 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={() => { setShowDeleteMsgConfirm(false); setDeleteMsgId(null); }} onTouchStart={() => { setShowDeleteMsgConfirm(false); setDeleteMsgId(null); }} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mx-4 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete Message</h3>
             <p className="text-gray-600 dark:text-gray-300 mb-4">Are you sure you want to delete this message? This action cannot be undone.</p>
             <div className="flex gap-3 justify-end">
@@ -4120,7 +4129,7 @@ export default function MessagesPage() {
       {/* ===== Report Message Modal ===== */}
       {showReportModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
+          <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => setShowReportModal(false)} onTouchStart={() => setShowReportModal(false)} />
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between rounded-t-2xl">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Report Message</h3>
@@ -4179,7 +4188,7 @@ export default function MessagesPage() {
       {/* ===== Block User Confirmation Modal ===== */}
       {showBlockConfirm && blockTargetUser && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockConfirm(false)} />
+          <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => setShowBlockConfirm(false)} onTouchStart={() => setShowBlockConfirm(false)} />
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
             <div className="w-14 h-14 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
               <Ban className="w-7 h-7 text-red-600 dark:text-red-400" />
@@ -4214,6 +4223,7 @@ export default function MessagesPage() {
           className="fixed inset-0 z-[9999] flex flex-col"
           style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
           onClick={(e) => { if (e.target === e.currentTarget) { setLightboxImage(null); setLightboxForwardOpen(false); } }}
+          onTouchStart={(e) => { if (e.target === e.currentTarget) { setLightboxImage(null); setLightboxForwardOpen(false); } }}
         >
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
@@ -4257,12 +4267,13 @@ export default function MessagesPage() {
           {lightboxForwardOpen && (
             <div
               className="absolute inset-0 z-[10000] flex items-end sm:items-center justify-center"
-              style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+              style={{ backgroundColor: 'rgba(0,0,0,0.5)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
               onClick={(e) => { if (e.target === e.currentTarget) setLightboxForwardOpen(false); }}
+              onTouchStart={(e) => { if (e.target === e.currentTarget) setLightboxForwardOpen(false); }}
             >
               <div
                 className="w-full sm:max-w-md bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl max-h-[70vh] flex flex-col shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
               >
                 {/* Forward header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
