@@ -211,7 +211,7 @@ const SettingsPage: React.FC = () => {
       <div className="divide-y divide-aurora-border">
         <div className="px-4 py-3 bg-aurora-indigo/10">
           <p className="text-xs text-aurora-indigo font-medium">
-            Control how and when ethniCity notifies you about activity
+            Control how and when EthniZity notifies you about activity
           </p>
         </div>
 
@@ -333,7 +333,7 @@ const SettingsPage: React.FC = () => {
                 <p className="text-sm font-medium text-aurora-text capitalize">{opt}</p>
                 <p className="text-xs text-aurora-text-muted">
                   {opt === 'public' && 'Anyone can view your profile'}
-                  {opt === 'community' && 'Only ethniCity community members'}
+                  {opt === 'community' && 'Only EthniZity community members'}
                   {opt === 'private' && 'Only people you approve'}
                 </p>
               </div>
@@ -597,8 +597,8 @@ const SettingsPage: React.FC = () => {
       body: (
         <div className="space-y-4 text-sm text-aurora-text-secondary">
           <div>
-            <p className="font-semibold text-aurora-text mb-1">What is ethniCity?</p>
-            <p>ethniCity is a community platform that connects diverse professionals, businesses, and families. Share updates, discover events, find local businesses, and build meaningful connections.</p>
+            <p className="font-semibold text-aurora-text mb-1">What is EthniZity?</p>
+            <p>EthniZity is a community platform that connects diverse professionals, businesses, and families. Share updates, discover events, find local businesses, and build meaningful connections.</p>
           </div>
           <div>
             <p className="font-semibold text-aurora-text mb-1">How do I switch from Individual to Business account?</p>
@@ -628,11 +628,11 @@ const SettingsPage: React.FC = () => {
       body: (
         <div className="space-y-3 text-sm text-aurora-text-secondary">
           <p><strong>Last updated:</strong> February 2026</p>
-          <p>By using ethniCity, you agree to these Terms of Service. ethniCity provides a community platform for connecting individuals and businesses within diverse communities.</p>
+          <p>By using EthniZity, you agree to these Terms of Service. EthniZity provides a community platform for connecting individuals and businesses within diverse communities.</p>
           <p><strong>Account Responsibilities:</strong> You are responsible for maintaining the confidentiality of your account credentials and for all activity under your account. You must provide accurate information during registration.</p>
-          <p><strong>Acceptable Use:</strong> You agree not to use ethniCity for any unlawful purpose, to harass or harm others, to post misleading or false content, or to attempt to gain unauthorized access to any part of the platform.</p>
-          <p><strong>Content:</strong> You retain ownership of content you post. By posting, you grant ethniCity a non-exclusive license to display your content on the platform. We may remove content that violates these terms.</p>
-          <p><strong>Business Listings:</strong> Business account holders are responsible for the accuracy of their business information. ethniCity reserves the right to approve, reject, or remove business listings.</p>
+          <p><strong>Acceptable Use:</strong> You agree not to use EthniZity for any unlawful purpose, to harass or harm others, to post misleading or false content, or to attempt to gain unauthorized access to any part of the platform.</p>
+          <p><strong>Content:</strong> You retain ownership of content you post. By posting, you grant EthniZity a non-exclusive license to display your content on the platform. We may remove content that violates these terms.</p>
+          <p><strong>Business Listings:</strong> Business account holders are responsible for the accuracy of their business information. EthniZity reserves the right to approve, reject, or remove business listings.</p>
           <p><strong>Termination:</strong> We may suspend or terminate accounts that violate these terms. You may delete your account at any time through Settings.</p>
           <p><strong>Contact:</strong> For questions about these terms, email support@ethnicity.com.</p>
         </div>
@@ -643,7 +643,7 @@ const SettingsPage: React.FC = () => {
       body: (
         <div className="space-y-3 text-sm text-aurora-text-secondary">
           <p><strong>Last updated:</strong> February 2026</p>
-          <p>ethniCity is committed to protecting your privacy. This policy explains how we collect, use, and safeguard your information.</p>
+          <p>EthniZity is committed to protecting your privacy. This policy explains how we collect, use, and safeguard your information.</p>
           <p><strong>Information We Collect:</strong> Account details (name, email, phone), profile information (heritage, location, bio), content you create (posts, events, business listings), and usage data (app interactions, device info).</p>
           <p><strong>How We Use Your Data:</strong> To provide and improve our services, to connect you with the community, to send notifications you've opted into, and to ensure platform safety.</p>
           <p><strong>Data Sharing:</strong> We do not sell your personal information. Your profile information is visible based on your privacy settings. We may share data with service providers who help operate the platform.</p>
@@ -654,14 +654,14 @@ const SettingsPage: React.FC = () => {
       ),
     },
     about: {
-      title: 'About ethniCity',
+      title: 'About EthniZity',
       body: (
         <div className="space-y-3 text-sm text-aurora-text-secondary text-center">
-          <div className="flex items-center gap-2 justify-center"><img src="/ethnicity-logo.svg" alt="ethniCity" className="w-8 h-8" /><p className="text-lg font-bold"><span style={{ color: '#c96830' }}>ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">City</span></p></div>
+          <div className="flex items-center gap-2 justify-center"><img src="/ethnicity-logo.svg" alt="EthniZity" className="w-8 h-8" /><p className="text-lg font-bold"><span style={{ color: '#c96830' }}>Ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">Zity</span></p></div>
           <p className="text-aurora-text-muted">Version 2.0.0 (PWA)</p>
-          <p>ethniCity — where EthniZity meets city — is a community platform built to connect, empower, and celebrate diverse cultures across the globe.</p>
-          <p>Whether you're an individual looking to connect with your community or a business owner wanting to reach local customers, ethniCity brings everyone together.</p>
-          <p className="text-xs text-aurora-text-muted pt-2">&copy; 2026 ethniCity. All rights reserved.</p>
+          <p>EthniZity — where EthniZity meets city — is a community platform built to connect, empower, and celebrate diverse cultures across the globe.</p>
+          <p>Whether you're an individual looking to connect with your community or a business owner wanting to reach local customers, EthniZity brings everyone together.</p>
+          <p className="text-xs text-aurora-text-muted pt-2">&copy; 2026 EthniZity. All rights reserved.</p>
         </div>
       ),
     },
@@ -673,14 +673,14 @@ const SettingsPage: React.FC = () => {
       <div className="divide-y divide-aurora-border">
         <div className="px-4 py-3 bg-aurora-surface-variant">
           <p className="text-xs text-aurora-text-secondary font-medium">
-            Get help, report issues, or learn more about ethniCity
+            Get help, report issues, or learn more about EthniZity
           </p>
         </div>
 
         <SettingRow
           icon={<HelpCircle size={18} />}
           label="FAQs"
-          description="Frequently asked questions about ethniCity"
+          description="Frequently asked questions about EthniZity"
           onClick={() => setHelpModal('faq')}
         />
         <SettingRow
@@ -707,7 +707,7 @@ const SettingsPage: React.FC = () => {
         />
         <SettingRow
           icon={<ExternalLink size={18} />}
-          label="About ethniCity"
+          label="About EthniZity"
           description="Version 2.0.0 (PWA)"
           onClick={() => setHelpModal('about')}
         />
@@ -757,7 +757,7 @@ const SettingsPage: React.FC = () => {
         <SettingRow
           icon={<Download size={18} />}
           label="Download My Data"
-          description="Get a copy of all your ethniCity data"
+          description="Get a copy of all your EthniZity data"
           onClick={async () => {
             if (!user) return;
             try {
@@ -977,7 +977,7 @@ const SettingsPage: React.FC = () => {
           >
             Sign Out
           </button>
-          <p className="text-center text-xs text-aurora-text-muted mt-4">ethniCity v2.0.0</p>
+          <p className="text-center text-xs text-aurora-text-muted mt-4">EthniZity v2.0.0</p>
         </div>
       </div>
     );

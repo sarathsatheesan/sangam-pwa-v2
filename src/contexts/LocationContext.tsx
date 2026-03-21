@@ -137,7 +137,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
               const { latitude, longitude } = position.coords;
               const response = await fetch(
                 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`,
-                { headers: { 'User-Agent': 'ethniCityApp/1.0' } }
+                { headers: { 'User-Agent': 'EthniZityApp/1.0' } }
               );
               const data = await response.json();
               const address = data.address;

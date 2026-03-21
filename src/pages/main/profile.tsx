@@ -926,7 +926,7 @@ export default function ProfilePage() {
                 <button
                   onClick={() => {
                     if (navigator.share) {
-                      navigator.share({ title: `${userProfile?.name} on ethniCity`, url: window.location.href });
+                      navigator.share({ title: `${userProfile?.name} on EthniZity`, url: window.location.href });
                     }
                   }}
                   className="px-3 py-1.5 bg-[var(--aurora-surface-variant)] rounded-lg font-semibold text-xs text-[var(--aurora-text)] hover:bg-[var(--aurora-border)] transition-colors flex items-center gap-1.5"

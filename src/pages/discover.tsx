@@ -954,26 +954,30 @@ export default function DiscoverPage() {
                   {incomingRequests.map((person) => {
                     const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
                     return (
-                      <div key={`req-${person.id}`} className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col">
-                        <div
-                          className="h-20 bg-gradient-to-r from-orange-400 to-amber-400 relative cursor-pointer"
-                          onClick={() => setSelectedPerson(person)}
-                        >
-                          <MatchBadge score={score} />
-                          {isNewMember(person) && (
-                            <span className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">NEW</span>
-                          )}
-                          <div className="absolute top-2 right-2 bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <UserPlus className="w-3 h-3" /> Wants to connect
+                      <div key={`req-${person.id}`} className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer"
+                        onClick={() => setSelectedPerson(person)}
+                      >
+                        {/* Gradient header — simple row of badges */}
+                        <div className="bg-gradient-to-r from-orange-400 to-amber-400 relative px-3 py-2.5">
+                          <div className="flex items-center gap-2">
+                            {isNewMember(person) && (
+                              <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">NEW</span>
+                            )}
+                            <div className="bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <UserPlus className="w-3 h-3" /> Wants to connect
+                            </div>
                           </div>
+                          <MatchBadge score={score} />
                         </div>
+                        {/* Card body */}
                         <div className="p-3 flex flex-col flex-1">
-                          <div className="flex items-end gap-3 -mt-7">
-                            <div className="w-12 h-12 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-lg relative z-10 border-2 border-white shrink-0 shadow-sm">
+                          {/* Avatar + Name side by side */}
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-lg border-2 border-orange-300 shrink-0 shadow-sm">
                               {renderAvatar(person.avatar, person.name)}
                             </div>
-                            <div className="min-w-0 flex-1 pb-1">
-                              <h4 className="font-bold text-[var(--aurora-text)] text-sm truncate leading-tight">{person.name}</h4>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-bold text-[var(--aurora-text)] text-sm leading-tight truncate">{person.name}</h4>
                               {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
                             </div>
                           </div>

@@ -964,52 +964,62 @@ export default function DiscoverPage() {
                   {incomingRequests.map((person) => {
                     const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
                     return (
-                      <div key={`req-${person.id}`} className="group bg-aurora-surface rounded-xl border border-orange-400/30 dark:border-orange-500/40 overflow-hidden cursor-pointer hover:shadow-md hover:border-orange-400/60 transition-all duration-200 flex flex-col p-3"
+                      <div key={`req-${person.id}`} className="group bg-aurora-surface rounded-xl border border-orange-400/30 dark:border-orange-500/40 overflow-hidden cursor-pointer hover:shadow-md hover:border-orange-400/60 transition-all duration-200 flex flex-col"
                         onClick={() => setSelectedPerson(person)}
                       >
-                        {/* Top row: avatar + match badge */}
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="relative">
-                            <div className="w-11 h-11 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                              {renderAvatar(person.avatar, person.name)}
-                            </div>
+                        {/* Gradient header — simple row of badges */}
+                        <div className="bg-gradient-to-r from-orange-400 to-amber-400 relative px-2.5 py-2">
+                          <div className="flex items-center gap-1.5">
                             {isNewMember(person) && (
-                              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none">NEW</span>
+                              <span className="bg-blue-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md leading-none">NEW</span>
                             )}
+                            <div className="bg-orange-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                              <UserPlus className="w-2.5 h-2.5" /> Connect
+                            </div>
                           </div>
                           <MatchBadge score={score} />
                         </div>
-                        {/* Name + profession */}
-                        <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
-                        {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
-                        {/* Heritage + location */}
-                        <div className="mt-1.5 space-y-0.5">
-                          {renderHeritage(person)}
-                          {person.showLocation && (
-                            <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
-                              <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
-                            </p>
-                          )}
-                          {getMutualConnectionCount(person.id) > 0 && (
-                            <p className="text-[10px] text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual</p>
-                          )}
-                        </div>
-                        {/* Action buttons — always at bottom */}
-                        <div className="mt-auto pt-2 flex gap-1">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
-                            disabled={connectingId === person.id}
-                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
-                          >
-                            <Check className="w-3 h-3" /> Accept
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
-                            disabled={connectingId === person.id}
-                            className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
-                          >
-                            <X className="w-3 h-3" /> Decline
-                          </button>
+                        {/* Card body */}
+                        <div className="p-2.5 flex flex-col flex-1">
+                          {/* Avatar + Name side by side */}
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-sm border-2 border-orange-300 shrink-0 shadow-sm">
+                              {renderAvatar(person.avatar, person.name)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-bold text-[var(--aurora-text)] text-xs leading-tight truncate">{person.name}</h4>
+                              {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                            </div>
+                          </div>
+                          {/* Heritage + location */}
+                          <div className="mt-1.5 space-y-0.5">
+                            {renderHeritage(person)}
+                            {person.showLocation && (
+                              <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
+                                <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
+                              </p>
+                            )}
+                            {getMutualConnectionCount(person.id) > 0 && (
+                              <p className="text-[10px] text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual</p>
+                            )}
+                          </div>
+                          {/* Action buttons — always at bottom */}
+                          <div className="mt-auto pt-2 flex gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
+                              disabled={connectingId === person.id}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                              <Check className="w-3 h-3" /> Accept
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
+                              disabled={connectingId === person.id}
+                              className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                              <X className="w-3 h-3" /> Decline
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

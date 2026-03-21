@@ -3542,7 +3542,7 @@ export default function MessagesPage() {
         <div className="w-[200px] h-[200px] mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--msg-own-bubble-hover)' }}>
           <MessageSquare size={80} style={{ color: '#6366F1' }} />
         </div>
-        <h2 className="text-2xl font-light mb-3" style={{ color: '#41525D' }}>ethniCity Messages</h2>
+        <h2 className="text-2xl font-light mb-3" style={{ color: '#41525D' }}>EthniZity Messages</h2>
         <p className="text-sm max-w-[340px] mx-auto" style={{ color: 'var(--msg-secondary)' }}>
           Send and receive messages with your community members. Select a conversation to start chatting.
         </p>

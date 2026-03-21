@@ -795,7 +795,7 @@ export const LoginPage: React.FC = () => {
           <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
             <img src="/ethnicity-logo.svg" alt="" className="hidden sm:block w-10 h-10 md:w-12 md:h-12 drop-shadow-lg" />
             <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight drop-shadow-lg" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
-              <span style={{ color: '#f4a261' }}>ethni</span><span className="font-black" style={{ color: '#ffffff' }}>City</span>
+              <span style={{ color: '#f4a261' }}>Ethni</span><span className="font-black" style={{ color: '#ffffff' }}>Zity</span>
             </h1>
           </div>
           <p className="text-sm sm:text-base md:text-lg font-medium tracking-wide drop-shadow-md" style={{ color: 'rgba(255,255,255,0.9)', fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
@@ -810,9 +810,9 @@ export const LoginPage: React.FC = () => {
           {/* Left column — branding card (desktop only) */}
           <div className="hidden md:flex md:w-1/2 flex-col">
             <div className="w-full flex-1 rounded-2xl flex flex-col items-center justify-center p-8 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0d4f5a 0%, #1a6b5a 50%, #0d4f5a 100%)' }}>
-              <img src="/ethnicity-logo.svg" alt="ethniCity" className="w-28 h-28 mb-6 drop-shadow-lg opacity-90" />
+              <img src="/ethnicity-logo.svg" alt="EthniZity" className="w-28 h-28 mb-6 drop-shadow-lg opacity-90" />
               <h3 className="text-2xl font-extrabold text-white mb-2 tracking-tight" style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
-                <span style={{ color: '#f4a261' }}>ethni</span><span>City</span>
+                <span style={{ color: '#f4a261' }}>Ethni</span><span>Zity</span>
               </h3>
               <div className="w-12 h-0.5 bg-white/30 rounded-full mb-3" />
               <p className="text-white/80 text-sm text-center px-4 leading-relaxed">

@@ -37,7 +37,7 @@ export const AppFooter: React.FC = () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'ethniCity',
+          title: 'EthniZity',
           text: 'Our culture, connected. Discover diverse communities near you!',
           url: window.location.href,
         });

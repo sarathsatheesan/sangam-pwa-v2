@@ -257,7 +257,7 @@ const generateICS = (event: Event): string => {
 
   const ics = `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//ethniCity//Events//EN
+PRODID:-//EthniZity//Events//EN
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
 BEGIN:VEVENT
