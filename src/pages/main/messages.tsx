@@ -30,6 +30,7 @@ import {
   Flag, Ban, VolumeX,
   Phone, PhoneOff, Video, VideoOff,
   Download, Share2, Reply, BellOff, Bell, Archive, ArchiveRestore,
+  Pin, PinOff, Star, StarOff, Forward, FileText,
 } from 'lucide-react';
 import {
   getCallManager,
@@ -74,6 +75,9 @@ type Message = {
     callType: 'audio' | 'video';
     duration?: number; // seconds, only for completed calls
   };
+  pinned?: boolean;
+  starred?: boolean;
+  forwarded?: boolean;
 };
 
 /**
@@ -516,8 +520,13 @@ function MessageContextMenu({
   onReport,
   onBlock,
   onReply,
+  onForward,
+  onPin,
+  onStar,
   onClose,
   isRecent,
+  isPinned,
+  isStarred,
 }: {
   isMine: boolean;
   onDelete: () => void;
@@ -525,15 +534,37 @@ function MessageContextMenu({
   onReport?: () => void;
   onBlock?: () => void;
   onReply?: () => void;
+  onForward?: () => void;
+  onPin?: () => void;
+  onStar?: () => void;
   onClose: () => void;
   isRecent: boolean;
+  isPinned?: boolean;
+  isStarred?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="bg-white dark:bg-[var(--aurora-surface)] rounded-lg shadow-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose} onTouchStart={onClose} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+      <div className="bg-white dark:bg-[var(--aurora-surface)] rounded-lg shadow-lg overflow-hidden" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
         {onReply && (
           <button onClick={() => { onReply(); onClose(); }} className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm" style={{ color: 'var(--msg-text)' }}>
             <Reply size={15} className="text-aurora-indigo" /> Reply
+          </button>
+        )}
+        {onForward && (
+          <button onClick={() => { onForward(); onClose(); }} className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm" style={{ color: 'var(--msg-text)' }}>
+            <Forward size={15} className="text-aurora-indigo" /> Forward
+          </button>
+        )}
+        {onPin && (
+          <button onClick={() => { onPin(); onClose(); }} className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm" style={{ color: 'var(--msg-text)' }}>
+            {isPinned ? <PinOff size={15} className="text-aurora-indigo" /> : <Pin size={15} className="text-aurora-indigo" />}
+            {isPinned ? 'Unpin' : 'Pin'}
+          </button>
+        )}
+        {onStar && (
+          <button onClick={() => { onStar(); onClose(); }} className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm" style={{ color: 'var(--msg-text)' }}>
+            {isStarred ? <StarOff size={15} className="text-amber-500" /> : <Star size={15} className="text-amber-500" />}
+            {isStarred ? 'Unstar' : 'Star'}
           </button>
         )}
         {isMine && isRecent && onEdit && (
@@ -1301,6 +1332,14 @@ export default function MessagesPage() {
   const [lightboxForwardOpen, setLightboxForwardOpen] = useState(false);
   const [forwardingImage, setForwardingImage] = useState(false);
 
+  // Batch 2: Forward, Pin, Star, Export state
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  const [showForwardPicker, setShowForwardPicker] = useState(false);
+  const [forwardingMsg, setForwardingMsg] = useState(false);
+  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [showPinnedBanner, setShowPinnedBanner] = useState(true);
+  const [showStarredView, setShowStarredView] = useState(false);
+
   // E2EE state
   const e2ePrivateKeyRef = useRef<CryptoKey | null>(null);
   const e2ePublicKeyRef = useRef<ExportedPublicKey | null>(null);
@@ -1689,6 +1728,7 @@ export default function MessagesPage() {
           msgs.push({ ...(rawMsg as Record<string, unknown>), id: (rawMsg as Record<string, unknown>).id as string, text, image, voiceMessage } as Message);
         }
         setMessages(msgs);
+        setPinnedMessages(msgs.filter(m => m.pinned));
         setMessagesLoading(false);
         setTimeout(() => scrollToBottom(), 100);
       },
@@ -2546,6 +2586,99 @@ export default function MessagesPage() {
     }
   };
 
+  // === Batch 2: Forward Message ===
+  const forwardMessageToConversation = async (targetConvId: string) => {
+    if (!user?.uid || !forwardingMessage) return;
+    setForwardingMsg(true);
+    try {
+      const msgData: Record<string, unknown> = {
+        text: forwardingMessage.text || '',
+        senderId: user.uid,
+        createdAt: serverTimestamp(),
+        time: formatMessageTime(Timestamp.now()),
+        forwarded: true,
+      };
+      if (forwardingMessage.image) {
+        msgData.image = forwardingMessage.image;
+      }
+      await addDoc(collection(db, 'conversations', targetConvId, 'messages'), msgData);
+      const preview = forwardingMessage.image
+        ? (forwardingMessage.text ? `↪ 📷 ${forwardingMessage.text.slice(0, 30)}` : '↪ 📷 Photo')
+        : `↪ ${forwardingMessage.text.slice(0, 40)}`;
+      await updateDoc(doc(db, 'conversations', targetConvId), {
+        lastMessage: preview,
+        lastMessageTime: serverTimestamp(),
+        lastMessageSenderId: user.uid,
+        updatedAt: serverTimestamp(),
+      });
+      showNotif('Message forwarded', 'success');
+      setShowForwardPicker(false);
+      setForwardingMessage(null);
+    } catch (err) {
+      console.error('Error forwarding message:', err);
+      showNotif('Failed to forward message', 'error');
+    } finally {
+      setForwardingMsg(false);
+    }
+  };
+
+  // === Batch 2: Pin/Unpin Message ===
+  const togglePinMessage = async (msg: Message) => {
+    if (!selectedConvId) return;
+    try {
+      const newPinned = !msg.pinned;
+      await updateDoc(doc(db, 'conversations', selectedConvId, 'messages', msg.id), { pinned: newPinned });
+      showNotif(newPinned ? 'Message pinned' : 'Message unpinned', 'info');
+    } catch {
+      showNotif('Failed to pin message', 'error');
+    }
+  };
+
+  // === Batch 2: Star/Unstar Message ===
+  const toggleStarMessage = async (msg: Message) => {
+    if (!selectedConvId) return;
+    try {
+      const newStarred = !msg.starred;
+      await updateDoc(doc(db, 'conversations', selectedConvId, 'messages', msg.id), { starred: newStarred });
+      showNotif(newStarred ? 'Message starred' : 'Message unstarred', 'info');
+    } catch {
+      showNotif('Failed to star message', 'error');
+    }
+  };
+
+  // === Batch 2: Export Chat ===
+  const exportChat = () => {
+    if (!messages.length) {
+      showNotif('No messages to export', 'info');
+      return;
+    }
+    const activeConv = selectedConvId ? conversations.find(c => c.id === selectedConvId) : null;
+    const chatName = activeConv?.isGroup ? activeConv.groupName : (selectedUser?.name || 'Chat');
+    const lines = messages
+      .filter(m => !m.deleted)
+      .map(m => {
+        const sender = m.senderId === user?.uid ? 'You' : (selectedUser?.name || m.senderId);
+        const time = m.time || '';
+        let content = m.text || '';
+        if (m.image) content = content ? `[Photo] ${content}` : '[Photo]';
+        if (m.voiceMessage) content = `[Voice message ${m.voiceMessage.duration}s]`;
+        if (m.callEvent) content = `[${m.callEvent.callType} call - ${m.callEvent.type}${m.callEvent.duration ? ` ${m.callEvent.duration}s` : ''}]`;
+        if (m.forwarded) content = `[Forwarded] ${content}`;
+        if (m.pinned) content = `📌 ${content}`;
+        if (m.starred) content = `⭐ ${content}`;
+        return `[${time}] ${sender}: ${content}`;
+      });
+    const header = `EthniZity Chat Export — ${chatName}\nExported: ${new Date().toLocaleString()}\nMessages: ${lines.length}\n${'─'.repeat(40)}\n`;
+    const blob = new Blob([header + lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ethnizity-chat-${chatName?.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotif('Chat exported', 'success');
+  };
+
   const handleMessageInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageText(e.target.value);
     if (!selectedUser) return;
@@ -3153,6 +3286,28 @@ export default function MessagesPage() {
                     {(conversations.find(c => c.id === selectedConvId)?.archived) ? 'Unarchive' : 'Archive'}
                   </button>
                 )}
+                {/* Starred Messages view */}
+                <button
+                  onClick={() => {
+                    setShowStarredView(true);
+                    setShowChatMenu(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                  style={{ color: 'var(--msg-text)' }}
+                >
+                  <Star size={16} className="text-amber-500" /> Starred Messages
+                </button>
+                {/* Export Chat */}
+                <button
+                  onClick={() => {
+                    exportChat();
+                    setShowChatMenu(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                  style={{ color: 'var(--msg-text)' }}
+                >
+                  <FileText size={16} style={{ color: 'var(--msg-secondary)' }} /> Export Chat
+                </button>
                 {/* Block User option - only for 1:1 chats */}
                 {selectedUser && (
                   <button
@@ -3183,6 +3338,117 @@ export default function MessagesPage() {
           }}
           onClose={() => setChatSearch(false)}
         />
+      )}
+
+      {/* Pinned messages banner */}
+      {pinnedMessages.length > 0 && showPinnedBanner && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800/30" style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => {
+          const lastPinned = pinnedMessages[pinnedMessages.length - 1];
+          const idx = messages.findIndex(m => m.id === lastPinned.id);
+          if (idx >= 0 && messagesContainerRef.current) {
+            const elem = messagesContainerRef.current.children[idx] as HTMLElement;
+            elem?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }}>
+          <Pin size={14} className="text-amber-600 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{pinnedMessages.length} pinned message{pinnedMessages.length > 1 ? 's' : ''}</span>
+            <p className="text-xs truncate" style={{ color: 'var(--msg-secondary)' }}>{pinnedMessages[pinnedMessages.length - 1]?.text || '📷 Photo'}</p>
+          </div>
+          <button onClick={(e) => { e.stopPropagation(); setShowPinnedBanner(false); }} onTouchStart={(e) => { e.stopPropagation(); setShowPinnedBanner(false); }} className="p-1 rounded-full hover:bg-amber-200/50">
+            <X size={14} className="text-amber-600" />
+          </button>
+        </div>
+      )}
+
+      {/* Starred messages overlay */}
+      {showStarredView && (
+        <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-[var(--aurora-primary)] to-[var(--aurora-primary-dark)]">
+            <button onClick={() => setShowStarredView(false)} className="p-1 rounded-full hover:bg-white/10">
+              <ArrowLeft size={20} className="text-white" />
+            </button>
+            <h3 className="text-white font-semibold">Starred Messages</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.filter(m => m.starred && !m.deleted).length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <Star size={40} className="text-amber-400 mb-3" />
+                <p className="font-medium" style={{ color: 'var(--msg-text)' }}>No starred messages</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--msg-secondary)' }}>Long press a message and tap Star to save it here</p>
+              </div>
+            ) : messages.filter(m => m.starred && !m.deleted).map(msg => {
+              const handleStarredClick = () => {
+                setShowStarredView(false);
+                const idx = messages.findIndex(m => m.id === msg.id);
+                if (idx >= 0 && messagesContainerRef.current) {
+                  setTimeout(() => {
+                    const elem = messagesContainerRef.current?.children[idx] as HTMLElement;
+                    elem?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                }
+              };
+              return (
+              <div key={msg.id} className="rounded-lg p-3 border border-[var(--aurora-border)] bg-white dark:bg-[var(--aurora-surface-variant)]" onClick={handleStarredClick} onTouchStart={handleStarredClick} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold" style={{ color: '#6366F1' }}>
+                    {msg.senderId === user?.uid ? 'You' : (users.find(u => u.id === msg.senderId)?.name || 'Unknown')}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Star size={11} className="text-amber-500" fill="#f59e0b" />
+                    <span className="text-[10px]" style={{ color: 'var(--msg-secondary)' }}>{msg.time}</span>
+                  </div>
+                </div>
+                {msg.image && <div className="text-xs mb-1" style={{ color: 'var(--msg-secondary)' }}>📷 Photo</div>}
+                {msg.text && <p className="text-sm break-words" style={{ color: 'var(--msg-text)' }}>{msg.text.slice(0, 200)}{msg.text.length > 200 ? '...' : ''}</p>}
+              </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Forward message picker modal */}
+      {showForwardPicker && forwardingMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowForwardPicker(false); setForwardingMessage(null); }} onTouchStart={() => { setShowForwardPicker(false); setForwardingMessage(null); }} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+          <div className="bg-white dark:bg-[var(--aurora-surface)] rounded-xl shadow-xl w-[90%] max-w-md max-h-[70vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-[var(--aurora-border)] flex items-center justify-between">
+              <h3 className="font-semibold" style={{ color: 'var(--msg-text)' }}>Forward to...</h3>
+              <button onClick={() => { setShowForwardPicker(false); setForwardingMessage(null); }} className="p-1 rounded-full hover:bg-gray-100">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-3 py-2 border-b border-[var(--aurora-border)] bg-gray-50 dark:bg-[var(--aurora-surface-variant)]">
+              <p className="text-xs truncate" style={{ color: 'var(--msg-secondary)' }}>
+                <Forward size={11} className="inline mr-1" />
+                {forwardingMessage.text ? forwardingMessage.text.slice(0, 60) : '📷 Photo'}
+                {forwardingMessage.text && forwardingMessage.text.length > 60 ? '...' : ''}
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {conversations.filter(c => c.id !== selectedConvId).map(conv => {
+                const otherUser = !conv.isGroup ? users.find(u => conv.participants.includes(u.id) && u.id !== user?.uid) : null;
+                const displayName = conv.isGroup ? conv.groupName : (otherUser?.name || 'Unknown');
+                return (
+                  <button
+                    key={conv.id}
+                    onClick={() => forwardMessageToConversation(conv.id)}
+                    disabled={forwardingMsg}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 border-b border-[var(--aurora-border)]/50"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--aurora-primary)] to-[var(--aurora-primary-dark)] flex items-center justify-center text-white text-sm font-bold shrink-0">
+                      {conv.isGroup ? <Users size={16} /> : (displayName?.charAt(0).toUpperCase() || '?')}
+                    </div>
+                    <span className="font-medium text-sm truncate" style={{ color: 'var(--msg-text)' }}>{displayName}</span>
+                  </button>
+                );
+              })}
+              {conversations.filter(c => c.id !== selectedConvId).length === 0 && (
+                <div className="p-6 text-center text-sm" style={{ color: 'var(--msg-secondary)' }}>No other conversations</div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Group Settings Panel - slides over the chat */}
@@ -3484,6 +3750,11 @@ export default function MessagesPage() {
                                 {users.find((u) => u.id === msg.senderId)?.name || 'Unknown'}
                               </div>
                             )}
+                            {msg.forwarded && (
+                              <div className="px-2.5 pt-1 flex items-center gap-1" style={{ color: 'var(--msg-secondary)' }}>
+                                <Forward size={11} /> <span className="text-[11px] italic">Forwarded</span>
+                              </div>
+                            )}
                             {msg.replyTo && (() => {
                               const rt = msg.replyTo!;
                               return (
@@ -3536,6 +3807,7 @@ export default function MessagesPage() {
                                       {msg.text && renderFormattedText(msg.text)}
                                       {/* Inline timestamp + read receipt (WhatsApp style) */}
                                       <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
+                                        {msg.starred && <Star size={11} className="text-amber-500" fill="#f59e0b" />}
                                         {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
                                         <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>
                                           {formatMessageTime(msg.createdAt)}
@@ -3772,10 +4044,25 @@ export default function MessagesPage() {
         <MessageContextMenu
           isMine={contextMenuMsg.senderId === user?.uid}
           isRecent={isMessageEditable(contextMenuMsg.createdAt)}
+          isPinned={!!contextMenuMsg.pinned}
+          isStarred={!!contextMenuMsg.starred}
           onReply={() => {
             setReplyingTo(contextMenuMsg);
             setContextMenuMsg(null);
             textareaRef.current?.focus();
+          }}
+          onForward={() => {
+            setForwardingMessage(contextMenuMsg);
+            setShowForwardPicker(true);
+            setContextMenuMsg(null);
+          }}
+          onPin={() => {
+            togglePinMessage(contextMenuMsg);
+            setContextMenuMsg(null);
+          }}
+          onStar={() => {
+            toggleStarMessage(contextMenuMsg);
+            setContextMenuMsg(null);
           }}
           onEdit={() => {
             setEditingMessage(contextMenuMsg);
