@@ -1383,12 +1383,13 @@ function NotificationToast({
 
   return (
     <div
-      className={`fixed top-4 left-4 right-4 max-w-xs ${bgColor[type]} rounded-lg shadow-lg p-3 flex items-center gap-3 border border-current ${textColor[type]}`}
+      className={`fixed top-6 left-1/2 -translate-x-1/2 z-[9999] w-[90vw] max-w-md ${bgColor[type]} rounded-xl shadow-2xl p-4 flex items-start gap-3 border ${textColor[type]}`}
+      style={{ borderColor: type === 'error' ? '#fca5a5' : type === 'success' ? '#86efac' : type === 'warning' ? '#fde047' : '#93c5fd' }}
     >
-      <Icon size={18} className={iconColor[type]} />
-      <span className="text-sm">{message}</span>
-      <button onClick={onDismiss} className="ml-auto">
-        <X size={16} />
+      <Icon size={20} className={`${iconColor[type]} shrink-0 mt-0.5`} />
+      <span className="text-sm font-medium leading-snug flex-1">{message}</span>
+      <button onClick={onDismiss} onTouchStart={onDismiss} className="shrink-0 ml-1" style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+        <X size={18} />
       </button>
     </div>
   );
@@ -4559,6 +4560,7 @@ export default function MessagesPage() {
           message={notificationMessage}
           type={notificationType}
           onDismiss={() => setShowNotification(false)}
+          duration={notificationType === 'error' ? 5000 : 3000}
         />
       )}
       {showDeleteMsgConfirm && (
