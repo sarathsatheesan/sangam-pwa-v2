@@ -1633,6 +1633,7 @@ export default function MessagesPage() {
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
   const [showStarredView, setShowStarredView] = useState(false);
+  const [showPinnedView, setShowPinnedView] = useState(false);
 
   // E2EE state
   const e2ePrivateKeyRef = useRef<CryptoKey | null>(null);
@@ -4013,6 +4014,17 @@ export default function MessagesPage() {
                 >
                   <Star size={16} className="text-amber-500" /> Starred Messages
                 </button>
+                {/* Pinned Messages view */}
+                <button
+                  onClick={() => {
+                    setShowPinnedView(true);
+                    setShowChatMenu(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                  style={{ color: 'var(--msg-text)' }}
+                >
+                  <Pin size={16} className="text-amber-600" /> Pinned Messages
+                </button>
                 {/* Export Chat */}
                 <button
                   onClick={() => {
@@ -4120,6 +4132,66 @@ export default function MessagesPage() {
                   <div className="flex items-center gap-1">
                     <Star size={11} className="text-amber-500" fill="#f59e0b" />
                     <span className="text-[10px]" style={{ color: 'var(--msg-secondary)' }}>{msg.time}</span>
+                  </div>
+                </div>
+                {msg.image && <div className="text-xs mb-1" style={{ color: 'var(--msg-secondary)' }}>📷 Photo</div>}
+                {msg.text && <p className="text-sm break-words" style={{ color: 'var(--msg-text)' }}>{msg.text.slice(0, 200)}{msg.text.length > 200 ? '...' : ''}</p>}
+              </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Pinned messages overlay */}
+      {showPinnedView && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
+            <button onClick={() => setShowPinnedView(false)} className="p-1 rounded-full hover:bg-white/10" onTouchStart={() => setShowPinnedView(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+              <ArrowLeft size={20} className="text-white" />
+            </button>
+            <h3 className="text-white font-semibold">Pinned Messages</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.filter(m => m.pinned && !m.deleted).length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <Pin size={40} className="text-amber-600 mb-3" />
+                <p className="font-medium" style={{ color: 'var(--msg-text)' }}>No pinned messages</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--msg-secondary)' }}>Long press a message and tap Pin to save it here</p>
+              </div>
+            ) : messages.filter(m => m.pinned && !m.deleted).map(msg => {
+              const handlePinnedClick = () => {
+                setShowPinnedView(false);
+                const idx = messages.findIndex(m => m.id === msg.id);
+                if (idx >= 0 && messagesContainerRef.current) {
+                  setTimeout(() => {
+                    const elem = messagesContainerRef.current?.children[idx] as HTMLElement;
+                    elem?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }, 100);
+                }
+              };
+              const handleUnpin = (e: React.MouseEvent | React.TouchEvent) => {
+                e.stopPropagation();
+                e.preventDefault();
+                togglePinMessage(msg);
+              };
+              return (
+              <div key={msg.id} className="rounded-lg p-3 border border-[var(--aurora-border)] bg-white dark:bg-[var(--aurora-surface-variant)]" onClick={handlePinnedClick} onTouchStart={handlePinnedClick} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold" style={{ color: '#6366F1' }}>
+                    {msg.senderId === user?.uid ? 'You' : (users.find(u => u.id === msg.senderId)?.name || 'Unknown')}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px]" style={{ color: 'var(--msg-secondary)' }}>{msg.time}</span>
+                    <button
+                      onClick={handleUnpin}
+                      onTouchStart={handleUnpin}
+                      className="p-1.5 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                      aria-label="Unpin message"
+                    >
+                      <PinOff size={14} className="text-red-500" />
+                    </button>
                   </div>
                 </div>
                 {msg.image && <div className="text-xs mb-1" style={{ color: 'var(--msg-secondary)' }}>📷 Photo</div>}
