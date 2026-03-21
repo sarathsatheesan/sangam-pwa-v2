@@ -17,12 +17,12 @@
   previously-fixed bugs.
 -->
 
-**Date:** March 20, 2026 (Last updated: Session 4)
+**Date:** March 21, 2026 (Last updated: Session 7)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** *(pending user push)* — fix: file attachment validation + error messages + microlink.io
+**Latest Commit:** `830dd61` — feat: add pinned messages view in 3-dots menu with unpin support
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`)
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4 (this note)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages)
 
 ---
 
@@ -58,6 +58,12 @@
 **Session 3 focused on:** Messaging bug fixes — Firestore persistence for Star/Pin/Forward, cross-browser compatibility for all overlays (12 total), Starred Messages header visibility, and dark mode purple gradient on desktop Messages header.
 
 **Session 4 focused on:** Batch 3 — Rich Media & Content: File/Document Sharing (base64 in Firestore, 700KB limit), Link Previews (microlink.io API), GIF/Sticker Support (Giphy integration), plus file attachment bug fix (MIME type + extension validation) and clear error messages.
+
+**Session 5 focused on:** Batch 4 — Push Notifications (FCM with VAPID, cross-browser), Online/Last Seen (Firestore presence with `pagehide` for mobile), Delivery Status (Sent/Read indicators with `visibilitychange`).
+
+**Session 6 focused on:** UI fixes (mobile icon bar overflow, placeholder alignment), Pinned Messages UX (3-dots menu entry with unpin capability, full-screen overlay).
+
+**Session 7 focused on:** Batch 5 — Disappearing Messages (conversation default timer + per-message override, pure `getDisappearingFields()` helper, cleanup effect with `useRef` pattern, settings overlay in 3-dots menu, per-message timer toggle in icon bar, Timer icon on disappearing message bubbles). Fixed critical send regression caused by setState inside async send flow.
 
 ---
 
@@ -129,6 +135,40 @@
      on what was done in each specific session.
      ================================================================ -->
 ## 3. What Was Completed
+
+### Session 7 (March 21, 2026) — Batch 5: Disappearing Messages
+| Task | File(s) Changed | Commit |
+|------|-----------------|--------|
+| Disappearing Messages — conversation default timer (Off + 5 options) | `src/pages/messages.tsx` | *(pending)* |
+| Disappearing Messages — per-message override toggle in icon bar | `src/pages/messages.tsx` | *(pending)* |
+| Disappearing Messages — settings overlay in 3-dots menu | `src/pages/messages.tsx` | *(pending)* |
+| Disappearing Messages — cleanup effect (15s interval, useRef pattern) | `src/pages/messages.tsx` | *(pending)* |
+| Disappearing Messages — Timer icon on message bubbles | `src/pages/messages.tsx` | *(pending)* |
+| Disappearing Messages — banner below chat header | `src/pages/messages.tsx` | *(pending)* |
+| Fixed send regression (setState in async flow) | `src/pages/messages.tsx` | *(pending)* |
+| All above synced to `src/pages/main/messages.tsx` | `src/pages/main/messages.tsx` | *(pending)* |
+
+**Key patterns:**
+- `getDisappearingFields()` — pure function returning `{disappearing, disappearingDuration, expiresAt}` object. NO setState inside.
+- Spread into addDoc: `{ ...msgData, ...getDisappearingFields(convId) }`
+- `setDisappearingPerMessage(null)` reset happens AFTER successful `addDoc`
+- Cleanup effect uses `useRef` for messages array, only `selectedConvId` and `user?.uid` in deps
+- 5 send paths updated: main send, GIF, forward photo, voice message, forward message
+
+**New state:** `showDisappearingMenu`, `disappearingPerMessage`
+**New Message fields:** `disappearing?: boolean`, `disappearingDuration?: number`, `expiresAt?: Timestamp`
+**New Conversation field:** `disappearingTimer?: number | null`
+
+### Session 5–6 (March 20–21, 2026) — Batch 4 + Pinned Messages + UI
+| Task | File(s) Changed | Commit |
+|------|-----------------|--------|
+| Push Notifications — FCM with cross-browser support | `src/pages/messages.tsx`, `public/firebase-messaging-sw.js`, `src/services/firebase.ts` | `9385bad` |
+| Online/Last Seen — presence with pagehide for mobile | `src/pages/messages.tsx` | `9385bad` |
+| Delivery Status — Sent/Read indicators | `src/pages/messages.tsx` | `9385bad` |
+| Pinned Messages — 3-dots menu entry + overlay with unpin | `src/pages/messages.tsx` | `830dd61` |
+| Mobile UI — icon bar overflow fix, placeholder alignment | `src/pages/messages.tsx` | `830dd61` |
+| Firefox service worker — postMessage fallback for client.navigate() | `public/firebase-messaging-sw.js` | `9385bad` |
+| Cloud Function for push notifications | `functions/src/index.ts` | *(needs deploy)* |
 
 ### Session 4 (March 20, 2026) — Batch 3: Rich Media & Content
 | Task | File(s) Changed | Commit |
@@ -206,7 +246,7 @@
 | Events | `src/pages/events.tsx` | — | Done |
 | Travel | `src/pages/travel.tsx` | — | Done |
 | Forum | `src/pages/forum.tsx` | 2,354 | Done |
-| Messages | `src/pages/messages.tsx` | ~3,900+ | Done (E2EE, voice, formatting, cross-browser) |
+| Messages | `src/pages/messages.tsx` | ~5,000+ | Done (E2EE, voice, formatting, cross-browser, push notifs, presence, disappearing msgs) |
 | Marketplace | `src/pages/marketplace.tsx` | 2,436 | Done |
 | Profile | `src/pages/profile.tsx` | 1,871 | Done (photo upload, base64) |
 | Admin | `src/pages/admin.tsx` | 2,759 | Done |
@@ -253,8 +293,8 @@
 
 ### Planned Feature Batches (user-approved roadmap)
 - **Batch 3:** ~~File/Document Sharing, Link Previews, GIF/Sticker Support~~ ✅ COMPLETED (Session 4)
-- **Batch 4:** Push Notifications, Online/Last Seen, Delivery Status
-- **Batch 5:** Disappearing Messages, Voice-to-Text, Group Video/Audio Calls
+- **Batch 4:** ~~Push Notifications, Online/Last Seen, Delivery Status~~ ✅ COMPLETED (Session 5)
+- **Batch 5:** ~~Disappearing Messages~~ ✅ COMPLETED (Session 7) — Voice-to-Text (Google Cloud Speech-to-Text), Group Video/Audio Calls (Daily.co) remaining
 
 ### Call System (mostly working, but fragile)
 - Audio and video calls work Chrome-Chrome and Chrome-Safari, but edge cases remain
@@ -292,18 +332,17 @@
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate (Batch 4 — Messaging Enhancements)
-*Batch 3 completed in Session 4.*
+### Immediate (Batch 5 remaining — Messaging Advanced Features)
+*Batch 3 completed in Session 4. Batch 4 completed in Session 5. Disappearing Messages completed in Session 7.*
 
-### Batch 4
-4. **Push Notifications** — Firebase Cloud Messaging integration
-5. **Online/Last Seen** — Real-time presence system
-6. **Delivery Status** — Sent/Delivered/Read indicators for messages
+### Batch 5 (remaining)
+7. **Voice-to-Text Transcription** — Google Cloud Speech-to-Text for voice messages
+8. **Group Video/Audio Calls** — Daily.co multi-party calls
 
-### Batch 5
-7. **Disappearing Messages** — Auto-delete after configurable time
-8. **Voice-to-Text** — Transcription for voice messages
-9. **Group Video/Audio Calls** — Multi-party WebRTC
+### Pending Deploys
+- **Replace `PENDING_VAPID_KEY`** in push notification useEffect with real VAPID key from Firebase Console > Project Settings > Cloud Messaging
+- **Deploy Cloud Functions:** `cd functions && npm install && firebase deploy --only functions`
+- **Build & deploy latest (Batch 5 disappearing messages):** `npm run build && firebase deploy --only hosting`
 
 ### Other High Priority
 10. **Wire up Housing UI for the 7 enhancements** — State is ready, just needs JSX.
@@ -359,7 +398,7 @@ git add <files> && git commit -m "message" && git push origin main
 | File | Why It Matters |
 |------|---------------|
 | `src/App.tsx` | All routing, context providers, lazy loading |
-| `src/pages/messages.tsx` | Main messages page (~4,500+ lines). ALL overlays have cross-browser touch handlers. Includes LinkPreviewCard, GifPicker, file sharing, URL linkification. |
+| `src/pages/messages.tsx` | Main messages page (~5,000+ lines). ALL overlays have cross-browser touch handlers. Includes LinkPreviewCard, GifPicker, file sharing, URL linkification, push notifications, presence, disappearing messages. |
 | `src/pages/main/messages.tsx` | **DUPLICATE** of above — MUST be kept in sync via `cp` |
 | `src/index.css` | CSS variables for Aurora theme + dark mode. Lines 90–98 = light mode msg vars. Lines 104–142 = `:root.dark`. Lines 143–151 = `@media` for `--msg-header-bg`/`--msg-header-text`. |
 | `firestore.rules` | Security rules — lines 238–243 = messages subcollection (read/create/update/delete) |
@@ -373,6 +412,8 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/contexts/AuthContext.tsx` | Auth state, user profile, admin detection |
 | `src/contexts/UserSettingsContext.tsx` | Dark mode toggle (`.dark` class on `<html>`) |
 | `src/constants/config.ts` | App config including ENCRYPTION_SALT |
+| `public/firebase-messaging-sw.js` | FCM service worker — background push + notification click with Firefox postMessage fallback |
+| `functions/src/index.ts` | Cloud Function for push notifications (needs deploy) |
 | `firebase.json` | Hosting config, cache headers |
 | `vite.config.ts` | Build config, PWA manifest, code splitting |
 
@@ -389,12 +430,17 @@ git add <files> && git commit -m "message" && git push origin main
 - **Giphy public beta key** — `GlVGYHkr3WSBnllca54iNt0yFbjz7L65`. Rate-limited but free. Replace with production key before launch.
 - **Firestore 1MB doc limit** — Base64-encoded files max ~700KB raw. Error message guides users to cloud links for larger files.
 - **fileInputRef.current.value must be cleared immediately** — Not in finally/cleanup. Otherwise re-selecting the same file won't trigger `onChange`.
+- **NEVER call setState inside a helper used during async send flow** — Causes React re-render mid-send that breaks execution context. Use pure functions that return objects, then setState AFTER the `await addDoc` succeeds.
+- **NEVER put `messages` array in useEffect dependency** — Causes effect to re-run on every message change, creating render thrashing. Use `useRef` to hold latest messages and only put stable IDs (`selectedConvId`, `user?.uid`) in deps.
+- **`pagehide` event needed for mobile presence** — `beforeunload` doesn't reliably fire on iOS Safari/Android Chrome. Add both listeners.
+- **Safari callback-based `Notification.requestPermission()`** — Older Safari uses callback pattern, not Promise. Wrap in try/catch with fallback.
+- **Firefox `client.navigate()` not supported in service workers** — Use `postMessage` fallback pattern with listener in app.
 
 ### Constraints
 - **No Firebase Storage for profile images or file attachments** — Using base64 in Firestore (1MB doc limit, ~700KB raw file max)
 - **Free TURN servers** — openrelay.metered.ca may be unreliable. Budget for a paid provider.
 - **Single-file page architecture** — Works but painful as features grow
-- **No backend/Cloud Functions** — Everything client-side. Security rules are critical.
+- **Cloud Functions added** — `functions/src/index.ts` has push notification function. Needs `cd functions && npm install && firebase deploy --only functions`.
 - **PWA-first** — Test on mobile Safari (Add to Home Screen) and Chrome (install prompt)
 - **`gh` CLI unavailable in Cowork VM** — Use `git` commands directly or Chrome browser for GitHub
 - **`npx tsc` is broken** — Always use `./node_modules/.bin/tsc` to avoid installing wrong package
@@ -457,4 +503,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Generated March 20, 2026 (Session 4) — for continuing development in a new session.*
+*Generated March 21, 2026 (Session 7) — for continuing development in a new session.*

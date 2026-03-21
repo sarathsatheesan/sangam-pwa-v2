@@ -30,7 +30,7 @@ import {
   Flag, Ban, VolumeX,
   Phone, PhoneOff, Video, VideoOff,
   Download, Share2, Reply, BellOff, Bell, Archive, ArchiveRestore,
-  Pin, PinOff, Star, StarOff, Forward, FileText,
+  Pin, PinOff, Star, StarOff, Forward, FileText, Timer, TimerOff,
 } from 'lucide-react';
 import {
   getCallManager,
@@ -87,6 +87,9 @@ type Message = {
     type: string;
     data: string; // base64 encoded
   };
+  disappearing?: boolean;
+  disappearingDuration?: number; // milliseconds
+  expiresAt?: Timestamp;
 };
 
 /**
@@ -111,6 +114,7 @@ type Conversation = {
   groupCreatedBy?: string;
   groupAdmins?: string[];
   lastMessageRead?: boolean;
+  disappearingTimer?: number | null; // milliseconds — null or 0 means off
 };
 
 /**
@@ -410,6 +414,25 @@ const getRelativeTime = (ts: Timestamp | null | undefined): string => {
 const PRESENCE_HEARTBEAT_INTERVAL = 60_000;
 const PRESENCE_AWAY_TIMEOUT = 5 * 60_000;
 const PRESENCE_OFFLINE_THRESHOLD = 2.5 * 60_000;
+
+/**
+ * Disappearing message timer presets (in milliseconds).
+ * Used for conversation-level default and per-message override.
+ */
+const DISAPPEARING_TIMER_OPTIONS: { label: string; value: number }[] = [
+  { label: '30 seconds', value: 30_000 },
+  { label: '5 minutes', value: 5 * 60_000 },
+  { label: '1 hour', value: 60 * 60_000 },
+  { label: '24 hours', value: 24 * 60 * 60_000 },
+  { label: '7 days', value: 7 * 24 * 60 * 60_000 },
+];
+
+const formatDisappearingTimer = (ms: number): string => {
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 60 * 60_000) return `${Math.round(ms / 60_000)}m`;
+  if (ms < 24 * 60 * 60_000) return `${Math.round(ms / (60 * 60_000))}h`;
+  return `${Math.round(ms / (24 * 60 * 60_000))}d`;
+};
 
 /**
  * Derive presence status from Firestore user data.
@@ -1634,6 +1657,8 @@ export default function MessagesPage() {
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
   const [showStarredView, setShowStarredView] = useState(false);
   const [showPinnedView, setShowPinnedView] = useState(false);
+  const [showDisappearingMenu, setShowDisappearingMenu] = useState(false);
+  const [disappearingPerMessage, setDisappearingPerMessage] = useState<number | null>(null); // per-message override (ms)
 
   // E2EE state
   const e2ePrivateKeyRef = useRef<CryptoKey | null>(null);
@@ -2471,6 +2496,26 @@ export default function MessagesPage() {
     };
   }, []);
 
+  // ===== DISAPPEARING MESSAGES — CLIENT-SIDE CLEANUP =====
+  // Uses a ref so the interval is stable and doesn't re-create on every message change.
+  const messagesRefForCleanup = useRef(messages);
+  messagesRefForCleanup.current = messages;
+  useEffect(() => {
+    if (!selectedConvId || !user?.uid) return;
+    const convId = selectedConvId;
+    const timer = setInterval(async () => {
+      const now = Date.now();
+      const expired = messagesRefForCleanup.current.filter(
+        (m) => m.disappearing === true && m.expiresAt && m.expiresAt.toMillis() <= now && !m.deleted
+      );
+      for (const msg of expired) {
+        try { await deleteDoc(doc(db, 'conversations', convId, 'messages', msg.id)); } catch {}
+      }
+    }, 15_000);
+    return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConvId, user?.uid]);
+
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -2653,13 +2698,15 @@ export default function MessagesPage() {
           senderId: replyingTo.senderId,
         };
       }
-      const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), msgData);
+      const disappearingExtra = getDisappearingFields(convId);
+      const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), { ...msgData, ...disappearingExtra });
       setUndoMessageId(msgRef.id);
       setShowUndoToast(true);
       setMessageText('');
       setPendingImage(null);
       setPendingFile(null);
       setReplyingTo(null);
+      if (disappearingPerMessage) setDisappearingPerMessage(null);
       const lastMsgPreview = pendingFile ? `📎 ${pendingFile.name}` : imageToSend ? (payload ? `📷 ${messageText.slice(0, 40)}` : '📷 Photo') : messageText.slice(0, 50);
       const convUpdateData: Record<string, unknown> = {
         lastMessage: lastMsgPreview,
@@ -2807,7 +2854,8 @@ export default function MessagesPage() {
         image: gifUrl,
         encrypted: false,
       };
-      await addDoc(collection(db, 'conversations', convId, 'messages'), msgData);
+      await addDoc(collection(db, 'conversations', convId, 'messages'), { ...msgData, ...getDisappearingFields(convId) });
+      if (disappearingPerMessage) setDisappearingPerMessage(null);
       const convUpdateData: Record<string, unknown> = {
         lastMessage: 'GIF',
         lastMessageTime: serverTimestamp(),
@@ -2859,8 +2907,7 @@ export default function MessagesPage() {
         createdAt: serverTimestamp(),
         image: imageToSend,
       };
-
-      await addDoc(collection(db, 'conversations', targetConvId, 'messages'), msgData);
+      await addDoc(collection(db, 'conversations', targetConvId, 'messages'), { ...msgData, ...getDisappearingFields(targetConvId) });
       await updateDoc(doc(db, 'conversations', targetConvId), {
         lastMessage: '📷 Forwarded photo',
         lastMessageTime: serverTimestamp(),
@@ -2965,9 +3012,10 @@ export default function MessagesPage() {
       if (shouldEncryptVoice && e2ePublicKeyRef.current) {
         voiceMsgData.senderPublicKey = e2ePublicKeyRef.current;
       }
-      const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), voiceMsgData);
+      const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), { ...voiceMsgData, ...getDisappearingFields(convId) });
       setUndoMessageId(msgRef.id);
       setShowUndoToast(true);
+      if (disappearingPerMessage) setDisappearingPerMessage(null);
       const convUpdateData: Record<string, unknown> = {
         lastMessage: '🎤 Voice message',
         lastMessageTime: serverTimestamp(),
@@ -3312,7 +3360,7 @@ export default function MessagesPage() {
       if (forwardingMessage.image) {
         msgData.image = forwardingMessage.image;
       }
-      await addDoc(collection(db, 'conversations', targetConvId, 'messages'), msgData);
+      await addDoc(collection(db, 'conversations', targetConvId, 'messages'), { ...msgData, ...getDisappearingFields(targetConvId) });
       const preview = forwardingMessage.image
         ? (forwardingMessage.text ? `↪ 📷 ${forwardingMessage.text.slice(0, 30)}` : '↪ 📷 Photo')
         : `↪ ${forwardingMessage.text.slice(0, 40)}`;
@@ -3332,6 +3380,25 @@ export default function MessagesPage() {
     } finally {
       setForwardingMsg(false);
     }
+  };
+
+  // === Batch 5: Compute disappearing fields for a new message ===
+  // Returns the extra fields to spread into msgData (or empty object if not applicable).
+  // IMPORTANT: pure computation only — no state updates here to avoid re-render during send.
+  const getDisappearingFields = (convId: string): Record<string, unknown> => {
+    try {
+      const timer = disappearingPerMessage || conversations.find(c => c.id === convId)?.disappearingTimer;
+      if (timer && timer > 0) {
+        return {
+          disappearing: true,
+          disappearingDuration: timer,
+          expiresAt: Timestamp.fromMillis(Date.now() + timer),
+        };
+      }
+    } catch (err) {
+      console.error('[Disappearing] Error computing fields:', err);
+    }
+    return {};
   };
 
   // === Batch 2: Pin/Unpin Message ===
@@ -4025,6 +4092,28 @@ export default function MessagesPage() {
                 >
                   <Pin size={16} className="text-amber-600" /> Pinned Messages
                 </button>
+                {/* Disappearing Messages */}
+                {selectedConvId && (
+                  <button
+                    onClick={() => {
+                      setShowDisappearingMenu(true);
+                      setShowChatMenu(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                    style={{ color: 'var(--msg-text)' }}
+                  >
+                    <Timer size={16} className="text-emerald-500" />
+                    <span className="flex-1">Disappearing Messages</span>
+                    {(() => {
+                      const conv = conversations.find(c => c.id === selectedConvId);
+                      return conv?.disappearingTimer ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 font-medium">
+                          {formatDisappearingTimer(conv.disappearingTimer)}
+                        </span>
+                      ) : null;
+                    })()}
+                  </button>
+                )}
                 {/* Export Chat */}
                 <button
                   onClick={() => {
@@ -4067,6 +4156,16 @@ export default function MessagesPage() {
           onClose={() => setChatSearch(false)}
         />
       )}
+
+      {/* Disappearing messages active banner */}
+      {selectedConvId && conversations.find(c => c.id === selectedConvId)?.disappearingTimer ? (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 border-b border-emerald-200 dark:border-emerald-800/30">
+          <Timer size={13} className="text-emerald-600" />
+          <span className="text-[11px] text-emerald-700 dark:text-emerald-400">
+            Disappearing messages: {DISAPPEARING_TIMER_OPTIONS.find(o => o.value === conversations.find(c => c.id === selectedConvId)?.disappearingTimer)?.label || 'On'}
+          </span>
+        </div>
+      ) : null}
 
       {/* Pinned messages banner */}
       {pinnedMessages.length > 0 && showPinnedBanner && (
@@ -4199,6 +4298,71 @@ export default function MessagesPage() {
               </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Disappearing messages settings overlay */}
+      {showDisappearingMenu && selectedConvId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDisappearingMenu(false)} onTouchStart={() => setShowDisappearingMenu(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+          <div className="bg-white dark:bg-[var(--aurora-surface)] rounded-xl shadow-xl w-[90%] max-w-sm overflow-hidden" onClick={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+            <div className="px-4 py-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600 flex items-center gap-3">
+              <Timer size={18} className="text-white" />
+              <h3 className="text-white font-semibold">Disappearing Messages</h3>
+            </div>
+            <div className="p-4">
+              <p className="text-xs mb-3" style={{ color: 'var(--msg-secondary)' }}>
+                New messages will be automatically deleted after the selected time.
+              </p>
+              {/* Off option */}
+              <button
+                onClick={async () => {
+                  try {
+                    await updateDoc(doc(db, 'conversations', selectedConvId!), { disappearingTimer: null });
+                    showNotif('Disappearing messages turned off', 'info');
+                    setShowDisappearingMenu(false);
+                  } catch (err) {
+                    console.error('Error updating disappearing timer:', err);
+                    showNotif('Failed to update setting', 'error');
+                  }
+                }}
+                className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm rounded-lg mb-1"
+                style={{ color: 'var(--msg-text)' }}
+              >
+                <TimerOff size={16} className="text-gray-400" />
+                <span className="flex-1">Off</span>
+                {!conversations.find(c => c.id === selectedConvId)?.disappearingTimer && (
+                  <Check size={16} className="text-emerald-500" />
+                )}
+              </button>
+              {/* Timer options */}
+              {DISAPPEARING_TIMER_OPTIONS.map(opt => {
+                const activeTimer = conversations.find(c => c.id === selectedConvId)?.disappearingTimer;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={async () => {
+                      try {
+                        await updateDoc(doc(db, 'conversations', selectedConvId!), { disappearingTimer: opt.value });
+                        showNotif(`Disappearing messages set to ${opt.label}`, 'success');
+                        setShowDisappearingMenu(false);
+                      } catch (err) {
+                        console.error('Error updating disappearing timer:', err);
+                        showNotif('Failed to update setting', 'error');
+                      }
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm rounded-lg mb-1"
+                    style={{ color: 'var(--msg-text)' }}
+                  >
+                    <Timer size={16} className="text-emerald-500" />
+                    <span className="flex-1">{opt.label}</span>
+                    {activeTimer === opt.value && (
+                      <Check size={16} className="text-emerald-500" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -4597,6 +4761,8 @@ export default function MessagesPage() {
                                 )}
                                 <div className="flex justify-end mt-0.5">
                                   <span className="flex items-center gap-0.5 whitespace-nowrap">
+
+                                    {msg.disappearing === true && <Timer size={11} className="text-emerald-500" />}
                                     {msg.starred && <Star size={11} className="text-amber-500" fill="#f59e0b" />}
                                     {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
                                     <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>{formatMessageTime(msg.createdAt)}</span>
@@ -4645,6 +4811,8 @@ export default function MessagesPage() {
                                       })()}
                                       {/* Inline timestamp + read receipt (WhatsApp style) */}
                                       <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
+
+                                        {msg.disappearing === true && <Timer size={11} className="text-emerald-500" />}
                                         {msg.starred && <Star size={11} className="text-amber-500" fill="#f59e0b" />}
                                         {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
                                         <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>
@@ -4764,6 +4932,28 @@ export default function MessagesPage() {
               aria-label="Send GIF"
             >
               <span className="text-xs font-bold" style={{ color: 'var(--msg-icon)' }}>GIF</span>
+            </button>
+            {/* Disappearing message per-message timer toggle */}
+            <button
+              onClick={() => {
+                if (disappearingPerMessage) {
+                  setDisappearingPerMessage(null);
+                } else {
+                  const convTimer = conversations.find(c => c.id === selectedConvId)?.disappearingTimer;
+                  const idx = DISAPPEARING_TIMER_OPTIONS.findIndex(o => o.value === convTimer);
+                  setDisappearingPerMessage(DISAPPEARING_TIMER_OPTIONS[(idx + 1) % DISAPPEARING_TIMER_OPTIONS.length].value);
+                }
+              }}
+              className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors relative"
+              style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+              aria-label="Toggle disappearing message timer"
+            >
+              <Timer size={20} style={{ color: (disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer) ? '#10b981' : 'var(--msg-icon)' }} />
+              {(disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer) ? (
+                <span className="absolute -top-1 -right-1 text-[7px] font-bold bg-emerald-500 text-white rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                  {formatDisappearingTimer(disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer || 0)}
+                </span>
+              ) : null}
             </button>
           </div>
           <div className="flex-1 min-w-0 rounded-3xl px-3 py-2 flex items-center" style={{ backgroundColor: 'var(--aurora-surface)', minHeight: '42px' }}>
