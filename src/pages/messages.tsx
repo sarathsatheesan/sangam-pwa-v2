@@ -2369,6 +2369,7 @@ export default function MessagesPage() {
   const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     // Validate by MIME type OR file extension (browsers sometimes set empty/unexpected MIME types)
     const allowedTypes = [
       'application/pdf',
@@ -2388,27 +2389,36 @@ export default function MessagesPage() {
     const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.zip'];
     const fileExtension = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
     const typeOk = allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension);
+
+    // Clear input immediately so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
     if (!typeOk) {
-      showNotif('Unsupported file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, ZIP', 'error');
+      showNotif(`"${file.name}" is not a supported file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, ZIP`, 'error');
       return;
     }
+
     // Firestore 1MB doc limit — base64 adds ~33% overhead, so cap raw file at 700KB
-    if (file.size > 700 * 1024) {
-      showNotif('File must be under 700KB (Firestore limit)', 'error');
+    const MAX_FILE_SIZE = 700 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      const fileSizeStr = formatFileSize(file.size);
+      showNotif(`"${file.name}" (${fileSizeStr}) exceeds the 700 KB limit. Please share large files via a cloud link instead.`, 'error');
       return;
     }
+
     try {
       const reader = new FileReader();
       reader.onload = () => {
         const base64 = reader.result as string;
         setPendingFile({ name: file.name, size: file.size, type: file.type || 'application/octet-stream', data: base64 });
+        showNotif(`"${file.name}" attached`, 'success');
       };
-      reader.onerror = () => showNotif('Failed to read file', 'error');
+      reader.onerror = () => {
+        showNotif(`Could not read "${file.name}". The file may be corrupted or locked.`, 'error');
+      };
       reader.readAsDataURL(file);
     } catch {
-      showNotif('Failed to process file', 'error');
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      showNotif(`Failed to process "${file.name}". Please try again.`, 'error');
     }
   };
 
