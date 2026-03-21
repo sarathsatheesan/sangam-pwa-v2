@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ClickOutsideOverlay } from '../../components/ClickOutsideOverlay';
+import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
   onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion,
 } from 'firebase/firestore';
-import { db } from '../../services/firebase';
-import { useAuth } from '../../contexts/AuthContext';
-import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
+import { db } from '@/services/firebase';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
   generateConversationKey, encryptMessage, decryptMessage,
   getOrCreateKeyPair, deriveSharedKey, e2eEncrypt, e2eDecrypt,
@@ -17,7 +17,7 @@ import {
   unwrapGroupKeyWithECDH, wrapGroupKeyForMemberWithECDH,
   getDeterministicSharedKey,
   type ExportedPublicKey,
-} from '../../utils/encryption';
+} from '@/utils/encryption';
 import {
   Search, X, Send, Smile, MoreVertical,
   Trash2,
@@ -29,12 +29,12 @@ import {
   Check, CheckCheck, Paperclip, Users, Shield, UserPlus, UserMinus, Crown, Settings,
   Flag, Ban, VolumeX,
   Phone, PhoneOff, Video, VideoOff,
-  Download, Share2,
+  Download, Share2, Reply, BellOff, Bell, Archive, ArchiveRestore,
 } from 'lucide-react';
 import {
   getCallManager,
   type CallState, type CallType,
-} from '../../utils/webrtc';
+} from '@/utils/webrtc';
 
 // ===== TYPES =====
 /**
@@ -164,11 +164,19 @@ const WALLPAPER_PRESETS = {
 /**
  * Emoji picker categories with curated emoji selections
  */
-const EMOJI_CATEGORIES = {
+const EMOJI_CATEGORIES: Record<string, string[]> = {
+  'Recent': [],
   'Smileys': ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🫡','🤐','🤨','😐','😑','😶','🫥','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🥴','😵','🤯','🥳','🥸','😎','🤓','🧐'],
   'Gestures': ['👋','🤚','🖐️','✋','🖖','🫱','🫲','👌','🤌','🤏','✌️','🤞','🫰','🤟','🤘','🤙','👈','👉','👆','👇','☝️','👍','👎','✊','👊','🤛','🤜','👏','🙌','🫶','👐','🤲','🤝','🙏'],
+  'People': ['👶','👧','🧒','👦','👩','🧑','👨','👩‍🦱','🧑‍🦱','👨‍🦱','👩‍🦰','🧑‍🦰','👨‍🦰','👱‍♀️','👱','👱‍♂️','👩‍🦳','🧑‍🦳','👨‍🦳','👩‍🦲','🧑‍🦲','👨‍🦲','🧔‍♀️','🧔','🧔‍♂️','👵','🧓','👴','👲','👳‍♀️','👳','👳‍♂️','🧕','👮‍♀️','👮','👮‍♂️','👷‍♀️','👷','👷‍♂️'],
   'Hearts': ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','💕','💞','💓','💗','💖','💘','💝','💟'],
-  'Objects': ['🎉','🎊','🎈','🎁','🏆','⭐','🌟','💫','✨','🔥','💯','🎯','💡','📱','💻','📸','🎵','🎶','☕','🍕','🍔','🌮','🍩','🍰','🧋'],
+  'Animals': ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🐢','🐍','🦎','🦂','🐙','🦑','🦐','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈'],
+  'Food': ['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🍈','🍒','🍑','🥭','🍍','🍕','🍔','🌮','🍩','🍰','🍪','☕','🍵','🥤'],
+  'Activities': ['⚽','🏀','🏈','⚾','🥎','🎾','🏐','🎱','🏓','🏸','🏒','🎳','🎯','🎮','🎲','⛳','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛼','🧘'],
+  'Travel': ['🚗','🚕','🚙','🚌','🚎','🚓','🚑','🚒','🚐','🚚','🚛','🏎️','✈️','🚀','🚁','🛳️','🚢','⛵','🚤','🚂','🚆','🚇','🚞','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏪','🏫','🗼','⛪','🕌'],
+  'Objects': ['🎉','🎊','🎈','🎁','🏆','⭐','🌟','💫','✨','🔥','💯','🎯','💡','📱','💻','📸','🎵','🎶','☕','🧩','🎮','📚','🖼️','🎨','🎭'],
+  'Symbols': ['❤️','💔','💕','💞','💓','💗','💖','💘','💝','💟','✔️','❌','⭕','✨','⚡','💥','🔔','📢','📣','🎺','🎸','🎹','🎤','🎧','📻'],
+  'Flags': ['🏳️','🏴','🏁','🚩','🏳️‍🌈','🇺🇸','🇬🇧','🇮🇳','🇨🇦','🇦🇺','🇫🇷','🇩🇪','🇯🇵','🇰🇷','🇨🇳','🇧🇷','🇲🇽','🇮🇹','🇪🇸','🇷🇺','🇿🇦','🇳🇬','🇰🇪'],
 };
 
 /**
@@ -507,6 +515,7 @@ function MessageContextMenu({
   onEdit,
   onReport,
   onBlock,
+  onReply,
   onClose,
   isRecent,
 }: {
@@ -515,12 +524,18 @@ function MessageContextMenu({
   onEdit?: () => void;
   onReport?: () => void;
   onBlock?: () => void;
+  onReply?: () => void;
   onClose: () => void;
   isRecent: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
       <div className="bg-white dark:bg-[var(--aurora-surface)] rounded-lg shadow-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {onReply && (
+          <button onClick={() => { onReply(); onClose(); }} className="w-48 px-4 py-2.5 text-left hover:bg-[var(--aurora-input)] transition flex items-center gap-2 text-sm" style={{ color: 'var(--msg-text)' }}>
+            <Reply size={15} className="text-aurora-indigo" /> Reply
+          </button>
+        )}
         {isMine && isRecent && onEdit && (
           <button
             onClick={() => {
@@ -601,12 +616,12 @@ function FormattingToolbar({ onFormat }: { onFormat: (label: string, wrap: strin
 
 /**
  * EmojiPicker Component
- * Modal emoji picker with category tabs and grid view
+ * Modal emoji picker with search, category tabs, and grid view
  */
-function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void; onClose: () => void }) {
-  const [activeCategory, setActiveCategory] = useState<string>('Smileys');
+function EmojiPicker({ onSelect, onClose, recentEmojis }: { onSelect: (emoji: string) => void; onClose: () => void; recentEmojis: string[] }) {
+  const [activeCategory, setActiveCategory] = useState<string>(recentEmojis.length > 0 ? 'Recent' : 'Smileys');
+  const [searchQuery, setSearchQuery] = useState('');
   const categories = Object.keys(EMOJI_CATEGORIES);
-  const currentEmojis = EMOJI_CATEGORIES[activeCategory as keyof typeof EMOJI_CATEGORIES] || [];
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -616,34 +631,68 @@ function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void;
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  const allEmojis = useMemo(() => {
+    return Object.values(EMOJI_CATEGORIES).flat();
+  }, []);
+
+  const displayEmojis = searchQuery
+    ? allEmojis.filter(() => true)
+    : activeCategory === 'Recent'
+    ? recentEmojis
+    : EMOJI_CATEGORIES[activeCategory as keyof typeof EMOJI_CATEGORIES] || [];
+
+  const categoryIcons: Record<string, string> = {
+    'Recent': '🕒', 'Smileys': '😀', 'Gestures': '👋', 'People': '👤', 'Hearts': '❤️',
+    'Animals': '🐶', 'Food': '🍕', 'Activities': '⚽', 'Travel': '✈️', 'Objects': '💡', 'Symbols': '💠', 'Flags': '🏳️',
+  };
+
   return (
-    <div className="absolute bottom-16 left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-96 bg-white dark:bg-[var(--aurora-surface)] rounded-lg shadow-lg border border-[var(--aurora-border)] z-40 flex flex-col overflow-hidden">
-      <div className="flex gap-1 p-2 border-b border-[var(--aurora-border)] overflow-x-auto">
-        {categories.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`px-3 py-1 rounded text-sm whitespace-nowrap transition ${
-              activeCategory === cat ? 'bg-aurora-indigo text-white' : 'hover:bg-[var(--aurora-input)]'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
+    <div className="absolute bottom-16 left-0 w-[calc(100vw-2rem)] sm:w-80 max-h-[360px] bg-white dark:bg-[var(--aurora-surface)] rounded-lg shadow-lg border border-[var(--aurora-border)] z-40 flex flex-col overflow-hidden">
+      {/* Search */}
+      <div className="px-2 pt-2">
+        <input
+          type="text"
+          placeholder="Search emojis..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-3 py-1.5 text-sm rounded-lg border border-[var(--aurora-border)] bg-[var(--aurora-input)] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-muted)] focus:outline-none focus:ring-1 focus:ring-aurora-indigo/40"
+        />
       </div>
-      <div className="flex-1 overflow-y-auto p-3 grid grid-cols-6 sm:grid-cols-8 gap-2">
-        {currentEmojis.map((emoji, idx) => (
+      {/* Category tabs */}
+      {!searchQuery && (
+        <div className="flex gap-0.5 px-1.5 pt-1.5 pb-1 overflow-x-auto scrollbar-hide">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              title={cat}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg text-base shrink-0 transition ${
+                activeCategory === cat ? 'bg-aurora-indigo/15 ring-1 ring-aurora-indigo/30' : 'hover:bg-[var(--aurora-input)]'
+              }`}
+            >
+              {categoryIcons[cat] || '📦'}
+            </button>
+          ))}
+        </div>
+      )}
+      {/* Emoji grid */}
+      <div className="flex-1 overflow-y-auto p-2 grid grid-cols-8 gap-0.5">
+        {displayEmojis.length > 0 ? displayEmojis.map((emoji, idx) => (
           <button
             key={idx}
             onClick={() => {
               onSelect(emoji);
               onClose();
             }}
-            className="w-10 h-10 flex items-center justify-center text-xl hover:scale-125 transition"
+            className="w-9 h-9 flex items-center justify-center text-xl hover:scale-110 hover:bg-[var(--aurora-input)] rounded transition"
           >
             {emoji}
           </button>
-        ))}
+        )) : (
+          <div className="col-span-8 py-4 text-center text-sm text-[var(--aurora-text-muted)]">
+            {activeCategory === 'Recent' ? 'No recent emojis yet' : 'No emojis found'}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1186,7 +1235,7 @@ export default function MessagesPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const encryptionEnabled = isFeatureEnabled('messages_encryption');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'connects'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'connects' | 'archived'>('all');
   const [showPenMenu, setShowPenMenu] = useState(false);
   const [showNewMsgPicker, setShowNewMsgPicker] = useState(false);
   const [showGroupCreator, setShowGroupCreator] = useState(false);
@@ -1208,6 +1257,8 @@ export default function MessagesPage() {
   // UI State
   const [showFormatting, setShowFormatting] = useState(false);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
   const [undoMessageId, setUndoMessageId] = useState<string | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -1966,11 +2017,19 @@ export default function MessagesPage() {
       if (imageToSend) {
         msgData.image = imageToSend;
       }
+      if (replyingTo) {
+        msgData.replyTo = {
+          id: replyingTo.id,
+          text: replyingTo.text.slice(0, 100),
+          senderId: replyingTo.senderId,
+        };
+      }
       const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), msgData);
       setUndoMessageId(msgRef.id);
       setShowUndoToast(true);
       setMessageText('');
       setPendingImage(null);
+      setReplyingTo(null);
       const lastMsgPreview = imageToSend ? (payload ? `📷 ${messageText.slice(0, 40)}` : '📷 Photo') : messageText.slice(0, 50);
       const convUpdateData: Record<string, unknown> = {
         lastMessage: lastMsgPreview,
@@ -2464,6 +2523,24 @@ export default function MessagesPage() {
     setShowUndoToast(false);
   };
 
+  const toggleMuteConversation = async (convId: string, currentMuted: boolean) => {
+    try {
+      await updateDoc(doc(db, 'conversations', convId), { notificationsMuted: !currentMuted });
+      showNotif(!currentMuted ? 'Conversation muted' : 'Conversation unmuted', 'info');
+    } catch {
+      showNotif('Failed to update mute setting', 'error');
+    }
+  };
+
+  const toggleArchiveConversation = async (convId: string, currentArchived: boolean) => {
+    try {
+      await updateDoc(doc(db, 'conversations', convId), { archived: !currentArchived });
+      showNotif(!currentArchived ? 'Conversation archived' : 'Conversation unarchived', 'info');
+    } catch {
+      showNotif('Failed to update archive setting', 'error');
+    }
+  };
+
   const handleMessageInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageText(e.target.value);
     if (!selectedUser) return;
@@ -2504,6 +2581,9 @@ export default function MessagesPage() {
       // Hide group conversations if group messaging is disabled
       if (conv.isGroup && !groupMessagingEnabled) return false;
 
+      // Filter out archived conversations when not viewing archived tab
+      if (conv.archived && activeFilter !== 'archived') return false;
+
       // Filter out conversations with blocked users (1:1 only)
       if (!conv.isGroup && blockedUsers.size > 0) {
         const otherParticipant = conv.participants.find((p) => p !== user?.uid);
@@ -2527,6 +2607,8 @@ export default function MessagesPage() {
     } else if (activeFilter === 'connects') {
       // Show only group conversations
       result = result.filter((conv) => conv.isGroup === true);
+    } else if (activeFilter === 'archived') {
+      result = result.filter((conv) => conv.archived === true);
     }
 
     return result;
@@ -2598,7 +2680,7 @@ export default function MessagesPage() {
 
       {/* Filter pills */}
       <div className="px-4 py-2 flex gap-1.5 overflow-x-auto border-b border-aurora-border bg-aurora-surface/95 backdrop-blur-md">
-        {(['all', 'unread', 'connects'] as const).map((filter) => (
+        {(['all', 'unread', 'connects', 'archived'] as const).map((filter) => (
           <button
             key={filter}
             onClick={() => setActiveFilter(filter)}
@@ -2646,7 +2728,10 @@ export default function MessagesPage() {
                     </div>
                     <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: 'var(--msg-divider)' }}>
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className="font-medium text-[16px]" style={{ color: 'var(--msg-text)' }}>{conv.groupName || 'Group'}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-[16px]" style={{ color: 'var(--msg-text)' }}>{conv.groupName || 'Group'}</span>
+                          {conv.notificationsMuted && <BellOff size={14} className="text-aurora-text-muted shrink-0" />}
+                        </div>
                         {conv.lastMessageTime && (
                           <span className="text-xs flex-shrink-0 ml-2" style={{ color: hasUnread ? '#6366F1' : 'var(--msg-secondary)' }}>
                             {getRelativeTime(conv.lastMessageTime)}
@@ -2692,7 +2777,10 @@ export default function MessagesPage() {
                   <ChatAvatar user={otherUser} size="lg" showOnlineStatus={true} />
                   <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: 'var(--msg-divider)' }}>
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-medium text-[16px]" style={{ color: 'var(--msg-text)' }}>{otherUser.name}</span>
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium text-[16px]" style={{ color: 'var(--msg-text)' }}>{otherUser.name}</span>
+                        {conv.notificationsMuted && <BellOff size={14} className="text-aurora-text-muted shrink-0" />}
+                      </div>
                       {conv.lastMessageTime && (
                         <span className="text-xs flex-shrink-0 ml-2" style={{ color: hasUnread ? '#6366F1' : 'var(--msg-secondary)' }}>
                           {getRelativeTime(conv.lastMessageTime)}
@@ -2728,6 +2816,12 @@ export default function MessagesPage() {
             <MessageSquare size={48} className="mx-auto mb-3 opacity-40" />
             <p className="text-sm">No group chats yet</p>
             <p className="text-xs mt-1">Create a group to start chatting with multiple people</p>
+          </div>
+        ) : activeFilter === 'archived' ? (
+          <div className="p-8 text-center" style={{ color: 'var(--msg-secondary)' }}>
+            <Archive size={48} className="mx-auto mb-3 opacity-40" />
+            <p className="text-sm">No archived conversations</p>
+            <p className="text-xs mt-1">Archive conversations to hide them from your main list</p>
           </div>
         ) : (
           <div className="p-8 text-center" style={{ color: 'var(--msg-secondary)' }}>
@@ -3024,6 +3118,36 @@ export default function MessagesPage() {
                   {compactMode ? <Maximize2 size={16} style={{ color: 'var(--msg-secondary)' }} /> : <Minimize2 size={16} style={{ color: 'var(--msg-secondary)' }} />}
                   {compactMode ? 'Comfortable' : 'Compact'}
                 </button>
+                {/* Mute/Unmute option */}
+                {selectedConvId && (
+                  <button
+                    onClick={() => {
+                      const conv = conversations.find(c => c.id === selectedConvId);
+                      if (conv) toggleMuteConversation(conv.id, !!conv.notificationsMuted);
+                      setShowChatMenu(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                    style={{ color: 'var(--msg-text)' }}
+                  >
+                    {((conversations.find(c => c.id === selectedConvId)?.notificationsMuted) ? <Bell size={16} /> : <BellOff size={16} />)}
+                    {(conversations.find(c => c.id === selectedConvId)?.notificationsMuted) ? 'Unmute' : 'Mute'}
+                  </button>
+                )}
+                {/* Archive/Unarchive option */}
+                {selectedConvId && (
+                  <button
+                    onClick={() => {
+                      const conv = conversations.find(c => c.id === selectedConvId);
+                      if (conv) toggleArchiveConversation(conv.id, !!conv.archived);
+                      setShowChatMenu(false);
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
+                    style={{ color: 'var(--msg-text)' }}
+                  >
+                    {(conversations.find(c => c.id === selectedConvId)?.archived) ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                    {(conversations.find(c => c.id === selectedConvId)?.archived) ? 'Unarchive' : 'Archive'}
+                  </button>
+                )}
                 {/* Block User option - only for 1:1 chats */}
                 {selectedUser && (
                   <button
@@ -3355,6 +3479,19 @@ export default function MessagesPage() {
                                 {users.find((u) => u.id === msg.senderId)?.name || 'Unknown'}
                               </div>
                             )}
+                            {msg.replyTo && (() => {
+                              const rt = msg.replyTo!;
+                              return (
+                                <div className="mx-2 mt-1.5 mb-1 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: isMine ? 'rgba(0,0,0,0.06)' : 'rgba(99,102,241,0.08)', borderLeftColor: '#6366F1', borderLeftWidth: '3px', borderLeftStyle: 'solid' }}>
+                                  <div className="text-[11px] font-semibold" style={{ color: '#6366F1' }}>
+                                    {rt.senderId === user?.uid ? 'You' : (users.find(u => u.id === rt.senderId)?.name || 'Unknown')}
+                                  </div>
+                                  <div className="text-[12px] truncate" style={{ color: 'var(--msg-secondary)' }}>
+                                    {rt.text || '📷 Photo'}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                             {msg.callEvent ? (
                               <div className="px-2.5 pt-1.5 pb-1">
                                 <CallEventBubble callEvent={msg.callEvent} isMine={isMine} />
@@ -3438,6 +3575,17 @@ export default function MessagesPage() {
 
       {/* WhatsApp-style input area */}
       <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
+        {replyingTo && (
+          <div className="px-4 py-2 flex items-center justify-between border-b" style={{ backgroundColor: 'var(--msg-own-bubble-hover)', borderColor: 'var(--aurora-border)' }}>
+            <div className="text-sm min-w-0 flex-1" style={{ color: '#4F46E5' }}>
+              <span className="font-semibold">Replying to {replyingTo.senderId === user?.uid ? 'yourself' : (users.find(u => u.id === replyingTo.senderId)?.name || 'Unknown')}:</span>{' '}
+              <span className="opacity-70">{truncateText(replyingTo.text, 50)}</span>
+            </div>
+            <button onClick={() => setReplyingTo(null)} className="p-1 rounded hover:bg-white/50 shrink-0 ml-2" aria-label="Cancel reply">
+              <X size={16} style={{ color: '#4F46E5' }} />
+            </button>
+          </div>
+        )}
         {editingMessage && (
           <div className="px-4 py-2 flex items-center justify-between border-b" style={{ backgroundColor: 'var(--msg-own-bubble-hover)', borderColor: 'var(--aurora-border)' }}>
             <div className="text-sm" style={{ color: '#4F46E5' }}>
@@ -3529,7 +3677,14 @@ export default function MessagesPage() {
           </div>
         </div>
         {showEmojiPicker && (
-          <EmojiPicker onSelect={(e) => setMessageText(messageText + e)} onClose={() => setShowEmojiPicker(false)} />
+          <EmojiPicker
+            recentEmojis={recentEmojis}
+            onSelect={(emoji) => {
+              setMessageText(messageText + emoji);
+              setRecentEmojis(prev => [emoji, ...prev.filter(e => e !== emoji)].slice(0, 24));
+            }}
+            onClose={() => setShowEmojiPicker(false)}
+          />
         )}
       </div>
     </div>
@@ -3612,6 +3767,11 @@ export default function MessagesPage() {
         <MessageContextMenu
           isMine={contextMenuMsg.senderId === user?.uid}
           isRecent={isMessageEditable(contextMenuMsg.createdAt)}
+          onReply={() => {
+            setReplyingTo(contextMenuMsg);
+            setContextMenuMsg(null);
+            textareaRef.current?.focus();
+          }}
           onEdit={() => {
             setEditingMessage(contextMenuMsg);
             setMessageText(contextMenuMsg.text);
