@@ -3373,8 +3373,8 @@ export default function MessagesPage() {
       {/* Starred messages overlay */}
       {showStarredView && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
-          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-[var(--aurora-primary)] to-[var(--aurora-primary-dark)]">
-            <button onClick={() => setShowStarredView(false)} className="p-1 rounded-full hover:bg-white/10">
+          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
+            <button onClick={() => setShowStarredView(false)} className="p-1 rounded-full hover:bg-white/10" onTouchStart={() => setShowStarredView(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               <ArrowLeft size={20} className="text-white" />
             </button>
             <h3 className="text-white font-semibold">Starred Messages</h3>
