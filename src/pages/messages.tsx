@@ -3372,7 +3372,7 @@ export default function MessagesPage() {
 
       {/* Starred messages overlay */}
       {showStarredView && (
-        <div className="absolute inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
           <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-[var(--aurora-primary)] to-[var(--aurora-primary-dark)]">
             <button onClick={() => setShowStarredView(false)} className="p-1 rounded-full hover:bg-white/10">
               <ArrowLeft size={20} className="text-white" />
