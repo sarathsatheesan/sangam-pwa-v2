@@ -137,15 +137,17 @@ const linkPreviewCache = new Map<string, LinkPreviewData | null>();
 const fetchLinkPreview = async (url: string): Promise<LinkPreviewData | null> => {
   if (linkPreviewCache.has(url)) return linkPreviewCache.get(url) || null;
   try {
-    const res = await fetch(`https://jsonlink.io/api/extract?url=${encodeURIComponent(url)}`);
+    const res = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(url)}`);
     if (!res.ok) { linkPreviewCache.set(url, null); return null; }
-    const data = await res.json();
+    const json = await res.json();
+    if (json.status !== 'success' || !json.data) { linkPreviewCache.set(url, null); return null; }
+    const data = json.data;
     const preview: LinkPreviewData = {
       url,
       title: data.title || undefined,
       description: data.description || undefined,
-      image: data.images?.[0] || undefined,
-      siteName: data.domain || new URL(url).hostname,
+      image: data.image?.url || undefined,
+      siteName: data.publisher || new URL(url).hostname,
     };
     linkPreviewCache.set(url, preview);
     return preview;
@@ -2367,6 +2369,7 @@ export default function MessagesPage() {
   const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Validate by MIME type OR file extension (browsers sometimes set empty/unexpected MIME types)
     const allowedTypes = [
       'application/pdf',
       'application/msword',
@@ -2377,10 +2380,15 @@ export default function MessagesPage() {
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       'text/plain',
       'text/csv',
+      'application/csv',
       'application/zip',
       'application/x-zip-compressed',
+      'application/octet-stream',
     ];
-    if (!allowedTypes.includes(file.type)) {
+    const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.zip'];
+    const fileExtension = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+    const typeOk = allowedTypes.includes(file.type) || allowedExtensions.includes(fileExtension);
+    if (!typeOk) {
       showNotif('Unsupported file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, ZIP', 'error');
       return;
     }
@@ -2393,7 +2401,7 @@ export default function MessagesPage() {
       const reader = new FileReader();
       reader.onload = () => {
         const base64 = reader.result as string;
-        setPendingFile({ name: file.name, size: file.size, type: file.type, data: base64 });
+        setPendingFile({ name: file.name, size: file.size, type: file.type || 'application/octet-stream', data: base64 });
       };
       reader.onerror = () => showNotif('Failed to read file', 'error');
       reader.readAsDataURL(file);
