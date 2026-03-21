@@ -78,6 +78,12 @@ type Message = {
   pinned?: boolean;
   starred?: boolean;
   forwarded?: boolean;
+  file?: {
+    name: string;
+    size: number;
+    type: string;
+    data: string; // base64 encoded
+  };
 };
 
 /**
@@ -113,6 +119,106 @@ type ViewState = 'list' | 'room';
  * Notification types for user feedback
  */
 type NotificationType = 'success' | 'error' | 'info' | 'warning';
+
+// ===== LINK PREVIEW =====
+
+type LinkPreviewData = {
+  url: string;
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+};
+
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+const linkPreviewCache = new Map<string, LinkPreviewData | null>();
+
+const fetchLinkPreview = async (url: string): Promise<LinkPreviewData | null> => {
+  if (linkPreviewCache.has(url)) return linkPreviewCache.get(url) || null;
+  try {
+    const res = await fetch(`https://jsonlink.io/api/extract?url=${encodeURIComponent(url)}`);
+    if (!res.ok) { linkPreviewCache.set(url, null); return null; }
+    const data = await res.json();
+    const preview: LinkPreviewData = {
+      url,
+      title: data.title || undefined,
+      description: data.description || undefined,
+      image: data.images?.[0] || undefined,
+      siteName: data.domain || new URL(url).hostname,
+    };
+    linkPreviewCache.set(url, preview);
+    return preview;
+  } catch {
+    linkPreviewCache.set(url, null);
+    return null;
+  }
+};
+
+/**
+ * LinkPreviewCard component — renders an OG preview card below message text.
+ * Cross-browser: uses onClick + onTouchStart for iOS Safari, proper cursor styling.
+ */
+const LinkPreviewCard = ({ url }: { url: string }) => {
+  const [preview, setPreview] = React.useState<LinkPreviewData | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchLinkPreview(url).then((data) => {
+      if (!cancelled) { setPreview(data); setLoading(false); }
+    });
+    return () => { cancelled = true; };
+  }, [url]);
+
+  if (loading) return (
+    <div className="mt-1.5 px-2 py-1.5 rounded-lg animate-pulse" style={{ backgroundColor: 'rgba(99,102,241,0.06)', minHeight: '40px' }}>
+      <div className="h-3 w-24 rounded" style={{ backgroundColor: 'rgba(99,102,241,0.12)' }} />
+    </div>
+  );
+  if (!preview || (!preview.title && !preview.description)) return null;
+
+  const openLink = () => window.open(url, '_blank', 'noopener,noreferrer');
+
+  return (
+    <div
+      className="mt-1.5 rounded-lg overflow-hidden"
+      style={{ backgroundColor: 'rgba(99,102,241,0.06)', borderLeft: '3px solid #6366F1', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+      onClick={openLink}
+      onTouchStart={openLink}
+      role="link"
+      tabIndex={0}
+    >
+      {preview.image && (
+        <img
+          src={preview.image}
+          alt=""
+          className="w-full object-cover"
+          style={{ maxHeight: '140px' }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+      )}
+      <div className="px-2.5 py-1.5">
+        {preview.siteName && (
+          <div className="text-[10.5px] uppercase font-semibold tracking-wide mb-0.5" style={{ color: '#6366F1' }}>
+            {preview.siteName}
+          </div>
+        )}
+        {preview.title && (
+          <div className="text-[13px] font-medium leading-tight line-clamp-2" style={{ color: 'var(--msg-text)' }}>
+            {preview.title}
+          </div>
+        )}
+        {preview.description && (
+          <div className="text-[11.5px] leading-snug mt-0.5 line-clamp-2" style={{ color: 'var(--msg-secondary)' }}>
+            {preview.description}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // ===== CONSTANTS =====
 
@@ -357,7 +463,30 @@ const renderFormattedText = (text: string): React.ReactNode => {
   }
   if (lastIndex < text.length) parts.push(text.slice(lastIndex));
 
-  return parts.length > 0 ? <>{parts}</> : text;
+  // Second pass: linkify URLs in plain text segments
+  const linkedParts: React.ReactNode[] = [];
+  const urlPattern = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+  for (const part of parts) {
+    if (typeof part !== 'string') { linkedParts.push(part); continue; }
+    let urlMatch;
+    let urlLastIndex = 0;
+    urlPattern.lastIndex = 0;
+    let hasUrlMatch = false;
+    while ((urlMatch = urlPattern.exec(part)) !== null) {
+      hasUrlMatch = true;
+      if (urlMatch.index > urlLastIndex) linkedParts.push(part.slice(urlLastIndex, urlMatch.index));
+      linkedParts.push(
+        <a key={`link-${key++}`} href={urlMatch[0]} target="_blank" rel="noopener noreferrer" style={{ color: '#6366F1', textDecoration: 'underline', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+          {urlMatch[0].length > 50 ? urlMatch[0].slice(0, 47) + '...' : urlMatch[0]}
+        </a>
+      );
+      urlLastIndex = urlPattern.lastIndex;
+    }
+    if (hasUrlMatch && urlLastIndex < part.length) linkedParts.push(part.slice(urlLastIndex));
+    if (!hasUrlMatch) linkedParts.push(part);
+  }
+
+  return linkedParts.length > 0 ? <>{linkedParts}</> : text;
 };
 
 // ===== COMPONENTS =====
@@ -764,6 +893,112 @@ const compressImage = (file: File, maxWidth = 800, quality = 0.7): Promise<strin
     reader.readAsDataURL(file);
   });
 };
+
+/**
+ * GifPicker Component
+ * Giphy-powered GIF search and trending grid for chat.
+ * Cross-browser: uses onClick + onTouchStart, proper cursor styling.
+ */
+const GIPHY_API_KEY = 'GlVGYHkr3WSBnllca54iNt0yFbjz7L65'; // Public beta key
+
+function GifPicker({ onSelect, onClose }: { onSelect: (gifUrl: string) => void; onClose: () => void }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [gifs, setGifs] = useState<{ id: string; url: string; preview: string; width: number; height: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchGifs = useCallback(async (query: string) => {
+    setLoading(true);
+    try {
+      const endpoint = query.trim()
+        ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=20&rating=pg-13`
+        : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=pg-13`;
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error('Giphy API error');
+      const data = await res.json();
+      setGifs(data.data.map((g: { id: string; images: { fixed_width: { url: string; width: string; height: string }; fixed_width_still: { url: string } } }) => ({
+        id: g.id,
+        url: g.images.fixed_width.url,
+        preview: g.images.fixed_width_still.url,
+        width: parseInt(g.images.fixed_width.width),
+        height: parseInt(g.images.fixed_width.height),
+      })));
+    } catch {
+      setGifs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchGifs(''); }, [fetchGifs]);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => fetchGifs(searchQuery), 400);
+    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
+  }, [searchQuery, fetchGifs]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div style={{ backgroundColor: 'var(--aurora-surface)', borderTop: '1px solid var(--aurora-border)' }}>
+      <div className="px-3 pt-2 pb-1.5 flex items-center gap-2">
+        <Search size={14} style={{ color: 'var(--msg-icon)', flexShrink: 0 }} />
+        <input
+          type="text"
+          placeholder="Search GIFs..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 bg-transparent outline-none text-sm placeholder-gray-400"
+          style={{ color: 'var(--msg-text)' }}
+          autoFocus
+        />
+        <button onClick={onClose} onTouchStart={onClose} className="p-1 rounded-full hover:bg-gray-200/60" style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} aria-label="Close GIF picker">
+          <X size={16} style={{ color: 'var(--msg-icon)' }} />
+        </button>
+      </div>
+      <div className="overflow-y-auto px-1.5 pb-1.5" style={{ maxHeight: '280px' }}>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+          </div>
+        ) : gifs.length === 0 ? (
+          <div className="text-center py-8 text-sm" style={{ color: 'var(--msg-secondary)' }}>
+            {searchQuery ? 'No GIFs found' : 'Unable to load GIFs'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-1.5">
+            {gifs.map((gif) => (
+              <div
+                key={gif.id}
+                className="rounded-lg overflow-hidden"
+                style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent', aspectRatio: `${gif.width}/${gif.height}` }}
+                onClick={() => { onSelect(gif.url); onClose(); }}
+                onTouchStart={() => { onSelect(gif.url); onClose(); }}
+                role="button"
+                tabIndex={0}
+              >
+                <img
+                  src={gif.url}
+                  alt="GIF"
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="px-3 py-1 text-center" style={{ borderTop: '1px solid var(--aurora-border)' }}>
+        <span className="text-[10px]" style={{ color: 'var(--msg-secondary)' }}>Powered by GIPHY</span>
+      </div>
+    </div>
+  );
+}
 
 /**
  * VoiceRecorder Component
@@ -1298,6 +1533,7 @@ export default function MessagesPage() {
   const [undoMessageId, setUndoMessageId] = useState<string | null>(null);
   const [showUndoToast, setShowUndoToast] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [chatSearch, setChatSearch] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
@@ -1326,6 +1562,8 @@ export default function MessagesPage() {
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [imageCompressing, setImageCompressing] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [pendingFile, setPendingFile] = useState<{ name: string; size: number; type: string; data: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Image lightbox state
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -1988,7 +2226,7 @@ export default function MessagesPage() {
   };
 
   const sendMessage = async () => {
-    if (!user?.uid || (!messageText.trim() && !pendingImage)) return;
+    if (!user?.uid || (!messageText.trim() && !pendingImage && !pendingFile)) return;
     // Determine conversation ID
     let convId: string | null = null;
     const activeConv = selectedConvId ? conversations.find((c) => c.id === selectedConvId) : null;
@@ -2062,6 +2300,14 @@ export default function MessagesPage() {
       if (imageToSend) {
         msgData.image = imageToSend;
       }
+      if (pendingFile) {
+        msgData.file = {
+          name: pendingFile.name,
+          size: pendingFile.size,
+          type: pendingFile.type,
+          data: pendingFile.data,
+        };
+      }
       if (replyingTo) {
         msgData.replyTo = {
           id: replyingTo.id,
@@ -2074,8 +2320,9 @@ export default function MessagesPage() {
       setShowUndoToast(true);
       setMessageText('');
       setPendingImage(null);
+      setPendingFile(null);
       setReplyingTo(null);
-      const lastMsgPreview = imageToSend ? (payload ? `📷 ${messageText.slice(0, 40)}` : '📷 Photo') : messageText.slice(0, 50);
+      const lastMsgPreview = pendingFile ? `📎 ${pendingFile.name}` : imageToSend ? (payload ? `📷 ${messageText.slice(0, 40)}` : '📷 Photo') : messageText.slice(0, 50);
       const convUpdateData: Record<string, unknown> = {
         lastMessage: lastMsgPreview,
         lastMessageTime: serverTimestamp(),
@@ -2114,6 +2361,111 @@ export default function MessagesPage() {
     } finally {
       setImageCompressing(false);
       if (imageInputRef.current) imageInputRef.current.value = '';
+    }
+  };
+
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/plain',
+      'text/csv',
+      'application/zip',
+      'application/x-zip-compressed',
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      showNotif('Unsupported file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV, ZIP', 'error');
+      return;
+    }
+    // Firestore 1MB doc limit — base64 adds ~33% overhead, so cap raw file at 700KB
+    if (file.size > 700 * 1024) {
+      showNotif('File must be under 700KB (Firestore limit)', 'error');
+      return;
+    }
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        setPendingFile({ name: file.name, size: file.size, type: file.type, data: base64 });
+      };
+      reader.onerror = () => showNotif('Failed to read file', 'error');
+      reader.readAsDataURL(file);
+    } catch {
+      showNotif('Failed to process file', 'error');
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getFileIcon = (type: string): string => {
+    if (type === 'application/pdf') return '📄';
+    if (type.includes('word') || type.includes('document')) return '📝';
+    if (type.includes('sheet') || type.includes('excel') || type === 'text/csv') return '📊';
+    if (type.includes('presentation') || type.includes('powerpoint')) return '📑';
+    if (type === 'text/plain') return '📃';
+    if (type.includes('zip')) return '🗜️';
+    return '📎';
+  };
+
+  const downloadFile = (fileData: string, fileName: string) => {
+    // iOS Safari doesn't always respect the download attribute — use window.open as fallback
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      window.open(fileData, '_blank');
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = fileData;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const sendGif = async (gifUrl: string) => {
+    if (!user?.uid) return;
+    let convId: string | null = null;
+    const activeConv = selectedConvId ? conversations.find((c) => c.id === selectedConvId) : null;
+    const isGroup = !!activeConv?.isGroup;
+    if (selectedConvId) { convId = selectedConvId; }
+    else if (selectedUser) { convId = generateConvId(user.uid, selectedUser.id); }
+    if (!convId) return;
+    try {
+      const msgData: Record<string, unknown> = {
+        text: '',
+        senderId: user.uid,
+        time: formatMessageTime(Timestamp.now()),
+        createdAt: serverTimestamp(),
+        image: gifUrl,
+        encrypted: false,
+      };
+      await addDoc(collection(db, 'conversations', convId, 'messages'), msgData);
+      const convUpdateData: Record<string, unknown> = {
+        lastMessage: 'GIF',
+        lastMessageTime: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastMessageSenderId: user.uid,
+      };
+      if (!isGroup && selectedUser) {
+        convUpdateData.participants = [user.uid, selectedUser.id].sort();
+      }
+      await setDoc(doc(db, 'conversations', convId), convUpdateData, { merge: true });
+    } catch (err) {
+      console.error('Failed to send GIF:', err);
+      showNotif('Failed to send GIF', 'error');
     }
   };
 
@@ -3773,7 +4125,7 @@ export default function MessagesPage() {
                                     {rt.senderId === user?.uid ? 'You' : (users.find(u => u.id === rt.senderId)?.name || 'Unknown')}
                                   </div>
                                   <div className="text-[12px] truncate" style={{ color: 'var(--msg-secondary)' }}>
-                                    {rt.text || '📷 Photo'}
+                                    {rt.text || '📷 Photo/File'}
                                   </div>
                                 </div>
                               );
@@ -3785,6 +4137,43 @@ export default function MessagesPage() {
                             ) : msg.voiceMessage ? (
                               <div className="px-2.5 pt-1.5 pb-1">
                                 <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} />
+                              </div>
+                            ) : msg.file ? (
+                              <div className="px-2.5 pt-1.5 pb-1">
+                                <div
+                                  className="flex items-center gap-2.5 p-2 rounded-lg cursor-pointer"
+                                  style={{ backgroundColor: isMine ? 'rgba(0,0,0,0.06)' : 'rgba(99,102,241,0.08)', minWidth: '200px', WebkitTapHighlightColor: 'transparent' }}
+                                  onClick={() => downloadFile(msg.file!.data, msg.file!.name)}
+                                  onTouchStart={() => downloadFile(msg.file!.data, msg.file!.name)}
+                                  role="button"
+                                  tabIndex={0}
+                                >
+                                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: isMine ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.12)' }}>
+                                    <span className="text-lg">{getFileIcon(msg.file.type)}</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-[13px] font-medium truncate" style={{ color: 'var(--msg-text)' }}>{msg.file.name}</div>
+                                    <div className="text-[11px]" style={{ color: 'var(--msg-secondary)' }}>{formatFileSize(msg.file.size)}</div>
+                                  </div>
+                                  <Download size={16} style={{ color: 'var(--msg-secondary)', flexShrink: 0 }} />
+                                </div>
+                                {msg.text && (
+                                  <div className="text-[14.2px] leading-[19px] break-words mt-1" style={{ color: 'var(--msg-text)' }}>
+                                    {renderFormattedText(msg.text)}
+                                  </div>
+                                )}
+                                <div className="flex justify-end mt-0.5">
+                                  <span className="flex items-center gap-0.5 whitespace-nowrap">
+                                    {msg.starred && <Star size={11} className="text-amber-500" fill="#f59e0b" />}
+                                    {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
+                                    <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>{formatMessageTime(msg.createdAt)}</span>
+                                    {isMine && (
+                                      msg.read
+                                        ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
+                                        : <CheckCheck size={14} style={{ color: '#B0B6B9' }} />
+                                    )}
+                                  </span>
+                                </div>
                               </div>
                             ) : (
                               <>
@@ -3815,6 +4204,12 @@ export default function MessagesPage() {
                                   <div className={`px-2.5 ${isImageWithText ? 'pt-1' : 'pt-1.5'} pb-1`}>
                                     <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? 'var(--msg-system-text)' : 'var(--msg-text)' }}>
                                       {msg.text && renderFormattedText(msg.text)}
+                                      {/* Link preview for URLs in message */}
+                                      {msg.text && !msg.deleted && (() => {
+                                        const urls = msg.text.match(URL_REGEX);
+                                        if (!urls || urls.length === 0) return null;
+                                        return <LinkPreviewCard url={urls[0]} />;
+                                      })()}
                                       {/* Inline timestamp + read receipt (WhatsApp style) */}
                                       <span className="float-right ml-2 mt-1 flex items-center gap-0.5 whitespace-nowrap" style={{ marginBottom: '-3px' }}>
                                         {msg.starred && <Star size={11} className="text-amber-500" fill="#f59e0b" />}
@@ -3900,14 +4295,42 @@ export default function MessagesPage() {
             <span className="text-sm" style={{ color: '#E65100' }}>Compressing image...</span>
           </div>
         )}
+        {/* File preview strip */}
+        {pendingFile && (
+          <div className="px-3 py-2 flex items-center gap-2 border-b" style={{ backgroundColor: 'var(--msg-own-bubble-hover)', borderColor: 'var(--aurora-border)' }}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'rgba(99,102,241,0.12)' }}>
+              <span className="text-lg">{getFileIcon(pendingFile.type)}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate" style={{ color: '#4F46E5' }}>{pendingFile.name}</div>
+              <div className="text-xs" style={{ color: 'var(--msg-secondary)' }}>{formatFileSize(pendingFile.size)}</div>
+            </div>
+            <button onClick={() => setPendingFile(null)} className="p-1 rounded hover:bg-white/50" aria-label="Remove file" onTouchStart={() => setPendingFile(null)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+              <X size={16} style={{ color: '#4F46E5' }} />
+            </button>
+          </div>
+        )}
         <input type="file" accept="image/*" ref={imageInputRef} onChange={handleImagePick} className="hidden" />
+        <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" ref={fileInputRef} onChange={handleFilePick} className="hidden" />
         <div className="px-2 sm:px-3 py-1.5 flex items-end gap-1.5 sm:gap-2">
           <div className="flex gap-0.5 flex-shrink-0 pb-1">
-            <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Toggle emoji picker">
+            <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Toggle emoji picker">
               <Smile size={22} style={{ color: 'var(--msg-icon)' }} />
             </button>
             <button onClick={() => imageInputRef.current?.click()} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach image">
               <ImagePlus size={22} style={{ color: 'var(--msg-icon)' }} />
+            </button>
+            <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach file" onTouchStart={() => fileInputRef.current?.click()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+              <Paperclip size={22} style={{ color: 'var(--msg-icon)' }} />
+            </button>
+            <button
+              onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }}
+              onTouchStart={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }}
+              className="px-1.5 py-1 rounded-full hover:bg-gray-200/60 transition-colors"
+              style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+              aria-label="Send GIF"
+            >
+              <span className="text-xs font-bold" style={{ color: 'var(--msg-icon)' }}>GIF</span>
             </button>
           </div>
           <div className="flex-1 rounded-3xl px-3 py-2 flex items-end" style={{ backgroundColor: 'var(--aurora-surface)', minHeight: '42px' }}>
@@ -3923,7 +4346,7 @@ export default function MessagesPage() {
             />
           </div>
           <div className="flex-shrink-0 pb-0.5">
-            {(messageText.trim() || pendingImage) ? (
+            {(messageText.trim() || pendingImage || pendingFile) ? (
               <button
                 onClick={() => {
                   if (editingMessage) {
@@ -3971,6 +4394,12 @@ export default function MessagesPage() {
               setRecentEmojis(prev => [emoji, ...prev.filter(e => e !== emoji)].slice(0, 24));
             }}
             onClose={() => setShowEmojiPicker(false)}
+          />
+        )}
+        {showGifPicker && (
+          <GifPicker
+            onSelect={(gifUrl) => { sendGif(gifUrl); setShowGifPicker(false); }}
+            onClose={() => setShowGifPicker(false)}
           />
         )}
       </div>
