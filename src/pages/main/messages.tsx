@@ -2757,17 +2757,18 @@ export default function MessagesPage() {
   // === Conversation list panel (reused in both mobile and desktop) ===
   const conversationListPanel = (
     <div className="h-full flex flex-col relative overflow-hidden" style={{ backgroundColor: 'var(--aurora-surface)' }}>
-      {/* Header - purple on mobile, light purple on desktop */}
-      <div className="px-4 pt-3 pb-2 sm:bg-gradient-to-r sm:from-purple-50 sm:via-violet-50 sm:to-indigo-50 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
+      {/* Header - purple gradient on mobile + desktop dark, light purple on desktop light */}
+      <div className="px-4 pt-3 pb-2" style={{ background: 'var(--msg-header-bg, linear-gradient(to right, #7e22ce, #7c3aed, #4f46e5))' }}>
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-xl font-bold tracking-wide sm:text-purple-700 text-white">Messages</h1>
+          <h1 className="text-xl font-bold tracking-wide" style={{ color: 'var(--msg-header-text, #ffffff)' }}>Messages</h1>
           <div className="relative">
             <button
               onClick={() => setShowPenMenu(!showPenMenu)}
-              className="p-1.5 rounded-full transition-colors sm:hover:bg-purple-100 hover:bg-white/10"
+              className="p-1.5 rounded-full transition-colors"
+              style={{ color: 'var(--msg-header-text, #ffffff)' }}
               aria-label="New message or group"
             >
-              <Edit3 size={20} className="sm:text-purple-600 text-white" />
+              <Edit3 size={20} />
             </button>
             {/* Pen dropdown menu */}
             {showPenMenu && (

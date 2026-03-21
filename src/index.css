@@ -141,6 +141,15 @@
   --msg-system-text: #8BAAB8;
 }
 
+/* Messages header: desktop light mode → light purple gradient + purple text.
+   Mobile (all modes) + desktop dark mode → fallback purple gradient + white text. */
+@media (min-width: 640px) {
+  :root:not(.dark) {
+    --msg-header-bg: linear-gradient(to right, #faf5ff, #f5f3ff, #eef2ff);
+    --msg-header-text: #7e22ce;
+  }
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
