@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
-  onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion,
+  onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion, writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +42,8 @@ import {
  * User type for messaging participants
  * Includes profile information and messaging preferences
  */
+type PresenceStatus = 'online' | 'away' | 'offline';
+
 type User = {
   id: string;
   name: string;
@@ -49,6 +51,7 @@ type User = {
   messagingPrivacy?: 'Everyone' | 'Contacts' | 'Nobody';
   lastSeen?: Timestamp;
   isOnline?: boolean;
+  presenceStatus?: PresenceStatus;
 };
 
 /**
@@ -107,6 +110,7 @@ type Conversation = {
   groupName?: string;
   groupCreatedBy?: string;
   groupAdmins?: string[];
+  lastMessageRead?: boolean;
 };
 
 /**
@@ -398,6 +402,53 @@ const getRelativeTime = (ts: Timestamp | null | undefined): string => {
 };
 
 /**
+ * Presence system constants
+ * HEARTBEAT_INTERVAL: How often to write "I'm still here" to Firestore (60s)
+ * AWAY_TIMEOUT: How long after tab blur before marking as "away" (5 min)
+ * OFFLINE_THRESHOLD: If lastSeen is older than this, consider user offline (2.5 min)
+ */
+const PRESENCE_HEARTBEAT_INTERVAL = 60_000;
+const PRESENCE_AWAY_TIMEOUT = 5 * 60_000;
+const PRESENCE_OFFLINE_THRESHOLD = 2.5 * 60_000;
+
+/**
+ * Derive presence status from Firestore user data.
+ * If the user has a presenceStatus field and a recent lastSeen, trust it.
+ * Otherwise, compute from lastSeen timestamp.
+ */
+const derivePresenceStatus = (u: User): PresenceStatus => {
+  if (!u.lastSeen) return 'offline';
+  const elapsed = Date.now() - u.lastSeen.toDate().getTime();
+  // If lastSeen is stale (> threshold), user is offline regardless of stored status
+  if (elapsed > PRESENCE_OFFLINE_THRESHOLD) return 'offline';
+  // Trust the stored presenceStatus if present and lastSeen is fresh
+  if (u.presenceStatus === 'away') return 'away';
+  return 'online';
+};
+
+/**
+ * Get presence status text for chat header
+ */
+const getPresenceText = (u: User): string => {
+  const status = derivePresenceStatus(u);
+  if (status === 'online') return 'online';
+  if (status === 'away') return 'away';
+  if (u.lastSeen) return `last seen ${getRelativeTime(u.lastSeen)}`;
+  return '';
+};
+
+/**
+ * Get presence dot color
+ * Green = online, Yellow/Amber = away, Gray = offline (no dot shown)
+ */
+const getPresenceDotColor = (u: User): string | null => {
+  const status = derivePresenceStatus(u);
+  if (status === 'online') return '#22c55e'; // green-500
+  if (status === 'away') return '#f59e0b'; // amber-500
+  return null; // offline — no dot
+};
+
+/**
  * Validate message text before sending
  * Checks for length and content requirements
  */
@@ -542,11 +593,13 @@ function ChatAvatar({ user, size = 'md', showOnlineStatus = false }: { user?: Us
 
   if (!showOnlineStatus) return <>{avatarElement}</>;
 
+  const dotColor = getPresenceDotColor(user);
+
   return (
     <div className="relative flex-shrink-0">
       {avatarElement}
-      {user.isOnline && (
-        <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white" style={{ backgroundColor: '#6366F1' }} />
+      {dotColor && (
+        <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800" style={{ backgroundColor: dotColor }} />
       )}
     </div>
   );
@@ -1771,6 +1824,132 @@ export default function MessagesPage() {
     }
   }, [searchParams, users, selectedUser, setSearchParams]);
 
+  // ===== PRESENCE SYSTEM =====
+  // Writes current user's presence to Firestore and listens for other users' presence.
+  // Uses heartbeat (60s), visibilitychange (away detection), and beforeunload (offline).
+  useEffect(() => {
+    if (!user?.uid) return;
+    const userDocRef = doc(db, 'users', user.uid);
+    let heartbeatTimer: ReturnType<typeof setInterval>;
+    let awayTimer: ReturnType<typeof setTimeout>;
+
+    const updatePresence = async (status: PresenceStatus) => {
+      try {
+        await updateDoc(userDocRef, {
+          presenceStatus: status,
+          isOnline: status !== 'offline',
+          lastSeen: serverTimestamp(),
+        });
+      } catch (err) {
+        console.error('Error updating presence:', err);
+      }
+    };
+
+    // Set online immediately
+    updatePresence('online');
+
+    // Heartbeat: refresh lastSeen every 60s while tab is visible
+    heartbeatTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        updatePresence('online');
+      }
+    }, PRESENCE_HEARTBEAT_INTERVAL);
+
+    // Visibility change: tab hidden → start away timer, tab visible → set online
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        awayTimer = setTimeout(() => {
+          updatePresence('away');
+        }, PRESENCE_AWAY_TIMEOUT);
+      } else {
+        clearTimeout(awayTimer);
+        updatePresence('online');
+      }
+    };
+
+    // Before unload: set offline (best-effort, may not always fire)
+    const handleBeforeUnload = () => {
+      // Use sendBeacon for reliable delivery during page unload
+      // Fall back to synchronous updateDoc which may not complete
+      const payload = JSON.stringify({
+        presenceStatus: 'offline',
+        isOnline: false,
+      });
+      // sendBeacon doesn't work with Firestore SDK, so we do a fire-and-forget updateDoc
+      updatePresence('offline');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(heartbeatTimer);
+      clearTimeout(awayTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Set offline on unmount
+      updatePresence('offline');
+    };
+  }, [user?.uid]);
+
+  // Real-time presence listener for users in active conversations
+  // Subscribes to presence changes for all users we have conversations with
+  useEffect(() => {
+    if (!user?.uid || conversations.length === 0) return;
+
+    // Collect unique other-user IDs from 1:1 conversations
+    const otherUserIds = new Set<string>();
+    conversations.forEach((conv) => {
+      if (!conv.isGroup && conv.participants) {
+        conv.participants.forEach((pid: string) => {
+          if (pid !== user.uid) otherUserIds.add(pid);
+        });
+      }
+    });
+
+    if (otherUserIds.size === 0) return;
+
+    // Subscribe to each user's presence (Firestore doesn't support 'in' with onSnapshot for > 30)
+    const unsubscribes: (() => void)[] = [];
+    const userIdArray = Array.from(otherUserIds);
+
+    // Batch into groups of 10 for Firestore 'in' query limit
+    for (let i = 0; i < userIdArray.length; i += 10) {
+      const batch = userIdArray.slice(i, i + 10);
+      const q = query(
+        collection(db, 'users'),
+        where('__name__', 'in', batch)
+      );
+      const unsub = onSnapshot(q, (snap) => {
+        setUsers((prev) => {
+          const updated = [...prev];
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'modified' || change.type === 'added') {
+              const data = change.doc.data();
+              const idx = updated.findIndex((u) => u.id === change.doc.id);
+              if (idx >= 0) {
+                updated[idx] = {
+                  ...updated[idx],
+                  isOnline: data.isOnline ?? false,
+                  lastSeen: data.lastSeen ?? undefined,
+                  presenceStatus: data.presenceStatus ?? 'offline',
+                };
+              }
+            }
+          });
+          return updated;
+        });
+      }, (err) => {
+        console.error('Error listening to user presence:', err);
+      });
+      unsubscribes.push(unsub);
+    }
+
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+    };
+  }, [user?.uid, conversations]);
+
   // Fetch conversations with real-time updates
   useEffect(() => {
     if (!user) return;
@@ -1972,6 +2151,30 @@ export default function MessagesPage() {
         setPinnedMessages(msgs.filter(m => m.pinned));
         setMessagesLoading(false);
         setTimeout(() => scrollToBottom(), 100);
+
+        // Mark unread messages from other user(s) as read
+        if (convId && document.visibilityState === 'visible') {
+          const unreadFromOthers = snap.docs.filter((d) => {
+            const data = d.data();
+            return data.senderId !== user.uid && !data.read;
+          });
+          if (unreadFromOthers.length > 0) {
+            try {
+              const batch = writeBatch(db);
+              unreadFromOthers.forEach((d) => {
+                batch.update(doc(db, 'conversations', convId!, 'messages', d.id), {
+                  read: true,
+                  readAt: serverTimestamp(),
+                });
+              });
+              // Also reset unreadCount and mark last message as read on the conversation doc
+              batch.update(doc(db, 'conversations', convId!), { unreadCount: 0, lastMessageRead: true });
+              await batch.commit();
+            } catch (err) {
+              console.error('Error marking messages as read:', err);
+            }
+          }
+        }
       },
       (err) => {
         console.error('Error fetching messages:', err);
@@ -2331,6 +2534,7 @@ export default function MessagesPage() {
         lastMessageTime: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastMessageSenderId: user.uid,
+        lastMessageRead: false,
       };
       // For 1:1 chats, ensure conversation document exists with participants
       if (!isGroup && selectedUser) {
@@ -2477,6 +2681,7 @@ export default function MessagesPage() {
         lastMessageTime: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastMessageSenderId: user.uid,
+        lastMessageRead: false,
       };
       if (!isGroup && selectedUser) {
         convUpdateData.participants = [user.uid, selectedUser.id].sort();
@@ -2529,6 +2734,7 @@ export default function MessagesPage() {
         lastMessageTime: serverTimestamp(),
         lastMessageSenderId: user.uid,
         updatedAt: serverTimestamp(),
+        lastMessageRead: false,
       });
 
       showNotif('Image forwarded', 'success');
@@ -2635,6 +2841,7 @@ export default function MessagesPage() {
         lastMessageTime: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastMessageSenderId: user.uid,
+        lastMessageRead: false,
       };
       // For 1:1 chats, ensure conversation document exists with participants
       if (!isGroup && selectedUser) {
@@ -2693,6 +2900,7 @@ export default function MessagesPage() {
         lastMessage: `Group "${groupName.trim()}" created`,
         lastMessageTime: serverTimestamp(),
         lastMessageSenderId: user.uid,
+        lastMessageRead: false,
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
         ...(Object.keys(e2eGroupKeys).length > 0 ? {
@@ -2981,6 +3189,7 @@ export default function MessagesPage() {
         lastMessageTime: serverTimestamp(),
         lastMessageSenderId: user.uid,
         updatedAt: serverTimestamp(),
+        lastMessageRead: false,
       });
       showNotif('Message forwarded', 'success');
       setShowForwardPicker(false);
@@ -3306,7 +3515,9 @@ export default function MessagesPage() {
                         ) : (
                           <span className="flex items-center gap-1">
                             {conv.lastMessageSenderId === user?.uid && (
-                              <CheckCheck size={14} className="flex-shrink-0" style={{ color: '#53BDEB' }} />
+                              conv.lastMessageRead
+                                ? <CheckCheck size={14} className="flex-shrink-0" style={{ color: '#53BDEB' }} />
+                                : <Check size={14} className="flex-shrink-0" style={{ color: '#B0B6B9' }} />
                             )}
                             {conv.lastMessage || 'No messages'}
                           </span>
@@ -3550,7 +3761,7 @@ export default function MessagesPage() {
             <div className="flex-1 min-w-0">
               <h2 className="font-medium text-white text-[15px] leading-tight">{selectedUser.name}</h2>
               <div className="text-xs leading-tight" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                {isOtherUserTyping ? 'typing...' : selectedUser.isOnline ? 'online' : selectedUser.lastSeen ? `last seen ${getRelativeTime(selectedUser.lastSeen)}` : ''}
+                {isOtherUserTyping ? 'typing...' : getPresenceText(selectedUser)}
               </div>
             </div>
           </>
@@ -4189,7 +4400,7 @@ export default function MessagesPage() {
                                     {isMine && (
                                       msg.read
                                         ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
-                                        : <CheckCheck size={14} style={{ color: '#B0B6B9' }} />
+                                        : <Check size={14} style={{ color: '#B0B6B9' }} />
                                     )}
                                   </span>
                                 </div>
@@ -4213,7 +4424,7 @@ export default function MessagesPage() {
                                         {isMine && (
                                           msg.read
                                             ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
-                                            : <CheckCheck size={14} style={{ color: '#FFFFFF' }} />
+                                            : <Check size={14} style={{ color: '#FFFFFF' }} />
                                         )}
                                       </div>
                                     )}
@@ -4239,7 +4450,7 @@ export default function MessagesPage() {
                                         {isMine && (
                                           msg.read
                                             ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
-                                            : <CheckCheck size={14} style={{ color: '#B0B6B9' }} />
+                                            : <Check size={14} style={{ color: '#B0B6B9' }} />
                                         )}
                                       </span>
                                     </div>
