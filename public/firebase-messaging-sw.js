@@ -38,6 +38,7 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 // Handle notification click — open the app to the messages page
+// Cross-browser: Chrome, Safari, Firefox, Android Chrome, iOS Safari 16.4+ PWA
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
@@ -47,9 +48,14 @@ self.addEventListener('notificationclick', (event) => {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       // If a window is already open, focus it and navigate
       for (const client of windowClients) {
-        if (client.url.includes('mithr-1e5f4.web.app')) {
+        if (client.url.includes('mithr-1e5f4.web.app') || client.url.includes('localhost')) {
           client.focus();
-          client.navigate(url);
+          // Firefox does not support client.navigate() — use postMessage fallback
+          if (typeof client.navigate === 'function') {
+            client.navigate(url);
+          } else {
+            client.postMessage({ type: 'NOTIFICATION_CLICK', url: url });
+          }
           return;
         }
       }

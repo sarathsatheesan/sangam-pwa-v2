@@ -1867,26 +1867,26 @@ export default function MessagesPage() {
       }
     };
 
-    // Before unload: set offline (best-effort, may not always fire)
+    // Before unload / pagehide: set offline (best-effort, may not always fire)
+    // `pagehide` is more reliable than `beforeunload` on iOS Safari and Android Chrome.
+    // We listen on both for maximum cross-browser coverage.
     const handleBeforeUnload = () => {
-      // Use sendBeacon for reliable delivery during page unload
-      // Fall back to synchronous updateDoc which may not complete
-      const payload = JSON.stringify({
-        presenceStatus: 'offline',
-        isOnline: false,
-      });
-      // sendBeacon doesn't work with Firestore SDK, so we do a fire-and-forget updateDoc
+      updatePresence('offline');
+    };
+    const handlePageHide = () => {
       updatePresence('offline');
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
 
     return () => {
       clearInterval(heartbeatTimer);
       clearTimeout(awayTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
       // Set offline on unmount
       updatePresence('offline');
     };
@@ -2186,6 +2186,43 @@ export default function MessagesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUser, selectedConvId, user, encryptionEnabled, e2eKeyVersion]);
 
+  // Mark messages as read when user returns to the tab (cross-browser: visibilitychange)
+  // This handles the case where messages arrived while the tab was hidden.
+  useEffect(() => {
+    const convId = selectedConvId || (selectedUser ? undefined : undefined);
+    const activeConvId = selectedConvId || conversations.find((c) =>
+      !c.isGroup && c.participants.includes(user?.uid || '') && c.participants.includes(selectedUser?.id || '')
+    )?.id;
+    if (!activeConvId || !user?.uid) return;
+    const handleVisibilityForRead = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const msgsRef = collection(db, 'conversations', activeConvId, 'messages');
+        const msgsSnap = await getDocs(msgsRef);
+        const unreadFromOthers = msgsSnap.docs.filter((d) => {
+          const data = d.data();
+          return data.senderId !== user.uid && !data.read;
+        });
+        if (unreadFromOthers.length > 0) {
+          const batch = writeBatch(db);
+          unreadFromOthers.forEach((d) => {
+            batch.update(doc(db, 'conversations', activeConvId, 'messages', d.id), {
+              read: true,
+              readAt: serverTimestamp(),
+            });
+          });
+          batch.update(doc(db, 'conversations', activeConvId), { unreadCount: 0, lastMessageRead: true });
+          await batch.commit();
+        }
+      } catch (err) {
+        console.error('Error marking messages as read on visibility change:', err);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityForRead);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityForRead);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUser?.id, selectedConvId, user?.uid, conversations]);
+
   // Clear message input when switching conversations to prevent accidental cross-sends
   useEffect(() => {
     setMessageText('');
@@ -2340,17 +2377,56 @@ export default function MessagesPage() {
   }, []);
 
   // ===== PUSH NOTIFICATIONS (FCM) =====
+  // Cross-browser: Chrome, Firefox, Safari desktop, Android Chrome, iOS Safari 16.4+ (PWA).
+  // Guards: isSupported(), navigator.serviceWorker check, Notification API check.
   useEffect(() => {
     if (!user?.uid) return;
     const setupPushNotifications = async () => {
       try {
+        // Guard: service workers not available in all contexts
+        // (e.g. some private/incognito modes, older iOS Safari non-PWA)
+        if (!('serviceWorker' in navigator)) {
+          console.warn('[PushNotif] Service workers not supported in this browser context');
+          return;
+        }
+        // Guard: Notification API not available (e.g. some in-app browsers)
+        if (typeof Notification === 'undefined') {
+          console.warn('[PushNotif] Notification API not available');
+          return;
+        }
         const messaging = await initMessaging();
-        if (!messaging) return; // FCM not supported (e.g. iOS Safari webview)
-        const permission = Notification.permission === 'granted'
-          ? 'granted'
-          : await Notification.requestPermission();
-        if (permission !== 'granted') return;
-        const swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        if (!messaging) {
+          console.warn('[PushNotif] FCM not supported in this browser');
+          return;
+        }
+        // Request permission — Safari requires user gesture, so this may silently fail
+        // if called outside a gesture context; it will succeed next time user interacts.
+        let permission = Notification.permission;
+        if (permission === 'default') {
+          try {
+            permission = await Notification.requestPermission();
+          } catch {
+            // Safari <16.4 uses callback-based API, handle gracefully
+            permission = await new Promise<NotificationPermission>((resolve) => {
+              Notification.requestPermission((p) => resolve(p));
+            });
+          }
+        }
+        if (permission !== 'granted') {
+          console.warn('[PushNotif] Notification permission not granted:', permission);
+          return;
+        }
+        // Register or reuse existing service worker
+        // Safari and Firefox both support this, but the scope must match
+        let swRegistration: ServiceWorkerRegistration;
+        const existingReg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+        if (existingReg) {
+          swRegistration = existingReg;
+        } else {
+          swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        }
+        // Wait for the service worker to be ready (important for Firefox first-load)
+        await navigator.serviceWorker.ready;
         const token = await getToken(messaging, {
           vapidKey: 'PENDING_VAPID_KEY',
           serviceWorkerRegistration: swRegistration,
@@ -2359,8 +2435,9 @@ export default function MessagesPage() {
           await updateDoc(doc(db, 'users', user.uid), {
             fcmTokens: arrayUnion(token),
           });
+          console.log('[PushNotif] FCM token registered successfully');
         }
-        // Listen for foreground messages
+        // Listen for foreground messages (all browsers)
         const unsubscribe = onMessage(messaging, (payload) => {
           const senderId = payload.data?.senderId;
           if (senderId === user.uid) return; // Don't notify for own messages
@@ -2370,13 +2447,28 @@ export default function MessagesPage() {
         });
         return unsubscribe;
       } catch (err) {
-        console.error('Error setting up push notifications:', err);
+        // Graceful failure — push notifications are an enhancement, not critical
+        console.error('[PushNotif] Error setting up push notifications:', err);
       }
     };
     let unsubForeground: (() => void) | undefined;
     setupPushNotifications().then((unsub) => { unsubForeground = unsub; });
     return () => { if (unsubForeground) unsubForeground(); };
   }, [user?.uid, showNotif]);
+
+  // Firefox fallback: listen for postMessage from service worker when client.navigate() is unavailable
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const handleSWMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NOTIFICATION_CLICK' && event.data?.url) {
+        window.location.href = event.data.url;
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+    };
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -4581,35 +4673,35 @@ export default function MessagesPage() {
         )}
         <input type="file" accept="image/*" ref={imageInputRef} onChange={handleImagePick} className="hidden" />
         <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" ref={fileInputRef} onChange={handleFilePick} className="hidden" />
-        <div className="px-2 sm:px-3 py-1.5 flex items-end gap-1.5 sm:gap-2">
-          <div className="flex gap-0.5 flex-shrink-0 pb-1">
-            <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Toggle emoji picker">
-              <Smile size={22} style={{ color: 'var(--msg-icon)' }} />
+        <div className="px-1 sm:px-3 py-1.5 flex items-end gap-1 sm:gap-2" style={{ overflow: 'hidden' }}>
+          <div className="flex gap-0 flex-shrink-0 pb-1">
+            <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Toggle emoji picker">
+              <Smile size={20} style={{ color: 'var(--msg-icon)' }} />
             </button>
-            <button onClick={() => imageInputRef.current?.click()} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach image">
-              <ImagePlus size={22} style={{ color: 'var(--msg-icon)' }} />
+            <button onClick={() => imageInputRef.current?.click()} className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach image">
+              <ImagePlus size={20} style={{ color: 'var(--msg-icon)' }} />
             </button>
-            <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach file" onTouchStart={() => fileInputRef.current?.click()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
-              <Paperclip size={22} style={{ color: 'var(--msg-icon)' }} />
+            <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach file" onTouchStart={() => fileInputRef.current?.click()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+              <Paperclip size={20} style={{ color: 'var(--msg-icon)' }} />
             </button>
             <button
               onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }}
               onTouchStart={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }}
-              className="px-1.5 py-1 rounded-full hover:bg-gray-200/60 transition-colors"
+              className="px-1 py-1 rounded-full hover:bg-gray-200/60 transition-colors"
               style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
               aria-label="Send GIF"
             >
               <span className="text-xs font-bold" style={{ color: 'var(--msg-icon)' }}>GIF</span>
             </button>
           </div>
-          <div className="flex-1 rounded-3xl px-3 py-2 flex items-end" style={{ backgroundColor: 'var(--aurora-surface)', minHeight: '42px' }}>
+          <div className="flex-1 min-w-0 rounded-3xl px-3 py-2 flex items-center" style={{ backgroundColor: 'var(--aurora-surface)', minHeight: '42px' }}>
             <textarea
               ref={textareaRef}
               value={messageText}
               onChange={handleMessageInput}
               placeholder="Type a message"
-              className="flex-1 bg-transparent outline-none text-base resize-none leading-[20px] placeholder-gray-400"
-              style={{ color: 'var(--msg-text)', maxHeight: '100px' }}
+              className="flex-1 bg-transparent outline-none text-sm sm:text-base resize-none leading-[20px] placeholder-gray-400"
+              style={{ color: 'var(--msg-text)', maxHeight: '100px', textAlign: 'left' }}
               rows={1}
               maxLength={MESSAGE_CONFIG.MAX_MESSAGE_LENGTH}
             />
