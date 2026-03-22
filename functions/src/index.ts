@@ -1,8 +1,11 @@
 import * as admin from "firebase-admin";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { SpeechClient } from "@google-cloud/speech";
 
 admin.initializeApp();
 const db = admin.firestore();
+const speechClient = new SpeechClient();
 
 /**
  * Cloud Function: sendNewMessageNotification
@@ -154,6 +157,102 @@ export const sendNewMessageNotification = onDocumentCreated(
             fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
           });
       }
+    }
+  }
+);
+
+/**
+ * Cloud Function: transcribeVoiceMessage
+ *
+ * Callable function that takes a conversationId + messageId,
+ * reads the voice message audio from Firestore, sends it to
+ * Google Cloud Speech-to-Text, and stores the transcription
+ * back on the message document.
+ */
+export const transcribeVoiceMessage = onCall(
+  { maxInstances: 10, timeoutSeconds: 120, invoker: "public" },
+  async (request) => {
+    // Require authentication
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be logged in to transcribe.");
+    }
+
+    const { conversationId, messageId, audioData } = request.data as {
+      conversationId?: string;
+      messageId?: string;
+      audioData?: string; // decrypted base64 audio from client (data URL or raw base64)
+    };
+
+    if (!conversationId || !messageId) {
+      throw new HttpsError("invalid-argument", "conversationId and messageId are required.");
+    }
+
+    if (!audioData) {
+      throw new HttpsError("invalid-argument", "audioData is required (decrypted audio from client).");
+    }
+
+    // Extract base64 audio content and detect mime type
+    let audioBytes: string;
+    let mimeType = "audio/webm";
+
+    if (audioData.startsWith("data:")) {
+      const commaIdx = audioData.indexOf(",");
+      const header = audioData.substring(0, commaIdx);
+      audioBytes = audioData.substring(commaIdx + 1);
+      const mimeMatch = header.match(/data:([^;]+)/);
+      if (mimeMatch) mimeType = mimeMatch[1];
+    } else {
+      audioBytes = audioData;
+    }
+
+    // Map MIME type to Speech-to-Text encoding enum values
+    // See: https://cloud.google.com/speech-to-text/docs/encoding
+    let encoding = 9; // WEBM_OPUS = 9
+    if (mimeType.includes("mp4")) {
+      encoding = 0; // ENCODING_UNSPECIFIED — let API auto-detect for mp4
+    } else if (mimeType.includes("ogg")) {
+      encoding = 6; // OGG_OPUS = 6
+    }
+
+    try {
+      const [response] = await speechClient.recognize({
+        audio: { content: audioBytes },
+        config: {
+          encoding: encoding,
+          sampleRateHertz: encoding === 0 ? 0 : 48000, // 0 = auto-detect for mp4
+          languageCode: "en-US",
+          alternativeLanguageCodes: ["ml-IN", "hi-IN", "ta-IN", "te-IN"],
+          model: "latest_long",
+          enableAutomaticPunctuation: true,
+        },
+      });
+
+      const transcription =
+        response.results
+          ?.map((r) => r.alternatives?.[0]?.transcript || "")
+          .join(" ")
+          .trim() || "";
+
+      if (!transcription) {
+        return { transcription: "", error: "No speech detected in this audio" };
+      }
+
+      // Save transcription back to Firestore message document
+      const msgRef = db
+        .collection("conversations")
+        .doc(conversationId)
+        .collection("messages")
+        .doc(messageId);
+
+      await msgRef.update({
+        "voiceMessage.transcription": transcription,
+      });
+
+      return { transcription };
+    } catch (err: unknown) {
+      console.error("[transcribeVoiceMessage] Speech-to-Text error:", err);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      throw new HttpsError("internal", `Transcription failed: ${errorMessage}`);
     }
   }
 );

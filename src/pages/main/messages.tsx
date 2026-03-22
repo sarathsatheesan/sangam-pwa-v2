@@ -7,7 +7,7 @@ import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
   onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion, writeBatch,
 } from 'firebase/firestore';
-import { db, initMessaging, getToken, onMessage } from '@/services/firebase';
+import { db, functions, httpsCallable, initMessaging, getToken, onMessage } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
@@ -69,7 +69,7 @@ type Message = {
   encrypted?: boolean;
   replyTo?: { id: string; text: string; senderId: string };
   reactions?: Record<string, string[]>;
-  voiceMessage?: { duration: number; audioUrl?: string };
+  voiceMessage?: { duration: number; audioUrl?: string; transcription?: string };
   image?: string;
   read?: boolean;
   readAt?: Timestamp;
@@ -1195,12 +1195,41 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number, audioB
  * VoiceMessageBubble Component
  * Displays voice message with play/pause button and duration
  */
-function VoiceMessageBubble({ duration, audioUrl, isMine }: { duration: number; audioUrl?: string; isMine: boolean }) {
+function VoiceMessageBubble({ duration, audioUrl, isMine, transcription, msgId, convId }: { duration: number; audioUrl?: string; isMine: boolean; transcription?: string; msgId?: string; convId?: string }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioError, setAudioError] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [localTranscription, setLocalTranscription] = useState<string | null>(transcription || null);
+  const [transcribeError, setTranscribeError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+
+  const handleTranscribe = async () => {
+    if (!audioUrl || !msgId || !convId || transcribing) return;
+    if (audioUrl.startsWith('{')) {
+      setTranscribeError('Audio is encrypted — cannot transcribe');
+      return;
+    }
+    setTranscribing(true);
+    setTranscribeError(null);
+    try {
+      const transcribeVoice = httpsCallable(functions, 'transcribeVoiceMessage');
+      const result = await transcribeVoice({ conversationId: convId, messageId: msgId, audioData: audioUrl });
+      const data = result.data as { transcription?: string; error?: string };
+      if (data.transcription) {
+        setLocalTranscription(data.transcription);
+      } else {
+        setTranscribeError(data.error || 'No speech detected');
+      }
+    } catch (err: unknown) {
+      console.error('[Transcribe] Error:', err);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setTranscribeError(msg.includes('internal') ? 'Transcription failed. Check Speech API is enabled.' : msg);
+    } finally {
+      setTranscribing(false);
+    }
+  };
 
   useEffect(() => {
     if (!audioUrl) return;
@@ -1272,29 +1301,57 @@ function VoiceMessageBubble({ duration, audioUrl, isMine }: { duration: number; 
   const secs = (playing ? displayTime : duration) % 60;
 
   return (
-    <div className="flex items-center gap-3 py-1">
-      <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: audioError ? '#EF4444' : '#6366F1' }} title={audioError ? 'Unable to play audio' : undefined}>
-        {audioError ? <VolumeX size={16} className="text-white" /> : playing ? <Pause size={16} className="text-white" /> : <Play size={16} className="text-white" style={{ marginLeft: '2px' }} />}
-      </button>
-      <div className="flex gap-[3px] items-end flex-1">
-        {[...Array(20)].map((_, i) => {
-          const barProgress = (i + 1) / 20;
-          const isActive = playing && barProgress <= progress;
-          return (
-            <div
-              key={i}
-              className="w-[2.5px] rounded-full transition-colors"
-              style={{
-                height: `${4 + Math.abs(Math.sin(i * 0.8)) * 14}px`,
-                backgroundColor: isActive ? '#6366F1' : '#A5B4FC',
-              }}
-            />
-          );
-        })}
+    <div className="py-1">
+      <div className="flex items-center gap-3">
+        <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: audioError ? '#EF4444' : '#6366F1' }} title={audioError ? 'Unable to play audio' : undefined}>
+          {audioError ? <VolumeX size={16} className="text-white" /> : playing ? <Pause size={16} className="text-white" /> : <Play size={16} className="text-white" style={{ marginLeft: '2px' }} />}
+        </button>
+        <div className="flex gap-[3px] items-end flex-1">
+          {[...Array(20)].map((_, i) => {
+            const barProgress = (i + 1) / 20;
+            const isActive = playing && barProgress <= progress;
+            return (
+              <div
+                key={i}
+                className="w-[2.5px] rounded-full transition-colors"
+                style={{
+                  height: `${4 + Math.abs(Math.sin(i * 0.8)) * 14}px`,
+                  backgroundColor: isActive ? '#6366F1' : '#A5B4FC',
+                }}
+              />
+            );
+          })}
+        </div>
+        <span className="text-[11px] font-mono" style={{ color: 'var(--msg-secondary)' }}>
+          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
+        </span>
       </div>
-      <span className="text-[11px] font-mono" style={{ color: 'var(--msg-secondary)' }}>
-        {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-      </span>
+      {/* Transcription display or button */}
+      {localTranscription ? (
+        <div className="mt-1.5 px-1">
+          <div className="flex items-center gap-1 mb-0.5">
+            <FileText size={10} style={{ color: 'var(--msg-secondary)' }} />
+            <span className="text-[9px] uppercase tracking-wider font-semibold" style={{ color: 'var(--msg-secondary)' }}>Transcript</span>
+          </div>
+          <p className="text-[12px] leading-relaxed" style={{ color: 'var(--msg-text)', opacity: 0.85 }}>{localTranscription}</p>
+        </div>
+      ) : (
+        <button
+          onClick={handleTranscribe}
+          onTouchStart={handleTranscribe}
+          disabled={transcribing || !audioUrl}
+          className="mt-1 flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] transition-colors hover:bg-gray-100 dark:hover:bg-white/5"
+          style={{ color: transcribeError ? '#EF4444' : '#6366F1', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+        >
+          {transcribing ? (
+            <><Loader2 size={12} className="animate-spin" /> Transcribing...</>
+          ) : transcribeError ? (
+            <><AlertCircle size={12} /> {transcribeError}</>
+          ) : (
+            <><FileText size={12} /> Transcribe</>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -1659,6 +1716,7 @@ export default function MessagesPage() {
   const [showPinnedView, setShowPinnedView] = useState(false);
   const [showDisappearingMenu, setShowDisappearingMenu] = useState(false);
   const [disappearingPerMessage, setDisappearingPerMessage] = useState<number | null>(null); // per-message override (ms)
+  const [showPerMsgTimerPicker, setShowPerMsgTimerPicker] = useState(false);
 
   // E2EE state
   const e2ePrivateKeyRef = useRef<CryptoKey | null>(null);
@@ -2508,9 +2566,33 @@ export default function MessagesPage() {
       const expired = messagesRefForCleanup.current.filter(
         (m) => m.disappearing === true && m.expiresAt && m.expiresAt.toMillis() <= now && !m.deleted
       );
+      if (expired.length === 0) return;
+      const expiredIds = new Set(expired.map((m) => m.id));
       for (const msg of expired) {
-        try { await deleteDoc(doc(db, 'conversations', convId, 'messages', msg.id)); } catch {}
+        try { await deleteDoc(doc(db, 'conversations', convId, 'messages', msg.id)); } catch (err) { console.error('[Disappearing] delete error:', err); }
       }
+      // Update conversation lastMessage to the latest non-expired message
+      try {
+        const remaining = messagesRefForCleanup.current.filter(
+          (m) => !expiredIds.has(m.id) && !m.deleted
+        );
+        if (remaining.length > 0) {
+          const latest = remaining[remaining.length - 1];
+          const preview = latest.image ? '📷 Photo' : latest.file ? `📎 ${latest.file.name}` : latest.voiceMessage ? '🎤 Voice message' : (latest.text || '').slice(0, 60);
+          await updateDoc(doc(db, 'conversations', convId), {
+            lastMessage: preview,
+            lastMessageTime: latest.createdAt || serverTimestamp(),
+            lastMessageSenderId: latest.senderId || '',
+          });
+        } else {
+          // All messages expired — clear the preview
+          await updateDoc(doc(db, 'conversations', convId), {
+            lastMessage: '',
+            lastMessageTime: serverTimestamp(),
+            lastMessageSenderId: '',
+          });
+        }
+      } catch (err) { console.error('[Disappearing] lastMessage update error:', err); }
     }, 15_000);
     return () => clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4733,7 +4815,7 @@ export default function MessagesPage() {
                               </div>
                             ) : msg.voiceMessage ? (
                               <div className="px-2.5 pt-1.5 pb-1">
-                                <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} />
+                                <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} transcription={msg.voiceMessage.transcription} msgId={msg.id} convId={selectedConvId || undefined} />
                               </div>
                             ) : msg.file ? (
                               <div className="px-2.5 pt-1.5 pb-1">
@@ -4934,27 +5016,74 @@ export default function MessagesPage() {
               <span className="text-xs font-bold" style={{ color: 'var(--msg-icon)' }}>GIF</span>
             </button>
             {/* Disappearing message per-message timer toggle */}
-            <button
-              onClick={() => {
-                if (disappearingPerMessage) {
-                  setDisappearingPerMessage(null);
-                } else {
-                  const convTimer = conversations.find(c => c.id === selectedConvId)?.disappearingTimer;
-                  const idx = DISAPPEARING_TIMER_OPTIONS.findIndex(o => o.value === convTimer);
-                  setDisappearingPerMessage(DISAPPEARING_TIMER_OPTIONS[(idx + 1) % DISAPPEARING_TIMER_OPTIONS.length].value);
-                }
-              }}
-              className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors relative"
-              style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
-              aria-label="Toggle disappearing message timer"
-            >
-              <Timer size={20} style={{ color: (disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer) ? '#10b981' : 'var(--msg-icon)' }} />
-              {(disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer) ? (
-                <span className="absolute -top-1 -right-1 text-[7px] font-bold bg-emerald-500 text-white rounded-full w-4 h-4 flex items-center justify-center leading-none">
-                  {formatDisappearingTimer(disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer || 0)}
-                </span>
-              ) : null}
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowPerMsgTimerPicker(!showPerMsgTimerPicker)}
+                onTouchStart={() => setShowPerMsgTimerPicker(!showPerMsgTimerPicker)}
+                className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors relative"
+                style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                aria-label="Set disappearing message timer"
+              >
+                <Timer size={20} style={{ color: (disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer) ? '#10b981' : 'var(--msg-icon)' }} />
+                {(disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer) ? (
+                  <span className="absolute -top-1 -right-1 text-[7px] font-bold bg-emerald-500 text-white rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                    {formatDisappearingTimer(disappearingPerMessage || conversations.find(c => c.id === selectedConvId)?.disappearingTimer || 0)}
+                  </span>
+                ) : null}
+              </button>
+              {showPerMsgTimerPicker && (() => {
+                const btnEl = document.querySelector('[aria-label="Set disappearing message timer"]');
+                const rect = btnEl?.getBoundingClientRect();
+                const popupBottom = rect ? rect.top - 8 : 200;
+                const popupLeft = rect ? Math.max(8, rect.left + rect.width / 2 - 80) : 40;
+                return (
+                <>
+                  <div
+                    className="fixed inset-0"
+                    style={{ zIndex: 9998, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                    onClick={() => setShowPerMsgTimerPicker(false)}
+                    onTouchStart={() => setShowPerMsgTimerPicker(false)}
+                  />
+                  <div
+                    className="fixed rounded-xl shadow-lg border py-1.5 w-40"
+                    style={{
+                      zIndex: 9999,
+                      bottom: `${window.innerHeight - popupBottom}px`,
+                      left: `${popupLeft}px`,
+                      backgroundColor: 'var(--aurora-surface)',
+                      borderColor: 'var(--aurora-border)',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--msg-secondary)' }}>
+                      Timer for next message
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDisappearingPerMessage(null); setShowPerMsgTimerPicker(false); }}
+                      onTouchStart={(e) => { e.stopPropagation(); setDisappearingPerMessage(null); setShowPerMsgTimerPicker(false); }}
+                      className="w-full px-3 py-1.5 text-left text-sm flex items-center justify-between hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                      style={{ color: !disappearingPerMessage ? '#10b981' : 'var(--msg-text)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                    >
+                      <span className="flex items-center gap-2"><TimerOff size={14} /> Off</span>
+                      {!disappearingPerMessage && <span className="text-emerald-500 text-xs">✓</span>}
+                    </button>
+                    {DISAPPEARING_TIMER_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={(e) => { e.stopPropagation(); setDisappearingPerMessage(opt.value); setShowPerMsgTimerPicker(false); }}
+                        onTouchStart={(e) => { e.stopPropagation(); setDisappearingPerMessage(opt.value); setShowPerMsgTimerPicker(false); }}
+                        className="w-full px-3 py-1.5 text-left text-sm flex items-center justify-between hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                        style={{ color: disappearingPerMessage === opt.value ? '#10b981' : 'var(--msg-text)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <span className="flex items-center gap-2"><Timer size={14} /> {opt.label}</span>
+                        {disappearingPerMessage === opt.value && <span className="text-emerald-500 text-xs">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+                );
+              })()}
+            </div>
           </div>
           <div className="flex-1 min-w-0 rounded-3xl px-3 py-2 flex items-center" style={{ backgroundColor: 'var(--aurora-surface)', minHeight: '42px' }}>
             <textarea

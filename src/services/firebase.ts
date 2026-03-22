@@ -3,6 +3,7 @@ import { initializeAuth, browserLocalPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getMessaging, getToken, onMessage, isSupported, type Messaging } from 'firebase/messaging';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const firebaseConfig = {
   apiKey: "AIzaSyClfuZtD0Si-oZ0QRJXcVFvyakYh0Csgyo",
@@ -43,4 +44,7 @@ const initMessaging = async (): Promise<Messaging | null> => {
   return messaging;
 };
 
-export { app, auth, db, storage, initMessaging, getToken, onMessage };
+// Initialize Functions
+const functions = getFunctions(app);
+
+export { app, auth, db, storage, functions, httpsCallable, initMessaging, getToken, onMessage };
