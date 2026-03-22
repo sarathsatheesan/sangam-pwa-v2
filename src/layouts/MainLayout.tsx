@@ -5,6 +5,7 @@ import ModuleSelector from '../components/layout/ModuleSelector';
 import AppFooter from '../components/layout/AppFooter';
 import { ToastContainer } from '../components/shared/Toast';
 import GlobalCallOverlay from '../components/GlobalCallOverlay';
+import GroupCallOverlay from '../components/GroupCallOverlay';
 
 export const MainLayout: React.FC = () => {
   return (
@@ -28,6 +29,9 @@ export const MainLayout: React.FC = () => {
 
       {/* Global call overlay — persists across all route changes */}
       <GlobalCallOverlay />
+
+      {/* Group call overlay — multi-party mesh calls */}
+      <GroupCallOverlay />
     </div>
   );
 };

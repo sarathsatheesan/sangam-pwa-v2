@@ -66,6 +66,9 @@ const GlobalCallOverlay: React.FC = () => {
   const [callState, setCallState] = useState<CallState>(getCallManager().getState());
   const [callMinimized, setCallMinimized] = useState(false);
 
+  // Deduplication guard — prevents writing the same call event twice
+  const writtenCallIdsRef = useRef<Set<string>>(new Set());
+
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -96,6 +99,14 @@ const GlobalCallOverlay: React.FC = () => {
     const unsub = callManagerRef.current.onCallEnded(async (event: CallEndedEvent) => {
       // Only the CALLER writes the call event message to prevent duplicates
       if (!event.isCaller) return;
+      // Dedup guard: skip if we already wrote an event for this callId
+      if (writtenCallIdsRef.current.has(event.callId)) {
+        console.log('[CallEvent] Skipping duplicate for callId:', event.callId);
+        return;
+      }
+      writtenCallIdsRef.current.add(event.callId);
+      // Clean up old entries after 30s to prevent memory leak
+      setTimeout(() => writtenCallIdsRef.current.delete(event.callId), 30_000);
       try {
         let eventType: 'missed' | 'completed' | 'rejected' | 'cancelled';
         if (event.endReason === 'timeout') {
@@ -120,7 +131,10 @@ const GlobalCallOverlay: React.FC = () => {
               ? `Declined ${callLabel.toLowerCase()} call`
               : `Cancelled ${callLabel.toLowerCase()} call`;
 
-        await addDoc(collection(db, 'conversations', convId, 'messages'), {
+        // Use setDoc with deterministic ID to prevent duplicates —
+        // even if this fires twice, it overwrites the same document
+        const callEventDocId = `call_${event.callId}`;
+        await setDoc(doc(db, 'conversations', convId, 'messages', callEventDocId), {
           text: textLabel,
           senderId: user.uid,
           time: formatMessageTime(Timestamp.now()),

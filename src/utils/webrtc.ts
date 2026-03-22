@@ -100,6 +100,8 @@ export class CallManager {
   private remoteDescriptionSet = false;
   // Guard against endCall being called multiple times concurrently
   private endingCall = false;
+  // Dedup: track callIds for which we already fired the ended event
+  private firedEndedCallIds: Set<string> = new Set();
   // Track current camera facing mode (getSettings() is unreliable on some devices)
   private currentFacingMode: 'user' | 'environment' = 'user';
   // Adaptive bitrate monitoring
@@ -661,8 +663,11 @@ export class CallManager {
       }
     }
 
-    // Fire call-ended event for chat message logging
-    if (callId && peerId) {
+    // Fire call-ended event for chat message logging (ONCE per callId)
+    if (callId && peerId && !this.firedEndedCallIds.has(callId)) {
+      this.firedEndedCallIds.add(callId);
+      // Clean up after 60s to prevent memory leak
+      setTimeout(() => this.firedEndedCallIds.delete(callId), 60_000);
       const event: CallEndedEvent = {
         callId,
         callType,

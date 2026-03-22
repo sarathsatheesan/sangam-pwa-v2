@@ -36,6 +36,11 @@ import {
   getCallManager,
   type CallState, type CallType,
 } from '@/utils/webrtc';
+import {
+  getGroupCallManager,
+  GroupCallManager,
+  type GroupCallState, type GroupCallType,
+} from '@/utils/groupWebrtc';
 
 // ===== TYPES =====
 /**
@@ -1451,10 +1456,7 @@ function WallpaperPicker({
   );
 }
 
-/**
- * UndoToast Component
- * Notification toast for message undo functionality with auto-dismiss
- */
+/* UndoToast Component — COMMENTED OUT (duplicate of delete functionality)
 function UndoToast({ onUndo, onDismiss }: { onUndo: () => void; onDismiss: () => void }) {
   useEffect(() => {
     const timer = setTimeout(onDismiss, MESSAGE_CONFIG.UNDO_TOAST_DURATION_MS);
@@ -1470,6 +1472,7 @@ function UndoToast({ onUndo, onDismiss }: { onUndo: () => void; onDismiss: () =>
     </div>
   );
 }
+*/
 
 /**
  * NotificationToast Component
@@ -1666,8 +1669,8 @@ export default function MessagesPage() {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
-  const [undoMessageId, setUndoMessageId] = useState<string | null>(null);
-  const [showUndoToast, setShowUndoToast] = useState(false);
+  // const [undoMessageId, setUndoMessageId] = useState<string | null>(null); // COMMENTED OUT — undo feature disabled
+  // const [showUndoToast, setShowUndoToast] = useState(false); // COMMENTED OUT — undo feature disabled
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -1743,6 +1746,11 @@ export default function MessagesPage() {
   const [callState, setCallState] = useState<CallState>(getCallManager().getState());
   const callManagerRef = useRef(getCallManager());
 
+  // Group call state
+  const [groupCallState, setGroupCallState] = useState<GroupCallState>(getGroupCallManager().getState());
+  const groupCallManagerRef = useRef(getGroupCallManager());
+  const [activeGroupCallId, setActiveGroupCallId] = useState<string | null>(null);
+
   // Refs
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1761,6 +1769,37 @@ export default function MessagesPage() {
     });
     return unsub;
   }, []);
+
+  // Subscribe to group call manager state changes
+  useEffect(() => {
+    const unsub = groupCallManagerRef.current.subscribe((state) => {
+      setGroupCallState(state);
+    });
+    return unsub;
+  }, []);
+
+  // Check for active group call when selecting a group conversation
+  useEffect(() => {
+    if (!selectedConvId) { setActiveGroupCallId(null); return; }
+    const conv = conversations.find((c) => c.id === selectedConvId);
+    if (!conv?.isGroup) { setActiveGroupCallId(null); return; }
+    let cancelled = false;
+    GroupCallManager.getActiveCall(selectedConvId).then((roomId) => {
+      if (!cancelled) setActiveGroupCallId(roomId);
+    }).catch(() => {});
+    // Also listen for groupCalls changes for this conversation
+    const q = query(
+      collection(db, 'groupCalls'),
+      where('conversationId', '==', selectedConvId),
+      where('status', '==', 'active'),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      if (!cancelled) {
+        setActiveGroupCallId(snap.empty ? null : snap.docs[0].id);
+      }
+    });
+    return () => { cancelled = true; unsub(); };
+  }, [selectedConvId, conversations]);
 
   // E2EE: Generate/load ECDH key pair on mount (syncs across devices via Firestore)
   useEffect(() => {
@@ -1907,6 +1946,32 @@ export default function MessagesPage() {
       }
     }
   }, [searchParams, users, selectedUser, setSearchParams]);
+
+  // Auto-join group call from deep link (e.g. ?joinCall=gc_xxx&conv=yyy)
+  useEffect(() => {
+    const joinCallId = searchParams.get('joinCall');
+    const convId = searchParams.get('conv');
+    if (!joinCallId || !convId || !user?.uid || !conversations.length) return;
+    // Find the conversation
+    const conv = conversations.find((c) => c.id === convId);
+    if (!conv) return;
+    // Clean up URL params immediately to prevent re-triggering
+    setSearchParams({}, { replace: true });
+    // Select the conversation
+    if (conv.isGroup) {
+      setSelectedConvId(convId);
+      setSelectedUser(null);
+      setViewState('room');
+    }
+    // Join the call after a short delay to let state settle
+    const timer = setTimeout(() => {
+      const myName = userProfile?.name || userProfile?.preferredName || user.displayName || 'User';
+      groupCallManagerRef.current.joinCall(joinCallId, user.uid, myName)
+        .then(() => { setActiveGroupCallId(joinCallId); })
+        .catch((err: Error) => showNotif(err.message || 'Failed to join call', 'error'));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchParams, user, conversations, userProfile]);
 
   // ===== PRESENCE SYSTEM =====
   // Writes current user's presence to Firestore and listens for other users' presence.
@@ -2782,8 +2847,9 @@ export default function MessagesPage() {
       }
       const disappearingExtra = getDisappearingFields(convId);
       const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), { ...msgData, ...disappearingExtra });
-      setUndoMessageId(msgRef.id);
-      setShowUndoToast(true);
+      // setUndoMessageId(msgRef.id); // COMMENTED OUT — undo feature disabled
+      // setShowUndoToast(true); // COMMENTED OUT — undo feature disabled
+      void msgRef; // suppress unused variable warning
       setMessageText('');
       setPendingImage(null);
       setPendingFile(null);
@@ -3095,8 +3161,9 @@ export default function MessagesPage() {
         voiceMsgData.senderPublicKey = e2ePublicKeyRef.current;
       }
       const msgRef = await addDoc(collection(db, 'conversations', convId, 'messages'), { ...voiceMsgData, ...getDisappearingFields(convId) });
-      setUndoMessageId(msgRef.id);
-      setShowUndoToast(true);
+      // setUndoMessageId(msgRef.id); // COMMENTED OUT — undo feature disabled
+      // setShowUndoToast(true); // COMMENTED OUT — undo feature disabled
+      void msgRef;
       if (disappearingPerMessage) setDisappearingPerMessage(null);
       const convUpdateData: Record<string, unknown> = {
         lastMessage: '🎤 Voice message',
@@ -3393,6 +3460,7 @@ export default function MessagesPage() {
     }
   };
 
+  /* undoSend — COMMENTED OUT (duplicate of delete functionality)
   const undoSend = async () => {
     if (!undoMessageId) return;
     if (!user?.uid) return;
@@ -3408,6 +3476,7 @@ export default function MessagesPage() {
     setUndoMessageId(null);
     setShowUndoToast(false);
   };
+  */
 
   const toggleMuteConversation = async (convId: string, currentMuted: boolean) => {
     try {
@@ -4048,7 +4117,7 @@ export default function MessagesPage() {
           </>
         ) : null}
         <div className="flex gap-1">
-          {/* Audio call button (1:1 only) */}
+          {/* Audio call button — 1:1 */}
           {selectedUser && !activeGroupConv && (
             <button
               onClick={() => initiateCall('audio')}
@@ -4059,7 +4128,7 @@ export default function MessagesPage() {
               <Phone size={18} className="text-white" />
             </button>
           )}
-          {/* Video call button (1:1 only) */}
+          {/* Video call button — 1:1 */}
           {selectedUser && !activeGroupConv && (
             <button
               onClick={() => initiateCall('video')}
@@ -4069,6 +4138,31 @@ export default function MessagesPage() {
             >
               <Video size={18} className="text-white" />
             </button>
+          )}
+          {/* Group call buttons */}
+          {activeGroupConv && (
+            <>
+              <button
+                onClick={() => initiateGroupCall('audio')}
+                onTouchStart={(e) => { e.preventDefault(); initiateGroupCall('audio'); }}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Group audio call"
+                disabled={groupCallState.status !== 'idle'}
+                style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <Phone size={18} className="text-white" />
+              </button>
+              <button
+                onClick={() => initiateGroupCall('video')}
+                onTouchStart={(e) => { e.preventDefault(); initiateGroupCall('video'); }}
+                className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Group video call"
+                disabled={groupCallState.status !== 'idle'}
+                style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+              >
+                <Video size={18} className="text-white" />
+              </button>
+            </>
           )}
           <button
             onClick={() => setChatSearch(!chatSearch)}
@@ -4237,6 +4331,46 @@ export default function MessagesPage() {
           }}
           onClose={() => setChatSearch(false)}
         />
+      )}
+
+      {/* Active group call banner — shown when there's an active call in this group conversation */}
+      {activeGroupCallId && activeGroupConv && groupCallState.status === 'idle' && (
+        <div
+          className="flex items-center gap-2 px-3 py-2 border-b cursor-pointer"
+          style={{
+            background: 'linear-gradient(90deg, #7e22ce15, #4f46e515)',
+            borderColor: 'rgba(124, 58, 206, 0.2)',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          onClick={() => {
+            if (!user?.uid) return;
+            groupCallManagerRef.current.joinCall(
+              activeGroupCallId,
+              user.uid,
+              userProfile?.name || userProfile?.preferredName || user.displayName || 'User',
+            ).catch((err: Error) => showNotif(err.message || 'Failed to join call', 'error'));
+          }}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            if (!user?.uid) return;
+            groupCallManagerRef.current.joinCall(
+              activeGroupCallId,
+              user.uid,
+              userProfile?.name || userProfile?.preferredName || user.displayName || 'User',
+            ).catch((err: Error) => showNotif(err.message || 'Failed to join call', 'error'));
+          }}
+        >
+          <div className="w-8 h-8 rounded-full flex items-center justify-center animate-pulse" style={{ background: '#7e22ce30' }}>
+            <Phone size={14} className="text-purple-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-[12px] font-semibold text-purple-700 dark:text-purple-400">Group call in progress</span>
+            <span className="text-[11px] text-purple-500 dark:text-purple-500 ml-2">Tap to join</span>
+          </div>
+          <div className="px-3 py-1 rounded-full text-[11px] font-semibold text-white" style={{ background: '#7e22ce' }}>
+            Join
+          </div>
+        </div>
       )}
 
       {/* Disappearing messages active banner */}
@@ -5207,7 +5341,49 @@ export default function MessagesPage() {
     }
   };
 
+  // === Group Call Helper ===
+  const initiateGroupCall = async (callType: GroupCallType) => {
+    if (!user?.uid || !selectedConvId || !activeGroupConv) return;
+    const myName = userProfile?.name || userProfile?.preferredName || user.displayName || 'User';
+    try {
+      if (activeGroupCallId) {
+        // Join existing group call
+        await groupCallManagerRef.current.joinCall(activeGroupCallId, user.uid, myName);
+      } else {
+        // Start new group call
+        const roomId = await groupCallManagerRef.current.startCall(selectedConvId, callType, user.uid, myName);
+        setActiveGroupCallId(roomId);
+        // Write a system message to the conversation
+        try {
+          await addDoc(collection(db, 'conversations', selectedConvId, 'messages'), {
+            text: `${myName} started a group ${callType} call`,
+            senderId: 'system',
+            createdAt: serverTimestamp(),
+            callEvent: { type: 'group_call_started', callType },
+          });
+        } catch (e) { console.error('[GroupCall] system msg error:', e); }
+      }
+    } catch (err) {
+      console.error('[GroupCall] Failed:', err);
+      const msg = err instanceof Error ? err.message : '';
+      let errorText = 'Failed to start group call.';
+      if (msg.includes('Permission') || msg.includes('NotAllowed')) {
+        errorText = callType === 'video'
+          ? 'Camera and microphone access required. Please allow in browser settings.'
+          : 'Microphone access required. Please allow in browser settings.';
+      } else if (msg.includes('full')) {
+        errorText = 'Call is full (max 8 participants).';
+      } else if (msg.includes('Already')) {
+        errorText = 'You are already in a call.';
+      } else if (msg.includes('ended')) {
+        errorText = 'This call has already ended.';
+      }
+      showNotif(errorText, 'error');
+    }
+  };
+
   // Call overlay UI is now in GlobalCallOverlay (src/components/GlobalCallOverlay.tsx)
+  // Group call overlay is in GroupCallOverlay (src/components/GroupCallOverlay.tsx)
 
   // === MOBILE LAYOUT: full-screen chat when in room view ===
   // === DESKTOP LAYOUT (md+): side-by-side panels like WhatsApp Web ===
@@ -5287,7 +5463,8 @@ export default function MessagesPage() {
           onClose={() => setShowWallpaperPicker(false)}
         />
       )}
-      {showUndoToast && <UndoToast onUndo={undoSend} onDismiss={() => setShowUndoToast(false)} />}
+      {/* COMMENTED OUT — undo feature disabled (duplicate of delete) */}
+      {/* {showUndoToast && <UndoToast onUndo={undoSend} onDismiss={() => setShowUndoToast(false)} />} */}
       {showNotification && (
         <NotificationToast
           message={notificationMessage}
