@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
   getGroupCallManager,
   type GroupCallState, type GroupCallEndedEvent, type GroupCallType,
@@ -165,6 +166,8 @@ function getGridLayout(count: number): { cols: number; rows: number } {
 
 export default function GroupCallOverlay() {
   const { user, userProfile } = useAuth();
+  const { isFeatureEnabled } = useFeatureSettings();
+  const screenSharingEnabled = isFeatureEnabled('messages_screenSharing');
   const [callState, setCallState] = useState<GroupCallState | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -418,7 +421,7 @@ export default function GroupCallOverlay() {
         )}
 
         {/* Screen Share (video calls only, not on mobile) */}
-        {callType === 'video' && typeof navigator !== 'undefined' && 'getDisplayMedia' in (navigator.mediaDevices || {}) && (
+        {screenSharingEnabled && callType === 'video' && typeof navigator !== 'undefined' && 'getDisplayMedia' in (navigator.mediaDevices || {}) && (
           <button
             onClick={() => manager.toggleScreenShare()}
             onTouchStart={(e) => { e.preventDefault(); manager.toggleScreenShare(); }}

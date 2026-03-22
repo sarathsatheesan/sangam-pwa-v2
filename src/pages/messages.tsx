@@ -741,7 +741,7 @@ function MessageContextMenu({
   isStarred,
 }: {
   isMine: boolean;
-  onDelete: () => void;
+  onDelete?: () => void;
   onEdit?: () => void;
   onReport?: () => void;
   onBlock?: () => void;
@@ -790,7 +790,7 @@ function MessageContextMenu({
             <Edit3 size={15} className="text-aurora-indigo" /> Edit
           </button>
         )}
-        {isMine && (
+        {isMine && onDelete && (
           <button
             onClick={() => {
               onDelete();
@@ -1200,7 +1200,7 @@ function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number, audioB
  * VoiceMessageBubble Component
  * Displays voice message with play/pause button and duration
  */
-function VoiceMessageBubble({ duration, audioUrl, isMine, transcription, msgId, convId }: { duration: number; audioUrl?: string; isMine: boolean; transcription?: string; msgId?: string; convId?: string }) {
+function VoiceMessageBubble({ duration, audioUrl, isMine, transcription, msgId, convId, voiceToTextEnabled = true }: { duration: number; audioUrl?: string; isMine: boolean; transcription?: string; msgId?: string; convId?: string; voiceToTextEnabled?: boolean }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioError, setAudioError] = useState(false);
@@ -1340,7 +1340,7 @@ function VoiceMessageBubble({ duration, audioUrl, isMine, transcription, msgId, 
           </div>
           <p className="text-[12px] leading-relaxed" style={{ color: 'var(--msg-text)', opacity: 0.85 }}>{localTranscription}</p>
         </div>
-      ) : (
+      ) : voiceToTextEnabled ? (
         <button
           onClick={handleTranscribe}
           onTouchStart={handleTranscribe}
@@ -1356,7 +1356,7 @@ function VoiceMessageBubble({ duration, audioUrl, isMine, transcription, msgId, 
             <><FileText size={12} /> Transcribe</>
           )}
         </button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1645,6 +1645,25 @@ export default function MessagesPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const encryptionEnabled = isFeatureEnabled('messages_encryption');
+  const voiceMessagesEnabled = isFeatureEnabled('messages_voiceMessages');
+  const voiceToTextEnabled = isFeatureEnabled('messages_voiceToText');
+  const fileSharingEnabled = isFeatureEnabled('messages_fileSharing');
+  const linkPreviewsEnabled = isFeatureEnabled('messages_linkPreviews');
+  const gifStickersEnabled = isFeatureEnabled('messages_gifStickers');
+  const disappearingMessagesEnabled = isFeatureEnabled('messages_disappearingMessages');
+  const groupCallsEnabled = isFeatureEnabled('messages_groupCalls');
+  const oneToOneCallsEnabled = isFeatureEnabled('messages_oneToOneCalls');
+  const screenSharingEnabled = isFeatureEnabled('messages_screenSharing');
+  const pushNotificationsEnabled = isFeatureEnabled('messages_pushNotifications');
+  const onlineLastSeenEnabled = isFeatureEnabled('messages_onlineLastSeen');
+  const pinnedMessagesEnabled = isFeatureEnabled('messages_pinnedMessages');
+  const starredMessagesEnabled = isFeatureEnabled('messages_starredMessages');
+  const forwardMessagesEnabled = isFeatureEnabled('messages_forwardMessages');
+  const deleteMessagesEnabled = isFeatureEnabled('messages_deleteMessages');
+  const emojiPickerEnabled = isFeatureEnabled('messages_emojiPicker');
+  const wallpaperEnabled = isFeatureEnabled('messages_wallpaper');
+  const searchEnabled = isFeatureEnabled('messages_search');
+  const readReceiptsEnabled = isFeatureEnabled('messages_readReceipts');
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'connects' | 'archived'>('all');
   const [showPenMenu, setShowPenMenu] = useState(false);
   const [showNewMsgPicker, setShowNewMsgPicker] = useState(false);
@@ -1977,7 +1996,7 @@ export default function MessagesPage() {
   // Writes current user's presence to Firestore and listens for other users' presence.
   // Uses heartbeat (60s), visibilitychange (away detection), and beforeunload (offline).
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !onlineLastSeenEnabled) return;
     const userDocRef = doc(db, 'users', user.uid);
     let heartbeatTimer: ReturnType<typeof setInterval>;
     let awayTimer: ReturnType<typeof setTimeout>;
@@ -2529,7 +2548,7 @@ export default function MessagesPage() {
   // Cross-browser: Chrome, Firefox, Safari desktop, Android Chrome, iOS Safari 16.4+ (PWA).
   // Guards: isSupported(), navigator.serviceWorker check, Notification API check.
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!user?.uid || !pushNotificationsEnabled) return;
     const setupPushNotifications = async () => {
       try {
         // Guard: service workers not available in all contexts
@@ -4107,18 +4126,20 @@ export default function MessagesPage() {
           </>
         ) : selectedUser ? (
           <>
-            <ChatAvatar user={selectedUser} size="sm" showOnlineStatus={true} />
+            <ChatAvatar user={selectedUser} size="sm" showOnlineStatus={onlineLastSeenEnabled} />
             <div className="flex-1 min-w-0">
               <h2 className="font-medium text-white text-[15px] leading-tight">{selectedUser.name}</h2>
+              {onlineLastSeenEnabled && (
               <div className="text-xs leading-tight" style={{ color: 'rgba(255,255,255,0.7)' }}>
                 {isOtherUserTyping ? 'typing...' : getPresenceText(selectedUser)}
               </div>
+              )}
             </div>
           </>
         ) : null}
         <div className="flex gap-1">
           {/* Audio call button — 1:1 */}
-          {selectedUser && !activeGroupConv && (
+          {oneToOneCallsEnabled && selectedUser && !activeGroupConv && (
             <button
               onClick={() => initiateCall('audio')}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
@@ -4129,7 +4150,7 @@ export default function MessagesPage() {
             </button>
           )}
           {/* Video call button — 1:1 */}
-          {selectedUser && !activeGroupConv && (
+          {oneToOneCallsEnabled && selectedUser && !activeGroupConv && (
             <button
               onClick={() => initiateCall('video')}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
@@ -4140,7 +4161,7 @@ export default function MessagesPage() {
             </button>
           )}
           {/* Group call buttons */}
-          {activeGroupConv && (
+          {groupCallsEnabled && activeGroupConv && (
             <>
               <button
                 onClick={() => initiateGroupCall('audio')}
@@ -4164,6 +4185,7 @@ export default function MessagesPage() {
               </button>
             </>
           )}
+          {searchEnabled && (
           <button
             onClick={() => setChatSearch(!chatSearch)}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
@@ -4171,6 +4193,7 @@ export default function MessagesPage() {
           >
             <SearchIcon size={18} className="text-white" />
           </button>
+          )}
           <div className="relative" ref={chatMenuRef}>
             <button
               onClick={() => setShowChatMenu(!showChatMenu)}
@@ -4195,6 +4218,7 @@ export default function MessagesPage() {
                     <Settings size={16} style={{ color: 'var(--msg-secondary)' }} /> Group Info
                   </button>
                 )}
+                {wallpaperEnabled && (
                 <button
                   onClick={() => {
                     setShowWallpaperPicker(true);
@@ -4205,6 +4229,7 @@ export default function MessagesPage() {
                 >
                   <Palette size={16} style={{ color: 'var(--msg-secondary)' }} /> Wallpaper
                 </button>
+                )}
                 <button
                   onClick={() => {
                     setCompactMode(!compactMode);
@@ -4247,6 +4272,7 @@ export default function MessagesPage() {
                   </button>
                 )}
                 {/* Starred Messages view */}
+                {starredMessagesEnabled && (
                 <button
                   onClick={() => {
                     setShowStarredView(true);
@@ -4257,7 +4283,9 @@ export default function MessagesPage() {
                 >
                   <Star size={16} className="text-amber-500" /> Starred Messages
                 </button>
+                )}
                 {/* Pinned Messages view */}
+                {pinnedMessagesEnabled && (
                 <button
                   onClick={() => {
                     setShowPinnedView(true);
@@ -4268,8 +4296,9 @@ export default function MessagesPage() {
                 >
                   <Pin size={16} className="text-amber-600" /> Pinned Messages
                 </button>
+                )}
                 {/* Disappearing Messages */}
-                {selectedConvId && (
+                {disappearingMessagesEnabled && selectedConvId && (
                   <button
                     onClick={() => {
                       setShowDisappearingMenu(true);
@@ -4384,7 +4413,7 @@ export default function MessagesPage() {
       ) : null}
 
       {/* Pinned messages banner */}
-      {pinnedMessages.length > 0 && showPinnedBanner && (
+      {pinnedMessagesEnabled && pinnedMessages.length > 0 && showPinnedBanner && (
         <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800/30" style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => {
           const lastPinned = pinnedMessages[pinnedMessages.length - 1];
           const idx = messages.findIndex(m => m.id === lastPinned.id);
@@ -4949,7 +4978,7 @@ export default function MessagesPage() {
                               </div>
                             ) : msg.voiceMessage ? (
                               <div className="px-2.5 pt-1.5 pb-1">
-                                <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} transcription={msg.voiceMessage.transcription} msgId={msg.id} convId={selectedConvId || undefined} />
+                                <VoiceMessageBubble duration={msg.voiceMessage.duration} audioUrl={msg.voiceMessage.audioUrl} isMine={isMine} transcription={msg.voiceMessage.transcription} msgId={msg.id} convId={selectedConvId || undefined} voiceToTextEnabled={voiceToTextEnabled} />
                               </div>
                             ) : msg.file ? (
                               <div className="px-2.5 pt-1.5 pb-1">
@@ -5020,7 +5049,7 @@ export default function MessagesPage() {
                                     <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? 'var(--msg-system-text)' : 'var(--msg-text)' }}>
                                       {msg.text && renderFormattedText(msg.text)}
                                       {/* Link preview for URLs in message */}
-                                      {msg.text && !msg.deleted && (() => {
+                                      {linkPreviewsEnabled && msg.text && !msg.deleted && (() => {
                                         const urls = msg.text.match(URL_REGEX);
                                         if (!urls || urls.length === 0) return null;
                                         return <LinkPreviewCard url={urls[0]} />;
@@ -5034,7 +5063,7 @@ export default function MessagesPage() {
                                         <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>
                                           {formatMessageTime(msg.createdAt)}
                                         </span>
-                                        {isMine && (
+                                        {readReceiptsEnabled && isMine && (
                                           msg.read
                                             ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
                                             : <Check size={14} style={{ color: '#B0B6B9' }} />
@@ -5131,15 +5160,20 @@ export default function MessagesPage() {
         <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" ref={fileInputRef} onChange={handleFilePick} className="hidden" />
         <div className="px-1 sm:px-3 py-1.5 flex items-end gap-1 sm:gap-2" style={{ overflow: 'hidden' }}>
           <div className="flex gap-0 flex-shrink-0 pb-1">
+            {emojiPickerEnabled && (
             <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Toggle emoji picker">
               <Smile size={20} style={{ color: 'var(--msg-icon)' }} />
             </button>
+            )}
             <button onClick={() => imageInputRef.current?.click()} className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach image">
               <ImagePlus size={20} style={{ color: 'var(--msg-icon)' }} />
             </button>
+            {fileSharingEnabled && (
             <button onClick={() => fileInputRef.current?.click()} className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors" aria-label="Attach file" onTouchStart={() => fileInputRef.current?.click()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               <Paperclip size={20} style={{ color: 'var(--msg-icon)' }} />
             </button>
+            )}
+            {gifStickersEnabled && (
             <button
               onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }}
               onTouchStart={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }}
@@ -5149,7 +5183,9 @@ export default function MessagesPage() {
             >
               <span className="text-xs font-bold" style={{ color: 'var(--msg-icon)' }}>GIF</span>
             </button>
+            )}
             {/* Disappearing message per-message timer toggle */}
+            {disappearingMessagesEnabled && (
             <div className="relative">
               <button
                 onClick={() => setShowPerMsgTimerPicker(!showPerMsgTimerPicker)}
@@ -5218,6 +5254,7 @@ export default function MessagesPage() {
                 );
               })()}
             </div>
+            )}
           </div>
           <div className="flex-1 min-w-0 rounded-3xl px-3 py-2 flex items-center" style={{ backgroundColor: 'var(--aurora-surface)', minHeight: '42px' }}>
             <textarea
@@ -5247,7 +5284,7 @@ export default function MessagesPage() {
               >
                 <Send size={18} className="text-white" style={{ marginLeft: '2px' }} />
               </button>
-            ) : (
+            ) : voiceMessagesEnabled ? (
               <button
                 onClick={async () => {
                   // Quick check if mic permission is explicitly denied (non-blocking)
@@ -5269,10 +5306,10 @@ export default function MessagesPage() {
               >
                 <Mic size={20} className="text-white" />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
-        {showEmojiPicker && (
+        {emojiPickerEnabled && showEmojiPicker && (
           <EmojiPicker
             recentEmojis={recentEmojis}
             onSelect={(emoji) => {
@@ -5282,7 +5319,7 @@ export default function MessagesPage() {
             onClose={() => setShowEmojiPicker(false)}
           />
         )}
-        {showGifPicker && (
+        {gifStickersEnabled && showGifPicker && (
           <GifPicker
             onSelect={(gifUrl) => { sendGif(gifUrl); setShowGifPicker(false); }}
             onClose={() => setShowGifPicker(false)}
@@ -5418,28 +5455,28 @@ export default function MessagesPage() {
             setContextMenuMsg(null);
             textareaRef.current?.focus();
           }}
-          onForward={() => {
+          onForward={forwardMessagesEnabled ? () => {
             setForwardingMessage(contextMenuMsg);
             setShowForwardPicker(true);
             setContextMenuMsg(null);
-          }}
-          onPin={() => {
+          } : undefined}
+          onPin={pinnedMessagesEnabled ? () => {
             togglePinMessage(contextMenuMsg);
             setContextMenuMsg(null);
-          }}
-          onStar={() => {
+          } : undefined}
+          onStar={starredMessagesEnabled ? () => {
             toggleStarMessage(contextMenuMsg);
             setContextMenuMsg(null);
-          }}
+          } : undefined}
           onEdit={() => {
             setEditingMessage(contextMenuMsg);
             setMessageText(contextMenuMsg.text);
             setContextMenuMsg(null);
           }}
-          onDelete={() => {
+          onDelete={deleteMessagesEnabled ? () => {
             deleteMessage(contextMenuMsg.id);
             setContextMenuMsg(null);
-          }}
+          } : undefined}
           onReport={contextMenuMsg.senderId !== user?.uid ? () => {
             openReportModal(contextMenuMsg.id, contextMenuMsg.text, contextMenuMsg.senderId);
             setContextMenuMsg(null);
