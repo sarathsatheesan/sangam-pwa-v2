@@ -399,8 +399,14 @@ const GlobalCallOverlay: React.FC = () => {
             transform: 'translateZ(0)',
             WebkitBackfaceVisibility: 'hidden',
             backfaceVisibility: 'hidden',
+            WebkitTapHighlightColor: 'transparent',
           }}
           onClick={() => {
+            setCallMinimized(false);
+            retryMediaPlayback();
+            setTimeout(retryMediaPlayback, 300);
+          }}
+          onTouchStart={() => {
             setCallMinimized(false);
             retryMediaPlayback();
             setTimeout(retryMediaPlayback, 300);
