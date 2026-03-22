@@ -50,6 +50,30 @@ interface UserPost {
   likes: number;
   comments: number;
   createdAt: any;
+  userName?: string;
+  userAvatar?: string;
+  heritage?: string | string[];
+  feeling?: string;
+  images?: string[];
+  reactions?: Record<string, string[]>;
+  reactionCount?: number;
+}
+
+interface UserThread {
+  id: string;
+  title: string;
+  content: string;
+  replies: number;
+  score: number;
+  createdAt: any;
+  authorName?: string;
+  authorAvatar?: string;
+  heritage?: string | string[];
+  flair?: string;
+  topicId?: string;
+  isPinned?: boolean;
+  upvotes?: number;
+  downvotes?: number;
 }
 
 interface UserActivity {
@@ -89,6 +113,51 @@ const SAVED_CATEGORY_CONFIG: Record<string, { label: string; icon: string; gradi
   forum: { label: 'Forum Threads', icon: '💬', gradient: 'from-cyan-500 to-blue-600' },
   event: { label: 'Events', icon: '📅', gradient: 'from-rose-500 to-pink-600' },
 };
+
+/* ─── Listing detail types for modal overlays ─── */
+interface BusinessDetail {
+  id: string; name: string; desc: string; category?: string; emoji?: string;
+  location?: string; phone?: string; website?: string; email?: string;
+  hours?: string; rating?: number; reviews?: number; heritage?: string | string[];
+  specialtyTags?: string[]; paymentMethods?: string[]; priceRange?: string;
+  yearEstablished?: number; photos?: string[]; coverPhotoIndex?: number; createdAt: any;
+}
+
+interface HousingDetail {
+  id: string; title: string; desc: string; price: number; type?: string;
+  beds?: number; baths?: number; sqft?: number; address?: string;
+  locCity?: string; locState?: string; locZip?: string; tags?: string[];
+  posterName?: string; heritage?: string | string[]; contactPhone?: string;
+  contactEmail?: string; availableDate?: string; petPolicy?: string;
+  parking?: string; photos?: string[]; coverPhotoIndex?: number;
+  propertyType?: string; createdAt: any;
+}
+
+interface MarketplaceDetail {
+  id: string; title: string; description: string; price: number;
+  category?: string; condition?: string; photos?: string[];
+  location?: string; locCity?: string; locState?: string;
+  sellerName?: string; brand?: string; model?: string;
+  deliveryMethod?: string; shippingPrice?: number; negotiable?: boolean;
+  tags?: string[]; heritage?: string | string[]; createdAt: any;
+}
+
+interface EventDetail {
+  id: string; title: string; desc: string; emoji?: string; type?: string;
+  fullDate?: string; time?: string; endTime?: string; location?: string;
+  locCity?: string; locState?: string; ticket?: string; price?: number;
+  organizer?: string; count?: number; capacity?: number;
+  contactEmail?: string; contactPhone?: string; heritage?: string | string[];
+  photos?: string[]; coverPhotoIndex?: number; status?: string; createdAt: any;
+}
+
+type ListingDetailItem =
+  | { kind: 'post'; data: UserPost }
+  | { kind: 'forum'; data: UserThread }
+  | { kind: 'business'; data: BusinessDetail }
+  | { kind: 'housing'; data: HousingDetail }
+  | { kind: 'marketplace'; data: MarketplaceDetail }
+  | { kind: 'event'; data: EventDetail };
 
 /* ─── sub-components ─── */
 
@@ -196,11 +265,12 @@ export default function ProfilePage() {
   const [postsCount, setPostsCount] = useState(0);
   const [forumCount, setForumCount] = useState(0);
   const [userPosts, setUserPosts] = useState<UserPost[]>([]);
-  const [userThreads, setUserThreads] = useState<{ id: string; title: string; content: string; replies: number; score: number; createdAt: any }[]>([]);
-  const [userBusinesses, setUserBusinesses] = useState<{ id: string; name: string; desc: string; createdAt: any }[]>([]);
-  const [userHousing, setUserHousing] = useState<{ id: string; title: string; desc: string; price: number; createdAt: any }[]>([]);
-  const [userMarketplace, setUserMarketplace] = useState<{ id: string; title: string; description: string; price: number; createdAt: any }[]>([]);
-  const [userEvents, setUserEvents] = useState<{ id: string; title: string; desc: string; createdAt: any }[]>([]);
+  const [userThreads, setUserThreads] = useState<UserThread[]>([]);
+  const [userBusinesses, setUserBusinesses] = useState<BusinessDetail[]>([]);
+  const [userHousing, setUserHousing] = useState<HousingDetail[]>([]);
+  const [userMarketplace, setUserMarketplace] = useState<MarketplaceDetail[]>([]);
+  const [userEvents, setUserEvents] = useState<EventDetail[]>([]);
+  const [listingDetail, setListingDetail] = useState<ListingDetailItem | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'post' | 'forum'>('all');
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -311,6 +381,13 @@ export default function ProfilePage() {
           likes: data.likes || 0,
           comments: data.comments || 0,
           createdAt: data.createdAt,
+          userName: data.userName,
+          userAvatar: data.userAvatar,
+          heritage: data.heritage,
+          feeling: data.feeling,
+          images: data.images,
+          reactions: data.reactions,
+          reactionCount: data.reactionCount,
         });
       });
       setUserPosts(posts);
@@ -327,7 +404,7 @@ export default function ProfilePage() {
         limit(50)
       );
       const forumSnap = await getDocs(forumQuery);
-      const threads: { id: string; title: string; content: string; replies: number; score: number; createdAt: any }[] = [];
+      const threads: UserThread[] = [];
       forumSnap.forEach((d) => {
         const data = d.data();
         if (!data.isRemoved) {
@@ -335,9 +412,17 @@ export default function ProfilePage() {
             id: d.id,
             title: data.title || '',
             content: data.content || '',
-            replies: data.replies || 0,
-            score: data.score || 0,
+            replies: data.replies || data.replyCount || 0,
+            score: data.score || data.voteScore || 0,
             createdAt: data.createdAt,
+            authorName: data.authorName,
+            authorAvatar: data.authorAvatar,
+            heritage: data.heritage,
+            flair: data.flair,
+            topicId: data.topicId,
+            isPinned: data.isPinned,
+            upvotes: data.upvotes,
+            downvotes: data.downvotes,
           });
         }
       });
@@ -349,56 +434,88 @@ export default function ProfilePage() {
       setForumCount(0);
     }
 
-    // Fetch user businesses
+    // Fetch user businesses (expanded fields for detail modal)
     try {
       const bizQuery = query(collection(db, 'businesses'), where('ownerId', '==', user.uid), limit(50));
       const bizSnap = await getDocs(bizQuery);
-      const biz: typeof userBusinesses = [];
+      const biz: BusinessDetail[] = [];
       bizSnap.forEach((d) => {
         const data = d.data();
-        biz.push({ id: d.id, name: data.name || '', desc: data.desc || '', createdAt: data.createdAt });
+        biz.push({
+          id: d.id, name: data.name || '', desc: data.desc || '', category: data.category,
+          emoji: data.emoji, location: data.location, phone: data.phone, website: data.website,
+          email: data.email, hours: data.hours, rating: data.rating, reviews: data.reviews,
+          heritage: data.heritage, specialtyTags: data.specialtyTags, paymentMethods: data.paymentMethods,
+          priceRange: data.priceRange, yearEstablished: data.yearEstablished,
+          photos: data.photos, coverPhotoIndex: data.coverPhotoIndex, createdAt: data.createdAt,
+        });
       });
       setUserBusinesses(biz);
     } catch (error) {
       console.error('Error fetching user businesses:', error);
     }
 
-    // Fetch user housing listings
+    // Fetch user housing listings (expanded fields for detail modal)
     try {
       const housingQuery = query(collection(db, 'listings'), where('posterId', '==', user.uid), limit(50));
       const housingSnap = await getDocs(housingQuery);
-      const housing: typeof userHousing = [];
+      const housing: HousingDetail[] = [];
       housingSnap.forEach((d) => {
         const data = d.data();
-        housing.push({ id: d.id, title: data.title || '', desc: data.desc || '', price: data.price || 0, createdAt: data.createdAt });
+        housing.push({
+          id: d.id, title: data.title || '', desc: data.desc || '', price: data.price || 0,
+          type: data.type, beds: data.beds, baths: data.baths, sqft: data.sqft,
+          address: data.address, locCity: data.locCity, locState: data.locState, locZip: data.locZip,
+          tags: data.tags, posterName: data.posterName, heritage: data.heritage,
+          contactPhone: data.contactPhone, contactEmail: data.contactEmail,
+          availableDate: data.availableDate, petPolicy: data.petPolicy, parking: data.parking,
+          photos: data.photos, coverPhotoIndex: data.coverPhotoIndex,
+          propertyType: data.propertyType, createdAt: data.createdAt,
+        });
       });
       setUserHousing(housing);
     } catch (error) {
       console.error('Error fetching user housing:', error);
     }
 
-    // Fetch user marketplace items
+    // Fetch user marketplace items (expanded fields for detail modal)
     try {
       const mktQuery = query(collection(db, 'marketplaceListings'), where('sellerId', '==', user.uid), limit(50));
       const mktSnap = await getDocs(mktQuery);
-      const mkt: typeof userMarketplace = [];
+      const mkt: MarketplaceDetail[] = [];
       mktSnap.forEach((d) => {
         const data = d.data();
-        mkt.push({ id: d.id, title: data.title || '', description: data.description || '', price: data.price || 0, createdAt: data.createdAt });
+        mkt.push({
+          id: d.id, title: data.title || '', description: data.description || '', price: data.price || 0,
+          category: data.category, condition: data.condition, photos: data.photos,
+          location: data.location, locCity: data.locCity, locState: data.locState,
+          sellerName: data.sellerName, brand: data.brand, model: data.model,
+          deliveryMethod: data.deliveryMethod, shippingPrice: data.shippingPrice,
+          negotiable: data.negotiable, tags: data.tags, heritage: data.heritage, createdAt: data.createdAt,
+        });
       });
       setUserMarketplace(mkt);
     } catch (error) {
       console.error('Error fetching user marketplace:', error);
     }
 
-    // Fetch user events
+    // Fetch user events (expanded fields for detail modal)
     try {
       const evtQuery = query(collection(db, 'events'), where('posterId', '==', user.uid), limit(50));
       const evtSnap = await getDocs(evtQuery);
-      const evts: typeof userEvents = [];
+      const evts: EventDetail[] = [];
       evtSnap.forEach((d) => {
         const data = d.data();
-        evts.push({ id: d.id, title: data.title || '', desc: data.desc || '', createdAt: data.createdAt });
+        evts.push({
+          id: d.id, title: data.title || '', desc: data.desc || '', emoji: data.emoji,
+          type: data.type, fullDate: data.fullDate, time: data.time, endTime: data.endTime,
+          location: data.location, locCity: data.locCity, locState: data.locState,
+          ticket: data.ticket, price: data.price, organizer: data.organizer,
+          count: data.count, capacity: data.capacity, contactEmail: data.contactEmail,
+          contactPhone: data.contactPhone, heritage: data.heritage,
+          photos: data.photos, coverPhotoIndex: data.coverPhotoIndex,
+          status: data.status, createdAt: data.createdAt,
+        });
       });
       setUserEvents(evts);
     } catch (error) {
@@ -567,17 +684,90 @@ export default function ProfilePage() {
   }, [userPosts, userThreads, userBusinesses, userHousing, userMarketplace, userEvents]);
 
   const handleActivityNavigate = useCallback((activity: UserActivity) => {
-    const routeMap: Record<string, string> = {
-      post: '/feed',
-      forum: '/forum',
-      business: '/business',
-      housing: '/housing',
-      marketplace: '/marketplace',
-      event: '/events',
+    // Posts: open modal overlay, "View Full Details" goes to feed page
+    if (activity.type === 'post') {
+      const post = userPosts.find((p) => p.id === activity.id);
+      if (post) setListingDetail({ kind: 'post', data: post });
+      return;
+    }
+    // Forums: open modal overlay, "View Full Details" goes to forum page
+    if (activity.type === 'forum') {
+      const thread = userThreads.find((t) => t.id === activity.id);
+      if (thread) setListingDetail({ kind: 'forum', data: thread });
+      return;
+    }
+
+    // Business, housing, marketplace, events: open modal overlay on profile page
+    if (activity.type === 'business') {
+      const biz = userBusinesses.find((b) => b.id === activity.id);
+      if (biz) setListingDetail({ kind: 'business', data: biz });
+      return;
+    }
+    if (activity.type === 'housing') {
+      const h = userHousing.find((item) => item.id === activity.id);
+      if (h) setListingDetail({ kind: 'housing', data: h });
+      return;
+    }
+    if (activity.type === 'marketplace') {
+      const m = userMarketplace.find((item) => item.id === activity.id);
+      if (m) setListingDetail({ kind: 'marketplace', data: m });
+      return;
+    }
+    if (activity.type === 'event') {
+      const e = userEvents.find((item) => item.id === activity.id);
+      if (e) setListingDetail({ kind: 'event', data: e });
+      return;
+    }
+  }, [navigate, userPosts, userThreads, userBusinesses, userHousing, userMarketplace, userEvents]);
+
+  // Saved items click handler — fetches full doc from Firestore then opens modal
+  const handleSavedItemClick = useCallback(async (item: SavedItem) => {
+    // Posts: fetch and open modal
+    if (item.category === 'post') {
+      try {
+        const snap = await getDoc(doc(db, 'posts', item.id));
+        if (snap.exists()) {
+          const data = snap.data();
+          setListingDetail({ kind: 'post', data: { id: snap.id, content: data.content || '', type: data.type || 'community', likes: data.likes || 0, comments: data.comments || 0, createdAt: data.createdAt, userName: data.userName, userAvatar: data.userAvatar, heritage: data.heritage, feeling: data.feeling, images: data.images, reactions: data.reactions, reactionCount: data.reactionCount } });
+        }
+      } catch (err) { console.error('Error fetching saved post:', err); }
+      return;
+    }
+    // Forums: fetch and open modal
+    if (item.category === 'forum') {
+      try {
+        const snap = await getDoc(doc(db, 'forumThreads', item.id));
+        if (snap.exists()) {
+          const data = snap.data();
+          setListingDetail({ kind: 'forum', data: { id: snap.id, title: data.title || '', content: data.content || '', replies: data.replies || data.replyCount || 0, score: data.score || data.voteScore || 0, createdAt: data.createdAt, authorName: data.authorName, authorAvatar: data.authorAvatar, heritage: data.heritage, flair: data.flair, topicId: data.topicId, isPinned: data.isPinned, upvotes: data.upvotes, downvotes: data.downvotes } });
+        }
+      } catch (err) { console.error('Error fetching saved thread:', err); }
+      return;
+    }
+
+    // For business/housing/event — fetch full doc then open modal
+    const collectionMap: Record<string, string> = {
+      business: 'businesses',
+      housing: 'listings',
+      event: 'events',
     };
-    const route = routeMap[activity.type];
-    if (route) {
-      navigate(`${route}?open=${activity.id}`);
+    const colName = collectionMap[item.category];
+    if (colName) {
+      try {
+        const snap = await getDoc(doc(db, colName, item.id));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (item.category === 'business') {
+            setListingDetail({ kind: 'business', data: { id: snap.id, name: data.name || '', desc: data.desc || '', category: data.category, emoji: data.emoji, location: data.location, phone: data.phone, website: data.website, email: data.email, hours: data.hours, rating: data.rating, reviews: data.reviews, heritage: data.heritage, specialtyTags: data.specialtyTags, paymentMethods: data.paymentMethods, priceRange: data.priceRange, yearEstablished: data.yearEstablished, photos: data.photos, coverPhotoIndex: data.coverPhotoIndex, createdAt: data.createdAt } });
+          } else if (item.category === 'housing') {
+            setListingDetail({ kind: 'housing', data: { id: snap.id, title: data.title || '', desc: data.desc || '', price: data.price || 0, type: data.type, beds: data.beds, baths: data.baths, sqft: data.sqft, address: data.address, locCity: data.locCity, locState: data.locState, locZip: data.locZip, tags: data.tags, posterName: data.posterName, heritage: data.heritage, contactPhone: data.contactPhone, contactEmail: data.contactEmail, availableDate: data.availableDate, petPolicy: data.petPolicy, parking: data.parking, photos: data.photos, coverPhotoIndex: data.coverPhotoIndex, propertyType: data.propertyType, createdAt: data.createdAt } });
+          } else if (item.category === 'event') {
+            setListingDetail({ kind: 'event', data: { id: snap.id, title: data.title || '', desc: data.desc || '', emoji: data.emoji, type: data.type, fullDate: data.fullDate, time: data.time, endTime: data.endTime, location: data.location, locCity: data.locCity, locState: data.locState, ticket: data.ticket, price: data.price, organizer: data.organizer, count: data.count, capacity: data.capacity, contactEmail: data.contactEmail, contactPhone: data.contactPhone, heritage: data.heritage, photos: data.photos, coverPhotoIndex: data.coverPhotoIndex, status: data.status, createdAt: data.createdAt } });
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching saved item detail:', err);
+      }
     }
   }, [navigate]);
 
@@ -1149,8 +1339,10 @@ export default function ProfilePage() {
                     {userBusinesses.map((b) => (
                       <div
                         key={b.id}
-                        onClick={() => navigate('/business')}
+                        onClick={() => setListingDetail({ kind: 'business', data: b })}
+                        onTouchStart={() => {}}
                         className="flex items-center gap-3 p-3 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl cursor-pointer hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0">
                           <Store size={18} />
@@ -1175,8 +1367,10 @@ export default function ProfilePage() {
                     {userHousing.map((h) => (
                       <div
                         key={h.id}
-                        onClick={() => navigate('/housing')}
+                        onClick={() => setListingDetail({ kind: 'housing', data: h })}
+                        onTouchStart={() => {}}
                         className="flex items-center gap-3 p-3 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl cursor-pointer hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shrink-0">
                           <Home size={18} />
@@ -1201,8 +1395,10 @@ export default function ProfilePage() {
                     {userMarketplace.map((m) => (
                       <div
                         key={m.id}
-                        onClick={() => navigate('/marketplace')}
+                        onClick={() => setListingDetail({ kind: 'marketplace', data: m })}
+                        onTouchStart={() => {}}
                         className="flex items-center gap-3 p-3 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl cursor-pointer hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shrink-0">
                           <ShoppingBag size={18} />
@@ -1227,8 +1423,10 @@ export default function ProfilePage() {
                     {userEvents.map((e) => (
                       <div
                         key={e.id}
-                        onClick={() => navigate('/events')}
+                        onClick={() => setListingDetail({ kind: 'event', data: e })}
+                        onTouchStart={() => {}}
                         className="flex items-center gap-3 p-3 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl cursor-pointer hover:bg-[var(--aurora-surface-variant)] transition-colors"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white shrink-0">
                           <CalendarDays size={18} />
@@ -1330,7 +1528,13 @@ export default function ProfilePage() {
                   {savedItems
                     .filter((item) => savedFilter === 'all' || item.category === savedFilter)
                     .map((item, idx) => (
-                      <div key={`${item.category}-${item.id}`} className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer">
+                      <div
+                        key={`${item.category}-${item.id}`}
+                        className="relative aspect-square rounded-xl overflow-hidden group cursor-pointer"
+                        onClick={() => handleSavedItemClick(item)}
+                        onTouchStart={() => {}}
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                      >
                         <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient}`} />
                         <div className="absolute inset-0 p-3 flex flex-col justify-between text-white">
                           <div>
@@ -1834,6 +2038,475 @@ export default function ProfilePage() {
 
             {/* Bottom spacing */}
             <div className="h-8" />
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════
+         LISTING DETAIL MODAL OVERLAY
+         ═══════════════════════════════════════════ */}
+      {listingDetail && (
+        <div
+          className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center"
+          onClick={() => setListingDetail(null)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50" />
+          {/* Modal */}
+          <div
+            className="relative w-full sm:max-w-lg max-h-[90vh] bg-[var(--aurora-surface)] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl animate-fadeSlideUp"
+            onClick={(e) => e.stopPropagation()}
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            {/* ─── Header ─── */}
+            {(() => {
+              const gradientMap: Record<string, string> = { post: 'from-indigo-500 to-purple-600', forum: 'from-cyan-500 to-blue-600', business: 'from-indigo-500 to-purple-600', housing: 'from-emerald-500 to-teal-600', marketplace: 'from-amber-500 to-orange-600', event: 'from-rose-500 to-pink-600' };
+              const iconMap: Record<string, React.ReactNode> = { post: <Edit3 size={18} className="text-white" />, forum: <MessageSquare size={18} className="text-white" />, business: <Store size={22} className="text-white" />, housing: <Home size={22} className="text-white" />, marketplace: <ShoppingBag size={22} className="text-white" />, event: <CalendarDays size={22} className="text-white" /> };
+              const labelMap: Record<string, string> = { post: 'Post', forum: 'Forum Thread', business: 'Business', housing: 'Housing', marketplace: 'Marketplace', event: 'Event' };
+              const photos = (listingDetail.data as any).photos as string[] | undefined;
+              const images = (listingDetail.data as any).images as string[] | undefined;
+              const allPhotos = photos || images;
+              const coverIdx = (listingDetail.data as any).coverPhotoIndex ?? 0;
+              const coverPhoto = allPhotos && allPhotos.length > 0 ? allPhotos[coverIdx] || allPhotos[0] : null;
+
+              // Determine title
+              let headerTitle = '';
+              if (listingDetail.kind === 'business') headerTitle = (listingDetail.data as BusinessDetail).name;
+              else if (listingDetail.kind === 'post') headerTitle = (listingDetail.data as UserPost).content.slice(0, 80) + ((listingDetail.data as UserPost).content.length > 80 ? '...' : '');
+              else if (listingDetail.kind === 'forum') headerTitle = (listingDetail.data as UserThread).title;
+              else headerTitle = (listingDetail.data as any).title || '';
+
+              return (
+                <div className={`relative ${coverPhoto ? 'h-48 sm:h-56' : 'h-28'} shrink-0`}>
+                  {coverPhoto ? (
+                    <img src={coverPhoto} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  ) : (
+                    <div className={`absolute inset-0 bg-gradient-to-br ${gradientMap[listingDetail.kind]}`} />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                  <div className="absolute top-3 right-3 flex items-center gap-2">
+                    <button
+                      onClick={() => setListingDetail(null)}
+                      className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="absolute bottom-3 left-4 right-4">
+                    <span className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2">
+                      {iconMap[listingDetail.kind]} {labelMap[listingDetail.kind]}
+                    </span>
+                    <h2 className="text-lg font-bold text-white leading-tight line-clamp-2 drop-shadow-lg">
+                      {headerTitle}
+                    </h2>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ─── Scrollable content ─── */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+
+              {/* Post detail */}
+              {listingDetail.kind === 'post' && (() => {
+                const p = listingDetail.data as UserPost;
+                const timeStr = p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                return (
+                  <>
+                    {/* Author row */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+                        {p.userAvatar ? <img src={p.userAvatar} alt="" className="w-full h-full object-cover" /> : (p.userName || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[var(--aurora-text)] truncate">{p.userName || userProfile?.name || 'You'}</p>
+                        <div className="flex items-center gap-2 text-[11px] text-[var(--aurora-text-muted)]">
+                          {timeStr && <span>{timeStr}</span>}
+                          {p.feeling && <span>Feeling {p.feeling}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Post type badge */}
+                    {p.type && p.type !== 'community' && (
+                      <span className="inline-block bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-xs font-semibold px-2.5 py-1 rounded-full capitalize">{p.type}</span>
+                    )}
+                    {/* Content */}
+                    <p className="text-sm text-[var(--aurora-text)] leading-relaxed whitespace-pre-wrap">{p.content}</p>
+                    {/* Images */}
+                    {p.images && p.images.length > 0 && (
+                      <div className={`grid gap-1.5 ${p.images.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                        {p.images.slice(0, 4).map((img, i) => (
+                          <img key={i} src={img} alt="" className="w-full rounded-lg object-cover max-h-48" />
+                        ))}
+                      </div>
+                    )}
+                    {/* Stats */}
+                    <div className="flex items-center gap-4 pt-2 border-t border-[var(--aurora-border)]">
+                      <div className="flex items-center gap-1.5 text-sm text-[var(--aurora-text-muted)]">
+                        <Heart size={14} /> <span>{p.likes || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-sm text-[var(--aurora-text-muted)]">
+                        <MessageSquare size={14} /> <span>{p.comments || 0}</span>
+                      </div>
+                      {p.reactionCount != null && p.reactionCount > 0 && (
+                        <div className="flex items-center gap-1.5 text-sm text-[var(--aurora-text-muted)]">
+                          <Sparkles size={14} /> <span>{p.reactionCount} reactions</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Heritage */}
+                    {p.heritage && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(Array.isArray(p.heritage) ? p.heritage : [p.heritage]).map((h) => (
+                          <span key={h} className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 text-[11px] font-medium px-2 py-0.5 rounded-full">{h}</span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Forum thread detail */}
+              {listingDetail.kind === 'forum' && (() => {
+                const t = listingDetail.data as UserThread;
+                const timeStr = t.createdAt?.toDate ? t.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                return (
+                  <>
+                    {/* Author row */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-cyan-500 text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+                        {t.authorAvatar ? <img src={t.authorAvatar} alt="" className="w-full h-full object-cover" /> : (t.authorName || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-[var(--aurora-text)] truncate">{t.authorName || userProfile?.name || 'You'}</p>
+                        <div className="flex items-center gap-2 text-[11px] text-[var(--aurora-text-muted)]">
+                          {timeStr && <span>{timeStr}</span>}
+                          {t.isPinned && <span className="text-amber-500 font-semibold">Pinned</span>}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Flair badge */}
+                    {t.flair && (
+                      <span className="inline-block bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-300 text-xs font-semibold px-2.5 py-1 rounded-full">{t.flair}</span>
+                    )}
+                    {/* Content */}
+                    <p className="text-sm text-[var(--aurora-text)] leading-relaxed whitespace-pre-wrap">{t.content}</p>
+                    {/* Stats */}
+                    <div className="flex items-center gap-4 pt-2 border-t border-[var(--aurora-border)]">
+                      <div className="flex items-center gap-1.5 text-sm text-[var(--aurora-text-muted)]">
+                        <MessageSquare size={14} /> <span>{t.replies} {t.replies === 1 ? 'reply' : 'replies'}</span>
+                      </div>
+                      {(t.upvotes != null || t.score != null) && (
+                        <div className="flex items-center gap-1.5 text-sm text-[var(--aurora-text-muted)]">
+                          <TrendingUp size={14} /> <span>{t.upvotes ?? t.score} upvotes</span>
+                        </div>
+                      )}
+                      {t.downvotes != null && t.downvotes > 0 && (
+                        <div className="flex items-center gap-1.5 text-sm text-[var(--aurora-text-muted)]">
+                          <ChevronDown size={14} /> <span>{t.downvotes}</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Heritage */}
+                    {t.heritage && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(Array.isArray(t.heritage) ? t.heritage : [t.heritage]).map((h) => (
+                          <span key={h} className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 text-[11px] font-medium px-2 py-0.5 rounded-full">{h}</span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Business detail */}
+              {listingDetail.kind === 'business' && (() => {
+                const b = listingDetail.data as BusinessDetail;
+                return (
+                  <>
+                    {/* Category + price range */}
+                    {(b.category || b.priceRange) && (
+                      <div className="flex flex-wrap gap-2">
+                        {b.category && <span className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-xs font-semibold px-2.5 py-1 rounded-full">{b.emoji} {b.category}</span>}
+                        {b.priceRange && <span className="bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-xs font-semibold px-2.5 py-1 rounded-full">{b.priceRange}</span>}
+                        {b.yearEstablished && <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium px-2.5 py-1 rounded-full">Est. {b.yearEstablished}</span>}
+                      </div>
+                    )}
+                    {/* Rating */}
+                    {b.rating != null && b.rating > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <Star size={14} className="text-amber-400" fill="currentColor" />
+                        <span className="text-sm font-semibold text-[var(--aurora-text)]">{b.rating.toFixed(1)}</span>
+                        {b.reviews != null && <span className="text-xs text-[var(--aurora-text-muted)]">({b.reviews} reviews)</span>}
+                      </div>
+                    )}
+                    {/* Description */}
+                    {b.desc && <p className="text-sm text-[var(--aurora-text-secondary)] leading-relaxed">{b.desc}</p>}
+                    {/* Specialty tags */}
+                    {b.specialtyTags && b.specialtyTags.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider mb-2">Specialties</h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {b.specialtyTags.map((t) => <span key={t} className="bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] text-[11px] px-2 py-0.5 rounded-full">{t}</span>)}
+                        </div>
+                      </div>
+                    )}
+                    {/* Contact info */}
+                    <div className="space-y-2">
+                      {b.location && (
+                        <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]">
+                          <MapPin size={14} className="text-[var(--aurora-text-muted)] shrink-0" />
+                          <span className="truncate">{b.location}</span>
+                        </div>
+                      )}
+                      {b.phone && (
+                        <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]">
+                          <Phone size={14} className="text-[var(--aurora-text-muted)] shrink-0" />
+                          <span>{b.phone}</span>
+                        </div>
+                      )}
+                      {b.email && (
+                        <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]">
+                          <Mail size={14} className="text-[var(--aurora-text-muted)] shrink-0" />
+                          <span className="truncate">{b.email}</span>
+                        </div>
+                      )}
+                      {b.website && (
+                        <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]">
+                          <Globe size={14} className="text-[var(--aurora-text-muted)] shrink-0" />
+                          <span className="truncate">{b.website}</span>
+                        </div>
+                      )}
+                      {b.hours && (
+                        <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]">
+                          <Calendar size={14} className="text-[var(--aurora-text-muted)] shrink-0" />
+                          <span>{b.hours}</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Heritage */}
+                    {b.heritage && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(Array.isArray(b.heritage) ? b.heritage : [b.heritage]).map((h) => (
+                          <span key={h} className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 text-[11px] font-medium px-2 py-0.5 rounded-full">{h}</span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Payment methods */}
+                    {b.paymentMethods && b.paymentMethods.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider mb-2">Payment</h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {b.paymentMethods.map((p) => <span key={p} className="bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] text-[11px] px-2 py-0.5 rounded-full">{p}</span>)}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Housing detail */}
+              {listingDetail.kind === 'housing' && (() => {
+                const h = listingDetail.data as HousingDetail;
+                return (
+                  <>
+                    {/* Price */}
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xl font-bold text-[var(--aurora-text)]">${h.price.toLocaleString()}</span>
+                      {h.type && <span className="text-xs text-[var(--aurora-text-muted)] font-medium">{h.type === 'rent' ? '/month' : ''}</span>}
+                    </div>
+                    {/* Key specs */}
+                    {(h.beds || h.baths || h.sqft) && (
+                      <div className="flex gap-4">
+                        {h.beds != null && <div className="text-center"><span className="text-sm font-bold text-[var(--aurora-text)]">{h.beds}</span><span className="text-[11px] text-[var(--aurora-text-muted)] ml-1">beds</span></div>}
+                        {h.baths != null && <div className="text-center"><span className="text-sm font-bold text-[var(--aurora-text)]">{h.baths}</span><span className="text-[11px] text-[var(--aurora-text-muted)] ml-1">baths</span></div>}
+                        {h.sqft != null && <div className="text-center"><span className="text-sm font-bold text-[var(--aurora-text)]">{h.sqft.toLocaleString()}</span><span className="text-[11px] text-[var(--aurora-text-muted)] ml-1">sqft</span></div>}
+                      </div>
+                    )}
+                    {/* Description */}
+                    {h.desc && <p className="text-sm text-[var(--aurora-text-secondary)] leading-relaxed">{h.desc}</p>}
+                    {/* Location */}
+                    {(h.address || h.locCity) && (
+                      <div className="flex items-start gap-2 text-sm text-[var(--aurora-text-secondary)]">
+                        <MapPin size={14} className="text-[var(--aurora-text-muted)] shrink-0 mt-0.5" />
+                        <span>{[h.address, h.locCity, h.locState, h.locZip].filter(Boolean).join(', ')}</span>
+                      </div>
+                    )}
+                    {/* Details grid */}
+                    {(h.propertyType || h.availableDate || h.petPolicy || h.parking) && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {h.propertyType && <div className="bg-[var(--aurora-surface-variant)] rounded-lg p-2.5"><p className="text-[10px] text-[var(--aurora-text-muted)] uppercase">Type</p><p className="text-xs font-semibold text-[var(--aurora-text)]">{h.propertyType}</p></div>}
+                        {h.availableDate && <div className="bg-[var(--aurora-surface-variant)] rounded-lg p-2.5"><p className="text-[10px] text-[var(--aurora-text-muted)] uppercase">Available</p><p className="text-xs font-semibold text-[var(--aurora-text)]">{h.availableDate}</p></div>}
+                        {h.petPolicy && <div className="bg-[var(--aurora-surface-variant)] rounded-lg p-2.5"><p className="text-[10px] text-[var(--aurora-text-muted)] uppercase">Pets</p><p className="text-xs font-semibold text-[var(--aurora-text)]">{h.petPolicy}</p></div>}
+                        {h.parking && <div className="bg-[var(--aurora-surface-variant)] rounded-lg p-2.5"><p className="text-[10px] text-[var(--aurora-text-muted)] uppercase">Parking</p><p className="text-xs font-semibold text-[var(--aurora-text)]">{h.parking}</p></div>}
+                      </div>
+                    )}
+                    {/* Tags */}
+                    {h.tags && h.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {h.tags.map((t) => <span key={t} className="bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] text-[11px] px-2 py-0.5 rounded-full">{t}</span>)}
+                      </div>
+                    )}
+                    {/* Contact */}
+                    {(h.contactPhone || h.contactEmail) && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider">Contact</h4>
+                        {h.contactPhone && <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]"><Phone size={14} className="text-[var(--aurora-text-muted)]" />{h.contactPhone}</div>}
+                        {h.contactEmail && <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]"><Mail size={14} className="text-[var(--aurora-text-muted)]" />{h.contactEmail}</div>}
+                      </div>
+                    )}
+                    {/* Heritage */}
+                    {h.heritage && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(Array.isArray(h.heritage) ? h.heritage : [h.heritage]).map((tag) => (
+                          <span key={tag} className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 text-[11px] font-medium px-2 py-0.5 rounded-full">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Marketplace detail */}
+              {listingDetail.kind === 'marketplace' && (() => {
+                const m = listingDetail.data as MarketplaceDetail;
+                return (
+                  <>
+                    {/* Price + condition */}
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-xl font-bold text-[var(--aurora-text)]">${m.price.toLocaleString()}</span>
+                      {m.negotiable && <span className="bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 text-[11px] font-semibold px-2 py-0.5 rounded-full">Negotiable</span>}
+                    </div>
+                    {(m.condition || m.category) && (
+                      <div className="flex flex-wrap gap-2">
+                        {m.condition && <span className="bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300 text-xs font-semibold px-2.5 py-1 rounded-full">{m.condition}</span>}
+                        {m.category && <span className="bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] text-xs font-medium px-2.5 py-1 rounded-full">{m.category}</span>}
+                      </div>
+                    )}
+                    {/* Description */}
+                    {m.description && <p className="text-sm text-[var(--aurora-text-secondary)] leading-relaxed">{m.description}</p>}
+                    {/* Item details */}
+                    {(m.brand || m.model) && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {m.brand && <div className="bg-[var(--aurora-surface-variant)] rounded-lg p-2.5"><p className="text-[10px] text-[var(--aurora-text-muted)] uppercase">Brand</p><p className="text-xs font-semibold text-[var(--aurora-text)]">{m.brand}</p></div>}
+                        {m.model && <div className="bg-[var(--aurora-surface-variant)] rounded-lg p-2.5"><p className="text-[10px] text-[var(--aurora-text-muted)] uppercase">Model</p><p className="text-xs font-semibold text-[var(--aurora-text)]">{m.model}</p></div>}
+                      </div>
+                    )}
+                    {/* Location */}
+                    {(m.location || m.locCity) && (
+                      <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]">
+                        <MapPin size={14} className="text-[var(--aurora-text-muted)] shrink-0" />
+                        <span>{[m.location, m.locCity, m.locState].filter(Boolean).join(', ')}</span>
+                      </div>
+                    )}
+                    {/* Delivery */}
+                    {m.deliveryMethod && (
+                      <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]">
+                        <Package size={14} className="text-[var(--aurora-text-muted)]" />
+                        <span>{m.deliveryMethod}{m.shippingPrice ? ` · $${m.shippingPrice} shipping` : ''}</span>
+                      </div>
+                    )}
+                    {/* Tags */}
+                    {m.tags && m.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {m.tags.map((t) => <span key={t} className="bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] text-[11px] px-2 py-0.5 rounded-full">{t}</span>)}
+                      </div>
+                    )}
+                    {/* Heritage */}
+                    {m.heritage && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(Array.isArray(m.heritage) ? m.heritage : [m.heritage]).map((tag) => (
+                          <span key={tag} className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 text-[11px] font-medium px-2 py-0.5 rounded-full">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Event detail */}
+              {listingDetail.kind === 'event' && (() => {
+                const ev = listingDetail.data as EventDetail;
+                return (
+                  <>
+                    {/* Type + status badges */}
+                    <div className="flex flex-wrap gap-2">
+                      {ev.type && <span className="bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300 text-xs font-semibold px-2.5 py-1 rounded-full">{ev.emoji} {ev.type}</span>}
+                      {ev.status && ev.status !== 'active' && <span className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-medium px-2.5 py-1 rounded-full capitalize">{ev.status.replace(/_/g, ' ')}</span>}
+                      {ev.ticket && <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-semibold px-2.5 py-1 rounded-full">{ev.ticket === 'free' ? 'Free' : ev.price ? `$${ev.price}` : 'Paid'}</span>}
+                    </div>
+                    {/* Date & time */}
+                    {(ev.fullDate || ev.time) && (
+                      <div className="bg-[var(--aurora-surface-variant)] rounded-xl p-3 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center">
+                          <CalendarDays size={18} className="text-rose-500" />
+                        </div>
+                        <div>
+                          {ev.fullDate && <p className="text-sm font-semibold text-[var(--aurora-text)]">{ev.fullDate}</p>}
+                          {ev.time && <p className="text-xs text-[var(--aurora-text-muted)]">{ev.time}{ev.endTime ? ` — ${ev.endTime}` : ''}</p>}
+                        </div>
+                      </div>
+                    )}
+                    {/* Location */}
+                    {(ev.location || ev.locCity) && (
+                      <div className="bg-[var(--aurora-surface-variant)] rounded-xl p-3 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                          <MapPin size={18} className="text-blue-500" />
+                        </div>
+                        <div>
+                          {ev.location && <p className="text-sm font-semibold text-[var(--aurora-text)]">{ev.location}</p>}
+                          {(ev.locCity || ev.locState) && <p className="text-xs text-[var(--aurora-text-muted)]">{[ev.locCity, ev.locState].filter(Boolean).join(', ')}</p>}
+                        </div>
+                      </div>
+                    )}
+                    {/* Description */}
+                    {ev.desc && <p className="text-sm text-[var(--aurora-text-secondary)] leading-relaxed">{ev.desc}</p>}
+                    {/* Organizer & attendance */}
+                    {(ev.organizer || ev.count != null || ev.capacity != null) && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {ev.organizer && <div className="bg-[var(--aurora-surface-variant)] rounded-lg p-2.5"><p className="text-[10px] text-[var(--aurora-text-muted)] uppercase">Organizer</p><p className="text-xs font-semibold text-[var(--aurora-text)]">{ev.organizer}</p></div>}
+                        {ev.count != null && <div className="bg-[var(--aurora-surface-variant)] rounded-lg p-2.5"><p className="text-[10px] text-[var(--aurora-text-muted)] uppercase">Attending</p><p className="text-xs font-semibold text-[var(--aurora-text)]">{ev.count}{ev.capacity ? ` / ${ev.capacity}` : ''}</p></div>}
+                      </div>
+                    )}
+                    {/* Contact */}
+                    {(ev.contactEmail || ev.contactPhone) && (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-[var(--aurora-text-muted)] uppercase tracking-wider">Contact</h4>
+                        {ev.contactPhone && <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]"><Phone size={14} className="text-[var(--aurora-text-muted)]" />{ev.contactPhone}</div>}
+                        {ev.contactEmail && <div className="flex items-center gap-2 text-sm text-[var(--aurora-text-secondary)]"><Mail size={14} className="text-[var(--aurora-text-muted)]" />{ev.contactEmail}</div>}
+                      </div>
+                    )}
+                    {/* Heritage */}
+                    {ev.heritage && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(Array.isArray(ev.heritage) ? ev.heritage : [ev.heritage]).map((tag) => (
+                          <span key={tag} className="bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 text-[11px] font-medium px-2 py-0.5 rounded-full">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* ─── Footer action ─── */}
+            <div className="shrink-0 border-t border-[var(--aurora-border)] px-4 py-3 flex gap-2">
+              <button
+                onClick={() => {
+                  const routeMap: Record<string, string> = { post: '/feed', forum: '/forum', business: '/business', housing: '/housing', marketplace: '/marketplace', event: '/events' };
+                  navigate(`${routeMap[listingDetail.kind]}?open=${listingDetail.data.id}`);
+                }}
+                className="flex-1 bg-aurora-indigo text-white text-sm font-semibold py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+              >
+                View Full Details
+              </button>
+              <button
+                onClick={() => setListingDetail(null)}
+                className="px-4 py-2.5 bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] text-sm font-medium rounded-xl hover:bg-[var(--aurora-border)] transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
