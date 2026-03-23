@@ -9,7 +9,7 @@ import {
   X, Plus, Heart, Sparkles, Store, ShoppingBag, Filter, ArrowLeft,
   ExternalLink, Trash2, Edit3, Loader2, Award, TrendingUp,
   ChevronDown, ChevronLeft, Upload, Image as ImageIcon, Camera,
-  Flag, Ban, AlertTriangle, MoreHorizontal
+  Flag, Ban, AlertTriangle, MoreHorizontal, Scale
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
@@ -140,14 +140,14 @@ const BusinessPhotoUploader: React.FC<{
           type="button"
           onClick={() => !photoUploading && fileInputRef.current?.click()}
           disabled={photoUploading}
-          className={`w-full border-2 border-dashed border-aurora-border rounded-xl p-4 flex flex-col items-center gap-2 text-aurora-text-muted hover:border-aurora-indigo hover:text-aurora-indigo transition-colors ${photoUploading.loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`w-full border-2 border-dashed border-aurora-border rounded-xl p-4 flex flex-col items-center gap-2 text-aurora-text-muted hover:border-aurora-indigo hover:text-aurora-indigo transition-colors ${photoUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          {photoUploading.loading ? (
+          {photoUploading ? (
             <Loader2 className="w-6 h-6 animate-spin" />
           ) : (
             <Upload className="w-6 h-6" />
           )}
-          <span className="text-sm">{photoUploading.loading ? 'Uploading...' : 'Click to upload photos'}</span>
+          <span className="text-sm">{photoUploading ? 'Uploading...' : 'Click to upload photos'}</span>
           <span className="text-xs text-aurora-text-muted">PNG, JPG up to 5MB each</span>
         </button>
       )}
@@ -290,7 +290,7 @@ export default function BusinessPage() {
         q = query(
           collection(db, 'businesses'),
           orderBy('createdAt', 'desc'),
-          startAfter(lastDoc),
+          startAfter(state.lastDoc),
           limit(PAGE_SIZE),
         );
       }
@@ -585,7 +585,7 @@ export default function BusinessPage() {
   };
 
   const handleBlockUser = async () => {
-    if (!user || !blockTargetUser) return;
+    if (!user || !state.blockTargetUser) return;
     try {
       await updateDoc(doc(db, 'users', user.uid), {
         blockedUsers: arrayUnion(state.blockTargetUser!.uid),
@@ -684,7 +684,7 @@ export default function BusinessPage() {
 
   const handleAddBusiness = async () => {
     // ── Field-level validation (uses extracted utility) ──
-    const errors = validateBusinessForm(formData as BusinessFormData);
+    const errors = validateBusinessForm(state.formData as BusinessFormData);
     dispatch({ type: 'SET_FORM_ERRORS', payload: errors });
     if (Object.keys(errors).length > 0) {
       dispatch({ type: 'SET_TOAST', payload: 'Please fix the errors in the form' });
@@ -721,7 +721,7 @@ export default function BusinessPage() {
           : userProfile?.heritage
           ? [userProfile.heritage]
           : [],
-        ...(state.formPhotos.length > 0 ? { photos: formPhotos, coverPhotoIndex: Math.min(coverPhotoIndex, state.formPhotos.length - 1) } : {}),
+        ...(state.formPhotos.length > 0 ? { photos: state.formPhotos, coverPhotoIndex: Math.min(state.coverPhotoIndex, state.formPhotos.length - 1) } : {}),
       });
       dispatch({ type: 'RESET_CREATE_FORM' });
       // Reset pagination and refetch from start
@@ -851,7 +851,7 @@ export default function BusinessPage() {
         text: state.newReview.text,
         createdAt: Timestamp.now(),
       };
-      const updatedReviews = [optimisticReview, ...businessReviews];
+      const updatedReviews = [optimisticReview, ...state.businessReviews];
       dispatch({ type: 'SET_BUSINESS_REVIEWS', payload: updatedReviews });
 
       // Recalculate average rating
@@ -1035,7 +1035,7 @@ export default function BusinessPage() {
                   </>
                 )}
               </p>
-              {(selectedCategory !== 'All' || state.selectedHeritage.length > 0 || state.searchQuery || state.activeCollection !== 'all') && (
+              {(state.selectedCategory !== 'All' || state.selectedHeritage.length > 0 || state.searchQuery || state.activeCollection !== 'all') && (
                 <button
                   onClick={() => { dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' }); dispatch({ type: 'SET_SELECTED_HERITAGE', payload: [] }); dispatch({ type: 'SET_SEARCH_QUERY', payload: '' }); dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: 'all' }); }}
                   className="text-xs text-aurora-indigo font-medium flex items-center gap-1 hover:text-aurora-indigo/80"
@@ -1046,7 +1046,7 @@ export default function BusinessPage() {
             </div>
 
             {/* Featured Carousel */}
-            {featuredBusinesses.length > 0 && !searchQuery && (
+            {featuredBusinesses.length > 0 && !state.searchQuery && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-bold text-aurora-text flex items-center gap-2">
@@ -1278,7 +1278,7 @@ export default function BusinessPage() {
                   Loading more businesses...
                 </div>
               )}
-              {!hasMore && state.businesses.length > PAGE_SIZE && (
+              {!state.hasMore && state.businesses.length > PAGE_SIZE && (
                 <p className="text-xs text-aurora-text-muted py-4">You've reached the end</p>
               )}
             </div>
@@ -1382,7 +1382,7 @@ export default function BusinessPage() {
       )}
 
       {/* ===== Business Detail Modal ===== */}
-      {state.selectedBusiness && !isEditing && (
+      {state.selectedBusiness && !state.isEditing && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
           onClick={() => dispatch({ type: 'SELECT_BUSINESS', payload: null })}
@@ -1401,17 +1401,17 @@ export default function BusinessPage() {
             </button>
             {user && (
               <button
-                onClick={(e) => openMenu(state.selectedBusiness.id, e)}
+                onClick={(e) => openMenu(state.selectedBusiness!.id, e)}
                 className="absolute top-3 right-14 z-[5] w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
               >
                 <MoreHorizontal className="w-4 h-4" />
               </button>
             )}
             <button
-              onClick={(e) => toggleFavorite(state.selectedBusiness.id, e)}
+              onClick={(e) => toggleFavorite(state.selectedBusiness!.id, e)}
               className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors z-[5]`}
             >
-              <Heart className={`w-4 h-4 ${state.favorites.has(state.selectedBusiness.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
+              <Heart className={`w-4 h-4 ${state.favorites.has(state.selectedBusiness!.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
             </button>
 
             {/* Hero Banner */}
@@ -1638,7 +1638,7 @@ export default function BusinessPage() {
                   </div>
                 )}
 
-                {!state.selectedBusiness.services && !state.selectedBusiness.menu && isOwnerOrAdmin(selectedBusiness) && (
+                {!state.selectedBusiness.services && !state.selectedBusiness.menu && isOwnerOrAdmin(state.selectedBusiness) && (
                   <div className="text-center py-6 bg-aurora-surface-variant rounded-xl">
                     <ShoppingBag className="w-6 h-6 text-aurora-text-muted mx-auto mb-2" />
                     <p className="text-sm text-aurora-text-muted mb-1">No services or menu listed yet</p>
@@ -1663,7 +1663,7 @@ export default function BusinessPage() {
                         <p className="text-sm text-aurora-text mt-1">{state.businessReviews.length} review{state.businessReviews.length !== 1 ? 's' : ''}</p>
                       )}
                     </div>
-                    {!showReviewForm && user && state.businessReviews.length > 0 && (
+                    {!state.showReviewForm && user && state.businessReviews.length > 0 && (
                       <button
                         onClick={() => dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: true })}
                         className="px-3 py-1.5 bg-aurora-indigo text-white rounded-lg text-xs font-medium hover:bg-aurora-indigo/90 transition-colors flex items-center gap-1"
@@ -1761,7 +1761,7 @@ export default function BusinessPage() {
                     </div>
                   ) : null}
 
-                  {state.businessReviews.length > 0 && !showReviewForm && user && (
+                  {state.businessReviews.length > 0 && !state.showReviewForm && user && (
                     <button
                       onClick={() => dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: true })}
                       className="w-full px-4 py-2.5 bg-aurora-indigo/10 text-aurora-indigo rounded-xl text-sm font-medium hover:bg-aurora-indigo/20 transition-colors border border-aurora-indigo/30"
@@ -1784,7 +1784,7 @@ export default function BusinessPage() {
                   <Edit3 className="w-4 h-4" /> Edit Business
                 </button>
                 <button
-                  onClick={() => handleDeleteBusiness(state.selectedBusiness.id)}
+                  onClick={() => handleDeleteBusiness(state.selectedBusiness!.id)}
                   className="px-4 py-2.5 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl font-medium text-sm hover:bg-red-100 dark:hover:bg-red-500/15 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -2010,7 +2010,7 @@ export default function BusinessPage() {
           SHARED THREE-DOT CONTEXT MENU (fixed-position, escapes all overflow)
           ═══════════════════════════════════════════════════════════════════ */}
       {state.menuBusinessId && state.menuPosition && (() => {
-        const biz = state.businesses.find((b) => b.id === menuBusinessId) || state.selectedBusiness;
+        const biz = state.businesses.find((b) => b.id === state.menuBusinessId) || state.selectedBusiness;
         if (!biz) return null;
         return (
           <>
