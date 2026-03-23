@@ -1,9 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, useReducer } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, Timestamp, query, where, setDoc, getDoc, serverTimestamp, arrayUnion, limit, orderBy, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
-import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
-import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import {
   Search, MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight,
   X, Plus, Heart, Sparkles, Store, ShoppingBag, Filter, ArrowLeft,
@@ -16,11 +13,13 @@ import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
 import {
   CATEGORIES, CATEGORY_EMOJI_MAP, CATEGORY_COLORS, CATEGORY_ICONS, REPORT_CATEGORIES,
 } from '@/components/business/businessConstants';
-import {
-  fuzzyMatch, getGoogleMapsUrl, validateBusinessForm,
-} from '@/components/business/businessValidation';
-import { businessReducer, createInitialState, type Business, type BusinessReview, type BusinessOrder, type MenuItem, type Deal, type BusinessFormData } from '@/reducers/businessReducer';
+import { getGoogleMapsUrl } from '@/components/business/businessValidation';
+import { businessReducer, createInitialState, type Business, type BusinessReview } from '@/reducers/businessReducer';
 import { compressImage, MAX_FILE_SIZE } from '@/components/business/imageUtils';
+import { useBusinessData } from '@/hooks/useBusinessData';
+import { useBusinessFilters } from '@/hooks/useBusinessFilters';
+import { useBusinessModeration } from '@/hooks/useBusinessModeration';
+import { useBusinessReviews } from '@/hooks/useBusinessReviews';
 
 // Constants, fuzzyMatch, getGoogleMapsUrl, compressImage, validateBusinessForm
 // are now imported from @/components/business/*
@@ -250,11 +249,21 @@ export default function BusinessPage() {
   const photosEnabled = isFeatureEnabled('business_photos');
   const merchantView = false; // My Businesses moved to Profile page
   const menuRef = useRef<HTMLDivElement>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const PAGE_SIZE = 20;
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const openMenu = (businessId: string, e: React.MouseEvent) => {
+  // ── Custom hooks (Phase 2 Steps 3-6) ──
+  const {
+    loadMoreRef, toggleFavorite, handleOpenCreateModal, handleAddBusiness,
+    handleDeleteBusiness, confirmDeleteBusiness, handleStartEdit, handleSaveEdit, PAGE_SIZE,
+  } = useBusinessData(state, dispatch, user, userRole, userProfile);
+
+  const { filteredBusinesses, featuredBusinesses, categoryCounts } = useBusinessFilters(state, dispatch);
+
+  const { openReportModal, handleSubmitReport, handleBlockUser, openBlockConfirm } = useBusinessModeration(state, dispatch, user, userProfile);
+
+  const { handleAddReview } = useBusinessReviews(state, dispatch, user, userProfile);
+
+  // ── Context menu (memoized) ──
+  const openMenu = useCallback((businessId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (state.menuBusinessId === businessId) {
       dispatch({ type: 'CLOSE_MENU' });
@@ -263,179 +272,13 @@ export default function BusinessPage() {
     const btn = e.currentTarget as HTMLElement;
     const rect = btn.getBoundingClientRect();
     dispatch({ type: 'OPEN_MENU', payload: { businessId, position: { top: rect.bottom + 4, right: window.innerWidth - rect.right } } });
-  };
+  }, [state.menuBusinessId, dispatch]);
 
-  const closeMenu = () => {
+  const closeMenu = useCallback(() => {
     dispatch({ type: 'CLOSE_MENU' });
-  };
+  }, [dispatch]);
 
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => {
-      dispatch({ type: 'SET_DEBOUNCED_SEARCH', payload: state.searchQuery });
-    }, 300);
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
-  }, [state.searchQuery, dispatch]);
-
-  const fetchBusinesses = async (isLoadMore = false) => {
-    try {
-      if (isLoadMore) dispatch({ type: 'SET_LOADING_MORE', payload: true }); else dispatch({ type: 'SET_LOADING', payload: true });
-
-      let q = query(
-        collection(db, 'businesses'),
-        orderBy('createdAt', 'desc'),
-        limit(PAGE_SIZE),
-      );
-      if (isLoadMore && state.lastDoc) {
-        q = query(
-          collection(db, 'businesses'),
-          orderBy('createdAt', 'desc'),
-          startAfter(state.lastDoc),
-          limit(PAGE_SIZE),
-        );
-      }
-
-      const snapshot = await getDocs(q);
-      const data: Business[] = [];
-      snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        // Skip hidden businesses (unless user is owner or admin)
-        if (d.isHidden) return;
-        data.push({
-          id: docSnap.id,
-          name: d.name || '',
-          emoji: d.emoji || CATEGORY_EMOJI_MAP[d.category] || '💼',
-          category: d.category || '',
-          desc: d.desc || '',
-          location: d.location || '',
-          phone: d.phone || '',
-          website: d.website || '',
-          email: d.email || '',
-          hours: d.hours || '',
-          rating: d.rating || 4.5,
-          reviews: d.reviews || 0,
-          promoted: d.promoted || false,
-          bgColor: d.bgColor || CATEGORY_COLORS[d.category] || '#999',
-          ownerId: d.ownerId,
-          heritage: d.heritage,
-          menu: d.menu || '',
-          services: d.services || '',
-          createdAt: d.createdAt,
-          priceRange: d.priceRange,
-          yearEstablished: d.yearEstablished,
-          specialtyTags: d.specialtyTags || [],
-          paymentMethods: d.paymentMethods || [],
-          deliveryOptions: d.deliveryOptions || [],
-          deals: d.deals || [],
-          photos: d.photos || [],
-          coverPhotoIndex: d.coverPhotoIndex || 0,
-          isHidden: d.isHidden || false,
-          hiddenAt: d.hiddenAt || '',
-          hiddenReason: d.hiddenReason || '',
-        });
-      });
-
-      // Track pagination cursor
-      if (snapshot.docs.length < PAGE_SIZE) {
-        dispatch({ type: 'SET_HAS_MORE', payload: false });
-      }
-      if (snapshot.docs.length > 0) {
-        dispatch({ type: 'SET_LAST_DOC', payload: snapshot.docs[snapshot.docs.length - 1] });
-      }
-
-      if (isLoadMore) {
-        dispatch({ type: 'APPEND_BUSINESSES', payload: data });
-      } else {
-        dispatch({ type: 'SET_BUSINESSES', payload: data });
-      }
-    } catch (error) {
-      console.error('Error fetching businesses:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to load businesses. Please try again.' });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-      dispatch({ type: 'SET_LOADING_MORE', payload: false });
-    }
-  };
-
-  const fetchReviews = async (businessId: string) => {
-    try {
-      const q = query(collection(db, 'businessReviews'), where('businessId', '==', businessId));
-      const snapshot = await getDocs(q);
-      const data: BusinessReview[] = [];
-      snapshot.forEach((docSnap) => {
-        data.push({
-          id: docSnap.id,
-          businessId: docSnap.data().businessId,
-          userId: docSnap.data().userId,
-          userName: docSnap.data().userName,
-          rating: docSnap.data().rating,
-          text: docSnap.data().text,
-          createdAt: docSnap.data().createdAt,
-        });
-      });
-      // Sort client-side (newest first) to avoid composite index requirement
-      data.sort((a, b) => {
-        const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
-        const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
-        return bTime - aTime;
-      });
-      dispatch({ type: 'SET_BUSINESS_REVIEWS', payload: data });
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to load reviews.' });
-    }
-  };
-
-  useEffect(() => {
-    fetchBusinesses();
-  }, []);
-
-  // ── Infinite scroll observer ──
-  useEffect(() => {
-    if (!loadMoreRef.current) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && state.hasMore && !state.loadingMore && !state.loading) {
-          fetchBusinesses(true);
-        }
-      },
-      { threshold: 0.1 },
-    );
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [state.hasMore, state.loadingMore, state.loading, state.lastDoc]);
-
-  // Load user safety data (muted businesses, blocked users)
-  useEffect(() => {
-    if (!user) return;
-    const loadUserSafetyData = async () => {
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          if (data.mutedBusinesses) {
-            dispatch({ type: 'SET_MUTED_BUSINESSES', payload: new Set(data.mutedBusinesses) });
-          }
-          if (data.blockedUsers) {
-            dispatch({ type: 'SET_BLOCKED_USERS', payload: new Set(data.blockedUsers) });
-          }
-        }
-      } catch (e) {
-        console.error('Error loading user safety data:', e);
-      }
-    };
-    loadUserSafetyData();
-  }, [user]);
-
-  useEffect(() => {
-    if (state.selectedBusiness) {
-      fetchReviews(state.selectedBusiness.id);
-    }
-  }, [state.selectedBusiness ?.id]);
-
-  // Close heritage dropdown on click outside - handled by ClickOutsideOverlay component
-
-  // Auto-dismiss toast
+  // ── Auto-dismiss toast ──
   useEffect(() => {
     if (state.toastMessage) {
       const t = setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 3500);
@@ -443,12 +286,7 @@ export default function BusinessPage() {
     }
   }, [state.toastMessage, dispatch]);
 
-  // Load favorites from localStorage cache
-  useEffect(() => {
-    dispatch({ type: 'SET_FAVORITES', payload: new Set(getLocalSavedIds('businesses')) });
-  }, [dispatch]);
-
-  // Deep-link: open specific business from profile activity
+  // ── Deep-link: open specific business from profile activity ──
   useEffect(() => {
     const openId = searchParams.get('open');
     if (openId && state.businesses.length > 0) {
@@ -461,432 +299,10 @@ export default function BusinessPage() {
     }
   }, [searchParams, state.businesses, setSearchParams, dispatch]);
 
-  const toggleFavorite = (businessId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!user?.uid) return;
-    toggleSavedItem(user.uid, 'businesses', businessId).then(({ ids }) => dispatch({ type: 'SET_FAVORITES', payload: ids }));
-  };
-
-  // ── Report / Block / Mute handlers ──────────────────────────────────
-
-  const openReportModal = (businessId: string) => {
-    dispatch({ type: 'OPEN_REPORT', payload: businessId });
-  };
-
-  const handleSubmitReport = async () => {
-    if (!state.reportReason || !state.reportBusinessId || !user) return;
-    try {
-      dispatch({ type: 'SET_REPORT_SUBMITTING', payload: true });
-      const reportedBusiness = state.businesses.find((b) => b.id === state.reportBusinessId);
-      const categoryObj = REPORT_CATEGORIES.find((c) => c.id === state.reportReason);
-
-      // Write to reports collection (stealth: no owner notification)
-      await addDoc(collection(db, 'reports'), {
-        businessId: state.reportBusinessId,
-        reportedBy: user.uid,
-        reporterName: userProfile?.name || user.displayName || 'Anonymous',
-        reporterAvatar: userProfile?.avatar || '',
-        category: state.reportReason,
-        categoryLabel: categoryObj?.label || state.reportReason,
-        details: state.reportDetails.trim() || '',
-        createdAt: serverTimestamp(),
-        status: 'pending',
-      });
-
-      // Check if moderationQueue entry already exists for this business
-      const modQueueQuery = query(
-        collection(db, 'moderationQueue'),
-        where('contentId', '==', state.reportBusinessId)
-      );
-      const existingMods = await getDocs(modQueueQuery);
-
-      let totalReportCount = 1;
-
-      if (existingMods.docs.length > 0) {
-        const existingDoc = existingMods.docs[0];
-        const existingData = existingDoc.data();
-        totalReportCount = (existingData.reportCount || 1) + 1;
-        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
-          reportCount: totalReportCount,
-          reporters: arrayUnion({
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: state.reportReason,
-            details: state.reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        await addDoc(collection(db, 'moderationQueue'), {
-          type: 'business',
-          content: reportedBusiness?.name || '',
-          contentId: state.reportBusinessId,
-          collection: 'businesses',
-          authorId: reportedBusiness?.ownerId || '',
-          authorName: reportedBusiness?.name || 'Unknown Business',
-          authorAvatar: '',
-          images: reportedBusiness?.photos || [],
-          category: state.reportReason,
-          categoryLabel: categoryObj?.label || state.reportReason,
-          reason: `${categoryObj?.label || state.reportReason}${state.reportDetails.trim() ? ': ' + state.reportDetails.trim() : ''}`,
-          reportedBy: user.uid,
-          reporterName: userProfile?.name || user.displayName || 'Anonymous',
-          reporterAvatar: userProfile?.avatar || '',
-          reportCount: 1,
-          reporters: [{
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: state.reportReason,
-            details: state.reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }],
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      // 3-strike auto-hide
-      if (totalReportCount >= 3) {
-        await updateDoc(doc(db, 'businesses', state.reportBusinessId), {
-          isHidden: true,
-          hiddenAt: new Date().toISOString(),
-          hiddenReason: 'Auto-hidden: reached 3 community reports',
-        });
-        if (reportedBusiness?.ownerId) {
-          await addDoc(collection(db, 'notifications'), {
-            type: 'content_hidden',
-            recipientId: reportedBusiness.ownerId,
-            recipientName: reportedBusiness.name || '',
-            postId: state.reportBusinessId,
-            reason: 'Your business listing received multiple community reports and has been temporarily hidden for review.',
-            message: 'Your business listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
-            actionUrl: '/business',
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-        }
-      }
-
-      // Mute-on-report: hide this business from the reporter's view
-      await updateDoc(doc(db, 'users', user.uid), {
-        mutedBusinesses: arrayUnion(state.reportBusinessId),
-      });
-      dispatch({ type: 'ADD_MUTED_BUSINESS', payload: state.reportBusinessId });
-      dispatch({ type: 'ADD_REPORTED_BUSINESS', payload: state.reportBusinessId });
-      dispatch({ type: 'CLOSE_REPORT' });
-      dispatch({ type: 'SET_TOAST', payload: 'Report submitted. The business has been hidden from your view. Thank you for helping keep the community safe.' });
-    } catch (error) {
-      console.error('Error submitting report:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to submit report. Please try again.' });
-    } finally {
-      dispatch({ type: 'SET_REPORT_SUBMITTING', payload: false });
-    }
-  };
-
-  const handleBlockUser = async () => {
-    if (!user || !state.blockTargetUser) return;
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        blockedUsers: arrayUnion(state.blockTargetUser!.uid),
-      });
-      dispatch({ type: 'ADD_BLOCKED_USER', payload: state.blockTargetUser!.uid });
-      dispatch({ type: 'CLOSE_BLOCK_CONFIRM' });
-      dispatch({ type: 'SET_TOAST', payload: `${state.blockTargetUser!.name} has been blocked. Their businesses will no longer appear in your listings.` });
-      setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 4000);
-    } catch (error) {
-      console.error('Error blocking user:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to block user. Please try again.' });
-    }
-  };
-
-  const openBlockConfirm = (ownerId: string, businessName: string) => {
-    dispatch({ type: 'OPEN_BLOCK_CONFIRM', payload: { uid: ownerId, name: businessName } });
-  };
-
-  const filteredBusinesses = useMemo(() => {
-    let filtered = state.businesses.filter((b) => {
-      // Mute-on-report: hide businesses the user has reported
-      if (state.mutedBusinesses.has(b.id)) return false;
-      // Block filter: hide businesses from blocked owners
-      if (b.ownerId && state.blockedUsers.has(b.ownerId)) return false;
-      return true;
-    });
-    if (state.selectedCategory !== 'All') {
-      filtered = filtered.filter((b) => b.category === state.selectedCategory);
-    }
-    if (state.selectedHeritage.length > 0) {
-      filtered = filtered.filter((b) => {
-        if (Array.isArray(b.heritage)) return b.heritage.some((h: string) => state.selectedHeritage.includes(h));
-        return b.heritage ? state.selectedHeritage.includes(b.heritage) : false;
-      });
-    }
-    if (state.debouncedSearchQuery.trim()) {
-      filtered = filtered.filter(
-        (b) =>
-          fuzzyMatch(b.name, state.debouncedSearchQuery) ||
-          fuzzyMatch(b.category, state.debouncedSearchQuery) ||
-          fuzzyMatch(b.location, state.debouncedSearchQuery) ||
-          fuzzyMatch(b.desc, state.debouncedSearchQuery)
-      );
-    }
-
-    // Smart discovery sorting
-    if (state.activeCollection === 'topRated') {
-      filtered = filtered.sort((a, b) => b.rating - a.rating);
-    } else if (state.activeCollection === 'new') {
-      filtered = filtered.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-    } else if (state.activeCollection === 'mostReviewed') {
-      filtered = filtered.sort((a, b) => b.reviews - a.reviews);
-    } else if (state.activeCollection === 'favorites') {
-      filtered = filtered.filter((b) => state.favorites.has(b.id));
-    } else {
-      filtered = filtered.sort((a, b) => {
-        if (a.promoted && !b.promoted) return -1;
-        if (!a.promoted && b.promoted) return 1;
-        return b.rating - a.rating;
-      });
-    }
-    return filtered;
-  }, [state.businesses, state.selectedCategory, state.selectedHeritage, state.debouncedSearchQuery, state.activeCollection, state.favorites, state.mutedBusinesses, state.blockedUsers]);
-
-  const featuredBusinesses = useMemo(() => {
-    let featured = state.businesses.filter((b) => b.promoted);
-    if (state.selectedCategory !== 'All') {
-      featured = featured.filter((b) => b.category === state.selectedCategory);
-    }
-    if (state.selectedHeritage.length > 0) {
-      featured = featured.filter((b) => {
-        if (Array.isArray(b.heritage)) return b.heritage.some((h: string) => state.selectedHeritage.includes(h));
-        return b.heritage ? state.selectedHeritage.includes(b.heritage) : false;
-      });
-    }
-    return featured;
-  }, [state.businesses, state.selectedCategory, state.selectedHeritage, dispatch]);
-
-  // getGoogleMapsUrl is imported from @/components/business/businessValidation
-
-  const handleOpenCreateModal = () => {
-    if (userProfile?.accountType !== 'business' && userRole !== 'admin') {
-      dispatch({ type: 'SET_TOAST', payload: 'Only business accounts can add listings. Please switch to a business account in your Profile settings.' });
-      return;
-    }
-    if (userProfile?.isRegistered === true && userProfile?.tinValidationStatus !== 'valid' && userRole !== 'admin') {
-      dispatch({ type: 'SET_SHOW_TIN_MODAL', payload: true });
-      return;
-    }
-    if (userProfile?.isRegistered === false && !userProfile?.adminApproved && userRole !== 'admin') {
-      dispatch({ type: 'SET_TOAST', payload: 'Your unregistered business account is pending admin approval.' });
-      return;
-    }
-    dispatch({ type: 'OPEN_CREATE_MODAL' });
-  };
-
-  const handleAddBusiness = async () => {
-    // ── Field-level validation (uses extracted utility) ──
-    const errors = validateBusinessForm(state.formData as BusinessFormData);
-    dispatch({ type: 'SET_FORM_ERRORS', payload: errors });
-    if (Object.keys(errors).length > 0) {
-      dispatch({ type: 'SET_TOAST', payload: 'Please fix the errors in the form' });
-      return;
-    }
-    dispatch({ type: 'SET_SAVING', payload: true });
-    try {
-      await addDoc(collection(db, 'businesses'), {
-        name: state.formData.name,
-        category: state.formData.category,
-        desc: state.formData.desc,
-        location: state.formData.location,
-        phone: state.formData.phone,
-        website: state.formData.website,
-        email: state.formData.email,
-        hours: state.formData.hours,
-        menu: state.formData.menu,
-        services: state.formData.services,
-        priceRange: state.formData.priceRange,
-        yearEstablished: state.formData.yearEstablished,
-        paymentMethods: state.formData.paymentMethods,
-        deliveryOptions: state.formData.deliveryOptions,
-        specialtyTags: state.formData.specialtyTags,
-        emoji: CATEGORY_EMOJI_MAP[state.formData.category] || '💼',
-        bgColor: CATEGORY_COLORS[state.formData.category] || '#999',
-        rating: 4.5,
-        reviews: 0,
-        promoted: false,
-        createdAt: Timestamp.now(),
-        ownerId: user?.uid || '',
-        ownerName: userProfile?.name || user?.displayName || 'Unknown',
-        heritage: Array.isArray(userProfile?.heritage)
-          ? userProfile.heritage
-          : userProfile?.heritage
-          ? [userProfile.heritage]
-          : [],
-        ...(state.formPhotos.length > 0 ? { photos: state.formPhotos, coverPhotoIndex: Math.min(state.coverPhotoIndex, state.formPhotos.length - 1) } : {}),
-      });
-      dispatch({ type: 'RESET_CREATE_FORM' });
-      // Reset pagination and refetch from start
-      dispatch({ type: 'SET_LAST_DOC', payload: null });
-      dispatch({ type: 'SET_HAS_MORE', payload: true });
-      await fetchBusinesses();
-    } catch (error) {
-      console.error('Error adding business:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to add business. Please try again.' });
-    } finally {
-      dispatch({ type: 'SET_SAVING', payload: false });
-    }
-  };
-
-  const handleDeleteBusiness = async (businessId: string) => {
-    dispatch({ type: 'OPEN_DELETE_CONFIRM', payload: businessId });
-  };
-
-  const confirmDeleteBusiness = async () => {
-    if (!state.deleteBusinessId) return;
-    dispatch({ type: 'SET_SAVING', payload: true });
-    try {
-      await deleteDoc(doc(db, 'businesses', state.deleteBusinessId));
-      dispatch({ type: 'REMOVE_BUSINESS', payload: state.deleteBusinessId });
-      dispatch({ type: 'SELECT_BUSINESS', payload: null });
-      dispatch({ type: 'SET_TOAST', payload: 'Business deleted successfully.' });
-    } catch (error) {
-      console.error('Error deleting business:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to delete business. Please try again.' });
-    } finally {
-      dispatch({ type: 'SET_SAVING', payload: false });
-      dispatch({ type: 'CLOSE_DELETE_CONFIRM' });
-    }
-  };
-
-  const handleStartEdit = () => {
-    if (!state.selectedBusiness) return;
-    dispatch({ type: 'SET_EDIT_DATA', payload: {
-      name: state.selectedBusiness.name,
-      desc: state.selectedBusiness.desc,
-      location: state.selectedBusiness.location,
-      phone: state.selectedBusiness.phone || '',
-      website: state.selectedBusiness.website || '',
-      email: state.selectedBusiness.email || '',
-      hours: state.selectedBusiness.hours || '',
-      category: state.selectedBusiness.category,
-      menu: state.selectedBusiness.menu || '',
-      services: state.selectedBusiness.services || '',
-      priceRange: state.selectedBusiness.priceRange || '',
-      yearEstablished: state.selectedBusiness.yearEstablished || new Date().getFullYear(),
-      paymentMethods: state.selectedBusiness.paymentMethods || [],
-      deliveryOptions: state.selectedBusiness.deliveryOptions || [],
-      specialtyTags: state.selectedBusiness.specialtyTags || [],
-    } });
-    dispatch({ type: 'SET_EDIT_PHOTOS', payload: state.selectedBusiness.photos || [] });
-    dispatch({ type: 'SET_EDIT_COVER_INDEX', payload: state.selectedBusiness.coverPhotoIndex || 0 });
-    dispatch({ type: 'SET_IS_EDITING', payload: true });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!state.selectedBusiness) return;
-    dispatch({ type: 'SET_SAVING', payload: true });
-    try {
-      const ref = doc(db, 'businesses', state.selectedBusiness.id);
-      await updateDoc(ref, {
-        name: state.editData.name,
-        desc: state.editData.desc,
-        location: state.editData.location,
-        phone: state.editData.phone,
-        website: state.editData.website,
-        email: state.editData.email,
-        hours: state.editData.hours,
-        category: state.editData.category,
-        menu: state.editData.menu,
-        services: state.editData.services,
-        priceRange: state.editData.priceRange,
-        yearEstablished: state.editData.yearEstablished,
-        paymentMethods: state.editData.paymentMethods,
-        deliveryOptions: state.editData.deliveryOptions,
-        specialtyTags: state.editData.specialtyTags,
-        emoji: CATEGORY_EMOJI_MAP[state.editData.category] || state.selectedBusiness.emoji,
-        bgColor: CATEGORY_COLORS[state.editData.category] || state.selectedBusiness.bgColor,
-        photos: state.editPhotos,
-        coverPhotoIndex: Math.min(state.editCoverPhotoIndex, Math.max(state.editPhotos.length - 1, 0)),
-      });
-      const updated = {
-        ...state.selectedBusiness,
-        ...state.editData,
-        emoji: CATEGORY_EMOJI_MAP[state.editData.category] || state.selectedBusiness.emoji,
-        bgColor: CATEGORY_COLORS[state.editData.category] || state.selectedBusiness.bgColor,
-        photos: state.editPhotos,
-        coverPhotoIndex: Math.min(state.editCoverPhotoIndex, Math.max(state.editPhotos.length - 1, 0)),
-      };
-      dispatch({ type: 'SELECT_BUSINESS', payload: updated });
-      dispatch({ type: 'UPDATE_BUSINESS', payload: updated });
-      dispatch({ type: 'SET_IS_EDITING', payload: false });
-    } catch (error) {
-      console.error('Error updating business:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to update business. Please try again.' });
-    } finally {
-      dispatch({ type: 'SET_SAVING', payload: false });
-    }
-  };
-
-  const handleAddReview = async () => {
-    if (!state.selectedBusiness || !user) return;
-    if (!state.newReview.text.trim()) {
-      dispatch({ type: 'SET_TOAST', payload: 'Please enter a review before submitting.' });
-      return;
-    }
-    try {
-      await addDoc(collection(db, 'businessReviews'), {
-        businessId: state.selectedBusiness.id,
-        userId: user.uid,
-        userName: userProfile?.name || 'Anonymous',
-        rating: state.newReview.rating,
-        text: state.newReview.text,
-        createdAt: Timestamp.now(),
-      });
-      // Optimistic update: add review to local state immediately
-      const optimisticReview: BusinessReview = {
-        id: 'temp-' + Date.now(),
-        businessId: state.selectedBusiness.id,
-        userId: user.uid,
-        userName: userProfile?.name || 'Anonymous',
-        rating: state.newReview.rating,
-        text: state.newReview.text,
-        createdAt: Timestamp.now(),
-      };
-      const updatedReviews = [optimisticReview, ...state.businessReviews];
-      dispatch({ type: 'SET_BUSINESS_REVIEWS', payload: updatedReviews });
-
-      // Recalculate average rating
-      const avgRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0) / updatedReviews.length;
-      const ref = doc(db, 'businesses', state.selectedBusiness.id);
-      await updateDoc(ref, {
-        rating: parseFloat(avgRating.toFixed(1)),
-        reviews: state.selectedBusiness.reviews + 1,
-      });
-
-      // Update local business state (avoid full refetch)
-      const updatedBusiness = { ...state.selectedBusiness, rating: parseFloat(avgRating.toFixed(1)), reviews: state.selectedBusiness.reviews + 1 };
-      dispatch({ type: 'SELECT_BUSINESS', payload: updatedBusiness });
-      dispatch({ type: 'UPDATE_BUSINESS', payload: updatedBusiness });
-
-      dispatch({ type: 'SET_NEW_REVIEW', payload: { rating: 5, text: '' } });
-      dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: false });
-    } catch (error) {
-      console.error('Error adding review:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to add review. Please try again.' });
-    }
-  };
-
+  // ── Derived values ──
   const canAddBusiness = userRole === 'admin' || userRole === 'business_owner' || userProfile?.accountType === 'business';
-  const isOwnerOrAdmin = (b: Business) => b.ownerId === user?.uid || userRole === 'admin';
+  const isOwnerOrAdmin = useCallback((b: Business) => b.ownerId === user?.uid || userRole === 'admin', [user?.uid, userRole]);
   const ownedBusinesses = state.businesses.filter((b) => b.ownerId === user?.uid || userRole === 'admin');
-
-  // Category count
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    state.businesses.forEach((b) => {
-      counts[b.category] = (counts[b.category] || 0) + 1;
-    });
-    return counts;
-  }, [state.businesses, dispatch]);
 
   // Skeleton card
   const SkeletonCard = () => (
