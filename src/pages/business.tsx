@@ -172,7 +172,7 @@ export default function BusinessPage() {
                 ref={categoryScrollRef}
                 role="tablist"
                 aria-label="Business categories"
-                className="flex gap-1 py-3 overflow-x-auto scrollbar-hide"
+                className="flex gap-1 py-3 overflow-x-auto hide-scrollbar"
               >
                 {/* All */}
                 <button
@@ -213,7 +213,7 @@ export default function BusinessPage() {
             {/* Smart Discovery Collections */}
             <div className="border-t border-aurora-border bg-aurora-surface">
               <div className="max-w-6xl mx-auto px-4 py-3">
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
                   {(['all', 'topRated', 'new', 'mostReviewed', 'favorites'] as const).map((collection) => {
                     const labels = {
                       all: 'All',

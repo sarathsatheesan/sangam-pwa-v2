@@ -30,7 +30,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
           Featured
         </h2>
       </div>
-      <div role="list" aria-labelledby="featured-heading" className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4" tabIndex={0} onKeyDown={(e) => { const el = e.currentTarget; if (e.key === 'ArrowRight') { el.scrollBy({ left: 200, behavior: 'smooth' }); } else if (e.key === 'ArrowLeft') { el.scrollBy({ left: -200, behavior: 'smooth' }); } }}>
+      <div role="list" aria-labelledby="featured-heading" className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar -mx-4 px-4" tabIndex={0} onKeyDown={(e) => { const el = e.currentTarget; if (e.key === 'ArrowRight') { el.scrollBy({ left: 200, behavior: 'smooth' }); } else if (e.key === 'ArrowLeft') { el.scrollBy({ left: -200, behavior: 'smooth' }); } }}>
         {businesses.map((business) => (
           <div
             key={business.id}

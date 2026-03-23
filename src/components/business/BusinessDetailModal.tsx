@@ -131,6 +131,19 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
     }
   }, [business.id, business.name, business.category]);
 
+  // Prevent body scroll behind modal (including iOS Safari)
+  useEffect(() => {
+    const htmlEl = document.documentElement;
+    const prevHtml = htmlEl.style.overflow;
+    const prevBody = document.body.style.overflow;
+    htmlEl.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      htmlEl.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
+
   // Focus trap + ESC-to-close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

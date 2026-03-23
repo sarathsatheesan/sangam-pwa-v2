@@ -56,11 +56,20 @@ const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose, goPrev, goNext]);
 
-  // Prevent body scroll when lightbox is open
+  // Prevent body scroll when lightbox is open (including iOS Safari)
   useEffect(() => {
-    const prev = document.body.style.overflow;
+    const htmlEl = document.documentElement;
+    const prevHtml = htmlEl.style.overflow;
+    const prevBody = document.body.style.overflow;
+    const prevTouch = document.body.style.touchAction;
+    htmlEl.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    document.body.style.touchAction = 'none';
+    return () => {
+      htmlEl.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+      document.body.style.touchAction = prevTouch;
+    };
   }, []);
 
   // Touch swipe handlers
@@ -180,7 +189,7 @@ const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       {/* Thumbnail strip */}
       {photos.length > 1 && (
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-4 py-3">
-          <div className="flex gap-2 justify-center overflow-x-auto scrollbar-hide">
+          <div className="flex gap-2 justify-center overflow-x-auto hide-scrollbar">
             {photos.map((photo, idx) => (
               <button
                 key={idx}

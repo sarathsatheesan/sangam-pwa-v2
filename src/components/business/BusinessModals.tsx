@@ -10,6 +10,19 @@ function useModalA11y(
   ref: React.RefObject<HTMLDivElement | null>,
   onClose: () => void,
 ) {
+  // Prevent body scroll behind modal (including iOS Safari)
+  useEffect(() => {
+    const htmlEl = document.documentElement;
+    const prevHtml = htmlEl.style.overflow;
+    const prevBody = document.body.style.overflow;
+    htmlEl.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      htmlEl.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { onClose(); return; }
