@@ -62,6 +62,7 @@ const BusinessPhotoCarousel: React.FC<{
         />
       )}
     </>
+  );
 };
 
 export interface BusinessDetailModalProps {
