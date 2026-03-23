@@ -1416,7 +1416,7 @@ export default function EventsPage() {
       </div>
 
       {/* ── Content ── */}
-      <div className="max-w-6xl mx-auto px-4 py-5 pb-24">
+      <div className="max-w-6xl mx-auto px-4 py-5 pb-4">
         {/* Results Header */}
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-aurora-text-secondary">
@@ -2206,7 +2206,7 @@ export default function EventsPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 pb-24 max-w-lg mx-auto w-full">
+          <div className="flex-1 overflow-y-auto p-4 pb-4 max-w-lg mx-auto w-full">
             {/* Step 1: Basics */}
             {createStep === 1 && (
               <div className="space-y-4">
@@ -2504,7 +2504,7 @@ export default function EventsPage() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 pb-24 max-w-lg mx-auto w-full">
+          <div className="flex-1 overflow-y-auto p-4 pb-4 max-w-lg mx-auto w-full">
             <div className="space-y-4">
               <FormInput label="Event Title" required type="text" value={editData.title} onChange={(e: any) => setEditData({ ...editData, title: e.target.value })} placeholder="What's happening?" />
 

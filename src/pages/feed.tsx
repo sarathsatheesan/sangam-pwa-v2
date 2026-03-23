@@ -1510,7 +1510,7 @@ export default function FeedPage() {
       </div>
 
       {/* ─── Posts Feed ─── */}
-      <div className="max-w-2xl mx-auto px-4 py-3 space-y-3 pb-24">
+      <div className="max-w-2xl mx-auto px-4 py-3 space-y-3 pb-4">
         {loading ? (
           // Skeleton loaders
           <div className="space-y-3">

@@ -762,7 +762,7 @@ export const SignupPage: React.FC = () => {
   const progressPercent = ((currentStep + 1) / 4) * 100;
 
   return (
-    <div className="min-h-screen bg-aurora-surface-variant flex flex-col">
+    <div className="bg-aurora-surface-variant flex flex-col" style={{ minHeight: 'var(--app-height, 100vh)' }}>
       {/* Header with Progress */}
       <div className="bg-aurora-indigo text-white pt-8 pb-8">
         <div className="max-w-md mx-auto px-6">

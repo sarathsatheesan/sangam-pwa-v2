@@ -15,8 +15,8 @@ import {
   serverTimestamp,
   arrayUnion,
 } from 'firebase/firestore';
-import { db } from '../../services/firebase';
-import { useAuth } from '../../contexts/AuthContext';
+import { db } from '@/services/firebase';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Search, X, Heart, MapPin, BedDouble, Bath, Ruler, Home,
   Building2, Users, Key, Plus, ChevronLeft, ChevronRight,
@@ -30,8 +30,8 @@ import {
   DoorOpen, Flame, Zap, Droplets, Sun, MessageCircle, Star,
   Flag, Ban, MoreHorizontal,
 } from 'lucide-react';
-import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
-import { ClickOutsideOverlay } from '../../components/ClickOutsideOverlay';
+import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
+import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 
 /* ─── types ─── */
 interface Listing {
@@ -1704,7 +1704,7 @@ export default function HousingPage() {
       </div>
 
       {/* ===== Listings ===== */}
-      <div className="max-w-6xl mx-auto px-4 py-5 pb-24">
+      <div className="max-w-6xl mx-auto px-4 py-5 pb-4">
         {myProperties && user && (
           <div className="max-w-7xl mx-auto px-4 pt-4 pb-2">
             <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4 mb-4">
@@ -2541,7 +2541,7 @@ export default function HousingPage() {
               <X size={20} />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 pb-24">
+          <div className="flex-1 overflow-y-auto p-4 pb-4">
             {renderFormFields(editData, setEditData, false)}
           </div>
           <div className="flex-shrink-0 bg-[var(--aurora-surface)] border-t border-[var(--aurora-border)] p-4 flex gap-3">
@@ -2581,7 +2581,7 @@ export default function HousingPage() {
               <X size={20} />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 pb-24">
+          <div className="flex-1 overflow-y-auto p-4 pb-4">
             {renderFormFields(formData, (d: any) => setFormData(d), true)}
           </div>
           <div className="flex-shrink-0 bg-[var(--aurora-surface)] border-t border-[var(--aurora-border)] p-4">

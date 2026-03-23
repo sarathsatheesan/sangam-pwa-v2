@@ -4442,7 +4442,7 @@ export default function MessagesPage() {
 
       {/* Starred messages overlay */}
       {showStarredView && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)', paddingTop: 'var(--safe-top, 0px)', paddingBottom: 'var(--safe-bottom, 0px)' }}>
           <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
             <button onClick={() => setShowStarredView(false)} className="p-1 rounded-full hover:bg-white/10" onTouchStart={() => setShowStarredView(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               <ArrowLeft size={20} className="text-white" />
@@ -4489,7 +4489,7 @@ export default function MessagesPage() {
 
       {/* Pinned messages overlay */}
       {showPinnedView && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)', paddingTop: 'var(--safe-top, 0px)', paddingBottom: 'var(--safe-bottom, 0px)' }}>
           <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
             <button onClick={() => setShowPinnedView(false)} className="p-1 rounded-full hover:bg-white/10" onTouchStart={() => setShowPinnedView(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               <ArrowLeft size={20} className="text-white" />
@@ -5425,7 +5425,7 @@ export default function MessagesPage() {
   // === MOBILE LAYOUT: full-screen chat when in room view ===
   // === DESKTOP LAYOUT (md+): side-by-side panels like WhatsApp Web ===
   return (
-    <div className={`h-full flex overflow-hidden ${viewState === 'room' ? 'fixed inset-0 z-50 bg-white md:relative md:inset-auto md:z-auto' : ''}`}>
+    <div className={`h-full flex overflow-hidden ${viewState === 'room' ? 'fixed inset-0 z-50 bg-white md:relative md:inset-auto md:z-auto' : ''}`} style={viewState === 'room' ? { paddingTop: 'var(--safe-top, 0px)', paddingBottom: 'var(--safe-bottom, 0px)' } : undefined}>
       {/* Left panel - conversation list */}
       {/* On mobile: show only when viewState is 'list' */}
       {/* On desktop: always show */}

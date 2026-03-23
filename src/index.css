@@ -151,8 +151,25 @@
 }
 
 @layer base {
+  /* ── Safe-area & dynamic viewport height ── */
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    /* dvh with vh fallback for browsers that don't support it */
+    --app-height: 100vh;
+  }
+
+  @supports (height: 100dvh) {
+    :root {
+      --app-height: 100dvh;
+    }
+  }
+
   html {
     scroll-behavior: smooth;
+    height: var(--app-height);
   }
 
   body {
@@ -162,6 +179,15 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     transition: background-color 0.3s ease, color 0.3s ease;
+    height: var(--app-height);
+    /* Safe area padding for notched devices */
+    padding-top: var(--safe-top);
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
+  }
+
+  #root {
+    height: 100%;
   }
 
   ::selection {
@@ -358,6 +384,14 @@
   /* ── Hide Scrollbar ── */
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* ── Safe-area aware fixed overlays ── */
+  .safe-inset-overlay {
+    padding-top: var(--safe-top, 0px);
+    padding-bottom: var(--safe-bottom, 0px);
+    padding-left: var(--safe-left, 0px);
+    padding-right: var(--safe-right, 0px);
+  }
 }
 
 /* ── Keyframe Animations ── */

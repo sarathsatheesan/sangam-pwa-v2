@@ -1220,7 +1220,7 @@ export default function BusinessPage() {
       {!merchantView && (
         <>
           {/* ── Content ── */}
-          <div className="max-w-6xl mx-auto px-4 py-5 pb-24">
+          <div className="max-w-6xl mx-auto px-4 py-5 pb-4">
             {/* Results Header */}
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-aurora-text-secondary">
@@ -1474,7 +1474,7 @@ export default function BusinessPage() {
 
       {/* Merchant Dashboard View */}
       {merchantView && canAddBusiness && (
-        <div className="max-w-6xl mx-auto px-4 py-5 pb-24">
+        <div className="max-w-6xl mx-auto px-4 py-5 pb-4">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-aurora-text">Your Businesses</h2>
@@ -1998,7 +1998,7 @@ export default function BusinessPage() {
               <X className="w-5 h-5" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 max-w-lg mx-auto w-full">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-4 max-w-lg mx-auto w-full">
             <FormInput label="Business Name" required type="text" value={editData.name} onChange={(e: any) => setEditData({ ...editData, name: e.target.value })} />
             <div>
               <label className="block text-sm font-medium text-aurora-text mb-1.5">Category</label>
@@ -2078,7 +2078,7 @@ export default function BusinessPage() {
               <X className="w-5 h-5" />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 max-w-lg mx-auto w-full">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-4 max-w-lg mx-auto w-full">
             <FormInput label="Business Name" required type="text" value={formData.name} onChange={(e: any) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter business name" />
             <div>
               <label className="block text-sm font-medium text-aurora-text mb-1.5">Category <span className="text-red-500">*</span></label>

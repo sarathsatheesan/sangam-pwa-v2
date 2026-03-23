@@ -9,7 +9,7 @@ import GroupCallOverlay from '../components/GroupCallOverlay';
 
 export const MainLayout: React.FC = () => {
   return (
-    <div className="flex flex-col h-screen aurora-bg-subtle">
+    <div className="flex flex-col overflow-hidden aurora-bg-subtle" style={{ height: 'var(--app-height, 100vh)' }}>
       {/* Header */}
       <AppHeader />
 
@@ -17,11 +17,11 @@ export const MainLayout: React.FC = () => {
       <ModuleSelector />
 
       {/* Main content area — scrolls between header/module-selector and footer */}
-      <main className="flex-1 overflow-y-auto min-h-0">
+      <main className="flex-1 overflow-y-auto min-h-0" style={{ paddingBottom: 'var(--safe-bottom, 0px)' }}>
         <Outlet />
       </main>
 
-      {/* Footer — fixed at bottom */}
+      {/* Footer — desktop only, with safe area bottom */}
       <AppFooter />
 
       {/* Toast notifications */}

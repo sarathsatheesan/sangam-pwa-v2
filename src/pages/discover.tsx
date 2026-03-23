@@ -189,6 +189,7 @@ export default function DiscoverPage() {
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [blockTargetUser, setBlockTargetUser] = useState<{ id: string; name: string } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [mutualListFor, setMutualListFor] = useState<string | null>(null);
 
   // Load blocked users from Firestore
   useEffect(() => {
@@ -595,6 +596,31 @@ export default function DiscoverPage() {
     return count;
   };
 
+  // Get actual mutual connection User objects
+  const getMutualConnections = (personId: string): User[] => {
+    const mutuals: User[] = [];
+    const targetPerson = people.find((p) => p.id === personId);
+    if (!targetPerson) return mutuals;
+
+    connections.forEach((status, uid) => {
+      if (status === 'connected' && uid !== personId) {
+        const connectedPerson = people.find((p) => p.id === uid);
+        if (connectedPerson) {
+          const tHeritage = Array.isArray(targetPerson.heritage)
+            ? targetPerson.heritage
+            : [targetPerson.heritage];
+          const cHeritage = Array.isArray(connectedPerson.heritage)
+            ? connectedPerson.heritage
+            : [connectedPerson.heritage];
+          const sharedHeritage = tHeritage.some((h) => cHeritage.includes(h));
+          const sharedCity = targetPerson.city === connectedPerson.city;
+          if (sharedHeritage || sharedCity) mutuals.push(connectedPerson);
+        }
+      }
+    });
+    return mutuals;
+  };
+
   // Filtered people
   const filteredPeople = useMemo(() => {
     let filtered = people;
@@ -723,7 +749,7 @@ export default function DiscoverPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-aurora-bg flex items-center justify-center">
+      <div className="min-h-full bg-aurora-bg flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
           <p className="text-gray-600 dark:text-gray-300">Loading...</p>
@@ -733,7 +759,7 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="min-h-screen bg-aurora-bg pb-20">
+    <div className="min-h-full bg-aurora-bg pb-4">
       {/* Stats Bar */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3">
         <div className="max-w-6xl mx-auto px-4">
@@ -838,44 +864,49 @@ export default function DiscoverPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {incomingRequests.map((person) => (
-                <div key={person.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col">
-                  <div className="h-32 bg-gradient-to-r from-yellow-400 to-orange-400 relative">
-                    <button
-                      onClick={() => setSelectedPerson(person)}
-                      className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
-                    />
+                <div key={person.id} className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer"
+                  onClick={() => setSelectedPerson(person)}
+                >
+                  <div className="bg-gradient-to-r from-orange-400 to-amber-400 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <UserPlus className="w-3 h-3" /> Wants to connect
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-4 flex flex-col flex-1">
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                  <div className="p-3 flex flex-col flex-1">
+                    {/* Avatar + Name side by side */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-lg border-2 border-orange-300 shrink-0 shadow-sm">
                         {renderAvatar(person.avatar, person.name)}
                       </div>
-                      {isRecentlyActive(person) && (
-                        <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-[var(--aurora-text)] text-sm leading-tight truncate">{person.name}</h4>
+                        {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                      </div>
+                    </div>
+                    <div className="mt-2 space-y-0.5">
+                      {renderHeritage(person)}
+                      {person.showLocation && (
+                        <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
+                          <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
+                        </p>
                       )}
                     </div>
-                    <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
-                    {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>}
-                    {renderHeritage(person, 'sm')}
-                    {person.showLocation && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" /> {person.city}
-                      </p>
-                    )}
-                    <div className="mt-auto pt-4 flex gap-2">
+                    <div className="mt-auto pt-2.5 flex gap-1.5">
                       <button
-                        onClick={() => handleAcceptConnection(person.id)}
+                        onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
                         disabled={connectingId === person.id}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
                       >
-                        <Check className="w-4 h-4" /> Accept
+                        <Check className="w-3.5 h-3.5" /> Accept
                       </button>
                       <button
-                        onClick={() => handleDeclineConnection(person.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
                         disabled={connectingId === person.id}
-                        className="flex-1 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-800 dark:text-white dark:text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                        className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
                       >
-                        <X className="w-4 h-4" /> Decline
+                        <X className="w-3.5 h-3.5" /> Decline
                       </button>
                     </div>
                   </div>
@@ -893,37 +924,42 @@ export default function DiscoverPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {sentRequests.map((person) => (
-                <div key={person.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col">
-                  <div className="h-32 bg-gradient-to-r from-purple-400 to-blue-400 relative">
-                    <button
-                      onClick={() => setSelectedPerson(person)}
-                      className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
-                    />
+                <div key={person.id} className="bg-aurora-surface rounded-2xl border border-purple-200 dark:border-purple-500/30 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer"
+                  onClick={() => setSelectedPerson(person)}
+                >
+                  <div className="bg-gradient-to-r from-purple-500 to-blue-400 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-purple-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> Sent request
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-4 flex flex-col flex-1">
-                    <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                  <div className="p-3 flex flex-col flex-1">
+                    {/* Avatar + Name side by side */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold text-lg border-2 border-purple-300 shrink-0 shadow-sm">
                         {renderAvatar(person.avatar, person.name)}
                       </div>
-                      {isRecentlyActive(person) && (
-                        <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-[var(--aurora-text)] text-sm leading-tight truncate">{person.name}</h4>
+                        {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                      </div>
+                    </div>
+                    <div className="mt-2 space-y-0.5">
+                      {renderHeritage(person)}
+                      {person.showLocation && (
+                        <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
+                          <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
+                        </p>
                       )}
                     </div>
-                    <h3 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h3>
-                    {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300">{person.profession}</p>}
-                    {renderHeritage(person, 'sm')}
-                    {person.showLocation && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" /> {person.city}
-                      </p>
-                    )}
-                    <div className="mt-auto pt-4">
+                    <div className="mt-auto pt-2.5 flex gap-1.5">
                       <button
-                        onClick={() => handleConnect(person.id)}
+                        onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
                         disabled={connectingId === person.id}
-                        className="w-full bg-gray-400 hover:bg-gray-500 text-white py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                        className="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
                       >
-                        <Clock className="w-4 h-4" /> Pending
+                        <Clock className="w-3.5 h-3.5" /> Pending
                       </button>
                     </div>
                   </div>
@@ -989,9 +1025,12 @@ export default function DiscoverPage() {
                               </p>
                             )}
                             {getMutualConnectionCount(person.id) > 0 && (
-                              <p className="text-[11px] text-blue-600 font-medium">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setMutualListFor(person.id); }}
+                                className="text-[11px] text-blue-600 font-medium hover:text-blue-800 hover:underline cursor-pointer transition-colors text-left"
+                              >
                                 {getMutualConnectionCount(person.id)} mutual connections
-                              </p>
+                              </button>
                             )}
                           </div>
                           <div className="mt-auto pt-2.5 flex gap-1.5">
@@ -1028,59 +1067,53 @@ export default function DiscoverPage() {
                     {pymkGroups.sameCity.map((person) => (
                       <div
                         key={person.id}
-                        className="w-44 sm:w-52 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
+                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-blue-200 dark:border-blue-500/30 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
+                        onClick={() => setSelectedPerson(person)}
                       >
-                        <div
-                          className={`h-32 bg-gradient-to-r ${
-                            HERITAGE_COLORS[
-                              Array.isArray(person.heritage)
-                                ? person.heritage[0]
-                                : person.heritage
-                            ] || 'from-gray-300 to-gray-400'
-                          } relative`}
-                        >
-                          <button
-                            onClick={() => setSelectedPerson(person)}
-                            className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
-                          />
+                        <div className="bg-gradient-to-r from-blue-500 to-blue-400 px-3 py-2">
+                          <div className="bg-blue-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                            <MapPin className="w-2.5 h-2.5" /> Your City
+                          </div>
                         </div>
-                        <div className="p-4 flex-1 flex flex-col">
-                          <div className="relative">
-                            <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                        <div className="p-3 flex-1 flex flex-col">
+                          {/* Avatar + Name side by side */}
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-lg border-2 border-blue-300 shrink-0 shadow-sm">
                               {renderAvatar(person.avatar, person.name)}
                             </div>
-                            {isRecentlyActive(person) && (
-                              <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-bold text-[var(--aurora-text)] text-sm leading-tight truncate">{person.name}</h4>
+                              {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                            </div>
+                          </div>
+                          <div className="mt-2 space-y-0.5">
+                            {renderHeritage(person)}
+                            {person.showLocation && (
+                              <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
+                                <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
+                              </p>
+                            )}
+                            {isNewMember(person) && (
+                              <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-0.5 rounded">
+                                New
+                              </div>
                             )}
                           </div>
-                          <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
-                          {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
-                          {renderHeritage(person)}
-                          {person.showLocation && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
-                              <MapPin className="w-3 h-3" /> {person.city}
-                            </p>
-                          )}
-                          {isNewMember(person) && (
-                            <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-1 rounded">
-                              New
-                            </div>
-                          )}
-                          <div className="mt-auto pt-3">
+                          <div className="mt-auto pt-2.5">
                             {connections.get(person.id) === 'pending' ? (
                               <button
                                 disabled
-                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-2 rounded font-medium text-sm flex items-center justify-center gap-1.5"
+                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5"
                               >
                                 <Clock className="w-3.5 h-3.5" /> Pending
                               </button>
                             ) : (
                               <button
-                                onClick={() => handleConnect(person.id)}
+                                onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
                                 disabled={connectingId === person.id}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
                               >
-                                Connect
+                                <UserPlus className="w-3.5 h-3.5" /> Connect
                               </button>
                             )}
                           </div>
@@ -1103,59 +1136,53 @@ export default function DiscoverPage() {
                     {pymkGroups.sameHeritage.map((person) => (
                       <div
                         key={person.id}
-                        className="w-60 sm:w-72 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
+                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-orange-200 dark:border-orange-500/30 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
+                        onClick={() => setSelectedPerson(person)}
                       >
-                        <div
-                          className={`h-32 bg-gradient-to-r ${
-                            HERITAGE_COLORS[
-                              Array.isArray(person.heritage)
-                                ? person.heritage[0]
-                                : person.heritage
-                            ] || 'from-gray-300 to-gray-400'
-                          } relative`}
-                        >
-                          <button
-                            onClick={() => setSelectedPerson(person)}
-                            className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
-                          />
+                        <div className="bg-gradient-to-r from-orange-500 to-amber-400 px-3 py-2">
+                          <div className="bg-orange-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                            <Globe className="w-2.5 h-2.5" /> Heritage
+                          </div>
                         </div>
-                        <div className="p-4 flex-1 flex flex-col">
-                          <div className="relative">
-                            <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                        <div className="p-3 flex-1 flex flex-col">
+                          {/* Avatar + Name side by side */}
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-lg border-2 border-orange-300 shrink-0 shadow-sm">
                               {renderAvatar(person.avatar, person.name)}
                             </div>
-                            {isRecentlyActive(person) && (
-                              <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-bold text-[var(--aurora-text)] text-sm leading-tight truncate">{person.name}</h4>
+                              {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                            </div>
+                          </div>
+                          <div className="mt-2 space-y-0.5">
+                            {renderHeritage(person)}
+                            {person.showLocation && (
+                              <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
+                                <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
+                              </p>
+                            )}
+                            {isNewMember(person) && (
+                              <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-0.5 rounded">
+                                New
+                              </div>
                             )}
                           </div>
-                          <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
-                          {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
-                          {renderHeritage(person)}
-                          {person.showLocation && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
-                              <MapPin className="w-3 h-3" /> {person.city}
-                            </p>
-                          )}
-                          {isNewMember(person) && (
-                            <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-1 rounded">
-                              New
-                            </div>
-                          )}
-                          <div className="mt-auto pt-3">
+                          <div className="mt-auto pt-2.5">
                             {connections.get(person.id) === 'pending' ? (
                               <button
                                 disabled
-                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-2 rounded font-medium text-sm flex items-center justify-center gap-1.5"
+                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5"
                               >
                                 <Clock className="w-3.5 h-3.5" /> Pending
                               </button>
                             ) : (
                               <button
-                                onClick={() => handleConnect(person.id)}
+                                onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
                                 disabled={connectingId === person.id}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
                               >
-                                Connect
+                                <UserPlus className="w-3.5 h-3.5" /> Connect
                               </button>
                             )}
                           </div>
@@ -1178,59 +1205,53 @@ export default function DiscoverPage() {
                     {pymkGroups.similarInterests.map((person) => (
                       <div
                         key={person.id}
-                        className="w-44 sm:w-52 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex-shrink-0 flex flex-col"
+                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-purple-200 dark:border-purple-500/30 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
+                        onClick={() => setSelectedPerson(person)}
                       >
-                        <div
-                          className={`h-32 bg-gradient-to-r ${
-                            HERITAGE_COLORS[
-                              Array.isArray(person.heritage)
-                                ? person.heritage[0]
-                                : person.heritage
-                            ] || 'from-gray-300 to-gray-400'
-                          } relative`}
-                        >
-                          <button
-                            onClick={() => setSelectedPerson(person)}
-                            className="absolute inset-0 w-full h-full hover:bg-black/10 transition-colors"
-                          />
+                        <div className="bg-gradient-to-r from-purple-500 to-violet-400 px-3 py-2">
+                          <div className="bg-purple-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
+                            <Sparkles className="w-2.5 h-2.5" /> Interests
+                          </div>
                         </div>
-                        <div className="p-4 flex-1 flex flex-col">
-                          <div className="relative">
-                            <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold -mt-8 relative z-10">
+                        <div className="p-3 flex-1 flex flex-col">
+                          {/* Avatar + Name side by side */}
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold text-lg border-2 border-purple-300 shrink-0 shadow-sm">
                               {renderAvatar(person.avatar, person.name)}
                             </div>
-                            {isRecentlyActive(person) && (
-                              <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white top-0 right-0" />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-bold text-[var(--aurora-text)] text-sm leading-tight truncate">{person.name}</h4>
+                              {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                            </div>
+                          </div>
+                          <div className="mt-2 space-y-0.5">
+                            {renderHeritage(person)}
+                            {person.showLocation && (
+                              <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
+                                <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
+                              </p>
+                            )}
+                            {isNewMember(person) && (
+                              <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-0.5 rounded">
+                                New
+                              </div>
                             )}
                           </div>
-                          <h4 className="font-bold text-gray-800 dark:text-white mt-2">{person.name}</h4>
-                          {person.profession && <p className="text-xs text-gray-600 dark:text-gray-300">{person.profession}</p>}
-                          {renderHeritage(person)}
-                          {person.showLocation && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
-                              <MapPin className="w-3 h-3" /> {person.city}
-                            </p>
-                          )}
-                          {isNewMember(person) && (
-                            <div className="mt-2 inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-1 rounded">
-                              New
-                            </div>
-                          )}
-                          <div className="mt-auto pt-3">
+                          <div className="mt-auto pt-2.5">
                             {connections.get(person.id) === 'pending' ? (
                               <button
                                 disabled
-                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-2 rounded font-medium text-sm flex items-center justify-center gap-1.5"
+                                className="w-full bg-amber-100 text-amber-700 border border-amber-300 py-1.5 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5"
                               >
                                 <Clock className="w-3.5 h-3.5" /> Pending
                               </button>
                             ) : (
                               <button
-                                onClick={() => handleConnect(person.id)}
+                                onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
                                 disabled={connectingId === person.id}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded font-medium text-sm disabled:opacity-50"
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
                               >
-                                Connect
+                                <UserPlus className="w-3.5 h-3.5" /> Connect
                               </button>
                             )}
                           </div>
@@ -1278,27 +1299,24 @@ export default function DiscoverPage() {
               return (
                 <div
                   key={person.id}
-                  className="group bg-aurora-surface rounded-xl border border-aurora-border overflow-hidden cursor-pointer hover:shadow-md hover:border-aurora-indigo/30 transition-all duration-200 flex flex-col p-3"
+                  className="group bg-aurora-surface rounded-2xl border border-green-200 dark:border-green-500/30 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 flex flex-col"
+                  style={{ WebkitTapHighlightColor: 'transparent' }}
                   onClick={() => setSelectedPerson(person)}
+                  onTouchStart={() => {}}
                 >
-                  {/* Top row: avatar + match badge */}
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="relative">
-                      <div className="w-11 h-11 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-                        {renderAvatar(person.avatar, person.name)}
-                      </div>
-                      {isNewMember(person) && (
-                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[7px] font-bold px-1 py-0.5 rounded-full leading-none">NEW</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
+                  {/* Short gradient header */}
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-400 px-2 py-1.5 flex items-center justify-between">
+                    {isNewMember(person) && (
+                      <span className="bg-green-700 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full leading-none">NEW</span>
+                    )}
+                    <div className="flex items-center gap-1 ml-auto">
                       <MatchBadge score={score} />
                       <div className="relative">
                         <button
                           onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
-                          className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                          className="p-0.5 hover:bg-white/20 rounded-full transition-colors"
                         >
-                          <MoreVertical className="w-3.5 h-3.5 text-gray-400" />
+                          <MoreVertical className="w-3.5 h-3.5 text-white/80" />
                         </button>
                         {openMenuId === person.id && (
                           <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[120px] z-20">
@@ -1313,47 +1331,62 @@ export default function DiscoverPage() {
                       </div>
                     </div>
                   </div>
-                  {/* Name + profession */}
-                  <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
-                  {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
-                  {/* Heritage + location */}
-                  <div className="mt-1.5 space-y-0.5">
-                    {renderHeritage(person)}
-                    {person.showLocation && (
-                      <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
-                        <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
-                      </p>
-                    )}
-                    {getMutualConnectionCount(person.id) > 0 && (
-                      <p className="text-[10px] text-blue-600 font-medium">{getMutualConnectionCount(person.id)} mutual</p>
-                    )}
-                  </div>
-                  {/* Action button — always at bottom */}
-                  <div className="mt-auto pt-2">
-                    {status === 'connected' ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white py-1 rounded-lg font-medium text-[10px] flex items-center justify-center gap-1"
-                      >
-                        <MessageCircle className="w-3 h-3" /> Message
-                      </button>
-                    ) : status === 'pending' ? (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                        disabled={connectingId === person.id}
-                        className="w-full bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
-                      >
-                        <Clock className="w-3 h-3" /> Pending
-                      </button>
-                    ) : (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
-                        disabled={connectingId === person.id}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
-                      >
-                        <UserPlus className="w-3 h-3" /> Connect
-                      </button>
-                    )}
+                  {/* Content wrapper — flex-1 to stretch, flex-col to pin button at bottom */}
+                  <div className="p-3 flex flex-col flex-1" style={{ minHeight: 0 }}>
+                    {/* Avatar + Name/Title side by side */}
+                    <div className="flex items-center gap-2.5 mb-2">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                        {renderAvatar(person.avatar, person.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
+                        {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                      </div>
+                    </div>
+                    {/* Heritage + location + mutual */}
+                    <div className="space-y-0.5">
+                      {renderHeritage(person)}
+                      {person.showLocation && (
+                        <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
+                          <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
+                        </p>
+                      )}
+                      {getMutualConnectionCount(person.id) > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setMutualListFor(person.id); }}
+                          className="text-[10px] text-blue-600 font-medium hover:text-blue-800 hover:underline cursor-pointer transition-colors text-left"
+                        >
+                          {getMutualConnectionCount(person.id)} mutual
+                        </button>
+                      )}
+                    </div>
+                    {/* Action button — pinned to bottom via mt-auto */}
+                    <div className="mt-auto pt-2.5">
+                      {status === 'connected' ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-[10px] flex items-center justify-center gap-1"
+                        >
+                          <MessageCircle className="w-3 h-3" /> Message
+                        </button>
+                      ) : status === 'pending' ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                          disabled={connectingId === person.id}
+                          className="w-full bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 py-1.5 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                          <Clock className="w-3 h-3" /> Pending
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleConnect(person.id); }}
+                          disabled={connectingId === person.id}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                        >
+                          <UserPlus className="w-3 h-3" /> Connect
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1427,9 +1460,12 @@ export default function DiscoverPage() {
                     )}
 
                     {getMutualConnectionCount(person.id) > 0 && (
-                      <p className="text-xs text-blue-600 font-medium mb-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setMutualListFor(person.id); }}
+                        className="text-xs text-blue-600 font-medium mb-2 hover:text-blue-800 hover:underline cursor-pointer transition-colors text-left"
+                      >
                         {getMutualConnectionCount(person.id)} mutual connections
-                      </p>
+                      </button>
                     )}
 
                     {person.interests && person.interests.length > 0 && (
@@ -1585,9 +1621,11 @@ export default function DiscoverPage() {
               )}
 
               {getMutualConnectionCount(selectedPerson.id) > 0 && (
-                <p className="text-center text-xs text-blue-600 dark:text-blue-400 font-medium mb-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setMutualListFor(selectedPerson.id); }}
+                  className="block mx-auto text-xs text-blue-600 dark:text-blue-400 font-medium mb-1 hover:text-blue-800 hover:underline cursor-pointer transition-colors">
                   {getMutualConnectionCount(selectedPerson.id)} mutual connections
-                </p>
+                </button>
               )}
 
               <div className="mb-4" />
@@ -1661,6 +1699,75 @@ export default function DiscoverPage() {
               >
                 <Ban className="w-4 h-4" /> Block User
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mutual Connections List Modal */}
+      {mutualListFor && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[60]"
+          onClick={() => setMutualListFor(null)}
+          onTouchStart={() => setMutualListFor(null)}
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+        >
+          <div
+            className="bg-white dark:bg-gray-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[70vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-indigo-500 px-4 py-3 flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-white font-bold text-sm">Mutual Connections</h3>
+                <p className="text-blue-100 text-[11px]">
+                  with {people.find((p) => p.id === mutualListFor)?.name || 'this person'}
+                </p>
+              </div>
+              <button
+                onClick={() => setMutualListFor(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
+              >
+                <X className="w-4 h-4 text-white" />
+              </button>
+            </div>
+            {/* List */}
+            <div className="overflow-y-auto flex-1 p-3 space-y-2" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {getMutualConnections(mutualListFor).length === 0 ? (
+                <p className="text-center text-gray-500 dark:text-gray-400 py-6 text-sm">No mutual connections found</p>
+              ) : (
+                getMutualConnections(mutualListFor).map((mutual) => (
+                  <div
+                    key={mutual.id}
+                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                    onClick={() => { setMutualListFor(null); setSelectedPerson(mutual); }}
+                  >
+                    <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
+                      {renderAvatar(mutual.avatar, mutual.name)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-semibold text-[var(--aurora-text)] text-sm truncate">{mutual.name}</h4>
+                      {mutual.profession && (
+                        <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{mutual.profession}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {mutual.city && (
+                          <span className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5">
+                            <MapPin className="w-2.5 h-2.5" /> {mutual.city}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setMutualListFor(null); navigate(`/messages?user=${mutual.id}`); }}
+                      className="shrink-0 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 p-2 rounded-full hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

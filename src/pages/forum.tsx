@@ -1560,7 +1560,7 @@ export default function ForumScreen() {
         </div>
 
         {/* Topics grid */}
-        <div className="max-w-4xl mx-auto px-4 py-5 pb-24">
+        <div className="max-w-4xl mx-auto px-4 py-5 pb-4">
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -1703,7 +1703,7 @@ export default function ForumScreen() {
         </div>
 
         {/* Thread list */}
-        <div className="max-w-4xl mx-auto px-4 py-4 pb-24 space-y-3">
+        <div className="max-w-4xl mx-auto px-4 py-4 pb-4 space-y-3">
           {loading ? (
             <>
               <SkeletonPost />

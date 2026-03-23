@@ -6,6 +6,7 @@ import { getFeatureFlag } from '../../services/featureFlags';
 import { AVATAR_OPTIONS, BUSINESS_TYPES } from '../../constants/config';
 import CountryEthnicitySelector from '../../components/CountryEthnicitySelector';
 import { validateMerchantTIN } from '../../services/merchantValidation';
+import { ChevronDown } from 'lucide-react';
 
 type SignupStep = 0 | 1 | 2 | 3;
 
@@ -648,6 +649,7 @@ export const SignupPage: React.FC = () => {
       <div className="mb-8">
         <label className="block text-sm font-semibold text-aurora-text mb-3">Your Heritage</label>
         <p className="text-xs text-aurora-text-secondary mb-3">Select your country and EthniZity</p>
+
         <CountryEthnicitySelector
           selected={formData.heritage}
           onChange={(val) => updateFormData('heritage', val)}
@@ -760,7 +762,7 @@ export const SignupPage: React.FC = () => {
   const progressPercent = ((currentStep + 1) / 4) * 100;
 
   return (
-    <div className="min-h-screen bg-aurora-surface-variant flex flex-col">
+    <div className="bg-aurora-surface-variant flex flex-col" style={{ minHeight: 'var(--app-height, 100vh)' }}>
       {/* Header with Progress */}
       <div className="bg-aurora-indigo text-white pt-8 pb-8">
         <div className="max-w-md mx-auto px-6">

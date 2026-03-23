@@ -774,7 +774,7 @@ export const LoginPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-aurora-surface-variant flex flex-col">
+    <div className="bg-aurora-surface-variant flex flex-col" style={{ minHeight: 'var(--app-height, 100vh)' }}>
       {/* Hero section with community image + CSS branding overlay */}
       <div className="relative overflow-hidden rounded-b-3xl">
         {/* Background image */}

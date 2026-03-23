@@ -25,7 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCulturalTheme } from '@/contexts/CulturalThemeContext';
 import { CulturalPatternOverlay } from '@/components/CulturalPatterns';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
-import EthnicityFilterDropdown from '../../components/EthnicityFilterDropdown';
+import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
 import {
   MessageCircle,
   Share2,
@@ -1510,7 +1510,7 @@ export default function FeedPage() {
       </div>
 
       {/* ─── Posts Feed ─── */}
-      <div className="max-w-2xl mx-auto px-4 py-3 space-y-3 pb-24">
+      <div className="max-w-2xl mx-auto px-4 py-3 space-y-3 pb-4">
         {loading ? (
           // Skeleton loaders
           <div className="space-y-3">

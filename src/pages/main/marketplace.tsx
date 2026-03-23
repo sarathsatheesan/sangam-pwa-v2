@@ -15,12 +15,12 @@ import {
   serverTimestamp,
   arrayUnion,
 } from 'firebase/firestore';
-import { db } from '../../services/firebase';
-import { useAuth } from '../../contexts/AuthContext';
-import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
-import { ClickOutsideOverlay } from '../../components/ClickOutsideOverlay';
-import EthnicityFilterDropdown from '../../components/EthnicityFilterDropdown';
-import { HERITAGE_OPTIONS } from '../../constants/config';
+import { db } from '@/services/firebase';
+import { useAuth } from '@/contexts/AuthContext';
+import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
+import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
+import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
+import { HERITAGE_OPTIONS } from '@/constants/config';
 import {
   Search,
   X,
@@ -1301,7 +1301,7 @@ export default function MarketplacePage() {
 
   if (!isFeatureEnabled('marketplace_addListing') && !isFeatureEnabled('marketplace_categoryFilter')) {
     return (
-      <div className="min-h-screen bg-[var(--aurora-bg)] flex items-center justify-center p-4">
+      <div className="min-h-full bg-[var(--aurora-bg)] flex items-center justify-center p-4">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-[var(--aurora-text-muted)] mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-[var(--aurora-text)] mb-2">Marketplace Coming Soon</h1>
@@ -1312,7 +1312,7 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--aurora-bg)]">
+    <div className="min-h-full bg-[var(--aurora-bg)]">
       {/* ─── Sticky Header: Search + Filter ─── */}
       <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
 

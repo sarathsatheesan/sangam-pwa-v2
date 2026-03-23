@@ -99,7 +99,7 @@ export const VerifyPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-aurora-surface-variant flex flex-col">
+    <div className="bg-aurora-surface-variant flex flex-col" style={{ minHeight: 'var(--app-height, 100vh)' }}>
       {/* Header */}
       <div className="bg-aurora-indigo text-white pt-12 pb-8 rounded-b-3xl">
         <div className="max-w-md mx-auto px-6">
