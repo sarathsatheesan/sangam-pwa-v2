@@ -38,9 +38,14 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
 
   return (
     <div
+      role="article"
+      aria-label={`${business.name} — ${business.category}, rated ${business.rating.toFixed(1)} stars`}
+      tabIndex={0}
       className="group bg-aurora-surface rounded-2xl border border-aurora-border overflow-visible
-                 cursor-pointer hover:shadow-lg hover:border-aurora-border/80 transition-all duration-200"
+                 cursor-pointer hover:shadow-lg hover:border-aurora-border/80 transition-all duration-200
+                 focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:ring-offset-2 focus-visible:outline-none"
       onClick={() => onSelect(business)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(business); } }}
     >
       {/* Card Image Area */}
       <div
@@ -53,6 +58,8 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
           <img
             src={business.photos[business.coverPhotoIndex || 0]}
             alt={business.name}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
           />
         ) : (
@@ -64,9 +71,11 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
         <div className="absolute top-3 right-3 flex items-center gap-1.5">
           <button
             onClick={(e) => toggleFavorite(business.id, e)}
+            aria-label={isFavorite ? `Remove ${business.name} from favorites` : `Add ${business.name} to favorites`}
+            aria-pressed={isFavorite}
             className="w-10 h-10 rounded-full bg-white/90 dark:bg-aurora-surface/90
                        flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
-                       transition-colors shadow-sm"
+                       transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none"
           >
             <Heart className={`w-4 h-4 transition-colors ${
               isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400'
@@ -75,9 +84,11 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
           {user && (
             <button
               onClick={(e) => openMenu(business.id, e)}
+              aria-label={`More options for ${business.name}`}
+              aria-haspopup="menu"
               className="w-10 h-10 rounded-full bg-white/90 dark:bg-aurora-surface/90
                          flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
-                         transition-colors shadow-sm"
+                         transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none"
             >
               <MoreHorizontal className="w-4 h-4 text-gray-500" />
             </button>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X, ArrowLeft, Loader2, Upload, Star,
 } from 'lucide-react';
@@ -120,6 +120,8 @@ const BusinessPhotoUploader: React.FC<{
               <img
                 src={photo}
                 alt={`Photo ${idx + 1}`}
+                loading="lazy"
+                decoding="async"
                 className={`w-full h-24 object-cover rounded-lg cursor-pointer ${
                   idx === coverIndex ? 'ring-2 ring-aurora-indigo' : ''
                 }`}
@@ -172,18 +174,30 @@ const BusinessEditModal: React.FC<BusinessEditModalProps> = ({
   dispatch,
   handleSaveEdit,
 }) => {
+  const handleClose = () => dispatch({ type: 'SET_IS_EDITING', payload: false });
+
+  // ESC-to-close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
-    <div className="fixed inset-0 bg-aurora-bg z-50 flex flex-col">
+    <div role="dialog" aria-modal="true" aria-labelledby="edit-modal-title" className="fixed inset-0 bg-aurora-bg z-50 flex flex-col">
       <div className="flex-shrink-0 bg-aurora-surface border-b border-aurora-border p-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => dispatch({ type: 'SET_IS_EDITING', payload: false })} className="p-1 hover:bg-aurora-surface-variant rounded-lg transition-colors">
+          <button onClick={handleClose} aria-label="Go back" className="p-1 hover:bg-aurora-surface-variant rounded-lg transition-colors focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none">
             <ArrowLeft className="w-5 h-5 text-aurora-text-secondary" />
           </button>
-          <h2 className="text-lg font-bold text-aurora-text">Edit Business</h2>
+          <h2 id="edit-modal-title" className="text-lg font-bold text-aurora-text">Edit Business</h2>
         </div>
         <button
-          onClick={() => dispatch({ type: 'SET_IS_EDITING', payload: false })}
-          className="text-aurora-text-muted hover:text-aurora-text-secondary"
+          onClick={handleClose}
+          aria-label="Close form"
+          className="text-aurora-text-muted hover:text-aurora-text-secondary focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none rounded"
         >
           <X className="w-5 h-5" />
         </button>
@@ -222,8 +236,8 @@ const BusinessEditModal: React.FC<BusinessEditModalProps> = ({
       <div className="sticky bottom-0 bg-aurora-surface border-t border-aurora-border p-4">
         <div className="flex gap-3 max-w-lg mx-auto">
           <button
-            onClick={() => dispatch({ type: 'SET_IS_EDITING', payload: false })}
-            className="flex-1 bg-aurora-surface-variant text-aurora-text-secondary py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-border/30 transition-colors"
+            onClick={handleClose}
+            className="flex-1 bg-aurora-surface-variant text-aurora-text-secondary py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-border/30 transition-colors focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none"
           >
             Cancel
           </button>

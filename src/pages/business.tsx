@@ -106,7 +106,7 @@ export default function BusinessPage() {
 
   // Skeleton card
   const SkeletonCard = () => (
-    <div className="bg-aurora-surface rounded-2xl border border-aurora-border overflow-hidden animate-pulse">
+    <div className="bg-aurora-surface rounded-2xl border border-aurora-border overflow-hidden animate-pulse" aria-hidden="true">
       <div className="h-36 bg-aurora-surface-variant shimmer" />
       <div className="p-4">
         <div className="h-4 w-3/4 bg-aurora-surface-variant shimmer rounded mb-2" />
@@ -131,7 +131,8 @@ export default function BusinessPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search businesses"
                   placeholder="Search restaurants, services, markets..."
                   value={state.searchQuery}
                   onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
@@ -145,7 +146,8 @@ export default function BusinessPage() {
                 {state.searchQuery && (
                   <button
                     onClick={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text"
+                    aria-label="Clear search"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none rounded-full"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -168,17 +170,21 @@ export default function BusinessPage() {
             <div className="max-w-6xl mx-auto px-4">
               <div
                 ref={categoryScrollRef}
+                role="tablist"
+                aria-label="Business categories"
                 className="flex gap-1 py-3 overflow-x-auto scrollbar-hide"
               >
                 {/* All */}
                 <button
+                  role="tab"
+                  aria-selected={state.selectedCategory === 'All'}
                   onClick={() => dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' })}
-                  className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all ${state.selectedCategory === 'All'
+                  className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none ${state.selectedCategory === 'All'
                       ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-md'
                       : 'text-aurora-text-secondary hover:bg-aurora-surface-variant'
                   }`}
                 >
-                  <Store className="w-5 h-5" />
+                  <Store className="w-5 h-5" aria-hidden="true" />
                   <span className="text-[11px] font-medium whitespace-nowrap">All</span>
                 </button>
                 {CATEGORIES.map((cat) => {
@@ -187,13 +193,15 @@ export default function BusinessPage() {
                   return (
                     <button
                       key={cat}
+                      role="tab"
+                      aria-selected={state.selectedCategory === cat}
                       onClick={() => dispatch({ type: 'SET_SELECTED_CATEGORY', payload: cat })}
-                      className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all ${state.selectedCategory === cat
+                      className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none ${state.selectedCategory === cat
                           ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-md'
                           : 'text-aurora-text-secondary hover:bg-aurora-surface-variant'
                       }`}
                     >
-                      <IconComp className="w-5 h-5" />
+                      <IconComp className="w-5 h-5" aria-hidden="true" />
                       <span className="text-[11px] font-medium whitespace-nowrap">{cat.split(' & ')[0]}</span>
                     </button>
                   );
@@ -217,8 +225,9 @@ export default function BusinessPage() {
                     return (
                       <button
                         key={collection}
+                        aria-pressed={state.activeCollection === collection}
                         onClick={() => dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: collection })}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all flex items-center gap-1 ${state.activeCollection === collection
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none ${state.activeCollection === collection
                             ? 'bg-aurora-indigo text-white'
                             : 'bg-aurora-surface-variant text-aurora-text-secondary hover:text-aurora-text'
                         }`}
@@ -241,7 +250,7 @@ export default function BusinessPage() {
           <div className="max-w-6xl mx-auto px-4 py-5 pb-4">
             {/* Results Header */}
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-aurora-text-secondary">
+              <p className="text-sm text-aurora-text-secondary" aria-live="polite" aria-atomic="true">
                 {state.loading ? 'Loading...' : (
                   <>
                     <span className="font-semibold text-aurora-text">{filteredBusinesses.length}</span>
@@ -276,28 +285,62 @@ export default function BusinessPage() {
                 {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
             ) : filteredBusinesses.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="w-16 h-16 rounded-full bg-aurora-surface-variant flex items-center justify-center mb-4">
-                  <Store className="w-7 h-7 text-aurora-text-muted" />
+              <div className="flex flex-col items-center justify-center py-16 text-center" role="status">
+                {/* Contextual SVG illustration */}
+                <div className="w-24 h-24 mb-5">
+                  {state.searchQuery ? (
+                    <svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <circle cx="42" cy="42" r="28" className="stroke-aurora-text-muted" strokeWidth="3" strokeDasharray="6 4" />
+                      <line x1="62" y1="62" x2="82" y2="82" className="stroke-aurora-text-muted" strokeWidth="3" strokeLinecap="round" />
+                      <line x1="34" y1="36" x2="50" y2="48" className="stroke-aurora-border" strokeWidth="2.5" strokeLinecap="round" />
+                      <line x1="50" y1="36" x2="34" y2="48" className="stroke-aurora-border" strokeWidth="2.5" strokeLinecap="round" />
+                    </svg>
+                  ) : state.activeCollection === 'favorites' ? (
+                    <svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path d="M48 80S16 60 16 36c0-12 10-20 20-20a22 22 0 0 1 12 4 22 22 0 0 1 12-4c10 0 20 8 20 20 0 24-32 44-32 44Z" className="stroke-aurora-text-muted fill-aurora-surface-variant" strokeWidth="2.5" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <rect x="16" y="32" width="64" height="44" rx="6" className="stroke-aurora-text-muted fill-aurora-surface-variant" strokeWidth="2.5" />
+                      <rect x="24" y="20" width="48" height="16" rx="4" className="stroke-aurora-border" strokeWidth="2" strokeDasharray="4 3" />
+                      <circle cx="48" cy="54" r="10" className="stroke-aurora-border" strokeWidth="2" />
+                      <path d="M48 49v10M43 54h10" className="stroke-aurora-text-muted" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  )}
                 </div>
-                <h3 className="text-lg font-semibold text-aurora-text mb-1">No businesses found</h3>
+                <h3 className="text-lg font-semibold text-aurora-text mb-1">
+                  {state.searchQuery ? 'No results found'
+                    : state.activeCollection === 'favorites' ? 'No favorites yet'
+                    : 'No businesses found'}
+                </h3>
                 <p className="text-sm text-aurora-text-secondary max-w-xs">
-                  {state.searchQuery ? `No results for "${state.searchQuery}". Try a different search.`
+                  {state.searchQuery ? `We couldn't find anything matching "${state.searchQuery}". Try different keywords or browse categories.`
+                    : state.activeCollection === 'favorites' ? 'Heart the businesses you love and they will appear here.'
                     : state.selectedHeritage.length > 0
-                    ? `No businesses under "${state.selectedHeritage.join(', ')}" heritage yet.`
+                    ? `No businesses under "${state.selectedHeritage.join(', ')}" heritage yet. Be the first to add one!`
                     : state.selectedCategory !== 'All'
-                    ? `No businesses in "${state.selectedCategory}" yet.`
-                    : 'No businesses listed yet. Be the first!'}
+                    ? `No businesses in "${state.selectedCategory}" yet. Know one? Add it!`
+                    : 'No businesses listed yet. Be the first to share your favorite local spot!'}
                 </p>
-                {canAddBusiness && (
-                  <button
-                    onClick={handleOpenCreateModal}
-                    className="mt-4 px-5 py-2 bg-aurora-indigo text-white rounded-xl font-medium text-sm
-                               hover:bg-aurora-indigo/90 shadow-sm flex items-center gap-1.5"
-                  >
-                    <Plus className="w-4 h-4" /> Add Business
-                  </button>
-                )}
+                <div className="flex gap-3 mt-5">
+                  {state.searchQuery && (
+                    <button
+                      onClick={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
+                      className="px-4 py-2 border border-aurora-border text-aurora-text-secondary rounded-xl font-medium text-sm hover:bg-aurora-surface-variant transition-colors"
+                    >
+                      Clear Search
+                    </button>
+                  )}
+                  {canAddBusiness && (
+                    <button
+                      onClick={handleOpenCreateModal}
+                      className="px-5 py-2 bg-aurora-indigo text-white rounded-xl font-medium text-sm
+                                 hover:bg-aurora-indigo/90 shadow-sm flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" /> Add Business
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -367,6 +410,8 @@ export default function BusinessPage() {
                         <img
                           src={business.photos[business.coverPhotoIndex || 0]}
                           alt={business.name}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -462,9 +507,10 @@ export default function BusinessPage() {
       {canAddBusiness && (
         <button
           onClick={handleOpenCreateModal}
-          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 w-14 h-14 aurora-gradient text-white rounded-full shadow-aurora-glow-lg flex items-center justify-center hover:shadow-aurora-4 transition-all z-10 btn-press"
+          aria-label="Add new business"
+          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 w-14 h-14 aurora-gradient text-white rounded-full shadow-aurora-glow-lg flex items-center justify-center hover:shadow-aurora-4 transition-all z-10 btn-press focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:outline-none"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
@@ -543,7 +589,7 @@ export default function BusinessPage() {
 
       {/* Toast Notification */}
       {state.toastMessage && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[80] text-sm font-medium max-w-md text-center">
+        <div role="alert" aria-live="assertive" className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[80] text-sm font-medium max-w-md text-center">
           {state.toastMessage}
         </div>
       )}

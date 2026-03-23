@@ -20,9 +20,9 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
   if (businesses.length === 0) return null;
 
   return (
-    <div className="mb-6">
+    <section aria-label="Featured businesses" className="mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold text-aurora-text flex items-center gap-2">
+        <h2 id="featured-heading" className="text-lg font-bold text-aurora-text flex items-center gap-2">
           <svg className="w-5 h-5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="8" r="7" />
             <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
@@ -30,13 +30,18 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
           Featured
         </h2>
       </div>
-      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
+      <div role="list" aria-labelledby="featured-heading" className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4" tabIndex={0} onKeyDown={(e) => { const el = e.currentTarget; if (e.key === 'ArrowRight') { el.scrollBy({ left: 200, behavior: 'smooth' }); } else if (e.key === 'ArrowLeft') { el.scrollBy({ left: -200, behavior: 'smooth' }); } }}>
         {businesses.map((business) => (
           <div
             key={business.id}
+            role="listitem"
+            tabIndex={0}
+            aria-label={`Featured: ${business.name} — ${business.category}, rated ${business.rating.toFixed(1)} stars`}
             className="flex-shrink-0 w-80 rounded-2xl overflow-hidden cursor-pointer group
-                       shadow-sm hover:shadow-lg transition-all duration-200 border border-aurora-border"
+                       shadow-sm hover:shadow-lg transition-all duration-200 border border-aurora-border
+                       focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:ring-offset-2 focus-visible:outline-none"
             onClick={() => onSelect(business)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(business); } }}
           >
             {/* Color banner */}
             <div
@@ -49,6 +54,8 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
                 <img
                   src={business.photos[business.coverPhotoIndex || 0]}
                   alt={business.name}
+                  loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
               ) : null}
@@ -60,8 +67,10 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
               </div>
               <button
                 onClick={(e) => toggleFavorite(business.id, e)}
+                aria-label={favorites.has(business.id) ? `Remove ${business.name} from favorites` : `Add ${business.name} to favorites`}
+                aria-pressed={favorites.has(business.id)}
                 className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center
-                           hover:bg-white transition-colors shadow-sm"
+                           hover:bg-white transition-colors shadow-sm focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none"
               >
                 <Heart className={`w-4 h-4 ${favorites.has(business.id) ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
               </button>
@@ -91,7 +100,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 });
 

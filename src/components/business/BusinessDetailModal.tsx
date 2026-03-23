@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight, ChevronLeft,
   X, Heart, Sparkles, ShoppingBag, ExternalLink, Trash2, Edit3,
-  MoreHorizontal,
+  MoreHorizontal, Share2,
 } from 'lucide-react';
 import { getGoogleMapsUrl } from '@/components/business/businessValidation';
+import PhotoLightbox from '@/components/business/PhotoLightbox';
 import type { Business, BusinessReview } from '@/reducers/businessReducer';
 
 // ── Photo carousel (local to detail modal) ──
@@ -13,36 +14,54 @@ const BusinessPhotoCarousel: React.FC<{
   title: string;
 }> = ({ photos, title }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showLightbox, setShowLightbox] = useState(false);
   if (!photos.length) return null;
 
   return (
-    <div className="relative w-full h-full">
-      <img
-        src={photos[currentIndex]}
-        alt={`${title} - ${currentIndex + 1}`}
-        className="w-full h-full object-cover"
-      />
-      {photos.length > 1 && (
-        <>
-          <button
-            onClick={(e) => { e.stopPropagation(); setCurrentIndex((p) => (p - 1 + photos.length) % photos.length); }}
-            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setCurrentIndex((p) => (p + 1) % photos.length); }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2.5 py-0.5 rounded-full text-xs">
-            {currentIndex + 1} / {photos.length}
-          </div>
-        </>
+    <>
+      <div className="relative w-full h-full" role="region" aria-label={`Photo gallery for ${title}`} aria-roledescription="carousel">
+        <img
+          src={photos[currentIndex]}
+          alt={`${title} — photo ${currentIndex + 1} of ${photos.length}`}
+          decoding="async"
+          className="w-full h-full object-cover cursor-pointer"
+          onClick={(e) => { e.stopPropagation(); setShowLightbox(true); }}
+          role="button"
+          tabIndex={0}
+          aria-label="Click to enlarge photo"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setShowLightbox(true); } }}
+        />
+        {photos.length > 1 && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setCurrentIndex((p) => (p - 1 + photos.length) % photos.length); }}
+              aria-label="Previous photo"
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setCurrentIndex((p) => (p + 1) % photos.length); }}
+              aria-label="Next photo"
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2.5 py-0.5 rounded-full text-xs" aria-live="polite" aria-atomic="true">
+              {currentIndex + 1} / {photos.length}
+            </div>
+          </>
+        )}
+      </div>
+      {showLightbox && (
+        <PhotoLightbox
+          photos={photos}
+          initialIndex={currentIndex}
+          title={title}
+          onClose={() => setShowLightbox(false)}
+        />
       )}
-    </div>
-  );
+    </>
 };
 
 export interface BusinessDetailModalProps {
@@ -76,34 +95,117 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
   handleDeleteBusiness,
   handleAddReview,
 }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const [shareToast, setShareToast] = useState<string | null>(null);
+
+  // Share business
+  const handleShare = useCallback(async () => {
+    const shareUrl = `${window.location.origin}/business?open=${business.id}`;
+    const shareData = {
+      title: business.name,
+      text: `Check out ${business.name} — ${business.category} on Sangam`,
+      url: shareUrl,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareToast('Link copied to clipboard!');
+        setTimeout(() => setShareToast(null), 2500);
+      }
+    } catch (err: any) {
+      // User cancelled share or clipboard failed — try fallback
+      if (err.name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          setShareToast('Link copied to clipboard!');
+          setTimeout(() => setShareToast(null), 2500);
+        } catch {
+          setShareToast('Could not share. Please copy the URL manually.');
+          setTimeout(() => setShareToast(null), 3000);
+        }
+      }
+    }
+  }, [business.id, business.name, business.category]);
+
+  // Focus trap + ESC-to-close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        dispatch({ type: 'SELECT_BUSINESS', payload: null });
+        return;
+      }
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusable = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    // Focus the modal on mount
+    const prev = document.activeElement as HTMLElement;
+    modalRef.current?.focus();
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      prev?.focus?.();
+    };
+  }, [dispatch]);
+
   return (
     <div
       className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
       onClick={() => dispatch({ type: 'SELECT_BUSINESS', payload: null })}
     >
       <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${business.name} details`}
+        tabIndex={-1}
         className="bg-aurora-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl
-                   max-h-[92vh] flex flex-col border border-aurora-border relative"
+                   max-h-[92vh] flex flex-col border border-aurora-border relative focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal action buttons */}
         <button
           onClick={() => dispatch({ type: 'SELECT_BUSINESS', payload: null })}
-          className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors z-[5]"
+          aria-label="Close business details"
+          className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors z-[5] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
         >
           <X className="w-5 h-5" />
         </button>
         {user && (
           <button
             onClick={(e) => openMenu(business.id, e)}
-            className="absolute top-3 right-14 z-[5] w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+            aria-label={`More options for ${business.name}`}
+            aria-haspopup="menu"
+            className="absolute top-3 right-14 z-[5] w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
         )}
         <button
+          onClick={handleShare}
+          aria-label={`Share ${business.name}`}
+          className={`absolute top-3 ${user ? 'right-[8.5rem]' : 'right-24'} w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors z-[5] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none`}
+        >
+          <Share2 className="w-4 h-4" />
+        </button>
+        <button
           onClick={(e) => toggleFavorite(business.id, e)}
-          className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors z-[5]`}
+          aria-label={favorites.has(business.id) ? `Remove ${business.name} from favorites` : `Add ${business.name} to favorites`}
+          aria-pressed={favorites.has(business.id)}
+          className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors z-[5] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none`}
         >
           <Heart className={`w-4 h-4 ${favorites.has(business.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
         </button>
@@ -375,13 +477,16 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 <div className="space-y-4 bg-aurora-surface-variant rounded-xl p-4 border border-aurora-indigo/20">
                   <h4 className="text-sm font-semibold text-aurora-text">Write a Review</h4>
                   <div>
-                    <label className="text-xs font-medium text-aurora-text block mb-2">Rating</label>
-                    <div className="flex gap-1 mb-3">
+                    <label id="rating-label" className="text-xs font-medium text-aurora-text block mb-2">Rating</label>
+                    <div className="flex gap-1 mb-3" role="radiogroup" aria-labelledby="rating-label">
                       {[1, 2, 3, 4, 5].map((rating) => (
                         <button
                           key={rating}
+                          role="radio"
+                          aria-checked={rating === newReview.rating}
+                          aria-label={`${rating} star${rating !== 1 ? 's' : ''}`}
                           onClick={() => dispatch({ type: 'SET_NEW_REVIEW', payload: { ...newReview, rating } })}
-                          className="transition-transform hover:scale-110"
+                          className="transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none rounded"
                         >
                           <Star
                             className={`w-6 h-6 ${rating <= newReview.rating ? 'fill-amber-400 text-amber-400' : 'text-aurora-border'}`}
@@ -423,10 +528,11 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                       <div className="flex items-start justify-between mb-1.5">
                         <div>
                           <p className="text-sm font-semibold text-aurora-text">{review.userName}</p>
-                          <div className="flex items-center gap-1 mt-0.5">
+                          <div className="flex items-center gap-1 mt-0.5" role="img" aria-label={`${review.rating} out of 5 stars`}>
                             {Array.from({ length: 5 }).map((_, i) => (
                               <Star
                                 key={i}
+                                aria-hidden="true"
                                 className={`w-3.5 h-3.5 ${i < review.rating ? 'fill-amber-400 text-amber-400' : 'text-aurora-border'}`}
                               />
                             ))}
@@ -439,17 +545,23 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 </div>
               ) : !showReviewForm ? (
                 <div className="text-center py-8">
-                  <div className="w-14 h-14 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
-                    <Star className="w-6 h-6 text-amber-500" />
+                  <div className="w-20 h-20 mx-auto mb-4">
+                    <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <circle cx="40" cy="40" r="30" className="fill-amber-50 dark:fill-amber-500/10" />
+                      <path d="M40 22l5.5 11.2 12.3 1.8-8.9 8.7 2.1 12.2L40 50.2l-11 5.7 2.1-12.2-8.9-8.7 12.3-1.8L40 22z" className="stroke-amber-400" strokeWidth="2" fill="none" />
+                      <circle cx="33" cy="40" r="1.5" className="fill-amber-400" />
+                      <circle cx="47" cy="40" r="1.5" className="fill-amber-400" />
+                      <path d="M35 46c2 2 8 2 10 0" className="stroke-amber-400" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+                    </svg>
                   </div>
                   <p className="text-sm font-medium text-aurora-text mb-1">No reviews yet</p>
-                  <p className="text-xs text-aurora-text-muted mb-4">Be the first to share your experience</p>
+                  <p className="text-xs text-aurora-text-muted mb-4">Your feedback helps others discover great businesses</p>
                   {user && (
                     <button
                       onClick={() => dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: true })}
-                      className="px-4 py-2 bg-aurora-indigo text-white rounded-xl text-sm font-medium hover:bg-aurora-indigo/90 transition-colors"
+                      className="px-4 py-2 bg-aurora-indigo text-white rounded-xl text-sm font-medium hover:bg-aurora-indigo/90 transition-colors flex items-center gap-1.5 mx-auto"
                     >
-                      Write a Review
+                      <Star className="w-3.5 h-3.5" /> Write the First Review
                     </button>
                   )}
                   {!user && (
@@ -470,6 +582,13 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
 
           </div>
         </div>
+
+        {/* Share toast */}
+        {shareToast && (
+          <div role="alert" aria-live="assertive" className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-xl shadow-lg z-10 text-sm font-medium whitespace-nowrap">
+            {shareToast}
+          </div>
+        )}
 
         {/* Action Buttons */}
         {isOwnerOrAdmin(business) && (
