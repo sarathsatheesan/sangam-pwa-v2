@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useReducer } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, Timestamp, query, where, setDoc, getDoc, serverTimestamp, arrayUnion, limit, orderBy, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
@@ -7,208 +7,24 @@ import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import {
   Search, MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight,
   X, Plus, Heart, Sparkles, Store, ShoppingBag, Filter, ArrowLeft,
-  ExternalLink, Trash2, Edit3, Loader2, Award, TrendingUp, Utensils,
-  Scissors, BookOpen, Laptop, Scale, Stethoscope, Plane, Palette,
-  DollarSign, Users, Briefcase, Home, ChevronDown, Building2, UtensilsCrossed,
-  ChevronLeft, Upload, Image as ImageIcon, Camera, Gem, Shirt, Flower2,
+  ExternalLink, Trash2, Edit3, Loader2, Award, TrendingUp,
+  ChevronDown, ChevronLeft, Upload, Image as ImageIcon, Camera,
   Flag, Ban, AlertTriangle, MoreHorizontal
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
+import {
+  CATEGORIES, CATEGORY_EMOJI_MAP, CATEGORY_COLORS, CATEGORY_ICONS, REPORT_CATEGORIES,
+} from '@/components/business/businessConstants';
+import {
+  fuzzyMatch, getGoogleMapsUrl, validateBusinessForm,
+} from '@/components/business/businessValidation';
+import { businessReducer, createInitialState, type Business, type BusinessReview, type BusinessOrder, type MenuItem, type Deal, type BusinessFormData } from '@/reducers/businessReducer';
+import { compressImage, MAX_FILE_SIZE } from '@/components/business/imageUtils';
 
-// ═════════════════════════════════════════════════════════════════════════════════
-// INTERFACES
-// ═════════════════════════════════════════════════════════════════════════════════
-
-interface Business {
-  id: string;
-  name: string;
-  emoji: string;
-  category: string;
-  desc: string;
-  location: string;
-  phone?: string;
-  website?: string;
-  email?: string;
-  hours?: string;
-  rating: number;
-  reviews: number;
-  promoted: boolean;
-  bgColor: string;
-  ownerId?: string;
-  heritage?: string | string[];
-  menu?: string;
-  services?: string;
-  createdAt?: any;
-  // NEW enhancement fields (optional for backward compat):
-  specialtyTags?: string[];
-  paymentMethods?: string[];
-  deliveryOptions?: string[];
-  priceRange?: string;
-  yearEstablished?: number;
-  deals?: Deal[];
-  photos?: string[];
-  coverPhotoIndex?: number;
-  isHidden?: boolean;
-  hiddenAt?: string;
-  hiddenReason?: string;
-}
-
-interface MenuItem {
-  id: string;
-  businessId: string;
-  name: string;
-  description?: string;
-  price?: number;
-  category?: string;
-  available: boolean;
-  createdAt: any;
-}
-
-interface BusinessReview {
-  id: string;
-  businessId: string;
-  userId: string;
-  userName: string;
-  rating: number;
-  text: string;
-  createdAt: any;
-}
-
-interface Deal {
-  id: string;
-  title: string;
-  description?: string;
-  discount?: number;
-  code?: string;
-  expiresAt?: any;
-}
-
-interface BusinessOrder {
-  id: string;
-  businessId: string;
-  customerId: string;
-  customerName: string;
-  items: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-  createdAt: any;
-}
-
-const CATEGORIES = [
-  'Arts & Entertainment',
-  'Beauty & Wellness',
-  'Boutique',
-  'Education & Tutoring',
-  'Financial Services',
-  'Grocery & Market',
-  'Healthcare',
-  'Henna',
-  'Hotels',
-  'Jewelry',
-  'Legal & Immigration',
-  'Non-Profit',
-  'Real Estate',
-  'Restaurant & Food',
-  'Technology',
-  'Tiffin',
-  'Travel & Tourism',
-  'Other',
-];
-
-const CATEGORY_EMOJI_MAP: { [key: string]: string } = {
-  'Arts & Entertainment': '🎭',
-  'Beauty & Wellness': '💆',
-  'Boutique': '👗',
-  'Education & Tutoring': '📚',
-  'Financial Services': '💰',
-  'Grocery & Market': '🛒',
-  'Healthcare': '🏥',
-  'Henna': '🌿',
-  'Hotels': '🏨',
-  'Jewelry': '💎',
-  'Legal & Immigration': '⚖️',
-  'Non-Profit': '🤝',
-  'Real Estate': '🏠',
-  'Restaurant & Food': '🍛',
-  'Technology': '💻',
-  'Tiffin': '🍱',
-  'Travel & Tourism': '✈️',
-  'Other': '💼',
-};
-
-const CATEGORY_COLORS: { [key: string]: string } = {
-  'Arts & Entertainment': '#D97706',
-  'Beauty & Wellness': '#DB2777',
-  'Boutique': '#E11D48',
-  'Education & Tutoring': '#6366F1',
-  'Financial Services': '#0369A1',
-  'Grocery & Market': '#16A34A',
-  'Healthcare': '#059669',
-  'Henna': '#65A30D',
-  'Hotels': '#8B5CF6',
-  'Jewelry': '#CA8A04',
-  'Legal & Immigration': '#B45309',
-  'Non-Profit': '#DC2626',
-  'Real Estate': '#1E40AF',
-  'Restaurant & Food': '#EA580C',
-  'Technology': '#7C3AED',
-  'Tiffin': '#F97316',
-  'Travel & Tourism': '#0D9488',
-  'Other': '#6D28D9',
-};
-
-const CATEGORY_ICONS: { [key: string]: any } = {
-  'Arts & Entertainment': Palette,
-  'Beauty & Wellness': Scissors,
-  'Boutique': Shirt,
-  'Education & Tutoring': BookOpen,
-  'Financial Services': DollarSign,
-  'Grocery & Market': ShoppingBag,
-  'Healthcare': Stethoscope,
-  'Henna': Flower2,
-  'Hotels': Building2,
-  'Jewelry': Gem,
-  'Legal & Immigration': Scale,
-  'Non-Profit': Users,
-  'Real Estate': Home,
-  'Restaurant & Food': Utensils,
-  'Technology': Laptop,
-  'Tiffin': UtensilsCrossed,
-  'Travel & Tourism': Plane,
-  'Other': Briefcase,
-};
-
-const REPORT_CATEGORIES = [
-  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
-  { id: 'hate_speech', label: 'Hate Speech or Bullying', icon: '🛑', description: 'Content targeting race, ethnicity, religion, gender, or personal attacks' },
-  { id: 'inappropriate', label: 'Inappropriate Content', icon: '⚠️', description: 'Sexual, violent, or graphic content not suitable for the community' },
-  { id: 'ip_violation', label: 'Intellectual Property Violation', icon: '©️', description: 'Unauthorized use of copyrighted material or trademarks' },
-  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
-  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
-  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
-];
-
-// ═════════════════════════════════════════════════════════════════════════════════
-// HELPER FUNCTIONS
-// ═════════════════════════════════════════════════════════════════════════════════
-
-// Fuzzy search
-const fuzzyMatch = (text: string, query: string): boolean => {
-  const t = text.toLowerCase();
-  const q = query.toLowerCase().trim();
-  if (!q) return true;
-  if (t.includes(q)) return true;
-  const queryWords = q.split(/\s+/);
-  return queryWords.every((word) => {
-    if (t.includes(word)) return true;
-    if (word.length <= 3) return false;
-    for (let i = 0; i < word.length; i++) {
-      const shortened = word.slice(0, i) + word.slice(i + 1);
-      if (t.includes(shortened)) return true;
-    }
-    return false;
-  });
-};
+// Constants, fuzzyMatch, getGoogleMapsUrl, compressImage, validateBusinessForm
+// are now imported from @/components/business/*
+// Interfaces are now imported from @/reducers/businessReducer
 
 // Star rating component
 const StarRating = ({ rating, reviews, size = 'sm' }: { rating: number; reviews: number; size?: 'sm' | 'md' | 'lg' }) => {
@@ -261,36 +77,8 @@ const FormTextarea = ({ label, ...props }: any) => (
 );
 
 // ═════════════════════════════════════════════════════════════════════════════════
-// IMAGE UTILITIES & COMPONENTS
+// IMAGE & PHOTO COMPONENTS
 // ═════════════════════════════════════════════════════════════════════════════════
-
-const compressImage = (file: File, maxWidth = 800, quality = 0.7): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = document.createElement('img');
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let w = img.width;
-        let h = img.height;
-        if (w > maxWidth) {
-          h = (h * maxWidth) / w;
-          w = maxWidth;
-        }
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject('Canvas error'); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = reject;
-      img.src = event.target?.result as string;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
 
 const BusinessPhotoUploader: React.FC<{
   photos: string[];
@@ -302,7 +90,6 @@ const BusinessPhotoUploader: React.FC<{
 
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -353,14 +140,14 @@ const BusinessPhotoUploader: React.FC<{
           type="button"
           onClick={() => !photoUploading && fileInputRef.current?.click()}
           disabled={photoUploading}
-          className={`w-full border-2 border-dashed border-aurora-border rounded-xl p-4 flex flex-col items-center gap-2 text-aurora-text-muted hover:border-aurora-indigo hover:text-aurora-indigo transition-colors ${photoUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`w-full border-2 border-dashed border-aurora-border rounded-xl p-4 flex flex-col items-center gap-2 text-aurora-text-muted hover:border-aurora-indigo hover:text-aurora-indigo transition-colors ${photoUploading.loading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          {photoUploading ? (
+          {photoUploading.loading ? (
             <Loader2 className="w-6 h-6 animate-spin" />
           ) : (
             <Upload className="w-6 h-6" />
           )}
-          <span className="text-sm">{photoUploading ? 'Uploading...' : 'Click to upload photos'}</span>
+          <span className="text-sm">{photoUploading.loading ? 'Uploading...' : 'Click to upload photos'}</span>
           <span className="text-xs text-aurora-text-muted">PNG, JPG up to 5MB each</span>
         </button>
       )}
@@ -457,123 +244,49 @@ const BusinessPhotoCarousel: React.FC<{
 export default function BusinessPage() {
   const { user, userRole, userProfile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [reviews, setReviews] = useState<BusinessReview[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showTinVerificationModal, setShowTinVerificationModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<any>({});
-  const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'about' | 'services' | 'reviews'>('about');
-  const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [activeCollection, setActiveCollection] = useState<'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites'>('all');
-  const merchantView = false; // My Businesses moved to Profile page
-  const [businessReviews, setBusinessReviews] = useState<BusinessReview[]>([]);
-  const [newReview, setNewReview] = useState({ rating: 5, text: '' });
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteBusinessId, setDeleteBusinessId] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [state, dispatch] = useReducer(businessReducer, undefined, createInitialState);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
   const { isFeatureEnabled } = useFeatureSettings();
   const photosEnabled = isFeatureEnabled('business_photos');
-
-  // Photo upload state
-  const [formPhotos, setFormPhotos] = useState<string[]>([]);
-  const [coverPhotoIndex, setCoverPhotoIndex] = useState(0);
-  const [editPhotos, setEditPhotos] = useState<string[]>([]);
-  const [editCoverPhotoIndex, setEditCoverPhotoIndex] = useState(0);
-
-  // Report / Block / Mute state
-  const [menuBusinessId, setMenuBusinessId] = useState<string | null>(null);
-  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const merchantView = false; // My Businesses moved to Profile page
   const menuRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const PAGE_SIZE = 20;
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openMenu = (businessId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (menuBusinessId === businessId) {
-      setMenuBusinessId(null);
-      setMenuPosition(null);
+    if (state.menuBusinessId === businessId) {
+      dispatch({ type: 'CLOSE_MENU' });
       return;
     }
     const btn = e.currentTarget as HTMLElement;
     const rect = btn.getBoundingClientRect();
-    setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-    setMenuBusinessId(businessId);
+    dispatch({ type: 'OPEN_MENU', payload: { businessId, position: { top: rect.bottom + 4, right: window.innerWidth - rect.right } } });
   };
 
   const closeMenu = () => {
-    setMenuBusinessId(null);
-    setMenuPosition(null);
+    dispatch({ type: 'CLOSE_MENU' });
   };
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reportBusinessId, setReportBusinessId] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState('');
-  const [reportDetails, setReportDetails] = useState('');
-  const [reportedBusinesses, setReportedBusinesses] = useState<Set<string>>(new Set());
-  const [mutedBusinesses, setMutedBusinesses] = useState<Set<string>>(new Set());
-  const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
-  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
-  const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    category: CATEGORIES[0],
-    desc: '',
-    location: '',
-    phone: '',
-    website: '',
-    email: '',
-    hours: '',
-    menu: '',
-    services: '',
-    priceRange: '',
-    yearEstablished: new Date().getFullYear(),
-    paymentMethods: [] as string[],
-    deliveryOptions: [] as string[],
-    specialtyTags: [] as string[],
-  });
-
-  // ── Form validation errors ──
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  // ── Pagination state ──
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const PAGE_SIZE = 20;
-
-  // ── Debounced search ──
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
+      dispatch({ type: 'SET_DEBOUNCED_SEARCH', payload: state.searchQuery });
     }, 300);
     return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
-  }, [searchQuery]);
+  }, [state.searchQuery, dispatch]);
 
   const fetchBusinesses = async (isLoadMore = false) => {
     try {
-      if (isLoadMore) setLoadingMore(true); else setLoading(true);
+      if (isLoadMore) dispatch({ type: 'SET_LOADING_MORE', payload: true }); else dispatch({ type: 'SET_LOADING', payload: true });
 
       let q = query(
         collection(db, 'businesses'),
         orderBy('createdAt', 'desc'),
         limit(PAGE_SIZE),
       );
-      if (isLoadMore && lastDoc) {
+      if (isLoadMore && state.lastDoc) {
         q = query(
           collection(db, 'businesses'),
           orderBy('createdAt', 'desc'),
@@ -624,23 +337,23 @@ export default function BusinessPage() {
 
       // Track pagination cursor
       if (snapshot.docs.length < PAGE_SIZE) {
-        setHasMore(false);
+        dispatch({ type: 'SET_HAS_MORE', payload: false });
       }
       if (snapshot.docs.length > 0) {
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        dispatch({ type: 'SET_LAST_DOC', payload: snapshot.docs[snapshot.docs.length - 1] });
       }
 
       if (isLoadMore) {
-        setBusinesses((prev) => [...prev, ...data]);
+        dispatch({ type: 'APPEND_BUSINESSES', payload: data });
       } else {
-        setBusinesses(data);
+        dispatch({ type: 'SET_BUSINESSES', payload: data });
       }
     } catch (error) {
       console.error('Error fetching businesses:', error);
-      setToastMessage('Failed to load businesses. Please try again.');
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to load businesses. Please try again.' });
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_LOADING_MORE', payload: false });
     }
   };
 
@@ -666,10 +379,10 @@ export default function BusinessPage() {
         const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
         return bTime - aTime;
       });
-      setBusinessReviews(data);
+      dispatch({ type: 'SET_BUSINESS_REVIEWS', payload: data });
     } catch (error) {
       console.error('Error fetching reviews:', error);
-      setToastMessage('Failed to load reviews.');
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to load reviews.' });
     }
   };
 
@@ -682,7 +395,7 @@ export default function BusinessPage() {
     if (!loadMoreRef.current) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+        if (entries[0].isIntersecting && state.hasMore && !state.loadingMore && !state.loading) {
           fetchBusinesses(true);
         }
       },
@@ -690,7 +403,7 @@ export default function BusinessPage() {
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadingMore, loading, lastDoc]);
+  }, [state.hasMore, state.loadingMore, state.loading, state.lastDoc]);
 
   // Load user safety data (muted businesses, blocked users)
   useEffect(() => {
@@ -701,10 +414,10 @@ export default function BusinessPage() {
         if (userDoc.exists()) {
           const data = userDoc.data();
           if (data.mutedBusinesses) {
-            setMutedBusinesses(new Set(data.mutedBusinesses));
+            dispatch({ type: 'SET_MUTED_BUSINESSES', payload: new Set(data.mutedBusinesses) });
           }
           if (data.blockedUsers) {
-            setBlockedUsers(new Set(data.blockedUsers));
+            dispatch({ type: 'SET_BLOCKED_USERS', payload: new Set(data.blockedUsers) });
           }
         }
       } catch (e) {
@@ -715,71 +428,67 @@ export default function BusinessPage() {
   }, [user]);
 
   useEffect(() => {
-    if (selectedBusiness) {
-      fetchReviews(selectedBusiness.id);
+    if (state.selectedBusiness) {
+      fetchReviews(state.selectedBusiness.id);
     }
-  }, [selectedBusiness?.id]);
+  }, [state.selectedBusiness ?.id]);
 
   // Close heritage dropdown on click outside - handled by ClickOutsideOverlay component
 
   // Auto-dismiss toast
   useEffect(() => {
-    if (toastMessage) {
-      const t = setTimeout(() => setToastMessage(null), 3500);
+    if (state.toastMessage) {
+      const t = setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 3500);
       return () => clearTimeout(t);
     }
-  }, [toastMessage]);
+  }, [state.toastMessage, dispatch]);
 
   // Load favorites from localStorage cache
   useEffect(() => {
-    setFavorites(new Set(getLocalSavedIds('businesses')));
-  }, []);
+    dispatch({ type: 'SET_FAVORITES', payload: new Set(getLocalSavedIds('businesses')) });
+  }, [dispatch]);
 
   // Deep-link: open specific business from profile activity
   useEffect(() => {
     const openId = searchParams.get('open');
-    if (openId && businesses.length > 0) {
-      const found = businesses.find((b: any) => b.id === openId);
+    if (openId && state.businesses.length > 0) {
+      const found = state.businesses.find((b: any) => b.id === openId);
       if (found) {
-        setSelectedBusiness(found);
-        setActiveTab('about');
+        dispatch({ type: 'SELECT_BUSINESS', payload: found });
+        dispatch({ type: 'SET_ACTIVE_TAB', payload: 'about' });
       }
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, businesses, setSearchParams]);
+  }, [searchParams, state.businesses, setSearchParams, dispatch]);
 
   const toggleFavorite = (businessId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user?.uid) return;
-    toggleSavedItem(user.uid, 'businesses', businessId).then(({ ids }) => setFavorites(ids));
+    toggleSavedItem(user.uid, 'businesses', businessId).then(({ ids }) => dispatch({ type: 'SET_FAVORITES', payload: ids }));
   };
 
   // ── Report / Block / Mute handlers ──────────────────────────────────
 
   const openReportModal = (businessId: string) => {
-    setMenuBusinessId(null);
-    setReportBusinessId(businessId);
-    setReportReason('');
-    setReportDetails('');
-    setShowReportModal(true);
+    dispatch({ type: 'OPEN_REPORT', payload: businessId });
   };
 
   const handleSubmitReport = async () => {
-    if (!reportReason || !reportBusinessId || !user) return;
+    if (!state.reportReason || !state.reportBusinessId || !user) return;
     try {
-      setReportSubmitting(true);
-      const reportedBusiness = businesses.find((b) => b.id === reportBusinessId);
-      const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
+      dispatch({ type: 'SET_REPORT_SUBMITTING', payload: true });
+      const reportedBusiness = state.businesses.find((b) => b.id === state.reportBusinessId);
+      const categoryObj = REPORT_CATEGORIES.find((c) => c.id === state.reportReason);
 
       // Write to reports collection (stealth: no owner notification)
       await addDoc(collection(db, 'reports'), {
-        businessId: reportBusinessId,
+        businessId: state.reportBusinessId,
         reportedBy: user.uid,
         reporterName: userProfile?.name || user.displayName || 'Anonymous',
         reporterAvatar: userProfile?.avatar || '',
-        category: reportReason,
-        categoryLabel: categoryObj?.label || reportReason,
-        details: reportDetails.trim() || '',
+        category: state.reportReason,
+        categoryLabel: categoryObj?.label || state.reportReason,
+        details: state.reportDetails.trim() || '',
         createdAt: serverTimestamp(),
         status: 'pending',
       });
@@ -787,7 +496,7 @@ export default function BusinessPage() {
       // Check if moderationQueue entry already exists for this business
       const modQueueQuery = query(
         collection(db, 'moderationQueue'),
-        where('contentId', '==', reportBusinessId)
+        where('contentId', '==', state.reportBusinessId)
       );
       const existingMods = await getDocs(modQueueQuery);
 
@@ -803,8 +512,8 @@ export default function BusinessPage() {
             uid: user.uid,
             name: userProfile?.name || user.displayName || 'Anonymous',
             avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
+            category: state.reportReason,
+            details: state.reportDetails.trim() || '',
             createdAt: new Date().toISOString(),
           }),
         });
@@ -812,15 +521,15 @@ export default function BusinessPage() {
         await addDoc(collection(db, 'moderationQueue'), {
           type: 'business',
           content: reportedBusiness?.name || '',
-          contentId: reportBusinessId,
+          contentId: state.reportBusinessId,
           collection: 'businesses',
           authorId: reportedBusiness?.ownerId || '',
           authorName: reportedBusiness?.name || 'Unknown Business',
           authorAvatar: '',
           images: reportedBusiness?.photos || [],
-          category: reportReason,
-          categoryLabel: categoryObj?.label || reportReason,
-          reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
+          category: state.reportReason,
+          categoryLabel: categoryObj?.label || state.reportReason,
+          reason: `${categoryObj?.label || state.reportReason}${state.reportDetails.trim() ? ': ' + state.reportDetails.trim() : ''}`,
           reportedBy: user.uid,
           reporterName: userProfile?.name || user.displayName || 'Anonymous',
           reporterAvatar: userProfile?.avatar || '',
@@ -829,8 +538,8 @@ export default function BusinessPage() {
             uid: user.uid,
             name: userProfile?.name || user.displayName || 'Anonymous',
             avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
+            category: state.reportReason,
+            details: state.reportDetails.trim() || '',
             createdAt: new Date().toISOString(),
           }],
           createdAt: serverTimestamp(),
@@ -839,7 +548,7 @@ export default function BusinessPage() {
 
       // 3-strike auto-hide
       if (totalReportCount >= 3) {
-        await updateDoc(doc(db, 'businesses', reportBusinessId), {
+        await updateDoc(doc(db, 'businesses', state.reportBusinessId), {
           isHidden: true,
           hiddenAt: new Date().toISOString(),
           hiddenReason: 'Auto-hidden: reached 3 community reports',
@@ -849,7 +558,7 @@ export default function BusinessPage() {
             type: 'content_hidden',
             recipientId: reportedBusiness.ownerId,
             recipientName: reportedBusiness.name || '',
-            postId: reportBusinessId,
+            postId: state.reportBusinessId,
             reason: 'Your business listing received multiple community reports and has been temporarily hidden for review.',
             message: 'Your business listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
             actionUrl: '/business',
@@ -861,20 +570,17 @@ export default function BusinessPage() {
 
       // Mute-on-report: hide this business from the reporter's view
       await updateDoc(doc(db, 'users', user.uid), {
-        mutedBusinesses: arrayUnion(reportBusinessId),
+        mutedBusinesses: arrayUnion(state.reportBusinessId),
       });
-      setMutedBusinesses((prev) => new Set(prev).add(reportBusinessId));
-
-      setReportedBusinesses((prev) => new Set(prev).add(reportBusinessId));
-      setShowReportModal(false);
-      setReportReason('');
-      setReportDetails('');
-      setToastMessage('Report submitted. The business has been hidden from your view. Thank you for helping keep the community safe.');
+      dispatch({ type: 'ADD_MUTED_BUSINESS', payload: state.reportBusinessId });
+      dispatch({ type: 'ADD_REPORTED_BUSINESS', payload: state.reportBusinessId });
+      dispatch({ type: 'CLOSE_REPORT' });
+      dispatch({ type: 'SET_TOAST', payload: 'Report submitted. The business has been hidden from your view. Thank you for helping keep the community safe.' });
     } catch (error) {
       console.error('Error submitting report:', error);
-      setToastMessage('Failed to submit report. Please try again.');
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to submit report. Please try again.' });
     } finally {
-      setReportSubmitting(false);
+      dispatch({ type: 'SET_REPORT_SUBMITTING', payload: false });
     }
   };
 
@@ -882,61 +588,58 @@ export default function BusinessPage() {
     if (!user || !blockTargetUser) return;
     try {
       await updateDoc(doc(db, 'users', user.uid), {
-        blockedUsers: arrayUnion(blockTargetUser.uid),
+        blockedUsers: arrayUnion(state.blockTargetUser!.uid),
       });
-      setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
-      setShowBlockConfirm(false);
-      setBlockTargetUser(null);
-      setToastMessage(`${blockTargetUser.name} has been blocked. Their businesses will no longer appear in your listings.`);
-      setTimeout(() => setToastMessage(null), 4000);
+      dispatch({ type: 'ADD_BLOCKED_USER', payload: state.blockTargetUser!.uid });
+      dispatch({ type: 'CLOSE_BLOCK_CONFIRM' });
+      dispatch({ type: 'SET_TOAST', payload: `${state.blockTargetUser!.name} has been blocked. Their businesses will no longer appear in your listings.` });
+      setTimeout(() => dispatch({ type: 'SET_TOAST', payload: null }), 4000);
     } catch (error) {
       console.error('Error blocking user:', error);
-      setToastMessage('Failed to block user. Please try again.');
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to block user. Please try again.' });
     }
   };
 
   const openBlockConfirm = (ownerId: string, businessName: string) => {
-    setMenuBusinessId(null);
-    setBlockTargetUser({ uid: ownerId, name: businessName });
-    setShowBlockConfirm(true);
+    dispatch({ type: 'OPEN_BLOCK_CONFIRM', payload: { uid: ownerId, name: businessName } });
   };
 
   const filteredBusinesses = useMemo(() => {
-    let filtered = businesses.filter((b) => {
+    let filtered = state.businesses.filter((b) => {
       // Mute-on-report: hide businesses the user has reported
-      if (mutedBusinesses.has(b.id)) return false;
+      if (state.mutedBusinesses.has(b.id)) return false;
       // Block filter: hide businesses from blocked owners
-      if (b.ownerId && blockedUsers.has(b.ownerId)) return false;
+      if (b.ownerId && state.blockedUsers.has(b.ownerId)) return false;
       return true;
     });
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter((b) => b.category === selectedCategory);
+    if (state.selectedCategory !== 'All') {
+      filtered = filtered.filter((b) => b.category === state.selectedCategory);
     }
-    if (selectedHeritage.length > 0) {
+    if (state.selectedHeritage.length > 0) {
       filtered = filtered.filter((b) => {
-        if (Array.isArray(b.heritage)) return b.heritage.some((h: string) => selectedHeritage.includes(h));
-        return b.heritage ? selectedHeritage.includes(b.heritage) : false;
+        if (Array.isArray(b.heritage)) return b.heritage.some((h: string) => state.selectedHeritage.includes(h));
+        return b.heritage ? state.selectedHeritage.includes(b.heritage) : false;
       });
     }
-    if (debouncedSearchQuery.trim()) {
+    if (state.debouncedSearchQuery.trim()) {
       filtered = filtered.filter(
         (b) =>
-          fuzzyMatch(b.name, debouncedSearchQuery) ||
-          fuzzyMatch(b.category, debouncedSearchQuery) ||
-          fuzzyMatch(b.location, debouncedSearchQuery) ||
-          fuzzyMatch(b.desc, debouncedSearchQuery)
+          fuzzyMatch(b.name, state.debouncedSearchQuery) ||
+          fuzzyMatch(b.category, state.debouncedSearchQuery) ||
+          fuzzyMatch(b.location, state.debouncedSearchQuery) ||
+          fuzzyMatch(b.desc, state.debouncedSearchQuery)
       );
     }
 
     // Smart discovery sorting
-    if (activeCollection === 'topRated') {
+    if (state.activeCollection === 'topRated') {
       filtered = filtered.sort((a, b) => b.rating - a.rating);
-    } else if (activeCollection === 'new') {
+    } else if (state.activeCollection === 'new') {
       filtered = filtered.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
-    } else if (activeCollection === 'mostReviewed') {
+    } else if (state.activeCollection === 'mostReviewed') {
       filtered = filtered.sort((a, b) => b.reviews - a.reviews);
-    } else if (activeCollection === 'favorites') {
-      filtered = filtered.filter((b) => favorites.has(b.id));
+    } else if (state.activeCollection === 'favorites') {
+      filtered = filtered.filter((b) => state.favorites.has(b.id));
     } else {
       filtered = filtered.sort((a, b) => {
         if (a.promoted && !b.promoted) return -1;
@@ -945,85 +648,68 @@ export default function BusinessPage() {
       });
     }
     return filtered;
-  }, [businesses, selectedCategory, selectedHeritage, debouncedSearchQuery, activeCollection, favorites, mutedBusinesses, blockedUsers]);
+  }, [state.businesses, state.selectedCategory, state.selectedHeritage, state.debouncedSearchQuery, state.activeCollection, state.favorites, state.mutedBusinesses, state.blockedUsers]);
 
   const featuredBusinesses = useMemo(() => {
-    let featured = businesses.filter((b) => b.promoted);
-    if (selectedCategory !== 'All') {
-      featured = featured.filter((b) => b.category === selectedCategory);
+    let featured = state.businesses.filter((b) => b.promoted);
+    if (state.selectedCategory !== 'All') {
+      featured = featured.filter((b) => b.category === state.selectedCategory);
     }
-    if (selectedHeritage.length > 0) {
+    if (state.selectedHeritage.length > 0) {
       featured = featured.filter((b) => {
-        if (Array.isArray(b.heritage)) return b.heritage.some((h: string) => selectedHeritage.includes(h));
-        return b.heritage ? selectedHeritage.includes(b.heritage) : false;
+        if (Array.isArray(b.heritage)) return b.heritage.some((h: string) => state.selectedHeritage.includes(h));
+        return b.heritage ? state.selectedHeritage.includes(b.heritage) : false;
       });
     }
     return featured;
-  }, [businesses, selectedCategory, selectedHeritage]);
+  }, [state.businesses, state.selectedCategory, state.selectedHeritage, dispatch]);
 
-  const getGoogleMapsUrl = (location: string) =>
-    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+  // getGoogleMapsUrl is imported from @/components/business/businessValidation
 
   const handleOpenCreateModal = () => {
     if (userProfile?.accountType !== 'business' && userRole !== 'admin') {
-      setToastMessage('Only business accounts can add listings. Please switch to a business account in your Profile settings.');
+      dispatch({ type: 'SET_TOAST', payload: 'Only business accounts can add listings. Please switch to a business account in your Profile settings.' });
       return;
     }
     if (userProfile?.isRegistered === true && userProfile?.tinValidationStatus !== 'valid' && userRole !== 'admin') {
-      setShowTinVerificationModal(true);
+      dispatch({ type: 'SET_SHOW_TIN_MODAL', payload: true });
       return;
     }
     if (userProfile?.isRegistered === false && !userProfile?.adminApproved && userRole !== 'admin') {
-      setToastMessage('Your unregistered business account is pending admin approval.');
+      dispatch({ type: 'SET_TOAST', payload: 'Your unregistered business account is pending admin approval.' });
       return;
     }
-    setShowCreateModal(true);
+    dispatch({ type: 'OPEN_CREATE_MODAL' });
   };
 
   const handleAddBusiness = async () => {
-    // ── Field-level validation ──
-    const errors: Record<string, string> = {};
-    if (!formData.name.trim()) errors.name = 'Business name is required';
-    if (!formData.category) errors.category = 'Category is required';
-    if (!formData.location.trim()) errors.location = 'Location is required';
-    if (!formData.phone.trim()) {
-      errors.phone = 'Phone number is required';
-    } else if (!/^[\d\s\-+()]{7,20}$/.test(formData.phone.trim())) {
-      errors.phone = 'Please enter a valid phone number';
-    }
-    if (!formData.email.trim()) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Please enter a valid email address';
-    }
-    if (formData.website.trim() && !/^https?:\/\/.+\..+/.test(formData.website.trim())) {
-      errors.website = 'Please enter a valid URL (e.g., https://example.com)';
-    }
-    setFormErrors(errors);
+    // ── Field-level validation (uses extracted utility) ──
+    const errors = validateBusinessForm(formData as BusinessFormData);
+    dispatch({ type: 'SET_FORM_ERRORS', payload: errors });
     if (Object.keys(errors).length > 0) {
-      setToastMessage('Please fix the errors in the form');
+      dispatch({ type: 'SET_TOAST', payload: 'Please fix the errors in the form' });
       return;
     }
-    setSaving(true);
+    dispatch({ type: 'SET_SAVING', payload: true });
     try {
       await addDoc(collection(db, 'businesses'), {
-        name: formData.name,
-        category: formData.category,
-        desc: formData.desc,
-        location: formData.location,
-        phone: formData.phone,
-        website: formData.website,
-        email: formData.email,
-        hours: formData.hours,
-        menu: formData.menu,
-        services: formData.services,
-        priceRange: formData.priceRange,
-        yearEstablished: formData.yearEstablished,
-        paymentMethods: formData.paymentMethods,
-        deliveryOptions: formData.deliveryOptions,
-        specialtyTags: formData.specialtyTags,
-        emoji: CATEGORY_EMOJI_MAP[formData.category] || '💼',
-        bgColor: CATEGORY_COLORS[formData.category] || '#999',
+        name: state.formData.name,
+        category: state.formData.category,
+        desc: state.formData.desc,
+        location: state.formData.location,
+        phone: state.formData.phone,
+        website: state.formData.website,
+        email: state.formData.email,
+        hours: state.formData.hours,
+        menu: state.formData.menu,
+        services: state.formData.services,
+        priceRange: state.formData.priceRange,
+        yearEstablished: state.formData.yearEstablished,
+        paymentMethods: state.formData.paymentMethods,
+        deliveryOptions: state.formData.deliveryOptions,
+        specialtyTags: state.formData.specialtyTags,
+        emoji: CATEGORY_EMOJI_MAP[state.formData.category] || '💼',
+        bgColor: CATEGORY_COLORS[state.formData.category] || '#999',
         rating: 4.5,
         reviews: 0,
         promoted: false,
@@ -1035,194 +721,172 @@ export default function BusinessPage() {
           : userProfile?.heritage
           ? [userProfile.heritage]
           : [],
-        ...(formPhotos.length > 0 ? { photos: formPhotos, coverPhotoIndex: Math.min(coverPhotoIndex, formPhotos.length - 1) } : {}),
+        ...(state.formPhotos.length > 0 ? { photos: formPhotos, coverPhotoIndex: Math.min(coverPhotoIndex, state.formPhotos.length - 1) } : {}),
       });
-      setFormPhotos([]);
-      setCoverPhotoIndex(0);
-      setFormData({
-        name: '',
-        category: CATEGORIES[0],
-        desc: '',
-        location: '',
-        phone: '',
-        website: '',
-        email: '',
-        hours: '',
-        menu: '',
-        services: '',
-        priceRange: '',
-        yearEstablished: new Date().getFullYear(),
-        paymentMethods: [],
-        deliveryOptions: [],
-        specialtyTags: [],
-      });
-      setShowCreateModal(false);
-      setFormErrors({});
+      dispatch({ type: 'RESET_CREATE_FORM' });
       // Reset pagination and refetch from start
-      setLastDoc(null);
-      setHasMore(true);
+      dispatch({ type: 'SET_LAST_DOC', payload: null });
+      dispatch({ type: 'SET_HAS_MORE', payload: true });
       await fetchBusinesses();
     } catch (error) {
       console.error('Error adding business:', error);
-      setToastMessage('Failed to add business. Please try again.');
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to add business. Please try again.' });
     } finally {
-      setSaving(false);
+      dispatch({ type: 'SET_SAVING', payload: false });
     }
   };
 
   const handleDeleteBusiness = async (businessId: string) => {
-    setDeleteBusinessId(businessId);
-    setShowDeleteConfirm(true);
+    dispatch({ type: 'OPEN_DELETE_CONFIRM', payload: businessId });
   };
 
   const confirmDeleteBusiness = async () => {
-    if (!deleteBusinessId) return;
-    setSaving(true);
+    if (!state.deleteBusinessId) return;
+    dispatch({ type: 'SET_SAVING', payload: true });
     try {
-      await deleteDoc(doc(db, 'businesses', deleteBusinessId));
-      setBusinesses(businesses.filter((b) => b.id !== deleteBusinessId));
-      setSelectedBusiness(null);
-      setToastMessage('Business deleted successfully.');
+      await deleteDoc(doc(db, 'businesses', state.deleteBusinessId));
+      dispatch({ type: 'REMOVE_BUSINESS', payload: state.deleteBusinessId });
+      dispatch({ type: 'SELECT_BUSINESS', payload: null });
+      dispatch({ type: 'SET_TOAST', payload: 'Business deleted successfully.' });
     } catch (error) {
       console.error('Error deleting business:', error);
-      setToastMessage('Failed to delete business. Please try again.');
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to delete business. Please try again.' });
     } finally {
-      setSaving(false);
-      setShowDeleteConfirm(false);
-      setDeleteBusinessId(null);
+      dispatch({ type: 'SET_SAVING', payload: false });
+      dispatch({ type: 'CLOSE_DELETE_CONFIRM' });
     }
   };
 
   const handleStartEdit = () => {
-    if (!selectedBusiness) return;
-    setEditData({
-      name: selectedBusiness.name,
-      desc: selectedBusiness.desc,
-      location: selectedBusiness.location,
-      phone: selectedBusiness.phone || '',
-      website: selectedBusiness.website || '',
-      email: selectedBusiness.email || '',
-      hours: selectedBusiness.hours || '',
-      category: selectedBusiness.category,
-      menu: selectedBusiness.menu || '',
-      services: selectedBusiness.services || '',
-      priceRange: selectedBusiness.priceRange || '',
-      yearEstablished: selectedBusiness.yearEstablished || new Date().getFullYear(),
-      paymentMethods: selectedBusiness.paymentMethods || [],
-      deliveryOptions: selectedBusiness.deliveryOptions || [],
-      specialtyTags: selectedBusiness.specialtyTags || [],
-    });
-    setEditPhotos(selectedBusiness.photos || []);
-    setEditCoverPhotoIndex(selectedBusiness.coverPhotoIndex || 0);
-    setIsEditing(true);
+    if (!state.selectedBusiness) return;
+    dispatch({ type: 'SET_EDIT_DATA', payload: {
+      name: state.selectedBusiness.name,
+      desc: state.selectedBusiness.desc,
+      location: state.selectedBusiness.location,
+      phone: state.selectedBusiness.phone || '',
+      website: state.selectedBusiness.website || '',
+      email: state.selectedBusiness.email || '',
+      hours: state.selectedBusiness.hours || '',
+      category: state.selectedBusiness.category,
+      menu: state.selectedBusiness.menu || '',
+      services: state.selectedBusiness.services || '',
+      priceRange: state.selectedBusiness.priceRange || '',
+      yearEstablished: state.selectedBusiness.yearEstablished || new Date().getFullYear(),
+      paymentMethods: state.selectedBusiness.paymentMethods || [],
+      deliveryOptions: state.selectedBusiness.deliveryOptions || [],
+      specialtyTags: state.selectedBusiness.specialtyTags || [],
+    } });
+    dispatch({ type: 'SET_EDIT_PHOTOS', payload: state.selectedBusiness.photos || [] });
+    dispatch({ type: 'SET_EDIT_COVER_INDEX', payload: state.selectedBusiness.coverPhotoIndex || 0 });
+    dispatch({ type: 'SET_IS_EDITING', payload: true });
   };
 
   const handleSaveEdit = async () => {
-    if (!selectedBusiness) return;
-    setSaving(true);
+    if (!state.selectedBusiness) return;
+    dispatch({ type: 'SET_SAVING', payload: true });
     try {
-      const ref = doc(db, 'businesses', selectedBusiness.id);
+      const ref = doc(db, 'businesses', state.selectedBusiness.id);
       await updateDoc(ref, {
-        name: editData.name,
-        desc: editData.desc,
-        location: editData.location,
-        phone: editData.phone,
-        website: editData.website,
-        email: editData.email,
-        hours: editData.hours,
-        category: editData.category,
-        menu: editData.menu,
-        services: editData.services,
-        priceRange: editData.priceRange,
-        yearEstablished: editData.yearEstablished,
-        paymentMethods: editData.paymentMethods,
-        deliveryOptions: editData.deliveryOptions,
-        specialtyTags: editData.specialtyTags,
-        emoji: CATEGORY_EMOJI_MAP[editData.category] || selectedBusiness.emoji,
-        bgColor: CATEGORY_COLORS[editData.category] || selectedBusiness.bgColor,
-        photos: editPhotos,
-        coverPhotoIndex: Math.min(editCoverPhotoIndex, Math.max(editPhotos.length - 1, 0)),
+        name: state.editData.name,
+        desc: state.editData.desc,
+        location: state.editData.location,
+        phone: state.editData.phone,
+        website: state.editData.website,
+        email: state.editData.email,
+        hours: state.editData.hours,
+        category: state.editData.category,
+        menu: state.editData.menu,
+        services: state.editData.services,
+        priceRange: state.editData.priceRange,
+        yearEstablished: state.editData.yearEstablished,
+        paymentMethods: state.editData.paymentMethods,
+        deliveryOptions: state.editData.deliveryOptions,
+        specialtyTags: state.editData.specialtyTags,
+        emoji: CATEGORY_EMOJI_MAP[state.editData.category] || state.selectedBusiness.emoji,
+        bgColor: CATEGORY_COLORS[state.editData.category] || state.selectedBusiness.bgColor,
+        photos: state.editPhotos,
+        coverPhotoIndex: Math.min(state.editCoverPhotoIndex, Math.max(state.editPhotos.length - 1, 0)),
       });
       const updated = {
-        ...selectedBusiness,
-        ...editData,
-        emoji: CATEGORY_EMOJI_MAP[editData.category] || selectedBusiness.emoji,
-        bgColor: CATEGORY_COLORS[editData.category] || selectedBusiness.bgColor,
-        photos: editPhotos,
-        coverPhotoIndex: Math.min(editCoverPhotoIndex, Math.max(editPhotos.length - 1, 0)),
+        ...state.selectedBusiness,
+        ...state.editData,
+        emoji: CATEGORY_EMOJI_MAP[state.editData.category] || state.selectedBusiness.emoji,
+        bgColor: CATEGORY_COLORS[state.editData.category] || state.selectedBusiness.bgColor,
+        photos: state.editPhotos,
+        coverPhotoIndex: Math.min(state.editCoverPhotoIndex, Math.max(state.editPhotos.length - 1, 0)),
       };
-      setSelectedBusiness(updated);
-      setBusinesses(businesses.map((b) => (b.id === updated.id ? updated : b)));
-      setIsEditing(false);
+      dispatch({ type: 'SELECT_BUSINESS', payload: updated });
+      dispatch({ type: 'UPDATE_BUSINESS', payload: updated });
+      dispatch({ type: 'SET_IS_EDITING', payload: false });
     } catch (error) {
       console.error('Error updating business:', error);
-      setToastMessage('Failed to update business. Please try again.');
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to update business. Please try again.' });
     } finally {
-      setSaving(false);
+      dispatch({ type: 'SET_SAVING', payload: false });
     }
   };
 
   const handleAddReview = async () => {
-    if (!selectedBusiness || !user) return;
-    if (!newReview.text.trim()) {
-      setToastMessage('Please enter a review before submitting.');
+    if (!state.selectedBusiness || !user) return;
+    if (!state.newReview.text.trim()) {
+      dispatch({ type: 'SET_TOAST', payload: 'Please enter a review before submitting.' });
       return;
     }
     try {
       await addDoc(collection(db, 'businessReviews'), {
-        businessId: selectedBusiness.id,
+        businessId: state.selectedBusiness.id,
         userId: user.uid,
         userName: userProfile?.name || 'Anonymous',
-        rating: newReview.rating,
-        text: newReview.text,
+        rating: state.newReview.rating,
+        text: state.newReview.text,
         createdAt: Timestamp.now(),
       });
       // Optimistic update: add review to local state immediately
       const optimisticReview: BusinessReview = {
         id: 'temp-' + Date.now(),
-        businessId: selectedBusiness.id,
+        businessId: state.selectedBusiness.id,
         userId: user.uid,
         userName: userProfile?.name || 'Anonymous',
-        rating: newReview.rating,
-        text: newReview.text,
+        rating: state.newReview.rating,
+        text: state.newReview.text,
         createdAt: Timestamp.now(),
       };
       const updatedReviews = [optimisticReview, ...businessReviews];
-      setBusinessReviews(updatedReviews);
+      dispatch({ type: 'SET_BUSINESS_REVIEWS', payload: updatedReviews });
 
       // Recalculate average rating
       const avgRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0) / updatedReviews.length;
-      const ref = doc(db, 'businesses', selectedBusiness.id);
+      const ref = doc(db, 'businesses', state.selectedBusiness.id);
       await updateDoc(ref, {
         rating: parseFloat(avgRating.toFixed(1)),
-        reviews: selectedBusiness.reviews + 1,
+        reviews: state.selectedBusiness.reviews + 1,
       });
 
       // Update local business state (avoid full refetch)
-      const updatedBusiness = { ...selectedBusiness, rating: parseFloat(avgRating.toFixed(1)), reviews: selectedBusiness.reviews + 1 };
-      setSelectedBusiness(updatedBusiness);
-      setBusinesses((prev) => prev.map((b) => b.id === updatedBusiness.id ? updatedBusiness : b));
+      const updatedBusiness = { ...state.selectedBusiness, rating: parseFloat(avgRating.toFixed(1)), reviews: state.selectedBusiness.reviews + 1 };
+      dispatch({ type: 'SELECT_BUSINESS', payload: updatedBusiness });
+      dispatch({ type: 'UPDATE_BUSINESS', payload: updatedBusiness });
 
-      setNewReview({ rating: 5, text: '' });
-      setShowReviewForm(false);
+      dispatch({ type: 'SET_NEW_REVIEW', payload: { rating: 5, text: '' } });
+      dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: false });
     } catch (error) {
       console.error('Error adding review:', error);
-      setToastMessage('Failed to add review. Please try again.');
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to add review. Please try again.' });
     }
   };
 
   const canAddBusiness = userRole === 'admin' || userRole === 'business_owner' || userProfile?.accountType === 'business';
   const isOwnerOrAdmin = (b: Business) => b.ownerId === user?.uid || userRole === 'admin';
-  const ownedBusinesses = businesses.filter((b) => b.ownerId === user?.uid || userRole === 'admin');
+  const ownedBusinesses = state.businesses.filter((b) => b.ownerId === user?.uid || userRole === 'admin');
 
   // Category count
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    businesses.forEach((b) => {
+    state.businesses.forEach((b) => {
       counts[b.category] = (counts[b.category] || 0) + 1;
     });
     return counts;
-  }, [businesses]);
+  }, [state.businesses, dispatch]);
 
   // Skeleton card
   const SkeletonCard = () => (
@@ -1253,18 +917,18 @@ export default function BusinessPage() {
                 <input
                   type="text"
                   placeholder="Search restaurants, services, markets..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
+                  value={state.searchQuery}
+                  onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
+                  onFocus={() => dispatch({ type: 'SET_SEARCH_FOCUSED', payload: true })}
+                  onBlur={() => dispatch({ type: 'SET_SEARCH_FOCUSED', payload: false })}
                   className={`w-full pl-11 pr-10 py-2.5 bg-aurora-surface border rounded-full
                              text-sm text-aurora-text placeholder:text-aurora-text-muted
                              focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all
-                             ${searchFocused ? 'border-aurora-indigo shadow-md' : 'border-aurora-border'}`}
+                             ${state.searchFocused ? 'border-aurora-indigo shadow-md' : 'border-aurora-border'}`}
                 />
-                {searchQuery && (
+                {state.searchQuery && (
                   <button
-                    onClick={() => setSearchQuery('')}
+                    onClick={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text"
                   >
                     <X className="w-4 h-4" />
@@ -1274,8 +938,8 @@ export default function BusinessPage() {
 
               {/* EthniZity Dropdown */}
               <EthnicityFilterDropdown
-                selected={selectedHeritage}
-                onChange={setSelectedHeritage}
+                selected={state.selectedHeritage}
+                onChange={(heritage) => dispatch({ type: 'SET_SELECTED_HERITAGE', payload: heritage })}
               />
             </div>
           )}
@@ -1292,9 +956,8 @@ export default function BusinessPage() {
               >
                 {/* All */}
                 <button
-                  onClick={() => setSelectedCategory('All')}
-                  className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all ${
-                    selectedCategory === 'All'
+                  onClick={() => dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' })}
+                  className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all ${state.selectedCategory === 'All'
                       ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-md'
                       : 'text-aurora-text-secondary hover:bg-aurora-surface-variant'
                   }`}
@@ -1308,9 +971,8 @@ export default function BusinessPage() {
                   return (
                     <button
                       key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all ${
-                        selectedCategory === cat
+                      onClick={() => dispatch({ type: 'SET_SELECTED_CATEGORY', payload: cat })}
+                      className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl min-w-[64px] flex-shrink-0 transition-all ${state.selectedCategory === cat
                           ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-md'
                           : 'text-aurora-text-secondary hover:bg-aurora-surface-variant'
                       }`}
@@ -1339,9 +1001,8 @@ export default function BusinessPage() {
                     return (
                       <button
                         key={collection}
-                        onClick={() => setActiveCollection(collection)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all flex items-center gap-1 ${
-                          activeCollection === collection
+                        onClick={() => dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: collection })}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all flex items-center gap-1 ${state.activeCollection === collection
                             ? 'bg-aurora-indigo text-white'
                             : 'bg-aurora-surface-variant text-aurora-text-secondary hover:text-aurora-text'
                         }`}
@@ -1365,18 +1026,18 @@ export default function BusinessPage() {
             {/* Results Header */}
             <div className="flex items-center justify-between mb-4">
               <p className="text-sm text-aurora-text-secondary">
-                {loading ? 'Loading...' : (
+                {state.loading ? 'Loading...' : (
                   <>
                     <span className="font-semibold text-aurora-text">{filteredBusinesses.length}</span>
                     {' '}business{filteredBusinesses.length !== 1 ? 'es' : ''}
-                    {selectedCategory !== 'All' && <> in <span className="font-medium text-aurora-text">{selectedCategory}</span></>}
-                    {selectedHeritage.length > 0 && <> · {selectedHeritage.join(', ')}</>}
+                    {state.selectedCategory !== 'All' && <> in <span className="font-medium text-aurora-text">{state.selectedCategory}</span></>}
+                    {state.selectedHeritage.length > 0 && <> · {state.selectedHeritage.join(', ')}</>}
                   </>
                 )}
               </p>
-              {(selectedCategory !== 'All' || selectedHeritage.length > 0 || searchQuery || activeCollection !== 'all') && (
+              {(selectedCategory !== 'All' || state.selectedHeritage.length > 0 || state.searchQuery || state.activeCollection !== 'all') && (
                 <button
-                  onClick={() => { setSelectedCategory('All'); setSelectedHeritage([]); setSearchQuery(''); setActiveCollection('all'); }}
+                  onClick={() => { dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' }); dispatch({ type: 'SET_SELECTED_HERITAGE', payload: [] }); dispatch({ type: 'SET_SEARCH_QUERY', payload: '' }); dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: 'all' }); }}
                   className="text-xs text-aurora-indigo font-medium flex items-center gap-1 hover:text-aurora-indigo/80"
                 >
                   <X className="w-3 h-3" /> Clear filters
@@ -1399,7 +1060,7 @@ export default function BusinessPage() {
                       key={business.id}
                       className="flex-shrink-0 w-80 rounded-2xl overflow-hidden cursor-pointer group
                                  shadow-sm hover:shadow-lg transition-all duration-200 border border-aurora-border"
-                      onClick={() => { setSelectedBusiness(business); setActiveTab('about'); }}
+                      onClick={() => { dispatch({ type: 'SELECT_BUSINESS', payload: business }); dispatch({ type: 'SET_ACTIVE_TAB', payload: 'about' }); }}
                     >
                       {/* Color banner */}
                       <div
@@ -1426,7 +1087,7 @@ export default function BusinessPage() {
                           className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center
                                      hover:bg-white transition-colors shadow-sm"
                         >
-                          <Heart className={`w-4 h-4 ${favorites.has(business.id) ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
+                          <Heart className={`w-4 h-4 ${state.favorites.has(business.id) ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
                         </button>
                         <div className="relative flex items-center gap-3">
                           <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl">
@@ -1457,7 +1118,7 @@ export default function BusinessPage() {
               </div>
             )}
 
-            {loading ? (
+            {state.loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
@@ -1468,12 +1129,11 @@ export default function BusinessPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-aurora-text mb-1">No businesses found</h3>
                 <p className="text-sm text-aurora-text-secondary max-w-xs">
-                  {searchQuery
-                    ? `No results for "${searchQuery}". Try a different search.`
-                    : selectedHeritage.length > 0
-                    ? `No businesses under "${selectedHeritage.join(', ')}" heritage yet.`
-                    : selectedCategory !== 'All'
-                    ? `No businesses in "${selectedCategory}" yet.`
+                  {state.searchQuery ? `No results for "${state.searchQuery}". Try a different search.`
+                    : state.selectedHeritage.length > 0
+                    ? `No businesses under "${state.selectedHeritage.join(', ')}" heritage yet.`
+                    : state.selectedCategory !== 'All'
+                    ? `No businesses in "${state.selectedCategory}" yet.`
                     : 'No businesses listed yet. Be the first!'}
                 </p>
                 {canAddBusiness && (
@@ -1499,7 +1159,7 @@ export default function BusinessPage() {
                       key={business.id}
                       className="group bg-aurora-surface rounded-2xl border border-aurora-border overflow-visible
                                  cursor-pointer hover:shadow-lg hover:border-aurora-border/80 transition-all duration-200"
-                      onClick={() => { setSelectedBusiness(business); setActiveTab('about'); }}
+                      onClick={() => { dispatch({ type: 'SELECT_BUSINESS', payload: business }); dispatch({ type: 'SET_ACTIVE_TAB', payload: 'about' }); }}
                     >
                       {/* Card Image Area */}
                       <div
@@ -1528,7 +1188,7 @@ export default function BusinessPage() {
                                        transition-colors shadow-sm"
                           >
                             <Heart className={`w-4 h-4 transition-colors ${
-                              favorites.has(business.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'
+                              state.favorites.has(business.id) ? 'fill-red-500 text-red-500' : 'text-gray-400'
                             }`} />
                           </button>
                           {user && (
@@ -1612,13 +1272,13 @@ export default function BusinessPage() {
 
             {/* Infinite scroll sentinel */}
             <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
-              {loadingMore && (
+              {state.loadingMore && (
                 <div className="flex items-center gap-2 text-aurora-text-muted text-sm py-4">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Loading more businesses...
                 </div>
               )}
-              {!hasMore && businesses.length > PAGE_SIZE && (
+              {!hasMore && state.businesses.length > PAGE_SIZE && (
                 <p className="text-xs text-aurora-text-muted py-4">You've reached the end</p>
               )}
             </div>
@@ -1701,13 +1361,13 @@ export default function BusinessPage() {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => { setSelectedBusiness(business); setActiveTab('about'); }}
+                        onClick={() => { dispatch({ type: 'SELECT_BUSINESS', payload: business }); dispatch({ type: 'SET_ACTIVE_TAB', payload: 'about' }); }}
                         className="flex-1 px-3 py-2 bg-aurora-surface-variant text-aurora-text rounded-lg text-sm font-medium hover:bg-aurora-border/30 transition-colors"
                       >
                         View
                       </button>
                       <button
-                        onClick={() => { setSelectedBusiness(business); handleStartEdit(); }}
+                        onClick={() => { dispatch({ type: 'SELECT_BUSINESS', payload: business }); handleStartEdit(); }}
                         className="flex-1 px-3 py-2 bg-aurora-indigo text-white rounded-lg text-sm font-medium hover:bg-aurora-indigo/90 transition-colors flex items-center justify-center gap-1"
                       >
                         <Edit3 className="w-4 h-4" /> Edit
@@ -1722,10 +1382,10 @@ export default function BusinessPage() {
       )}
 
       {/* ===== Business Detail Modal ===== */}
-      {selectedBusiness && !isEditing && (
+      {state.selectedBusiness && !isEditing && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
-          onClick={() => setSelectedBusiness(null)}
+          onClick={() => dispatch({ type: 'SELECT_BUSINESS', payload: null })}
         >
           <div
             className="bg-aurora-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl
@@ -1734,40 +1394,40 @@ export default function BusinessPage() {
           >
             {/* Modal action buttons — positioned outside hero to avoid overflow-hidden clipping */}
             <button
-              onClick={() => setSelectedBusiness(null)}
+              onClick={() => dispatch({ type: 'SELECT_BUSINESS', payload: null })}
               className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors z-[5]"
             >
               <X className="w-5 h-5" />
             </button>
             {user && (
               <button
-                onClick={(e) => openMenu(selectedBusiness.id, e)}
+                onClick={(e) => openMenu(state.selectedBusiness.id, e)}
                 className="absolute top-3 right-14 z-[5] w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
               >
                 <MoreHorizontal className="w-4 h-4" />
               </button>
             )}
             <button
-              onClick={(e) => toggleFavorite(selectedBusiness.id, e)}
+              onClick={(e) => toggleFavorite(state.selectedBusiness.id, e)}
               className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors z-[5]`}
             >
-              <Heart className={`w-4 h-4 ${favorites.has(selectedBusiness.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
+              <Heart className={`w-4 h-4 ${state.favorites.has(state.selectedBusiness.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
             </button>
 
             {/* Hero Banner */}
             <div
               className="relative h-40 sm:rounded-t-2xl flex items-end p-5 overflow-hidden"
               style={{
-                background: selectedBusiness.photos?.length ? '#000' : `linear-gradient(135deg, ${selectedBusiness.bgColor}, ${selectedBusiness.bgColor}cc)`,
+                background: state.selectedBusiness.photos?.length ? '#000' : `linear-gradient(135deg, ${state.selectedBusiness.bgColor}, ${state.selectedBusiness.bgColor}cc)`,
               }}
             >
-              {selectedBusiness.photos && selectedBusiness.photos.length > 0 && (
+              {state.selectedBusiness.photos && state.selectedBusiness.photos.length > 0 && (
                 <div className="absolute inset-0">
-                  <BusinessPhotoCarousel photos={selectedBusiness.photos} title={selectedBusiness.name} />
+                  <BusinessPhotoCarousel photos={state.selectedBusiness.photos} title={state.selectedBusiness.name} />
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent sm:rounded-t-2xl" />
-              {selectedBusiness.promoted && (
+              {state.selectedBusiness.promoted && (
                 <div className="absolute top-3 left-3">
                   <span className="px-2.5 py-1 bg-amber-400 text-amber-900 text-[11px] font-bold rounded-lg flex items-center gap-1">
                     <Sparkles className="w-3 h-3" /> FEATURED
@@ -1776,15 +1436,15 @@ export default function BusinessPage() {
               )}
               <div className="relative flex items-center gap-4">
                 <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-3xl">
-                  {selectedBusiness.emoji}
+                  {state.selectedBusiness.emoji}
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white leading-tight">{selectedBusiness.name}</h2>
-                  <p className="text-white/80 text-sm">{selectedBusiness.category}</p>
+                  <h2 className="text-xl font-bold text-white leading-tight">{state.selectedBusiness.name}</h2>
+                  <p className="text-white/80 text-sm">{state.selectedBusiness.category}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <Star className="w-4 h-4 fill-amber-300 text-amber-300" />
-                    <span className="text-white font-semibold text-sm">{selectedBusiness.rating.toFixed(1)}</span>
-                    <span className="text-white/70 text-xs">({selectedBusiness.reviews} reviews)</span>
+                    <span className="text-white font-semibold text-sm">{state.selectedBusiness.rating.toFixed(1)}</span>
+                    <span className="text-white/70 text-xs">({state.selectedBusiness.reviews} reviews)</span>
                   </div>
                 </div>
               </div>
@@ -1795,36 +1455,36 @@ export default function BusinessPage() {
               <div className="p-5 space-y-6">
 
                 {/* ── About Section ── */}
-                {selectedBusiness.desc && (
+                {state.selectedBusiness.desc && (
                   <div>
                     <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">About</h4>
-                    <p className="text-sm text-aurora-text-secondary leading-relaxed">{selectedBusiness.desc}</p>
+                    <p className="text-sm text-aurora-text-secondary leading-relaxed">{state.selectedBusiness.desc}</p>
                   </div>
                 )}
 
                 {/* Quick Info Row */}
-                {(selectedBusiness.yearEstablished || selectedBusiness.priceRange) && (
+                {(state.selectedBusiness.yearEstablished || state.selectedBusiness.priceRange) && (
                   <div className="flex gap-3 flex-wrap">
-                    {selectedBusiness.yearEstablished && (
+                    {state.selectedBusiness.yearEstablished && (
                       <div className="flex-1 min-w-[120px] bg-aurora-surface-variant rounded-xl p-3 text-center">
                         <p className="text-[10px] font-semibold text-aurora-text-muted uppercase tracking-wider">Established</p>
-                        <p className="text-sm font-bold text-aurora-text mt-1">{selectedBusiness.yearEstablished}</p>
+                        <p className="text-sm font-bold text-aurora-text mt-1">{state.selectedBusiness.yearEstablished}</p>
                       </div>
                     )}
-                    {selectedBusiness.priceRange && (
+                    {state.selectedBusiness.priceRange && (
                       <div className="flex-1 min-w-[120px] bg-aurora-surface-variant rounded-xl p-3 text-center">
                         <p className="text-[10px] font-semibold text-aurora-text-muted uppercase tracking-wider">Price Range</p>
-                        <p className="text-sm font-bold text-aurora-text mt-1">{selectedBusiness.priceRange}</p>
+                        <p className="text-sm font-bold text-aurora-text mt-1">{state.selectedBusiness.priceRange}</p>
                       </div>
                     )}
                   </div>
                 )}
 
-                {selectedBusiness.heritage && (
+                {state.selectedBusiness.heritage && (
                   <div>
                     <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Heritage</h4>
                     <div className="flex gap-2 flex-wrap">
-                      {(Array.isArray(selectedBusiness.heritage) ? selectedBusiness.heritage : [selectedBusiness.heritage]).map((h) => (
+                      {(Array.isArray(state.selectedBusiness.heritage) ? state.selectedBusiness.heritage : [state.selectedBusiness.heritage]).map((h) => (
                         <span key={h} className="text-xs font-medium bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-full border border-amber-200/50 dark:border-amber-500/20">
                           {h}
                         </span>
@@ -1833,11 +1493,11 @@ export default function BusinessPage() {
                   </div>
                 )}
 
-                {selectedBusiness.specialtyTags && selectedBusiness.specialtyTags.length > 0 && (
+                {state.selectedBusiness.specialtyTags && state.selectedBusiness.specialtyTags.length > 0 && (
                   <div>
                     <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Specialties</h4>
                     <div className="flex gap-2 flex-wrap">
-                      {selectedBusiness.specialtyTags.map((tag) => (
+                      {state.selectedBusiness.specialtyTags.map((tag) => (
                         <span key={tag} className="text-xs font-medium bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 px-3 py-1 rounded-full">
                           {tag}
                         </span>
@@ -1846,11 +1506,11 @@ export default function BusinessPage() {
                   </div>
                 )}
 
-                {selectedBusiness.paymentMethods && selectedBusiness.paymentMethods.length > 0 && (
+                {state.selectedBusiness.paymentMethods && state.selectedBusiness.paymentMethods.length > 0 && (
                   <div>
                     <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Payment Methods</h4>
                     <div className="flex gap-2 flex-wrap">
-                      {selectedBusiness.paymentMethods.map((method) => (
+                      {state.selectedBusiness.paymentMethods.map((method) => (
                         <span key={method} className="text-xs font-medium bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-400 px-3 py-1 rounded-full">
                           {method}
                         </span>
@@ -1863,9 +1523,9 @@ export default function BusinessPage() {
                 <div>
                   <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Contact</h4>
                   <div className="space-y-2">
-                    {selectedBusiness.location && (
+                    {state.selectedBusiness.location && (
                       <a
-                        href={getGoogleMapsUrl(selectedBusiness.location)}
+                        href={getGoogleMapsUrl(state.selectedBusiness.location)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3 hover:bg-aurora-border/30 transition-colors"
@@ -1874,43 +1534,43 @@ export default function BusinessPage() {
                           <MapPin className="w-4 h-4 text-aurora-indigo" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-aurora-text truncate">{selectedBusiness.location}</p>
+                          <p className="text-sm text-aurora-text truncate">{state.selectedBusiness.location}</p>
                           <p className="text-xs text-aurora-indigo mt-0.5">Open in Google Maps</p>
                         </div>
                         <ExternalLink className="w-4 h-4 text-aurora-text-muted flex-shrink-0" />
                       </a>
                     )}
-                    {selectedBusiness.phone && (
+                    {state.selectedBusiness.phone && (
                       <a
-                        href={`tel:${selectedBusiness.phone}`}
+                        href={`tel:${state.selectedBusiness.phone}`}
                         className="flex items-center gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3 hover:bg-aurora-border/30 transition-colors"
                       >
                         <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
                           <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-aurora-text">{selectedBusiness.phone}</p>
+                          <p className="text-sm text-aurora-text">{state.selectedBusiness.phone}</p>
                           <p className="text-xs text-aurora-text-muted mt-0.5">Tap to call</p>
                         </div>
                       </a>
                     )}
-                    {selectedBusiness.email && (
+                    {state.selectedBusiness.email && (
                       <a
-                        href={`mailto:${selectedBusiness.email}`}
+                        href={`mailto:${state.selectedBusiness.email}`}
                         className="flex items-center gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3 hover:bg-aurora-border/30 transition-colors"
                       >
                         <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                           <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-aurora-text truncate">{selectedBusiness.email}</p>
+                          <p className="text-sm text-aurora-text truncate">{state.selectedBusiness.email}</p>
                           <p className="text-xs text-aurora-text-muted mt-0.5">Send email</p>
                         </div>
                       </a>
                     )}
-                    {selectedBusiness.website && (
+                    {state.selectedBusiness.website && (
                       <a
-                        href={selectedBusiness.website.startsWith('http') ? selectedBusiness.website : `https://${selectedBusiness.website}`}
+                        href={state.selectedBusiness.website.startsWith('http') ? state.selectedBusiness.website : `https://${state.selectedBusiness.website}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3 hover:bg-aurora-border/30 transition-colors"
@@ -1919,7 +1579,7 @@ export default function BusinessPage() {
                           <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-aurora-indigo truncate">{selectedBusiness.website}</p>
+                          <p className="text-sm text-aurora-indigo truncate">{state.selectedBusiness.website}</p>
                           <p className="text-xs text-aurora-text-muted mt-0.5">Visit website</p>
                         </div>
                         <ExternalLink className="w-4 h-4 text-aurora-text-muted flex-shrink-0" />
@@ -1928,21 +1588,21 @@ export default function BusinessPage() {
                   </div>
                 </div>
 
-                {selectedBusiness.hours && (
+                {state.selectedBusiness.hours && (
                   <div>
                     <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Hours</h4>
                     <div className="flex items-start gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3">
                       <Clock className="w-4 h-4 text-aurora-text-muted mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-aurora-text-secondary whitespace-pre-line">{selectedBusiness.hours}</p>
+                      <p className="text-sm text-aurora-text-secondary whitespace-pre-line">{state.selectedBusiness.hours}</p>
                     </div>
                   </div>
                 )}
 
-                {selectedBusiness.deals && selectedBusiness.deals.length > 0 && (
+                {state.selectedBusiness.deals && state.selectedBusiness.deals.length > 0 && (
                   <div>
                     <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Current Deals</h4>
                     <div className="space-y-2">
-                      {selectedBusiness.deals.map((deal, idx) => (
+                      {state.selectedBusiness.deals.map((deal, idx) => (
                         <div key={idx} className="bg-red-50 dark:bg-red-500/10 rounded-xl p-4 border border-red-200/50 dark:border-red-500/20">
                           <h5 className="font-semibold text-red-700 dark:text-red-400 text-sm">{deal.title}</h5>
                           {deal.description && <p className="text-sm text-red-600 dark:text-red-300/80 mt-1">{deal.description}</p>}
@@ -1958,27 +1618,27 @@ export default function BusinessPage() {
                 <div className="border-t border-aurora-border" />
 
                 {/* ── Services Section ── */}
-                {selectedBusiness.services && (
+                {state.selectedBusiness.services && (
                   <div>
                     <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Services Offered</h4>
                     <div className="bg-aurora-surface-variant rounded-xl p-4">
-                      <p className="text-sm text-aurora-text-secondary whitespace-pre-line leading-relaxed">{selectedBusiness.services}</p>
+                      <p className="text-sm text-aurora-text-secondary whitespace-pre-line leading-relaxed">{state.selectedBusiness.services}</p>
                     </div>
                   </div>
                 )}
 
-                {selectedBusiness.menu && (
+                {state.selectedBusiness.menu && (
                   <div>
                     <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">
-                      {selectedBusiness.category === 'Restaurant & Food' ? 'Menu' : 'Products'}
+                      {state.selectedBusiness.category === 'Restaurant & Food' ? 'Menu' : 'Products'}
                     </h4>
                     <div className="bg-aurora-surface-variant rounded-xl p-4">
-                      <p className="text-sm text-aurora-text-secondary whitespace-pre-line leading-relaxed">{selectedBusiness.menu}</p>
+                      <p className="text-sm text-aurora-text-secondary whitespace-pre-line leading-relaxed">{state.selectedBusiness.menu}</p>
                     </div>
                   </div>
                 )}
 
-                {!selectedBusiness.services && !selectedBusiness.menu && isOwnerOrAdmin(selectedBusiness) && (
+                {!state.selectedBusiness.services && !state.selectedBusiness.menu && isOwnerOrAdmin(selectedBusiness) && (
                   <div className="text-center py-6 bg-aurora-surface-variant rounded-xl">
                     <ShoppingBag className="w-6 h-6 text-aurora-text-muted mx-auto mb-2" />
                     <p className="text-sm text-aurora-text-muted mb-1">No services or menu listed yet</p>
@@ -1999,13 +1659,13 @@ export default function BusinessPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider">Reviews</h4>
-                      {businessReviews.length > 0 && (
-                        <p className="text-sm text-aurora-text mt-1">{businessReviews.length} review{businessReviews.length !== 1 ? 's' : ''}</p>
+                      {state.businessReviews.length > 0 && (
+                        <p className="text-sm text-aurora-text mt-1">{state.businessReviews.length} review{state.businessReviews.length !== 1 ? 's' : ''}</p>
                       )}
                     </div>
-                    {!showReviewForm && user && businessReviews.length > 0 && (
+                    {!showReviewForm && user && state.businessReviews.length > 0 && (
                       <button
-                        onClick={() => setShowReviewForm(true)}
+                        onClick={() => dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: true })}
                         className="px-3 py-1.5 bg-aurora-indigo text-white rounded-lg text-xs font-medium hover:bg-aurora-indigo/90 transition-colors flex items-center gap-1"
                       >
                         <Star className="w-3.5 h-3.5" />
@@ -2014,7 +1674,7 @@ export default function BusinessPage() {
                     )}
                   </div>
 
-                  {showReviewForm && (
+                  {state.showReviewForm && (
                     <div className="space-y-4 bg-aurora-surface-variant rounded-xl p-4 border border-aurora-indigo/20">
                       <h4 className="text-sm font-semibold text-aurora-text">Write a Review</h4>
                       <div>
@@ -2023,11 +1683,11 @@ export default function BusinessPage() {
                           {[1, 2, 3, 4, 5].map((rating) => (
                             <button
                               key={rating}
-                              onClick={() => setNewReview({ ...newReview, rating })}
+                              onClick={() => dispatch({ type: 'SET_NEW_REVIEW', payload: { ...state.newReview, rating } })}
                               className="transition-transform hover:scale-110"
                             >
                               <Star
-                                className={`w-6 h-6 ${rating <= newReview.rating ? 'fill-amber-400 text-amber-400' : 'text-aurora-border'}`}
+                                className={`w-6 h-6 ${rating <= state.newReview.rating ? 'fill-amber-400 text-amber-400' : 'text-aurora-border'}`}
                               />
                             </button>
                           ))}
@@ -2036,15 +1696,15 @@ export default function BusinessPage() {
                       <div>
                         <textarea
                           placeholder="Share your experience..."
-                          value={newReview.text}
-                          onChange={(e) => setNewReview({ ...newReview, text: e.target.value })}
+                          value={state.newReview.text}
+                          onChange={(e) => dispatch({ type: 'SET_NEW_REVIEW', payload: { ...state.newReview, text: e.target.value } })}
                           className="w-full px-3 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text placeholder:text-aurora-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo"
                           rows={3}
                         />
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => { setShowReviewForm(false); setNewReview({ rating: 5, text: '' }); }}
+                          onClick={() => { dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: false }); dispatch({ type: 'SET_NEW_REVIEW', payload: { rating: 5, text: '' } }); }}
                           className="flex-1 px-3 py-2.5 bg-aurora-surface text-aurora-text rounded-xl text-sm font-medium hover:bg-aurora-border/30 transition-colors"
                         >
                           Cancel
@@ -2059,9 +1719,9 @@ export default function BusinessPage() {
                     </div>
                   )}
 
-                  {businessReviews.length > 0 ? (
+                  {state.businessReviews.length > 0 ? (
                     <div className="space-y-3">
-                      {businessReviews.map((review) => (
+                      {state.businessReviews.map((review) => (
                         <div key={review.id} className="bg-aurora-surface-variant rounded-xl p-3.5">
                           <div className="flex items-start justify-between mb-1.5">
                             <div>
@@ -2080,7 +1740,7 @@ export default function BusinessPage() {
                         </div>
                       ))}
                     </div>
-                  ) : !showReviewForm ? (
+                  ) : !state.showReviewForm ? (
                     <div className="text-center py-8">
                       <div className="w-14 h-14 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center mx-auto mb-3">
                         <Star className="w-6 h-6 text-amber-500" />
@@ -2089,7 +1749,7 @@ export default function BusinessPage() {
                       <p className="text-xs text-aurora-text-muted mb-4">Be the first to share your experience</p>
                       {user && (
                         <button
-                          onClick={() => setShowReviewForm(true)}
+                          onClick={() => dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: true })}
                           className="px-4 py-2 bg-aurora-indigo text-white rounded-xl text-sm font-medium hover:bg-aurora-indigo/90 transition-colors"
                         >
                           Write a Review
@@ -2101,9 +1761,9 @@ export default function BusinessPage() {
                     </div>
                   ) : null}
 
-                  {businessReviews.length > 0 && !showReviewForm && user && (
+                  {state.businessReviews.length > 0 && !showReviewForm && user && (
                     <button
-                      onClick={() => setShowReviewForm(true)}
+                      onClick={() => dispatch({ type: 'SET_SHOW_REVIEW_FORM', payload: true })}
                       className="w-full px-4 py-2.5 bg-aurora-indigo/10 text-aurora-indigo rounded-xl text-sm font-medium hover:bg-aurora-indigo/20 transition-colors border border-aurora-indigo/30"
                     >
                       Add Your Review
@@ -2115,7 +1775,7 @@ export default function BusinessPage() {
             </div>
 
             {/* Action Buttons */}
-            {isOwnerOrAdmin(selectedBusiness) && (
+            {state.selectedBusiness && isOwnerOrAdmin(state.selectedBusiness) && (
               <div className="border-t border-aurora-border p-4 flex gap-3 bg-aurora-surface sm:rounded-b-2xl">
                 <button
                   onClick={handleStartEdit}
@@ -2124,7 +1784,7 @@ export default function BusinessPage() {
                   <Edit3 className="w-4 h-4" /> Edit Business
                 </button>
                 <button
-                  onClick={() => handleDeleteBusiness(selectedBusiness.id)}
+                  onClick={() => handleDeleteBusiness(state.selectedBusiness.id)}
                   className="px-4 py-2.5 bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl font-medium text-sm hover:bg-red-100 dark:hover:bg-red-500/15 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -2136,67 +1796,67 @@ export default function BusinessPage() {
       )}
 
       {/* ===== Edit Modal ===== */}
-      {isEditing && selectedBusiness && (
+      {state.isEditing && state.selectedBusiness && (
         <div className="fixed inset-0 bg-aurora-bg z-50 flex flex-col">
           <div className="flex-shrink-0 bg-aurora-surface border-b border-aurora-border p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => setIsEditing(false)} className="p-1 hover:bg-aurora-surface-variant rounded-lg transition-colors">
+              <button onClick={() => dispatch({ type: 'SET_IS_EDITING', payload: false })} className="p-1 hover:bg-aurora-surface-variant rounded-lg transition-colors">
                 <ArrowLeft className="w-5 h-5 text-aurora-text-secondary" />
               </button>
               <h2 className="text-lg font-bold text-aurora-text">Edit Business</h2>
             </div>
             <button
-              onClick={() => setIsEditing(false)}
+              onClick={() => dispatch({ type: 'SET_IS_EDITING', payload: false })}
               className="text-aurora-text-muted hover:text-aurora-text-secondary"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-4 max-w-lg mx-auto w-full">
-            <FormInput label="Business Name" required type="text" value={editData.name} onChange={(e: any) => setEditData({ ...editData, name: e.target.value })} />
+            <FormInput label="Business Name" required type="text" value={state.editData.name} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, name: e.target.value } })} />
             <div>
               <label className="block text-sm font-medium text-aurora-text mb-1.5">Category</label>
               <select
-                value={editData.category}
-                onChange={(e) => setEditData({ ...editData, category: e.target.value })}
+                value={state.editData.category}
+                onChange={(e) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, category: e.target.value } })}
                 className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo"
               >
                 {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </div>
-            <FormTextarea label="Description" value={editData.desc} onChange={(e: any) => setEditData({ ...editData, desc: e.target.value })} rows={3} />
+            <FormTextarea label="Description" value={state.editData.desc} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, desc: e.target.value } })} rows={3} />
             {photosEnabled && (
               <BusinessPhotoUploader
-                photos={editPhotos}
-                onPhotosChange={setEditPhotos}
-                onCoverChange={setEditCoverPhotoIndex}
-                coverIndex={editCoverPhotoIndex}
+                photos={state.editPhotos}
+                onPhotosChange={(photos) => dispatch({ type: 'SET_EDIT_PHOTOS', payload: photos })}
+                onCoverChange={(index) => dispatch({ type: 'SET_EDIT_COVER_INDEX', payload: index })}
+                coverIndex={state.editCoverPhotoIndex}
               />
             )}
-            <FormInput label="Location / Address" type="text" value={editData.location} onChange={(e: any) => setEditData({ ...editData, location: e.target.value })} />
-            <FormInput label="Phone" type="tel" value={editData.phone} onChange={(e: any) => setEditData({ ...editData, phone: e.target.value })} />
-            <FormInput label="Email" type="email" value={editData.email} onChange={(e: any) => setEditData({ ...editData, email: e.target.value })} />
-            <FormInput label="Website" type="url" value={editData.website} onChange={(e: any) => setEditData({ ...editData, website: e.target.value })} />
-            <FormTextarea label="Business Hours" value={editData.hours} onChange={(e: any) => setEditData({ ...editData, hours: e.target.value })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
-            <FormInput label="Year Established" type="number" value={editData.yearEstablished} onChange={(e: any) => setEditData({ ...editData, yearEstablished: parseInt(e.target.value) })} />
-            <FormInput label="Price Range" type="text" value={editData.priceRange} placeholder="$$-$$$" onChange={(e: any) => setEditData({ ...editData, priceRange: e.target.value })} />
-            <FormTextarea label="Services" value={editData.services} onChange={(e: any) => setEditData({ ...editData, services: e.target.value })} rows={3} placeholder="List your services..." />
-            <FormTextarea label={editData.category === 'Restaurant & Food' ? 'Menu' : 'Products / Merchandise'} value={editData.menu} onChange={(e: any) => setEditData({ ...editData, menu: e.target.value })} rows={4} placeholder="List your menu items or products..." />
+            <FormInput label="Location / Address" type="text" value={state.editData.location} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, location: e.target.value } })} />
+            <FormInput label="Phone" type="tel" value={state.editData.phone} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, phone: e.target.value } })} />
+            <FormInput label="Email" type="email" value={state.editData.email} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, email: e.target.value } })} />
+            <FormInput label="Website" type="url" value={state.editData.website} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, website: e.target.value } })} />
+            <FormTextarea label="Business Hours" value={state.editData.hours} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, hours: e.target.value } })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
+            <FormInput label="Year Established" type="number" value={state.editData.yearEstablished} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, yearEstablished: parseInt(e.target.value) } })} />
+            <FormInput label="Price Range" type="text" value={state.editData.priceRange} placeholder="$$-$$$" onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, priceRange: e.target.value } })} />
+            <FormTextarea label="Services" value={state.editData.services} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, services: e.target.value } })} rows={3} placeholder="List your services..." />
+            <FormTextarea label={state.editData.category === 'Restaurant & Food' ? 'Menu' : 'Products / Merchandise'} value={state.editData.menu} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...state.editData, menu: e.target.value } })} rows={4} placeholder="List your menu items or products..." />
           </div>
           <div className="sticky bottom-0 bg-aurora-surface border-t border-aurora-border p-4">
             <div className="flex gap-3 max-w-lg mx-auto">
               <button
-                onClick={() => setIsEditing(false)}
+                onClick={() => dispatch({ type: 'SET_IS_EDITING', payload: false })}
                 className="flex-1 bg-aurora-surface-variant text-aurora-text-secondary py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-border/30 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
-                disabled={saving}
+                disabled={state.saving}
                 className="flex-1 bg-aurora-indigo text-white py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-indigo/90 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
               >
-                {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
+                {state.saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Changes'}
               </button>
             </div>
           </div>
@@ -2216,61 +1876,61 @@ export default function BusinessPage() {
       )}
 
       {/* ===== Create Modal ===== */}
-      {showCreateModal && (
+      {state.showCreateModal && (
         <div className="fixed inset-0 bg-aurora-bg z-50 flex flex-col">
           <div className="flex-shrink-0 bg-aurora-surface border-b border-aurora-border p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => { setShowCreateModal(false); setFormPhotos([]); setCoverPhotoIndex(0); }} className="p-1 hover:bg-aurora-surface-variant rounded-lg transition-colors">
+              <button onClick={() => { dispatch({ type: 'CLOSE_CREATE_MODAL' }); dispatch({ type: 'SET_FORM_PHOTOS', payload: [] }); dispatch({ type: 'SET_COVER_PHOTO_INDEX', payload: 0 }); }} className="p-1 hover:bg-aurora-surface-variant rounded-lg transition-colors">
                 <ArrowLeft className="w-5 h-5 text-aurora-text-secondary" />
               </button>
               <h2 className="text-lg font-bold text-aurora-text">Add Business</h2>
             </div>
             <button
-              onClick={() => { setShowCreateModal(false); setFormPhotos([]); setCoverPhotoIndex(0); }}
+              onClick={() => { dispatch({ type: 'CLOSE_CREATE_MODAL' }); dispatch({ type: 'SET_FORM_PHOTOS', payload: [] }); dispatch({ type: 'SET_COVER_PHOTO_INDEX', payload: 0 }); }}
               className="text-aurora-text-muted hover:text-aurora-text-secondary"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-4 max-w-lg mx-auto w-full">
-            <FormInput label="Business Name" required error={formErrors.name} type="text" value={formData.name} onChange={(e: any) => { setFormData({ ...formData, name: e.target.value }); setFormErrors((prev) => ({ ...prev, name: '' })); }} placeholder="Enter business name" />
+            <FormInput label="Business Name" required error={state.formErrors.name} type="text" value={state.formData.name} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'name', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'name' }); }} placeholder="Enter business name" />
             <div>
               <label className="block text-sm font-medium text-aurora-text mb-1.5">Category <span className="text-red-500">*</span></label>
               <select
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                value={state.formData.category}
+                onChange={(e) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'category', value: e.target.value })}
                 className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo"
               >
                 {CATEGORIES.map((cat) => <option key={cat} value={cat}>{CATEGORY_EMOJI_MAP[cat]} {cat}</option>)}
               </select>
             </div>
-            <FormTextarea label="Description" value={formData.desc} onChange={(e: any) => setFormData({ ...formData, desc: e.target.value })} rows={3} placeholder="Tell customers about your business..." />
+            <FormTextarea label="Description" value={state.formData.desc} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'desc', value: e.target.value })} rows={3} placeholder="Tell customers about your business..." />
             {photosEnabled && (
               <BusinessPhotoUploader
-                photos={formPhotos}
-                onPhotosChange={setFormPhotos}
-                onCoverChange={setCoverPhotoIndex}
-                coverIndex={coverPhotoIndex}
+                photos={state.formPhotos}
+                onPhotosChange={(photos) => dispatch({ type: 'SET_FORM_PHOTOS', payload: photos })}
+                onCoverChange={(index) => dispatch({ type: 'SET_COVER_PHOTO_INDEX', payload: index })}
+                coverIndex={state.coverPhotoIndex}
               />
             )}
-            <FormInput label="Location / Address" required error={formErrors.location} type="text" value={formData.location} onChange={(e: any) => { setFormData({ ...formData, location: e.target.value }); setFormErrors((prev) => ({ ...prev, location: '' })); }} placeholder="123 Main St, City, State" />
-            <FormInput label="Phone" required error={formErrors.phone} type="tel" value={formData.phone} onChange={(e: any) => { setFormData({ ...formData, phone: e.target.value }); setFormErrors((prev) => ({ ...prev, phone: '' })); }} placeholder="(555) 123-4567" />
-            <FormInput label="Email" required error={formErrors.email} type="email" value={formData.email} onChange={(e: any) => { setFormData({ ...formData, email: e.target.value }); setFormErrors((prev) => ({ ...prev, email: '' })); }} placeholder="contact@business.com" />
-            <FormInput label="Website" error={formErrors.website} type="url" value={formData.website} onChange={(e: any) => { setFormData({ ...formData, website: e.target.value }); setFormErrors((prev) => ({ ...prev, website: '' })); }} placeholder="https://www.mybusiness.com" />
-            <FormTextarea label="Business Hours" value={formData.hours} onChange={(e: any) => setFormData({ ...formData, hours: e.target.value })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
-            <FormInput label="Year Established" type="number" value={formData.yearEstablished} onChange={(e: any) => setFormData({ ...formData, yearEstablished: parseInt(e.target.value) })} />
-            <FormInput label="Price Range" type="text" value={formData.priceRange} placeholder="$$-$$$" onChange={(e: any) => setFormData({ ...formData, priceRange: e.target.value })} />
-            <FormTextarea label="Services" value={formData.services} onChange={(e: any) => setFormData({ ...formData, services: e.target.value })} rows={3} placeholder="List your services..." />
-            <FormTextarea label={formData.category === 'Restaurant & Food' ? 'Menu' : 'Products / Merchandise'} value={formData.menu} onChange={(e: any) => setFormData({ ...formData, menu: e.target.value })} rows={4} placeholder="List your menu items or products..." />
+            <FormInput label="Location / Address" required error={state.formErrors.location} type="text" value={state.formData.location} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'location', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'location' }); }} placeholder="123 Main St, City, State" />
+            <FormInput label="Phone" required error={state.formErrors.phone} type="tel" value={state.formData.phone} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'phone', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'phone' }); }} placeholder="(555) 123-4567" />
+            <FormInput label="Email" required error={state.formErrors.email} type="email" value={state.formData.email} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'email', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'email' }); }} placeholder="contact@business.com" />
+            <FormInput label="Website" error={state.formErrors.website} type="url" value={state.formData.website} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'website', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'website' }); }} placeholder="https://www.mybusiness.com" />
+            <FormTextarea label="Business Hours" value={state.formData.hours} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'hours', value: e.target.value })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
+            <FormInput label="Year Established" type="number" value={state.formData.yearEstablished} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'yearEstablished', value: parseInt(e.target.value) })} />
+            <FormInput label="Price Range" type="text" value={state.formData.priceRange} placeholder="$$-$$$" onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'priceRange', value: e.target.value })} />
+            <FormTextarea label="Services" value={state.formData.services} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'services', value: e.target.value })} rows={3} placeholder="List your services..." />
+            <FormTextarea label={state.formData.category === 'Restaurant & Food' ? 'Menu' : 'Products / Merchandise'} value={state.formData.menu} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'menu', value: e.target.value })} rows={4} placeholder="List your menu items or products..." />
           </div>
           <div className="sticky bottom-0 bg-aurora-surface border-t border-aurora-border p-4">
             <div className="max-w-lg mx-auto">
               <button
                 onClick={handleAddBusiness}
-                disabled={saving}
+                disabled={state.saving}
                 className="w-full bg-aurora-indigo text-white py-3 rounded-xl font-semibold text-sm hover:bg-aurora-indigo/90 shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
               >
-                {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</> : <><Plus className="w-4 h-4" /> Add Business</>}
+                {state.saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</> : <><Plus className="w-4 h-4" /> Add Business</>}
               </button>
             </div>
           </div>
@@ -2278,10 +1938,10 @@ export default function BusinessPage() {
       )}
 
       {/* TIN Verification Modal */}
-      {showTinVerificationModal && (
+      {state.showTinVerificationModal && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowTinVerificationModal(false)}
+          onClick={() => dispatch({ type: 'SET_SHOW_TIN_MODAL', payload: false })}
         >
           <div
             className="bg-aurora-surface rounded-2xl shadow-2xl max-w-md w-full p-6 border border-aurora-border"
@@ -2298,13 +1958,13 @@ export default function BusinessPage() {
             </div>
             <div className="space-y-2.5">
               <button
-                onClick={() => { setShowTinVerificationModal(false); window.location.href = '/profile'; }}
+                onClick={() => { dispatch({ type: 'SET_SHOW_TIN_MODAL', payload: false }); window.location.href = '/profile'; }}
                 className="w-full bg-aurora-indigo text-white py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-indigo/90 transition-colors"
               >
                 Go to Profile
               </button>
               <button
-                onClick={() => setShowTinVerificationModal(false)}
+                onClick={() => dispatch({ type: 'SET_SHOW_TIN_MODAL', payload: false })}
                 className="w-full bg-aurora-surface-variant text-aurora-text-secondary py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-border/30 transition-colors"
               >
                 Cancel
@@ -2315,8 +1975,8 @@ export default function BusinessPage() {
       )}
 
       {/* Delete Business Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4" onClick={() => { setShowDeleteConfirm(false); setDeleteBusinessId(null); }}>
+      {state.showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4" onClick={() => { dispatch({ type: 'CLOSE_DELETE_CONFIRM' }); }}>
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-center">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -2328,17 +1988,17 @@ export default function BusinessPage() {
               </p>
               <div className="flex gap-3">
                 <button
-                  onClick={() => { setShowDeleteConfirm(false); setDeleteBusinessId(null); }}
+                  onClick={() => { dispatch({ type: 'CLOSE_DELETE_CONFIRM' }); }}
                   className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDeleteBusiness}
-                  disabled={saving}
+                  disabled={state.saving}
                   className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</> : 'Delete'}
+                  {state.saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</> : 'Delete'}
                 </button>
               </div>
             </div>
@@ -2349,20 +2009,20 @@ export default function BusinessPage() {
       {/* ═══════════════════════════════════════════════════════════════════
           SHARED THREE-DOT CONTEXT MENU (fixed-position, escapes all overflow)
           ═══════════════════════════════════════════════════════════════════ */}
-      {menuBusinessId && menuPosition && (() => {
-        const biz = businesses.find((b) => b.id === menuBusinessId) || selectedBusiness;
+      {state.menuBusinessId && state.menuPosition && (() => {
+        const biz = state.businesses.find((b) => b.id === menuBusinessId) || state.selectedBusiness;
         if (!biz) return null;
         return (
           <>
             <div className="fixed inset-0 z-[55]" onClick={closeMenu} />
             <div
               className="fixed bg-aurora-surface rounded-xl shadow-aurora-3 border border-aurora-border py-1.5 z-[56] min-w-[200px]"
-              style={{ top: menuPosition.top, right: menuPosition.right }}
+              style={{ top: state.menuPosition.top, right: state.menuPosition.right }}
             >
               {isOwnerOrAdmin(biz) && (
                 <>
                   <button
-                    onClick={(e) => { e.stopPropagation(); closeMenu(); if (!selectedBusiness) setSelectedBusiness(biz); setTimeout(() => handleStartEdit(), 50); }}
+                    onClick={(e) => { e.stopPropagation(); closeMenu(); if (!state.selectedBusiness) dispatch({ type: 'SELECT_BUSINESS', payload: biz }); setTimeout(() => handleStartEdit(), 50); }}
                     className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
                   >
                     <Edit3 size={16} /> Edit Business
@@ -2378,16 +2038,16 @@ export default function BusinessPage() {
               <button
                 onClick={(e) => { e.stopPropagation(); closeMenu(); openReportModal(biz.id); }}
                 className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-text-secondary hover:bg-aurora-surface-variant transition-colors"
-                disabled={reportedBusinesses.has(biz.id)}
+                disabled={state.reportedBusinesses.has(biz.id)}
               >
-                <Flag size={16} /> {reportedBusinesses.has(biz.id) ? 'Reported' : 'Report Business'}
+                <Flag size={16} /> {state.reportedBusinesses.has(biz.id) ? 'Reported' : 'Report Business'}
               </button>
               {biz.ownerId && biz.ownerId !== user?.uid && (
                 <button
                   onClick={(e) => { e.stopPropagation(); closeMenu(); openBlockConfirm(biz.ownerId!, biz.name); }}
                   className="w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm text-aurora-danger hover:bg-aurora-danger/10 transition-colors"
                 >
-                  <Ban size={16} /> {blockedUsers.has(biz.ownerId!) ? 'Blocked' : 'Block Owner'}
+                  <Ban size={16} /> {state.blockedUsers.has(biz.ownerId!) ? 'Blocked' : 'Block Owner'}
                 </button>
               )}
             </div>
@@ -2398,7 +2058,7 @@ export default function BusinessPage() {
       {/* ═══════════════════════════════════════════════════════════════════
           REPORT BUSINESS MODAL
           ═══════════════════════════════════════════════════════════════════ */}
-      {showReportModal && (
+      {state.showReportModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
           <div className="bg-aurora-surface rounded-2xl shadow-aurora-4 w-full max-w-md border border-aurora-border overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
             {/* Header */}
@@ -2411,7 +2071,7 @@ export default function BusinessPage() {
                   </h3>
                   <p className="text-sm text-aurora-text-muted mt-0.5">Select a category that best describes the issue</p>
                 </div>
-                <button onClick={() => setShowReportModal(false)} className="p-1.5 rounded-full hover:bg-aurora-surface-variant transition-colors">
+                <button onClick={() => dispatch({ type: 'CLOSE_REPORT' })} className="p-1.5 rounded-full hover:bg-aurora-surface-variant transition-colors">
                   <X size={18} className="text-aurora-text-muted" />
                 </button>
               </div>
@@ -2422,9 +2082,8 @@ export default function BusinessPage() {
               {REPORT_CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
-                  onClick={() => setReportReason(cat.id)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 ${
-                    reportReason === cat.id
+                  onClick={() => dispatch({ type: 'SET_REPORT_REASON', payload: cat.id })}
+                  className={`w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 ${state.reportReason === cat.id
                       ? 'border-red-400 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-300'
                       : 'border-aurora-border hover:border-aurora-border-glass hover:bg-aurora-surface-variant'
                   }`}
@@ -2432,12 +2091,12 @@ export default function BusinessPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-lg shrink-0">{cat.icon}</span>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${reportReason === cat.id ? 'text-red-700 dark:text-red-400' : 'text-aurora-text'}`}>
+                      <p className={`text-sm font-semibold ${state.reportReason === cat.id ? 'text-red-700 dark:text-red-400' : 'text-aurora-text'}`}>
                         {cat.label}
                       </p>
                       <p className="text-xs text-aurora-text-muted mt-0.5 leading-relaxed">{cat.description}</p>
                     </div>
-                    {reportReason === cat.id && (
+                    {state.reportReason === cat.id && (
                       <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center shrink-0">
                         <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                       </div>
@@ -2448,35 +2107,35 @@ export default function BusinessPage() {
             </div>
 
             {/* Optional Details */}
-            {reportReason && (
+            {state.reportReason && (
               <div className="px-5 py-3 border-t border-aurora-border/50">
                 <label className="text-xs font-semibold text-aurora-text-secondary uppercase tracking-wider">Additional Details (Optional)</label>
                 <textarea
-                  value={reportDetails}
-                  onChange={(e) => setReportDetails(e.target.value)}
+                  value={state.reportDetails}
+                  onChange={(e) => dispatch({ type: 'SET_REPORT_DETAILS', payload: e.target.value })}
                   placeholder="Provide more context about why you're reporting this business..."
                   maxLength={500}
                   rows={3}
                   className="mt-1.5 w-full px-3 py-2.5 bg-aurora-surface-variant border border-aurora-border rounded-xl text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-red-300/50 resize-none"
                 />
-                <p className="text-[10px] text-aurora-text-muted text-right mt-1">{reportDetails.length}/500</p>
+                <p className="text-[10px] text-aurora-text-muted text-right mt-1">{state.reportDetails.length}/500</p>
               </div>
             )}
 
             {/* Actions */}
             <div className="px-5 py-4 border-t border-aurora-border flex gap-3">
               <button
-                onClick={() => { setShowReportModal(false); setReportReason(''); setReportDetails(''); }}
+                onClick={() => { dispatch({ type: 'CLOSE_REPORT' }); }}
                 className="flex-1 py-2.5 rounded-xl border border-aurora-border text-aurora-text-secondary font-medium hover:bg-aurora-surface-variant transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmitReport}
-                disabled={!reportReason || reportSubmitting}
+                disabled={!state.reportReason || state.reportSubmitting}
                 className="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 disabled:opacity-50 transition-colors btn-press flex items-center justify-center gap-2"
               >
-                {reportSubmitting ? (
+                {state.reportSubmitting ? (
                   <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Submitting...</>
                 ) : (
                   <><Flag size={14} /> Submit Report</>
@@ -2490,19 +2149,19 @@ export default function BusinessPage() {
       {/* ═══════════════════════════════════════════════════════════════════
           BLOCK USER CONFIRMATION MODAL
           ═══════════════════════════════════════════════════════════════════ */}
-      {showBlockConfirm && blockTargetUser && (
+      {state.showBlockConfirm && state.blockTargetUser && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
           <div className="bg-aurora-surface rounded-2xl shadow-aurora-4 border border-aurora-border max-w-sm w-full p-6 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
               <Ban size={24} className="text-red-500" />
             </div>
-            <h3 className="text-lg font-bold text-aurora-text mb-2">Block {blockTargetUser.name}?</h3>
+            <h3 className="text-lg font-bold text-aurora-text mb-2">Block {state.blockTargetUser.name}?</h3>
             <p className="text-sm text-aurora-text-muted mb-6">
               They won't be notified. Their businesses will be hidden from your listings. You can unblock them anytime from your Profile settings.
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}
+                onClick={() => { dispatch({ type: 'CLOSE_BLOCK_CONFIRM' }); }}
                 className="flex-1 py-2.5 rounded-xl border border-aurora-border text-aurora-text-secondary font-medium hover:bg-aurora-surface-variant transition-colors"
               >
                 Cancel
@@ -2519,9 +2178,9 @@ export default function BusinessPage() {
       )}
 
       {/* Toast Notification */}
-      {toastMessage && (
+      {state.toastMessage && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[80] text-sm font-medium max-w-md text-center">
-          {toastMessage}
+          {state.toastMessage}
         </div>
       )}
     </div>
