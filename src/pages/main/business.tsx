@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, Timestamp, query, where, setDoc, getDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import {
   Search, MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight,
   X, Plus, Heart, Sparkles, Store, ShoppingBag, Filter, ArrowLeft,
@@ -626,12 +627,9 @@ export default function BusinessPage() {
     }
   }, [toastMessage]);
 
-  // Load favorites from localStorage
+  // Load favorites from localStorage cache
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('business_favorites');
-      if (saved) setFavorites(new Set(JSON.parse(saved)));
-    } catch { /* ignore */ }
+    setFavorites(new Set(getLocalSavedIds('businesses')));
   }, []);
 
   // Deep-link: open specific business from profile activity
@@ -649,13 +647,8 @@ export default function BusinessPage() {
 
   const toggleFavorite = (businessId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(businessId)) next.delete(businessId);
-      else next.add(businessId);
-      try { localStorage.setItem('business_favorites', JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
-    });
+    if (!user?.uid) return;
+    toggleSavedItem(user.uid, 'businesses', businessId).then(({ ids }) => setFavorites(ids));
   };
 
   // ── Report / Block / Mute handlers ──────────────────────────────────

@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import { useCulturalTheme } from '@/contexts/CulturalThemeContext';
 import { CulturalPatternOverlay } from '@/components/CulturalPatterns';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
@@ -450,17 +451,9 @@ export default function FeedPage() {
   // Close heritage dropdown on outside click
   // ClickOutsideOverlay rendered in JSX instead of useClickOutside hook
 
-  // Load saved posts from localStorage
+  // Load saved posts from localStorage cache
   useEffect(() => {
-    const saved = localStorage.getItem('sangam_saved_posts');
-    if (saved) {
-      try {
-        const postIds = JSON.parse(saved);
-        setSavedPosts(new Set(postIds));
-      } catch (err) {
-        console.error('Failed to load saved posts:', err);
-      }
-    }
+    setSavedPosts(new Set(getLocalSavedIds('posts')));
   }, []);
 
   // Listen for posts with pagination
@@ -825,16 +818,10 @@ export default function FeedPage() {
   };
 
   const handleToggleBookmark = (postId: string) => {
-    const newSavedPosts = new Set(savedPosts);
-    if (newSavedPosts.has(postId)) {
-      newSavedPosts.delete(postId);
-      setToastMessage('Removed from saved');
-    } else {
-      newSavedPosts.add(postId);
-      setToastMessage('Post saved');
-    }
-    setSavedPosts(newSavedPosts);
-    localStorage.setItem('sangam_saved_posts', JSON.stringify(Array.from(newSavedPosts)));
+    if (!user?.uid) return;
+    const wasSaved = savedPosts.has(postId);
+    toggleSavedItem(user.uid, 'posts', postId).then(({ ids }) => setSavedPosts(ids));
+    setToastMessage(wasSaved ? 'Removed from saved' : 'Post saved');
   };
 
   // ─── Comments ──────────────────────────────────────────────────────

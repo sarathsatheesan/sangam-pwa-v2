@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import {
   Search, X, Heart, MapPin, BedDouble, Bath, Ruler, Home,
   Building2, Users, Key, Plus, ChevronLeft, ChevronRight,
@@ -492,10 +493,7 @@ export default function HousingPage() {
     try { return JSON.parse(localStorage.getItem('recentHousing') || '[]'); }
     catch { return []; }
   });
-  const [savedListings, setSavedListings] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('savedHousing') || '[]')); }
-    catch { return new Set(); }
-  });
+  const [savedListings, setSavedListings] = useState<Set<string>>(() => new Set(getLocalSavedIds('housing')));
   const [detailTab, setDetailTab] = useState<'overview' | 'details' | 'map' | 'calculator' | 'comments'>('overview');
   const [photoGalleryOpen, setPhotoGalleryOpen] = useState(false);
   const [galleryIdx, setGalleryIdx] = useState(0);
@@ -573,10 +571,7 @@ export default function HousingPage() {
     }
   }, [toastMessage]);
 
-  /* saved listings persistence */
-  useEffect(() => {
-    localStorage.setItem('savedHousing', JSON.stringify([...savedListings]));
-  }, [savedListings]);
+  /* saved listings persistence — now handled by Firestore service in toggleSave */
 
   useEffect(() => {
     localStorage.setItem('recentHousing', JSON.stringify(recentlyViewed));
@@ -610,37 +605,18 @@ export default function HousingPage() {
 
   const toggleSave = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setSavedListings((prev) => {
-      const next = new Set(prev);
-      const isSaving = !next.has(id);
-      if (isSaving) {
-        next.add(id);
-        // Increment saveCount in Firestore
-        try {
-          updateDoc(doc(db, 'listings', id), {
-            saveCount: increment(1),
-          });
-        } catch (error) {
-          console.error('Error updating save count:', error);
-        }
-        // Update local state immediately
-        setListings((prev) => prev.map((l) => l.id === id ? { ...l, saveCount: (l.saveCount || 0) + 1 } : l));
-      } else {
-        next.delete(id);
-        // Decrement saveCount in Firestore
-        try {
-          updateDoc(doc(db, 'listings', id), {
-            saveCount: increment(-1),
-          });
-        } catch (error) {
-          console.error('Error updating save count:', error);
-        }
-        // Update local state immediately
-        setListings((prev) => prev.map((l) => l.id === id ? { ...l, saveCount: Math.max(0, (l.saveCount || 0) - 1) } : l));
-      }
-      return next;
-    });
-  }, []);
+    if (!user?.uid) return;
+    const isSaving = !savedListings.has(id);
+    // Optimistic UI update for saveCount
+    if (isSaving) {
+      try { updateDoc(doc(db, 'listings', id), { saveCount: increment(1) }); } catch {}
+      setListings((prev) => prev.map((l) => l.id === id ? { ...l, saveCount: (l.saveCount || 0) + 1 } : l));
+    } else {
+      try { updateDoc(doc(db, 'listings', id), { saveCount: increment(-1) }); } catch {}
+      setListings((prev) => prev.map((l) => l.id === id ? { ...l, saveCount: Math.max(0, (l.saveCount || 0) - 1) } : l));
+    }
+    toggleSavedItem(user.uid, 'housing', id).then(({ ids }) => setSavedListings(ids));
+  }, [user?.uid, savedListings]);
 
   /* fetch */
   const fetchListings = async () => {

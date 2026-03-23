@@ -8,6 +8,7 @@ import { db, auth } from '@/services/firebase';
 import { doc, updateDoc, getDoc, arrayRemove, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { downloadMyData, deleteMyData } from '@/services/dataPrivacy';
+import { pullSavedItems } from '@/services/savedItems';
 import { AVATAR_OPTIONS, BUSINESS_TYPES } from '@/constants/config';
 import { compressProfileImage } from '@/utils/profileImage';
 import CountryEthnicitySelector from '@/components/CountryEthnicitySelector';
@@ -531,10 +532,14 @@ export default function ProfilePage() {
   }, [activeTab]);
 
   const fetchSavedContent = async () => {
+    if (!user?.uid) return;
     setSavedLoading(true);
     const items: SavedItem[] = [];
 
     try {
+      // Pull saved IDs from Firestore (source of truth) and hydrate localStorage
+      const saved = await pullSavedItems(user.uid);
+
       // Helper to batch-fetch docs by IDs (Firestore 'in' supports max 30)
       const fetchByIds = async (collectionName: string, ids: string[]) => {
         if (ids.length === 0) return [] as any[];
@@ -556,9 +561,8 @@ export default function ProfilePage() {
       };
 
       // 1. Saved Feed Posts
-      const savedPostIds: string[] = JSON.parse(localStorage.getItem('sangam_saved_posts') || '[]');
-      if (savedPostIds.length > 0) {
-        const posts = await fetchByIds('posts', savedPostIds);
+      if (saved.posts.length > 0) {
+        const posts = await fetchByIds('posts', saved.posts);
         posts.forEach((p) => {
           items.push({
             id: p.id, category: 'post',
@@ -571,9 +575,8 @@ export default function ProfilePage() {
       }
 
       // 2. Favorited Businesses
-      const favBusinessIds: string[] = JSON.parse(localStorage.getItem('business_favorites') || '[]');
-      if (favBusinessIds.length > 0) {
-        const businesses = await fetchByIds('businesses', favBusinessIds);
+      if (saved.businesses.length > 0) {
+        const businesses = await fetchByIds('businesses', saved.businesses);
         businesses.forEach((b) => {
           items.push({
             id: b.id, category: 'business',
@@ -586,9 +589,8 @@ export default function ProfilePage() {
       }
 
       // 3. Saved Housing Listings
-      const savedHousingIds: string[] = JSON.parse(localStorage.getItem('savedHousing') || '[]');
-      if (savedHousingIds.length > 0) {
-        const listings = await fetchByIds('listings', savedHousingIds);
+      if (saved.housing.length > 0) {
+        const listings = await fetchByIds('listings', saved.housing);
         listings.forEach((l) => {
           items.push({
             id: l.id, category: 'housing',
@@ -601,9 +603,8 @@ export default function ProfilePage() {
       }
 
       // 4. Saved Forum Threads
-      const savedForumIds: string[] = JSON.parse(localStorage.getItem('savedForumThreads') || '[]');
-      if (savedForumIds.length > 0) {
-        const threads = await fetchByIds('forumThreads', savedForumIds);
+      if (saved.forumThreads.length > 0) {
+        const threads = await fetchByIds('forumThreads', saved.forumThreads);
         threads.forEach((t) => {
           items.push({
             id: t.id, category: 'forum',
@@ -616,9 +617,8 @@ export default function ProfilePage() {
       }
 
       // 5. Saved Events
-      const savedEventIds: string[] = JSON.parse(localStorage.getItem('saved_events') || '[]');
-      if (savedEventIds.length > 0) {
-        const events = await fetchByIds('events', savedEventIds);
+      if (saved.events.length > 0) {
+        const events = await fetchByIds('events', saved.events);
         events.forEach((ev) => {
           items.push({
             id: ev.id, category: 'event',

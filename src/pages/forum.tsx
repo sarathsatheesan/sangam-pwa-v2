@@ -22,6 +22,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import { FORUM_TOPICS, HERITAGE_OPTIONS, REPORT_REASONS } from '@/constants/config';
 import type { ForumTopic } from '@/constants/config';
 import { moderateContent, smartFilter } from '@/utils/contentModeration';
@@ -431,26 +432,15 @@ export default function ForumScreen() {
   const [contentWarningCallback, setContentWarningCallback] = useState<(() => Promise<void>) | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [savedThreads, setSavedThreads] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('savedForumThreads') || '[]')); }
-    catch { return new Set(); }
-  });
-
-  /* saved persistence */
-  useEffect(() => {
-    localStorage.setItem('savedForumThreads', JSON.stringify([...savedThreads]));
-  }, [savedThreads]);
+  const [savedThreads, setSavedThreads] = useState<Set<string>>(() => new Set(getLocalSavedIds('forumThreads')));
 
   // useClickOutside hook replaced with ClickOutsideOverlay component in JSX
 
   const toggleSaveThread = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setSavedThreads((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
+    if (!user?.uid) return;
+    toggleSavedItem(user.uid, 'forumThreads', id).then(({ ids }) => setSavedThreads(ids));
+  }, [user?.uid]);
 
   /* ─── data loaders ─── */
   const loadTopics = useCallback(async () => {

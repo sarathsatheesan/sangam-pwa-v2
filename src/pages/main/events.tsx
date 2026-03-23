@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
+import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import {
   Search, MapPin, Clock, Calendar, CalendarDays, Users, UserCheck,
   X, Plus, Heart, Sparkles, Ticket, ChevronRight, ArrowLeft,
@@ -679,23 +680,15 @@ export default function EventsPage() {
 
   // Click outside handling is now managed by ClickOutsideOverlay component
 
-  // Load saved events from localStorage
+  // Load saved events from localStorage cache
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('saved_events');
-      if (saved) setSavedEvents(new Set(JSON.parse(saved)));
-    } catch { /* ignore */ }
+    setSavedEvents(new Set(getLocalSavedIds('events')));
   }, []);
 
   const toggleSaved = (eventId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSavedEvents((prev) => {
-      const next = new Set(prev);
-      if (next.has(eventId)) next.delete(eventId);
-      else next.add(eventId);
-      try { localStorage.setItem('saved_events', JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
-    });
+    if (!user?.uid) return;
+    toggleSavedItem(user.uid, 'events', eventId).then(({ ids }) => setSavedEvents(ids));
   };
 
   const fetchEvents = async () => {
