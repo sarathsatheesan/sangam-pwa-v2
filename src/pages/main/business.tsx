@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, Timestamp, query, where, setDoc, getDoc, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, Timestamp, query, where, setDoc, getDoc, serverTimestamp, arrayUnion, limit, orderBy, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
@@ -232,17 +232,19 @@ const StarRating = ({ rating, reviews, size = 'sm' }: { rating: number; reviews:
 // FORM COMPONENTS (defined outside to prevent re-mount on every keystroke)
 // ═════════════════════════════════════════════════════════════════════════════════
 
-const FormInput = ({ label, required, ...props }: any) => (
+const FormInput = ({ label, required, error, ...props }: any) => (
   <div>
     <label className="block text-sm font-medium text-aurora-text mb-1.5">
       {label} {required && <span className="text-red-500">*</span>}
     </label>
     <input
       {...props}
-      className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl
+      className={`w-full px-4 py-2.5 bg-aurora-surface border rounded-xl
                  text-sm text-aurora-text placeholder:text-aurora-text-muted
-                 focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo transition-all"
+                 focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo transition-all
+                 ${error ? 'border-red-400 ring-1 ring-red-400/30' : 'border-aurora-border'}`}
     />
+    {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
   </div>
 );
 
@@ -298,35 +300,67 @@ const BusinessPhotoUploader: React.FC<{
 }> = ({ photos, onPhotosChange, onCoverChange, coverIndex }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
+    setPhotoError(null);
     const remaining = 5 - photos.length;
     const toProcess = Array.from(files).slice(0, remaining);
+
+    // Validate file sizes
+    for (const file of toProcess) {
+      if (file.size > MAX_FILE_SIZE) {
+        setPhotoError(`"${file.name}" exceeds the 5MB size limit. Please choose a smaller file.`);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+    }
+
+    setPhotoUploading(true);
     const newPhotos = [...photos];
+    let failCount = 0;
     for (const file of toProcess) {
       try {
         const compressed = await compressImage(file);
         newPhotos.push(compressed);
       } catch (err) {
         console.error('Error compressing image:', err);
+        failCount++;
       }
+    }
+    if (failCount > 0) {
+      setPhotoError(`${failCount} photo(s) failed to upload. Please try again.`);
     }
     onPhotosChange(newPhotos);
     if (fileInputRef.current) fileInputRef.current.value = '';
+    setPhotoUploading(false);
   };
 
   return (
     <div>
       <h3 className="text-sm font-semibold text-aurora-text mb-2">Photos (max 5)</h3>
+      {photoError && (
+        <div className="mb-2 text-xs text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">
+          {photoError}
+        </div>
+      )}
       {photos.length < 5 && (
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full border-2 border-dashed border-aurora-border rounded-xl p-4 flex flex-col items-center gap-2 text-aurora-text-muted hover:border-aurora-indigo hover:text-aurora-indigo transition-colors"
+          onClick={() => !photoUploading && fileInputRef.current?.click()}
+          disabled={photoUploading}
+          className={`w-full border-2 border-dashed border-aurora-border rounded-xl p-4 flex flex-col items-center gap-2 text-aurora-text-muted hover:border-aurora-indigo hover:text-aurora-indigo transition-colors ${photoUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          <Upload className="w-6 h-6" />
-          <span className="text-sm">Click to upload photos</span>
+          {photoUploading ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : (
+            <Upload className="w-6 h-6" />
+          )}
+          <span className="text-sm">{photoUploading ? 'Uploading...' : 'Click to upload photos'}</span>
           <span className="text-xs text-aurora-text-muted">PNG, JPG up to 5MB each</span>
         </button>
       )}
@@ -508,9 +542,47 @@ export default function BusinessPage() {
     specialtyTags: [] as string[],
   });
 
-  const fetchBusinesses = async () => {
+  // ── Form validation errors ──
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // ── Pagination state ──
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const PAGE_SIZE = 20;
+
+  // ── Debounced search ──
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [searchQuery]);
+
+  const fetchBusinesses = async (isLoadMore = false) => {
     try {
-      const snapshot = await getDocs(collection(db, 'businesses'));
+      if (isLoadMore) setLoadingMore(true); else setLoading(true);
+
+      let q = query(
+        collection(db, 'businesses'),
+        orderBy('createdAt', 'desc'),
+        limit(PAGE_SIZE),
+      );
+      if (isLoadMore && lastDoc) {
+        q = query(
+          collection(db, 'businesses'),
+          orderBy('createdAt', 'desc'),
+          startAfter(lastDoc),
+          limit(PAGE_SIZE),
+        );
+      }
+
+      const snapshot = await getDocs(q);
       const data: Business[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
@@ -549,11 +621,26 @@ export default function BusinessPage() {
           hiddenReason: d.hiddenReason || '',
         });
       });
-      setBusinesses(data);
+
+      // Track pagination cursor
+      if (snapshot.docs.length < PAGE_SIZE) {
+        setHasMore(false);
+      }
+      if (snapshot.docs.length > 0) {
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+      }
+
+      if (isLoadMore) {
+        setBusinesses((prev) => [...prev, ...data]);
+      } else {
+        setBusinesses(data);
+      }
     } catch (error) {
       console.error('Error fetching businesses:', error);
+      setToastMessage('Failed to load businesses. Please try again.');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -582,12 +669,28 @@ export default function BusinessPage() {
       setBusinessReviews(data);
     } catch (error) {
       console.error('Error fetching reviews:', error);
+      setToastMessage('Failed to load reviews.');
     }
   };
 
   useEffect(() => {
     fetchBusinesses();
   }, []);
+
+  // ── Infinite scroll observer ──
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          fetchBusinesses(true);
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, lastDoc]);
 
   // Load user safety data (muted businesses, blocked users)
   useEffect(() => {
@@ -766,10 +869,10 @@ export default function BusinessPage() {
       setShowReportModal(false);
       setReportReason('');
       setReportDetails('');
-      alert('Report submitted. The business has been hidden from your view. Thank you for helping keep the community safe.');
+      setToastMessage('Report submitted. The business has been hidden from your view. Thank you for helping keep the community safe.');
     } catch (error) {
       console.error('Error submitting report:', error);
-      alert('Failed to submit report.');
+      setToastMessage('Failed to submit report. Please try again.');
     } finally {
       setReportSubmitting(false);
     }
@@ -788,7 +891,7 @@ export default function BusinessPage() {
       setTimeout(() => setToastMessage(null), 4000);
     } catch (error) {
       console.error('Error blocking user:', error);
-      alert('Failed to block user. Please try again.');
+      setToastMessage('Failed to block user. Please try again.');
     }
   };
 
@@ -815,13 +918,13 @@ export default function BusinessPage() {
         return b.heritage ? selectedHeritage.includes(b.heritage) : false;
       });
     }
-    if (searchQuery.trim()) {
+    if (debouncedSearchQuery.trim()) {
       filtered = filtered.filter(
         (b) =>
-          fuzzyMatch(b.name, searchQuery) ||
-          fuzzyMatch(b.category, searchQuery) ||
-          fuzzyMatch(b.location, searchQuery) ||
-          fuzzyMatch(b.desc, searchQuery)
+          fuzzyMatch(b.name, debouncedSearchQuery) ||
+          fuzzyMatch(b.category, debouncedSearchQuery) ||
+          fuzzyMatch(b.location, debouncedSearchQuery) ||
+          fuzzyMatch(b.desc, debouncedSearchQuery)
       );
     }
 
@@ -842,7 +945,7 @@ export default function BusinessPage() {
       });
     }
     return filtered;
-  }, [businesses, selectedCategory, selectedHeritage, searchQuery, activeCollection, favorites, mutedBusinesses, blockedUsers]);
+  }, [businesses, selectedCategory, selectedHeritage, debouncedSearchQuery, activeCollection, favorites, mutedBusinesses, blockedUsers]);
 
   const featuredBusinesses = useMemo(() => {
     let featured = businesses.filter((b) => b.promoted);
@@ -878,10 +981,30 @@ export default function BusinessPage() {
   };
 
   const handleAddBusiness = async () => {
-    if (!formData.name.trim() || !formData.category || !formData.location.trim() || !formData.phone.trim() || !formData.email.trim()) {
-      setToastMessage('Please fill in all required fields: Business Name, Category, Location, Phone, and Email');
+    // ── Field-level validation ──
+    const errors: Record<string, string> = {};
+    if (!formData.name.trim()) errors.name = 'Business name is required';
+    if (!formData.category) errors.category = 'Category is required';
+    if (!formData.location.trim()) errors.location = 'Location is required';
+    if (!formData.phone.trim()) {
+      errors.phone = 'Phone number is required';
+    } else if (!/^[\d\s\-+()]{7,20}$/.test(formData.phone.trim())) {
+      errors.phone = 'Please enter a valid phone number';
+    }
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (formData.website.trim() && !/^https?:\/\/.+\..+/.test(formData.website.trim())) {
+      errors.website = 'Please enter a valid URL (e.g., https://example.com)';
+    }
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setToastMessage('Please fix the errors in the form');
       return;
     }
+    setSaving(true);
     try {
       await addDoc(collection(db, 'businesses'), {
         name: formData.name,
@@ -934,10 +1057,16 @@ export default function BusinessPage() {
         specialtyTags: [],
       });
       setShowCreateModal(false);
+      setFormErrors({});
+      // Reset pagination and refetch from start
+      setLastDoc(null);
+      setHasMore(true);
       await fetchBusinesses();
     } catch (error) {
       console.error('Error adding business:', error);
       setToastMessage('Failed to add business. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -948,14 +1077,17 @@ export default function BusinessPage() {
 
   const confirmDeleteBusiness = async () => {
     if (!deleteBusinessId) return;
+    setSaving(true);
     try {
       await deleteDoc(doc(db, 'businesses', deleteBusinessId));
       setBusinesses(businesses.filter((b) => b.id !== deleteBusinessId));
       setSelectedBusiness(null);
+      setToastMessage('Business deleted successfully.');
     } catch (error) {
       console.error('Error deleting business:', error);
       setToastMessage('Failed to delete business. Please try again.');
     } finally {
+      setSaving(false);
       setShowDeleteConfirm(false);
       setDeleteBusinessId(null);
     }
@@ -1045,18 +1177,34 @@ export default function BusinessPage() {
         text: newReview.text,
         createdAt: Timestamp.now(),
       });
+      // Optimistic update: add review to local state immediately
+      const optimisticReview: BusinessReview = {
+        id: 'temp-' + Date.now(),
+        businessId: selectedBusiness.id,
+        userId: user.uid,
+        userName: userProfile?.name || 'Anonymous',
+        rating: newReview.rating,
+        text: newReview.text,
+        createdAt: Timestamp.now(),
+      };
+      const updatedReviews = [optimisticReview, ...businessReviews];
+      setBusinessReviews(updatedReviews);
+
       // Recalculate average rating
-      const allReviews = [...businessReviews, { ...newReview, id: 'temp' }];
-      const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+      const avgRating = updatedReviews.reduce((sum, r) => sum + r.rating, 0) / updatedReviews.length;
       const ref = doc(db, 'businesses', selectedBusiness.id);
       await updateDoc(ref, {
-        rating: avgRating,
+        rating: parseFloat(avgRating.toFixed(1)),
         reviews: selectedBusiness.reviews + 1,
       });
+
+      // Update local business state (avoid full refetch)
+      const updatedBusiness = { ...selectedBusiness, rating: parseFloat(avgRating.toFixed(1)), reviews: selectedBusiness.reviews + 1 };
+      setSelectedBusiness(updatedBusiness);
+      setBusinesses((prev) => prev.map((b) => b.id === updatedBusiness.id ? updatedBusiness : b));
+
       setNewReview({ rating: 5, text: '' });
       setShowReviewForm(false);
-      await fetchReviews(selectedBusiness.id);
-      await fetchBusinesses();
     } catch (error) {
       console.error('Error adding review:', error);
       setToastMessage('Failed to add review. Please try again.');
@@ -1275,7 +1423,7 @@ export default function BusinessPage() {
                         </div>
                         <button
                           onClick={(e) => toggleFavorite(business.id, e)}
-                          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center
+                          className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center
                                      hover:bg-white transition-colors shadow-sm"
                         >
                           <Heart className={`w-4 h-4 ${favorites.has(business.id) ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
@@ -1375,7 +1523,7 @@ export default function BusinessPage() {
                         <div className="absolute top-3 right-3 flex items-center gap-1.5">
                           <button
                             onClick={(e) => toggleFavorite(business.id, e)}
-                            className="w-8 h-8 rounded-full bg-white/90 dark:bg-aurora-surface/90
+                            className="w-10 h-10 rounded-full bg-white/90 dark:bg-aurora-surface/90
                                        flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
                                        transition-colors shadow-sm"
                           >
@@ -1386,7 +1534,7 @@ export default function BusinessPage() {
                           {user && (
                             <button
                               onClick={(e) => openMenu(business.id, e)}
-                              className="w-8 h-8 rounded-full bg-white/90 dark:bg-aurora-surface/90
+                              className="w-10 h-10 rounded-full bg-white/90 dark:bg-aurora-surface/90
                                          flex items-center justify-center hover:bg-white dark:hover:bg-aurora-surface
                                          transition-colors shadow-sm"
                             >
@@ -1461,6 +1609,19 @@ export default function BusinessPage() {
                 })}
               </div>
             )}
+
+            {/* Infinite scroll sentinel */}
+            <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
+              {loadingMore && (
+                <div className="flex items-center gap-2 text-aurora-text-muted text-sm py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading more businesses...
+                </div>
+              )}
+              {!hasMore && businesses.length > PAGE_SIZE && (
+                <p className="text-xs text-aurora-text-muted py-4">You've reached the end</p>
+              )}
+            </div>
           </div>
         </>
       )}
@@ -1574,21 +1735,21 @@ export default function BusinessPage() {
             {/* Modal action buttons — positioned outside hero to avoid overflow-hidden clipping */}
             <button
               onClick={() => setSelectedBusiness(null)}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors z-[5]"
+              className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors z-[5]"
             >
               <X className="w-5 h-5" />
             </button>
             {user && (
               <button
                 onClick={(e) => openMenu(selectedBusiness.id, e)}
-                className="absolute top-3 right-14 z-[5] w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
+                className="absolute top-3 right-14 z-[5] w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center text-white transition-colors"
               >
                 <MoreHorizontal className="w-4 h-4" />
               </button>
             )}
             <button
               onClick={(e) => toggleFavorite(selectedBusiness.id, e)}
-              className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-8 h-8 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors z-[5]`}
+              className={`absolute top-3 ${user ? 'right-24' : 'right-14'} w-10 h-10 rounded-full bg-white/20 backdrop-blur hover:bg-white/30 flex items-center justify-center transition-colors z-[5]`}
             >
               <Heart className={`w-4 h-4 ${favorites.has(selectedBusiness.id) ? 'fill-red-400 text-red-400' : 'text-white'}`} />
             </button>
@@ -2072,7 +2233,7 @@ export default function BusinessPage() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-4 max-w-lg mx-auto w-full">
-            <FormInput label="Business Name" required type="text" value={formData.name} onChange={(e: any) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter business name" />
+            <FormInput label="Business Name" required error={formErrors.name} type="text" value={formData.name} onChange={(e: any) => { setFormData({ ...formData, name: e.target.value }); setFormErrors((prev) => ({ ...prev, name: '' })); }} placeholder="Enter business name" />
             <div>
               <label className="block text-sm font-medium text-aurora-text mb-1.5">Category <span className="text-red-500">*</span></label>
               <select
@@ -2092,10 +2253,10 @@ export default function BusinessPage() {
                 coverIndex={coverPhotoIndex}
               />
             )}
-            <FormInput label="Location / Address" required type="text" value={formData.location} onChange={(e: any) => setFormData({ ...formData, location: e.target.value })} placeholder="123 Main St, City, State" />
-            <FormInput label="Phone" required type="tel" value={formData.phone} onChange={(e: any) => setFormData({ ...formData, phone: e.target.value })} placeholder="(555) 123-4567" />
-            <FormInput label="Email" required type="email" value={formData.email} onChange={(e: any) => setFormData({ ...formData, email: e.target.value })} placeholder="contact@business.com" />
-            <FormInput label="Website" type="url" value={formData.website} onChange={(e: any) => setFormData({ ...formData, website: e.target.value })} placeholder="https://www.mybusiness.com" />
+            <FormInput label="Location / Address" required error={formErrors.location} type="text" value={formData.location} onChange={(e: any) => { setFormData({ ...formData, location: e.target.value }); setFormErrors((prev) => ({ ...prev, location: '' })); }} placeholder="123 Main St, City, State" />
+            <FormInput label="Phone" required error={formErrors.phone} type="tel" value={formData.phone} onChange={(e: any) => { setFormData({ ...formData, phone: e.target.value }); setFormErrors((prev) => ({ ...prev, phone: '' })); }} placeholder="(555) 123-4567" />
+            <FormInput label="Email" required error={formErrors.email} type="email" value={formData.email} onChange={(e: any) => { setFormData({ ...formData, email: e.target.value }); setFormErrors((prev) => ({ ...prev, email: '' })); }} placeholder="contact@business.com" />
+            <FormInput label="Website" error={formErrors.website} type="url" value={formData.website} onChange={(e: any) => { setFormData({ ...formData, website: e.target.value }); setFormErrors((prev) => ({ ...prev, website: '' })); }} placeholder="https://www.mybusiness.com" />
             <FormTextarea label="Business Hours" value={formData.hours} onChange={(e: any) => setFormData({ ...formData, hours: e.target.value })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
             <FormInput label="Year Established" type="number" value={formData.yearEstablished} onChange={(e: any) => setFormData({ ...formData, yearEstablished: parseInt(e.target.value) })} />
             <FormInput label="Price Range" type="text" value={formData.priceRange} placeholder="$$-$$$" onChange={(e: any) => setFormData({ ...formData, priceRange: e.target.value })} />
@@ -2106,9 +2267,10 @@ export default function BusinessPage() {
             <div className="max-w-lg mx-auto">
               <button
                 onClick={handleAddBusiness}
-                className="w-full bg-aurora-indigo text-white py-3 rounded-xl font-semibold text-sm hover:bg-aurora-indigo/90 shadow-sm flex items-center justify-center gap-2 transition-colors"
+                disabled={saving}
+                className="w-full bg-aurora-indigo text-white py-3 rounded-xl font-semibold text-sm hover:bg-aurora-indigo/90 shadow-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
               >
-                <Plus className="w-4 h-4" /> Add Business
+                {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</> : <><Plus className="w-4 h-4" /> Add Business</>}
               </button>
             </div>
           </div>
@@ -2173,9 +2335,10 @@ export default function BusinessPage() {
                 </button>
                 <button
                   onClick={confirmDeleteBusiness}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Delete
+                  {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Deleting...</> : 'Delete'}
                 </button>
               </div>
             </div>
