@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight, ChevronLeft,
+  MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight,
   X, Heart, Sparkles, ShoppingBag, ExternalLink, Trash2, Edit3,
   MoreHorizontal, Share2, BarChart3, MessageCircle, BadgeCheck, UserPlus,
   UserMinus, Plus, Calendar, Percent, Tag, Trash, CalendarClock,
@@ -311,27 +311,11 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent sm:rounded-t-2xl pointer-events-none z-[3]" />
-          {/* Carousel nav arrows — hidden on mobile (swipe works), visible on sm+ screens */}
+          {/* Photo counter — swipe to navigate on touch, click image to open lightbox with full arrows */}
           {carouselPhotos.length > 1 && (
-            <>
-              <button
-                onClick={(e) => { e.stopPropagation(); carouselGoPrev(); }}
-                aria-label="Previous photo"
-                className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[4] items-center justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); carouselGoNext(); }}
-                aria-label="Next photo"
-                className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[4] items-center justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2.5 py-0.5 rounded-full text-xs z-[4]" aria-live="polite" aria-atomic="true">
-                {carouselIndex + 1} / {carouselPhotos.length}
-              </div>
-            </>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2.5 py-0.5 rounded-full text-xs z-[4]" aria-live="polite" aria-atomic="true">
+              {carouselIndex + 1} / {carouselPhotos.length}
+            </div>
           )}
           {business.promoted && (
             <div className="absolute top-3 left-3 z-[4]">
