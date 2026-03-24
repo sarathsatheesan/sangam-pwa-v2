@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   MapPin, Heart, Sparkles, Star,
 } from 'lucide-react';
+import { parseOpenNow } from '@/components/business/businessUtils';
 import type { Business } from '@/reducers/businessReducer';
 
 export interface FeaturedCarouselProps {
@@ -40,6 +41,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
             className="flex-shrink-0 w-80 rounded-2xl overflow-hidden cursor-pointer group
                        shadow-sm hover:shadow-lg transition-all duration-200 border border-aurora-border
                        focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:ring-offset-2 focus-visible:outline-none"
+            style={{ background: `linear-gradient(180deg, ${business.bgColor}22 0%, ${business.bgColor}11 100%)` }}
             onClick={() => onSelect(business)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(business); } }}
           >
@@ -84,7 +86,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
                 </div>
               </div>
             </div>
-            <div className="bg-aurora-surface p-3">
+            <div className="p-3">
               <p className="text-xs text-aurora-text-secondary line-clamp-1 mb-2">{business.desc}</p>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1">
@@ -92,6 +94,20 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
                   <span className="text-xs font-semibold text-aurora-text">{business.rating.toFixed(1)}</span>
                   <span className="text-xs text-aurora-text-muted">({business.reviews})</span>
                 </div>
+                {(() => {
+                  const status = parseOpenNow(business.hours);
+                  if (!status) return null;
+                  return (
+                    <span className={'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none ' + (
+                      status.isOpen
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                        : 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400'
+                    )}>
+                      <span className={'w-1.5 h-1.5 rounded-full flex-shrink-0 ' + (status.isOpen ? 'bg-emerald-500' : 'bg-red-500')} />
+                      {status.label}
+                    </span>
+                  );
+                })()}
                 <span className="text-xs text-aurora-text-muted flex items-center gap-1">
                   <MapPin className="w-3 h-3" /> {business.location || 'No location'}
                 </span>

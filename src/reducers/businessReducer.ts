@@ -54,6 +54,8 @@ export interface Business {
   // Followers (#34)
   followers?: string[];
   followerCount?: number;
+  // Booking (#36)
+  bookingUrl?: string;
 }
 
 export interface Deal {
@@ -116,6 +118,7 @@ export interface BusinessFormData {
   specialtyTags: string[];
   latitude: number | '';
   longitude: number | '';
+  bookingUrl: string;
 }
 
 // ── State shape ──
@@ -275,6 +278,7 @@ export function createInitialState(): BusinessState {
       specialtyTags: [],
       latitude: '',
       longitude: '',
+      bookingUrl: '',
     },
     formErrors: {},
     formPhotos: [],

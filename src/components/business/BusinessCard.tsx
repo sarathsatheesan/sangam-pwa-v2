@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   MapPin, Phone, Heart, Sparkles, Store, Star, MoreHorizontal, BadgeCheck,
 } from 'lucide-react';
 import { CATEGORY_ICONS } from '@/components/business/businessConstants';
+import { parseOpenNow } from '@/components/business/businessUtils';
 import type { Business } from '@/reducers/businessReducer';
 
 // Re-use the StarRating helper inline (tiny, no need for a separate file)
@@ -35,6 +36,7 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
   const heritageArr = business.heritage
     ? (Array.isArray(business.heritage) ? business.heritage : [business.heritage])
     : [];
+  const openStatus = useMemo(() => parseOpenNow(business.hours), [business.hours]);
 
   return (
     <div
@@ -127,7 +129,19 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
           {business.name}
           {business.verified && <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" aria-label="Verified" />}
         </h3>
-        <p className="text-xs text-aurora-text-muted mb-2">{business.category}</p>
+        <div className="flex items-center gap-1.5 mb-2">
+          <p className="text-xs text-aurora-text-muted">{business.category}</p>
+          {openStatus && (
+            <span className={'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none ' + (
+              openStatus.isOpen
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400'
+                : 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400'
+            )}>
+              <span className={'w-1.5 h-1.5 rounded-full flex-shrink-0 ' + (openStatus.isOpen ? 'bg-emerald-500' : 'bg-red-500')} />
+              {openStatus.label}
+            </span>
+          )}
+        </div>
 
         <div className="flex items-center justify-between mb-2.5">
           <StarRating rating={business.rating} reviews={business.reviews} />

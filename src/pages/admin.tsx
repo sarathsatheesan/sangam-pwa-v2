@@ -863,7 +863,7 @@ export default function AdminPage() {
       if (newVerified) {
         await updateDoc(doc(db, 'businesses', listing.id), {
           verified: true,
-          verifiedAt: new Date(),
+          verifiedAt: serverTimestamp(),
           verificationMethod: 'admin',
         });
       } else {

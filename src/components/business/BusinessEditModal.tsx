@@ -227,6 +227,7 @@ const BusinessEditModal: React.FC<BusinessEditModalProps> = ({
         <FormInput label="Phone" type="tel" value={editData.phone} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, phone: e.target.value } })} />
         <FormInput label="Email" type="email" value={editData.email} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, email: e.target.value } })} />
         <FormInput label="Website" type="url" value={editData.website} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, website: e.target.value } })} />
+        <FormInput label="Booking / Reservation URL" type="url" value={editData.bookingUrl || ''} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, bookingUrl: e.target.value } })} placeholder="https://www.opentable.com/mybusiness" />
         <FormTextarea label="Business Hours" value={editData.hours} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, hours: e.target.value } })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
         <FormInput label="Year Established" type="number" value={editData.yearEstablished} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, yearEstablished: parseInt(e.target.value) } })} />
         <FormInput label="Price Range" type="text" value={editData.priceRange} placeholder="$$-$$$" onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, priceRange: e.target.value } })} />

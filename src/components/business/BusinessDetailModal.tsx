@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight, ChevronLeft,
   X, Heart, Sparkles, ShoppingBag, ExternalLink, Trash2, Edit3,
   MoreHorizontal, Share2, BarChart3, MessageCircle, BadgeCheck, UserPlus,
-  UserMinus, Plus, Calendar, Percent, Tag, Trash,
+  UserMinus, Plus, Calendar, Percent, Tag, Trash, CalendarClock,
 } from 'lucide-react';
 import { getGoogleMapsUrl } from '@/components/business/businessValidation';
 import PhotoLightbox from '@/components/business/PhotoLightbox';
 import BusinessAnalyticsTab from '@/components/business/BusinessAnalyticsTab';
+import BusinessQASection from '@/components/business/BusinessQASection';
 import type { Business, BusinessReview, BusinessAnalytics } from '@/reducers/businessReducer';
 import { recordView, recordContactClick, recordShare } from '@/services/businessAnalytics';
+import { parseOpenNow } from '@/components/business/businessUtils';
 
 // ── Photo carousel (local to detail modal) ──
 const BusinessPhotoCarousel: React.FC<{
@@ -24,12 +26,13 @@ const BusinessPhotoCarousel: React.FC<{
   const goPrev = () => setCurrentIndex((p) => (p - 1 + photos.length) % photos.length);
   const goNext = () => setCurrentIndex((p) => (p + 1) % photos.length);
 
-  // Touch swipe handlers for mobile
+  // Touch swipe handlers for mobile (with safety checks for iOS/Android)
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (!e.touches || e.touches.length === 0) return;
     touchStartRef.current = { x: e.touches[0].clientX, time: Date.now() };
   };
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
+    if (!touchStartRef.current || !e.changedTouches || e.changedTouches.length === 0) return;
     const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
     const dt = Date.now() - touchStartRef.current.time;
     if (Math.abs(dx) > 40 && dt < 400) {
@@ -152,21 +155,38 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
       url: shareUrl,
     };
 
+    // Helper: copy to clipboard with fallback for older browsers / Firefox
+    const copyToClipboard = async (text: string) => {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback: execCommand (works on older Firefox, Safari, etc.)
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    };
+
     try {
-      if (navigator.share && navigator.canShare?.(shareData)) {
+      if (typeof navigator.share === 'function' && navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData);
         recordShare(business.id);
       } else {
-        await navigator.clipboard.writeText(shareUrl);
+        await copyToClipboard(shareUrl);
         setShareToast('Link copied to clipboard!');
         setTimeout(() => setShareToast(null), 2500);
         recordShare(business.id);
       }
     } catch (err: any) {
       // User cancelled share or clipboard failed — try fallback
-      if (err.name !== 'AbortError') {
+      if (err && err.name !== 'AbortError') {
         try {
-          await navigator.clipboard.writeText(shareUrl);
+          await copyToClipboard(shareUrl);
           setShareToast('Link copied to clipboard!');
           setTimeout(() => setShareToast(null), 2500);
         } catch {
@@ -185,13 +205,28 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
   // Prevent body scroll behind modal (including iOS Safari)
   useEffect(() => {
     const htmlEl = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
     const prevHtml = htmlEl.style.overflow;
-    const prevBody = document.body.style.overflow;
+    const prevBody = body.style.overflow;
+    const prevPosition = body.style.position;
+    const prevTop = body.style.top;
+    const prevWidth = body.style.width;
+
     htmlEl.style.overflow = 'hidden';
-    document.body.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    // iOS Safari fix: position:fixed prevents elastic scroll-through
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.width = '100%';
+
     return () => {
       htmlEl.style.overflow = prevHtml;
-      document.body.style.overflow = prevBody;
+      body.style.overflow = prevBody;
+      body.style.position = prevPosition;
+      body.style.top = prevTop;
+      body.style.width = prevWidth;
+      window.scrollTo(0, scrollY); // Restore scroll position
     };
   }, []);
 
@@ -497,19 +532,53 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     <ExternalLink className="w-4 h-4 text-aurora-text-muted flex-shrink-0" />
                   </a>
                 )}
+                {/* Booking / Reservation link (#36) */}
+                {business.bookingUrl && (
+                  <a
+                    href={business.bookingUrl.startsWith('http') ? business.bookingUrl : `https://${business.bookingUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 bg-gradient-to-r from-aurora-indigo/5 to-purple-500/5 rounded-xl px-4 py-3 hover:from-aurora-indigo/10 hover:to-purple-500/10 transition-colors border border-aurora-indigo/20"
+                    onClick={() => recordContactClick(business.id)}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-aurora-indigo/10 flex items-center justify-center flex-shrink-0">
+                      <CalendarClock className="w-4 h-4 text-aurora-indigo" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-aurora-indigo">Book a Reservation</p>
+                      <p className="text-xs text-aurora-text-muted mt-0.5">Schedule online</p>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-aurora-indigo/60 flex-shrink-0" />
+                  </a>
+                )}
               </div>
             </div>
 
-            {/* Hours */}
-            {business.hours && (
-              <div>
-                <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Hours</h4>
-                <div className="flex items-start gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3">
-                  <Clock className="w-4 h-4 text-aurora-text-muted mt-0.5 flex-shrink-0" />
-                  <p className="text-sm text-aurora-text-secondary whitespace-pre-line">{business.hours}</p>
+            {/* Hours + Open Now indicator (#24) */}
+            {business.hours && (() => {
+              const openStatus = parseOpenNow(business.hours);
+              return (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider">Hours</h4>
+                    {openStatus && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        openStatus.isOpen
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${openStatus.isOpen ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                        {openStatus.label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-start gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3">
+                    <Clock className="w-4 h-4 text-aurora-text-muted mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-aurora-text-secondary whitespace-pre-line">{business.hours}</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Deals */}
             {(business.deals && business.deals.length > 0) || isOwnerOrAdmin(business) ? (
@@ -801,6 +870,13 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Q&A Section (#35) */}
+            <BusinessQASection
+              business={business}
+              user={user}
+              isOwnerOrAdmin={isOwnerOrAdmin(business)}
+            />
 
             {/* Owner Analytics Section */}
             {isOwnerOrAdmin(business) && (

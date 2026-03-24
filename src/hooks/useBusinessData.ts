@@ -81,6 +81,12 @@ export function useBusinessData(
           isHidden: d.isHidden || false,
           hiddenAt: d.hiddenAt || '',
           hiddenReason: d.hiddenReason || '',
+          verified: d.verified || false,
+          verifiedAt: d.verifiedAt || null,
+          verificationMethod: d.verificationMethod || null,
+          followers: d.followers || [],
+          followerCount: d.followerCount || 0,
+          bookingUrl: d.bookingUrl || '',
         });
       });
 
@@ -176,6 +182,7 @@ export function useBusinessData(
         location: state.formData.location,
         phone: state.formData.phone,
         website: state.formData.website,
+        bookingUrl: state.formData.bookingUrl || '',
         email: state.formData.email,
         hours: state.formData.hours,
         menu: state.formData.menu,
@@ -291,6 +298,7 @@ export function useBusinessData(
         location: state.editData.location,
         phone: state.editData.phone,
         website: state.editData.website,
+        bookingUrl: state.editData.bookingUrl || '',
         email: state.editData.email,
         hours: state.editData.hours,
         category: state.editData.category,
