@@ -68,18 +68,18 @@ const BusinessPhotoCarousel: React.FC<{
             <button
               onClick={(e) => { e.stopPropagation(); goPrev(); }}
               aria-label="Previous photo"
-              className="absolute left-2 bottom-8 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[3] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); goNext(); }}
               aria-label="Next photo"
-              className="absolute right-2 bottom-8 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[3] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2.5 py-0.5 rounded-full text-xs" aria-live="polite" aria-atomic="true">
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2.5 py-0.5 rounded-full text-xs z-[3]" aria-live="polite" aria-atomic="true">
               {currentIndex + 1} / {photos.length}
             </div>
           </>
