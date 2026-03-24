@@ -40,6 +40,13 @@ export interface Business {
   isHidden?: boolean;
   hiddenAt?: string;
   hiddenReason?: string;
+  // Geolocation (for map view)
+  latitude?: number;
+  longitude?: number;
+  // Analytics counters (denormalized for fast reads)
+  viewCount?: number;
+  contactClicks?: number;
+  shareCount?: number;
 }
 
 export interface Deal {
@@ -100,6 +107,8 @@ export interface BusinessFormData {
   paymentMethods: string[];
   deliveryOptions: string[];
   specialtyTags: string[];
+  latitude: number | '';
+  longitude: number | '';
 }
 
 // ── State shape ──
@@ -120,7 +129,7 @@ export interface BusinessState {
   showTinVerificationModal: boolean;
   selectedBusiness: Business | null;
   isEditing: boolean;
-  activeTab: 'about' | 'services' | 'reviews';
+  activeTab: 'about' | 'services' | 'reviews' | 'analytics';
   showReviewForm: boolean;
   showDeleteConfirm: boolean;
   deleteBusinessId: string | null;
@@ -169,9 +178,36 @@ export interface BusinessState {
   showBlockConfirm: boolean;
   blockTargetUser: { uid: string; name: string } | null;
 
+  // Map view
+  viewMode: 'list' | 'map';
+  userLocation: { lat: number; lng: number } | null;
+  geolocating: boolean;
+
+  // Analytics (owner dashboard)
+  analyticsData: BusinessAnalytics | null;
+  analyticsLoading: boolean;
+
   // Pagination
   lastDoc: QueryDocumentSnapshot | null;
   hasMore: boolean;
+}
+
+// ── Analytics shape ──
+
+export interface AnalyticsEvent {
+  date: string; // YYYY-MM-DD
+  views: number;
+  contactClicks: number;
+  shares: number;
+  favorites: number;
+}
+
+export interface BusinessAnalytics {
+  totalViews: number;
+  totalContactClicks: number;
+  totalShares: number;
+  totalFavorites: number;
+  dailyData: AnalyticsEvent[];
 }
 
 // ── Initial state factory ──
@@ -228,6 +264,8 @@ export function createInitialState(): BusinessState {
       paymentMethods: [],
       deliveryOptions: [],
       specialtyTags: [],
+      latitude: '',
+      longitude: '',
     },
     formErrors: {},
     formPhotos: [],
@@ -246,6 +284,13 @@ export function createInitialState(): BusinessState {
     blockedUsers: new Set(),
     showBlockConfirm: false,
     blockTargetUser: null,
+
+    viewMode: 'list',
+    userLocation: null,
+    geolocating: false,
+
+    analyticsData: null,
+    analyticsLoading: false,
 
     lastDoc: null,
     hasMore: true,
@@ -329,6 +374,15 @@ export type BusinessAction =
   | { type: 'ADD_BLOCKED_USER'; payload: string }
   | { type: 'OPEN_BLOCK_CONFIRM'; payload: { uid: string; name: string } }
   | { type: 'CLOSE_BLOCK_CONFIRM' }
+
+  // Map view
+  | { type: 'SET_VIEW_MODE'; payload: 'list' | 'map' }
+  | { type: 'SET_USER_LOCATION'; payload: { lat: number; lng: number } | null }
+  | { type: 'SET_GEOLOCATING'; payload: boolean }
+
+  // Analytics
+  | { type: 'SET_ANALYTICS_DATA'; payload: BusinessAnalytics | null }
+  | { type: 'SET_ANALYTICS_LOADING'; payload: boolean }
 
   // Pagination
   | { type: 'SET_LAST_DOC'; payload: QueryDocumentSnapshot | null }
@@ -506,6 +560,20 @@ export function businessReducer(state: BusinessState, action: BusinessAction): B
       return { ...state, hasMore: action.payload };
     case 'RESET_PAGINATION':
       return { ...state, lastDoc: null, hasMore: true };
+
+    // ── Map view ──
+    case 'SET_VIEW_MODE':
+      return { ...state, viewMode: action.payload };
+    case 'SET_USER_LOCATION':
+      return { ...state, userLocation: action.payload, geolocating: false };
+    case 'SET_GEOLOCATING':
+      return { ...state, geolocating: action.payload };
+
+    // ── Analytics ──
+    case 'SET_ANALYTICS_DATA':
+      return { ...state, analyticsData: action.payload, analyticsLoading: false };
+    case 'SET_ANALYTICS_LOADING':
+      return { ...state, analyticsLoading: action.payload };
 
     default:
       return state;

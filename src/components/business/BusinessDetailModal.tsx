@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight, ChevronLeft,
   X, Heart, Sparkles, ShoppingBag, ExternalLink, Trash2, Edit3,
-  MoreHorizontal, Share2,
+  MoreHorizontal, Share2, BarChart3,
 } from 'lucide-react';
 import { getGoogleMapsUrl } from '@/components/business/businessValidation';
 import PhotoLightbox from '@/components/business/PhotoLightbox';
-import type { Business, BusinessReview } from '@/reducers/businessReducer';
+import BusinessAnalyticsTab from '@/components/business/BusinessAnalyticsTab';
+import type { Business, BusinessReview, BusinessAnalytics } from '@/reducers/businessReducer';
+import { recordView, recordContactClick, recordShare } from '@/services/businessAnalytics';
 
 // ── Photo carousel (local to detail modal) ──
 const BusinessPhotoCarousel: React.FC<{
@@ -105,6 +107,9 @@ export interface BusinessDetailModalProps {
   handleStartEdit: () => void;
   handleDeleteBusiness: (id: string) => void;
   handleAddReview: () => void;
+  // Analytics (owner dashboard)
+  analyticsData: BusinessAnalytics | null;
+  analyticsLoading: boolean;
 }
 
 const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
@@ -121,9 +126,12 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
   handleStartEdit,
   handleDeleteBusiness,
   handleAddReview,
+  analyticsData,
+  analyticsLoading,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const [shareToast, setShareToast] = useState<string | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Share business
   const handleShare = useCallback(async () => {
@@ -137,10 +145,12 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
     try {
       if (navigator.share && navigator.canShare?.(shareData)) {
         await navigator.share(shareData);
+        recordShare(business.id);
       } else {
         await navigator.clipboard.writeText(shareUrl);
         setShareToast('Link copied to clipboard!');
         setTimeout(() => setShareToast(null), 2500);
+        recordShare(business.id);
       }
     } catch (err: any) {
       // User cancelled share or clipboard failed — try fallback
@@ -156,6 +166,11 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
       }
     }
   }, [business.id, business.name, business.category]);
+
+  // Record view for analytics (debounced per session in the service)
+  useEffect(() => {
+    recordView(business.id);
+  }, [business.id]);
 
   // Prevent body scroll behind modal (including iOS Safari)
   useEffect(() => {
@@ -360,6 +375,7 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3 hover:bg-aurora-border/30 transition-colors"
+                    onClick={() => recordContactClick(business.id)}
                   >
                     <div className="w-9 h-9 rounded-full bg-aurora-indigo/10 flex items-center justify-center flex-shrink-0">
                       <MapPin className="w-4 h-4 text-aurora-indigo" />
@@ -375,6 +391,7 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                   <a
                     href={`tel:${business.phone}`}
                     className="flex items-center gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3 hover:bg-aurora-border/30 transition-colors"
+                    onClick={() => recordContactClick(business.id)}
                   >
                     <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
                       <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -405,6 +422,7 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 bg-aurora-surface-variant rounded-xl px-4 py-3 hover:bg-aurora-border/30 transition-colors"
+                    onClick={() => recordContactClick(business.id)}
                   >
                     <div className="w-9 h-9 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
                       <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -611,6 +629,32 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Owner Analytics Section */}
+            {isOwnerOrAdmin(business) && (
+              <div>
+                <button
+                  onClick={() => setShowAnalytics((v) => !v)}
+                  className="flex items-center gap-2 w-full text-left"
+                  aria-expanded={showAnalytics}
+                  aria-controls="analytics-panel"
+                >
+                  <BarChart3 className="w-4 h-4 text-indigo-500" />
+                  <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider">Analytics Dashboard</h4>
+                  <ChevronRight className={`w-4 h-4 text-aurora-text-muted ml-auto transition-transform ${showAnalytics ? 'rotate-90' : ''}`} />
+                </button>
+                {showAnalytics && (
+                  <div id="analytics-panel" className="mt-3">
+                    <BusinessAnalyticsTab
+                      businessId={business.id}
+                      analyticsData={analyticsData}
+                      analyticsLoading={analyticsLoading}
+                      dispatch={dispatch}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
           </div>
         </div>

@@ -230,6 +230,12 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
           />
         )}
         <FormInput label="Location / Address" required error={formErrors.location} type="text" value={formData.location} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'location', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'location' }); }} placeholder="123 Main St, City, State" />
+        {/* Map coordinates (optional — for map pin placement) */}
+        <div className="grid grid-cols-2 gap-3">
+          <FormInput label="Latitude" type="number" value={formData.latitude} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'latitude', value: e.target.value === '' ? '' : parseFloat(e.target.value) })} placeholder="40.7608" />
+          <FormInput label="Longitude" type="number" value={formData.longitude} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'longitude', value: e.target.value === '' ? '' : parseFloat(e.target.value) })} placeholder="-111.891" />
+        </div>
+        <p className="text-[10px] text-aurora-text-muted -mt-2">Optional — enables your business on the map view. Find coordinates on Google Maps.</p>
         <FormInput label="Phone" required error={formErrors.phone} type="tel" value={formData.phone} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'phone', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'phone' }); }} placeholder="(555) 123-4567" />
         <FormInput label="Email" required error={formErrors.email} type="email" value={formData.email} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'email', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'email' }); }} placeholder="contact@business.com" />
         <FormInput label="Website" error={formErrors.website} type="url" value={formData.website} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'website', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'website' }); }} placeholder="https://www.mybusiness.com" />

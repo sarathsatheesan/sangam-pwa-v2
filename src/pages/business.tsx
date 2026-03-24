@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useCallback, useReducer } from 'react';
+import React, { useEffect, useRef, useCallback, useReducer, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Search, MapPin, Phone, Star, X, Plus, Heart, Sparkles, Store,
-  Filter, Loader2, TrendingUp,
+  Filter, Loader2, TrendingUp, Map, List, Navigation,
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
@@ -29,6 +29,10 @@ import {
   ReportModal,
   BlockConfirmModal,
 } from '@/components/business/BusinessModals';
+import { recordFavorite } from '@/services/businessAnalytics';
+
+// Lazy-load map view (loads Leaflet CDN on demand)
+const BusinessMapView = lazy(() => import('@/components/business/BusinessMapView'));
 
 // ═════════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -74,6 +78,41 @@ export default function BusinessPage() {
 
   // ── Select business handler (memoized for card/carousel) ──
   const handleSelectBusiness = useCallback((business: Business) => {
+    dispatch({ type: 'SELECT_BUSINESS', payload: business });
+    dispatch({ type: 'SET_ACTIVE_TAB', payload: 'about' });
+  }, [dispatch]);
+
+  // ── Geolocation handler ──
+  const handleRequestGeolocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      dispatch({ type: 'SET_TOAST', payload: 'Geolocation is not supported by your browser.' });
+      return;
+    }
+    dispatch({ type: 'SET_GEOLOCATING', payload: true });
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        dispatch({
+          type: 'SET_USER_LOCATION',
+          payload: { lat: position.coords.latitude, lng: position.coords.longitude },
+        });
+        dispatch({ type: 'SET_TOAST', payload: 'Location found! Showing businesses near you.' });
+      },
+      (error) => {
+        dispatch({ type: 'SET_GEOLOCATING', payload: false });
+        const messages: Record<number, string> = {
+          1: 'Location access denied. Please enable it in your browser settings.',
+          2: 'Unable to determine your location. Please try again.',
+          3: 'Location request timed out. Please try again.',
+        };
+        dispatch({ type: 'SET_TOAST', payload: messages[error.code] || 'Could not get your location.' });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    );
+  }, [dispatch]);
+
+  // ── Map view business selection ──
+  const handleMapSelectBusiness = useCallback((business: Business) => {
+    dispatch({ type: 'SET_VIEW_MODE', payload: 'list' });
     dispatch({ type: 'SELECT_BUSINESS', payload: business });
     dispatch({ type: 'SET_ACTIVE_TAB', payload: 'about' });
   }, [dispatch]);
@@ -260,31 +299,86 @@ export default function BusinessPage() {
                   </>
                 )}
               </p>
-              {(state.selectedCategory !== 'All' || state.selectedHeritage.length > 0 || state.searchQuery || state.activeCollection !== 'all') && (
-                <button
-                  onClick={() => { dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' }); dispatch({ type: 'SET_SELECTED_HERITAGE', payload: [] }); dispatch({ type: 'SET_SEARCH_QUERY', payload: '' }); dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: 'all' }); }}
-                  className="text-xs text-aurora-indigo font-medium flex items-center gap-1 hover:text-aurora-indigo/80"
-                >
-                  <X className="w-3 h-3" /> Clear filters
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {(state.selectedCategory !== 'All' || state.selectedHeritage.length > 0 || state.searchQuery || state.activeCollection !== 'all') && (
+                  <button
+                    onClick={() => { dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' }); dispatch({ type: 'SET_SELECTED_HERITAGE', payload: [] }); dispatch({ type: 'SET_SEARCH_QUERY', payload: '' }); dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: 'all' }); }}
+                    className="text-xs text-aurora-indigo font-medium flex items-center gap-1 hover:text-aurora-indigo/80"
+                  >
+                    <X className="w-3 h-3" /> Clear filters
+                  </button>
+                )}
+                {/* Map / List Toggle */}
+                <div className="flex bg-aurora-surface-variant rounded-lg p-0.5 border border-aurora-border" role="radiogroup" aria-label="View mode">
+                  <button
+                    role="radio"
+                    aria-checked={state.viewMode === 'list'}
+                    onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'list' })}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none ${
+                      state.viewMode === 'list'
+                        ? 'bg-aurora-surface text-aurora-text shadow-sm'
+                        : 'text-aurora-text-muted hover:text-aurora-text'
+                    }`}
+                    aria-label="Grid view"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">List</span>
+                  </button>
+                  <button
+                    role="radio"
+                    aria-checked={state.viewMode === 'map'}
+                    onClick={() => dispatch({ type: 'SET_VIEW_MODE', payload: 'map' })}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none ${
+                      state.viewMode === 'map'
+                        ? 'bg-aurora-surface text-aurora-text shadow-sm'
+                        : 'text-aurora-text-muted hover:text-aurora-text'
+                    }`}
+                    aria-label="Map view"
+                  >
+                    <Map className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Map</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Featured Carousel */}
-            {featuredBusinesses.length > 0 && !state.searchQuery && (
-              <FeaturedCarousel
-                businesses={featuredBusinesses}
-                favorites={state.favorites}
-                toggleFavorite={toggleFavorite}
-                onSelect={handleSelectBusiness}
-              />
+            {/* ── Map View ── */}
+            {state.viewMode === 'map' && !state.loading && (
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-20 gap-2 text-aurora-text-muted">
+                  <Loader2 className="w-5 h-5 animate-spin" /> Loading map...
+                </div>
+              }>
+                <BusinessMapView
+                  businesses={filteredBusinesses}
+                  userLocation={state.userLocation}
+                  geolocating={state.geolocating}
+                  onRequestGeolocation={handleRequestGeolocation}
+                  onSelectBusiness={handleMapSelectBusiness}
+                />
+              </Suspense>
             )}
 
-            {state.loading ? (
+            {/* ── List View ── */}
+            {state.viewMode === 'list' && (
+              <>
+                {/* Featured Carousel */}
+                {featuredBusinesses.length > 0 && !state.searchQuery && (
+                  <FeaturedCarousel
+                    businesses={featuredBusinesses}
+                    favorites={state.favorites}
+                    toggleFavorite={toggleFavorite}
+                    onSelect={handleSelectBusiness}
+                  />
+                )}
+              </>
+            )}
+
+            {state.viewMode === 'list' && state.loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
               </div>
-            ) : filteredBusinesses.length === 0 ? (
+            ) : state.viewMode === 'list' && filteredBusinesses.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center" role="status">
                 {/* Contextual SVG illustration */}
                 <div className="w-24 h-24 mb-5">
@@ -342,7 +436,7 @@ export default function BusinessPage() {
                   )}
                 </div>
               </div>
-            ) : (
+            ) : state.viewMode === 'list' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredBusinesses.map((business) => (
                   <BusinessCard
@@ -356,10 +450,10 @@ export default function BusinessPage() {
                   />
                 ))}
               </div>
-            )}
+            ) : null}
 
-            {/* Infinite scroll sentinel */}
-            <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
+            {/* Infinite scroll sentinel (list view only) */}
+            {state.viewMode === 'list' && <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
               {state.loadingMore && (
                 <div className="flex items-center gap-2 text-aurora-text-muted text-sm py-4">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -369,7 +463,7 @@ export default function BusinessPage() {
               {!state.hasMore && state.businesses.length > PAGE_SIZE && (
                 <p className="text-xs text-aurora-text-muted py-4">You've reached the end</p>
               )}
-            </div>
+            </div>}
           </div>
         </>
       )}
@@ -487,6 +581,8 @@ export default function BusinessPage() {
           handleStartEdit={handleStartEdit}
           handleDeleteBusiness={handleDeleteBusiness}
           handleAddReview={handleAddReview}
+          analyticsData={state.analyticsData}
+          analyticsLoading={state.analyticsLoading}
         />
       )}
 

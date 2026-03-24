@@ -13,6 +13,7 @@ import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import { CATEGORY_EMOJI_MAP, CATEGORY_COLORS } from '@/components/business/businessConstants';
 import { validateBusinessForm } from '@/components/business/businessValidation';
 import type { BusinessState, BusinessAction, Business, BusinessFormData } from '@/reducers/businessReducer';
+import { recordFavorite } from '@/services/businessAnalytics';
 
 const PAGE_SIZE = 20;
 
@@ -134,7 +135,11 @@ export function useBusinessData(
   const toggleFavorite = useCallback((businessId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user?.uid) return;
-    toggleSavedItem(user.uid, 'businesses', businessId).then(({ ids }) => dispatch({ type: 'SET_FAVORITES', payload: ids }));
+    toggleSavedItem(user.uid, 'businesses', businessId).then(({ ids }) => {
+      dispatch({ type: 'SET_FAVORITES', payload: ids });
+      // Track analytics if it was added (not removed)
+      if (ids.has(businessId)) recordFavorite(businessId);
+    });
   }, [user?.uid, dispatch]);
 
   // ── Open create modal (with business account / TIN checks) ──
@@ -194,6 +199,15 @@ export function useBusinessData(
           ? [userProfile.heritage]
           : [],
         ...(state.formPhotos.length > 0 ? { photos: state.formPhotos, coverPhotoIndex: Math.min(state.coverPhotoIndex, state.formPhotos.length - 1) } : {}),
+        // Geolocation (for map view)
+        ...(state.formData.latitude !== '' && state.formData.longitude !== '' ? {
+          latitude: Number(state.formData.latitude),
+          longitude: Number(state.formData.longitude),
+        } : {}),
+        // Analytics counters
+        viewCount: 0,
+        contactClicks: 0,
+        shareCount: 0,
       });
       dispatch({ type: 'RESET_CREATE_FORM' });
       dispatch({ type: 'SET_LAST_DOC', payload: null });
