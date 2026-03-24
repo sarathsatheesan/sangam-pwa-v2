@@ -252,7 +252,7 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
 
         {/* Hero Banner */}
         <div
-          className="relative h-40 sm:rounded-t-2xl flex items-end p-5 overflow-hidden"
+          className="relative h-56 sm:rounded-t-2xl flex items-end p-5 overflow-hidden"
           style={{
             background: business.photos?.length ? '#000' : `linear-gradient(135deg, ${business.bgColor}, ${business.bgColor}cc)`,
           }}
@@ -293,26 +293,18 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
             {/* About */}
             {business.desc && (
               <div>
-                <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">About</h4>
+                <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">About{business.yearEstablished ? ` (Since ${business.yearEstablished})` : ''}</h4>
                 <p className="text-sm text-aurora-text-secondary leading-relaxed">{business.desc}</p>
               </div>
             )}
 
             {/* Quick Info Row */}
-            {(business.yearEstablished || business.priceRange) && (
+            {business.priceRange && (
               <div className="flex gap-3 flex-wrap">
-                {business.yearEstablished && (
-                  <div className="flex-1 min-w-[120px] bg-aurora-surface-variant rounded-xl p-3 text-center">
-                    <p className="text-[10px] font-semibold text-aurora-text-muted uppercase tracking-wider">Established</p>
-                    <p className="text-sm font-bold text-aurora-text mt-1">{business.yearEstablished}</p>
-                  </div>
-                )}
-                {business.priceRange && (
-                  <div className="flex-1 min-w-[120px] bg-aurora-surface-variant rounded-xl p-3 text-center">
-                    <p className="text-[10px] font-semibold text-aurora-text-muted uppercase tracking-wider">Price Range</p>
-                    <p className="text-sm font-bold text-aurora-text mt-1">{business.priceRange}</p>
-                  </div>
-                )}
+                <div className="flex-1 min-w-[120px] bg-aurora-surface-variant rounded-xl p-3 text-center">
+                  <p className="text-[10px] font-semibold text-aurora-text-muted uppercase tracking-wider">Price Range</p>
+                  <p className="text-sm font-bold text-aurora-text mt-1">{business.priceRange}</p>
+                </div>
               </div>
             )}
 
