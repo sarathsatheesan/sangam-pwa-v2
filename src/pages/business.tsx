@@ -147,7 +147,16 @@ export default function BusinessPage() {
   const handleSaveDeals = useCallback(async (businessId: string, deals: import('@/reducers/businessReducer').Deal[]) => {
     try {
       const bizRef = doc(db, 'businesses', businessId);
-      await updateDoc(bizRef, { deals });
+      // Sanitize deals — Firestore rejects undefined values
+      const sanitized = deals.map((d) => {
+        const clean: Record<string, any> = { id: d.id, title: d.title };
+        if (d.description != null) clean.description = d.description;
+        if (d.discount != null) clean.discount = d.discount;
+        if (d.code != null) clean.code = d.code;
+        if (d.expiresAt != null) clean.expiresAt = d.expiresAt;
+        return clean;
+      });
+      await updateDoc(bizRef, { deals: sanitized });
       // Update local state
       const biz = state.businesses.find((b) => b.id === businessId);
       if (biz) {

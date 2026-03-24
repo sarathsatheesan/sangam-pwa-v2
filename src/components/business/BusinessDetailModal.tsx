@@ -311,20 +311,20 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent sm:rounded-t-2xl pointer-events-none z-[3]" />
-          {/* Carousel nav arrows — rendered at hero-banner level so they sit ABOVE the gradient overlay */}
+          {/* Carousel nav arrows — hidden on mobile (swipe works), visible on sm+ screens */}
           {carouselPhotos.length > 1 && (
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); carouselGoPrev(); }}
                 aria-label="Previous photo"
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[4] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[4] items-center justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); carouselGoNext(); }}
                 aria-label="Next photo"
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[4] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+                className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[4] items-center justify-center focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -658,14 +658,15 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                     <button
                       onClick={() => {
                         if (!newDeal.title.trim()) return;
-                        const deal = {
+                        // Build deal without undefined values — Firestore rejects undefined
+                        const deal: import('@/reducers/businessReducer').Deal = {
                           id: `deal_${Date.now()}`,
                           title: newDeal.title.trim(),
-                          description: newDeal.description.trim() || undefined,
-                          discount: newDeal.discount ? Number(newDeal.discount) : undefined,
-                          code: newDeal.code.trim() || undefined,
-                          expiresAt: newDeal.expiresAt || undefined,
                         };
+                        if (newDeal.description.trim()) deal.description = newDeal.description.trim();
+                        if (newDeal.discount) deal.discount = Number(newDeal.discount);
+                        if (newDeal.code.trim()) deal.code = newDeal.code.trim();
+                        if (newDeal.expiresAt) deal.expiresAt = newDeal.expiresAt;
                         const updatedDeals = [...editingDeals, deal];
                         setEditingDeals(updatedDeals);
                         handleSaveDeals(business.id, updatedDeals);
