@@ -90,6 +90,12 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null;
+
+      // Analytics subcollection (daily event counters)
+      match /analytics/{dateKey} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
+      }
     }
 
     // ─── Business Menu Items ────────────────────────
