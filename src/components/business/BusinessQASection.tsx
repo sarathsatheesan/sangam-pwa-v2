@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { MessageCircle, Send, ChevronRight, ChevronDown, User, Shield, Search, X } from 'lucide-react';
+import { MessageCircle, Send, ChevronDown, User, Shield, Search, X } from 'lucide-react';
 import {
   collection, addDoc, getDocs, updateDoc, doc, arrayUnion, serverTimestamp,
   query, orderBy, Timestamp,
@@ -66,7 +66,6 @@ const BusinessQASection: React.FC<BusinessQASectionProps> = ({ business, user, i
   const [loading, setLoading] = useState(true);
   const [newQuestion, setNewQuestion] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [expandedQ, setExpandedQ] = useState<string | null>(null);
   const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [replySubmitting, setReplySubmitting] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -277,98 +276,94 @@ const BusinessQASection: React.FC<BusinessQASectionProps> = ({ business, user, i
         </div>
       ) : filteredQuestions.length > 0 ? (
         <div className="space-y-2.5">
-          {filteredQuestions.map((q) => {
-            const isExpanded = expandedQ === q.id;
-            return (
-              <div key={q.id} className="bg-aurora-surface-variant rounded-xl overflow-hidden">
-                {/* Question */}
-                <button
-                  onClick={() => setExpandedQ(isExpanded ? null : q.id)}
-                  className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-aurora-border/20 transition-colors"
-                >
-                  <div className="w-7 h-7 rounded-full bg-aurora-indigo/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <User className="w-3.5 h-3.5 text-aurora-indigo" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-aurora-text leading-relaxed">{q.text}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-[11px] text-aurora-text-muted">{q.userName}</span>
-                      <span className="text-[11px] text-aurora-text-muted">·</span>
-                      <span className="text-[11px] text-aurora-text-muted">{timeAgo(q.createdAt)}</span>
-                      {q.answers.length > 0 && (
-                        <>
-                          <span className="text-[11px] text-aurora-text-muted">·</span>
-                          <span className="text-[11px] font-medium text-aurora-indigo">
-                            {q.answers.length} answer{q.answers.length !== 1 ? 's' : ''}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-aurora-text-muted flex-shrink-0 mt-1" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-aurora-text-muted flex-shrink-0 mt-1" />
-                  )}
-                </button>
-
-                {/* Answers (expanded) */}
-                {isExpanded && (
-                  <div className="px-4 pb-3 space-y-2.5 border-t border-aurora-border/50">
-                    {q.answers.length > 0 ? (
-                      q.answers.map((a) => (
-                        <div key={a.id} className="flex items-start gap-2.5 pt-2.5">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${a.isOwner ? 'bg-emerald-100 dark:bg-emerald-500/20' : 'bg-aurora-surface'}`}>
-                            {a.isOwner ? (
-                              <Shield className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <User className="w-3 h-3 text-aurora-text-muted" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-semibold text-aurora-text">{a.userName}</span>
-                              {a.isOwner && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                  Owner
-                                </span>
-                              )}
-                              <span className="text-[10px] text-aurora-text-muted">{timeAgo(a.createdAt)}</span>
-                            </div>
-                            <p className="text-sm text-aurora-text-secondary leading-relaxed mt-0.5">{a.text}</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-aurora-text-muted pt-2.5 italic">No answers yet</p>
+          {/* Cross-browser CSS for native <details>/<summary> — hides default marker, adds chevron rotation */}
+          <style>{`
+            .qa-details summary { list-style: none; cursor: pointer; }
+            .qa-details summary::-webkit-details-marker { display: none; }
+            .qa-details summary::marker { display: none; content: ''; }
+            .qa-details .qa-chevron { transition: transform 0.2s ease; }
+            .qa-details[open] .qa-chevron { transform: rotate(180deg); }
+          `}</style>
+          {filteredQuestions.map((q) => (
+            <details key={q.id} className="qa-details bg-aurora-surface-variant rounded-xl overflow-hidden group">
+              {/* Question — native collapsible summary */}
+              <summary className="px-4 py-3 flex items-start gap-3 hover:bg-aurora-border/20 transition-colors select-none">
+                <div className="w-7 h-7 rounded-full bg-aurora-indigo/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <User className="w-3.5 h-3.5 text-aurora-indigo" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-aurora-text leading-relaxed">{q.text}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-[11px] text-aurora-text-muted">{q.userName}</span>
+                    <span className="text-[11px] text-aurora-text-muted">·</span>
+                    <span className="text-[11px] text-aurora-text-muted">{timeAgo(q.createdAt)}</span>
+                    {q.answers.length > 0 && (
+                      <>
+                        <span className="text-[11px] text-aurora-text-muted">·</span>
+                        <span className="text-[11px] font-medium text-aurora-indigo">
+                          {q.answers.length} answer{q.answers.length !== 1 ? 's' : ''}
+                        </span>
+                      </>
                     )}
+                  </div>
+                </div>
+                <ChevronDown className="qa-chevron w-4 h-4 text-aurora-text-muted flex-shrink-0 mt-1 -rotate-90" />
+              </summary>
 
-                    {/* Reply form */}
-                    {user && (
-                      <div className="flex gap-2 pt-1.5">
-                        <input
-                          type="text"
-                          value={replyText[q.id] || ''}
-                          onChange={(e) => setReplyText((prev) => ({ ...prev, [q.id]: e.target.value }))}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAnswer(q.id)}
-                          placeholder={isOwnerOrAdmin ? 'Reply as owner...' : 'Add an answer...'}
-                          className="flex-1 bg-aurora-surface rounded-lg px-3 py-2 text-xs text-aurora-text placeholder:text-aurora-text-muted border border-aurora-border focus:outline-none focus:ring-2 focus:ring-aurora-indigo/30"
-                          maxLength={500}
-                        />
-                        <button
-                          onClick={() => handleAnswer(q.id)}
-                          disabled={!replyText[q.id]?.trim() || replySubmitting === q.id}
-                          className="px-2.5 py-2 bg-aurora-indigo text-white rounded-lg text-xs font-medium hover:bg-aurora-indigo/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                        </button>
+              {/* Answers — visible when <details> is open */}
+              <div className="px-4 pb-3 space-y-2.5 border-t border-aurora-border/50">
+                {q.answers.length > 0 ? (
+                  q.answers.map((a) => (
+                    <div key={a.id} className="flex items-start gap-2.5 pt-2.5">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${a.isOwner ? 'bg-emerald-100 dark:bg-emerald-500/20' : 'bg-aurora-surface'}`}>
+                        {a.isOwner ? (
+                          <Shield className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <User className="w-3 h-3 text-aurora-text-muted" />
+                        )}
                       </div>
-                    )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-aurora-text">{a.userName}</span>
+                          {a.isOwner && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                              Owner
+                            </span>
+                          )}
+                          <span className="text-[10px] text-aurora-text-muted">{timeAgo(a.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-aurora-text-secondary leading-relaxed mt-0.5">{a.text}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-aurora-text-muted pt-2.5 italic">No answers yet</p>
+                )}
+
+                {/* Reply form */}
+                {user && (
+                  <div className="flex gap-2 pt-1.5">
+                    <input
+                      type="text"
+                      value={replyText[q.id] || ''}
+                      onChange={(e) => setReplyText((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAnswer(q.id)}
+                      placeholder={isOwnerOrAdmin ? 'Reply as owner...' : 'Add an answer...'}
+                      className="flex-1 bg-aurora-surface rounded-lg px-3 py-2 text-xs text-aurora-text placeholder:text-aurora-text-muted border border-aurora-border focus:outline-none focus:ring-2 focus:ring-aurora-indigo/30"
+                      maxLength={500}
+                    />
+                    <button
+                      onClick={() => handleAnswer(q.id)}
+                      disabled={!replyText[q.id]?.trim() || replySubmitting === q.id}
+                      className="px-2.5 py-2 bg-aurora-indigo text-white rounded-lg text-xs font-medium hover:bg-aurora-indigo/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
               </div>
-            );
-          })}
+            </details>
+          ))}
         </div>
       ) : (
         <div className="text-center py-6">
