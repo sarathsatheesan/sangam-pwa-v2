@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  X, Trash2, Edit3, Loader2, Flag, Ban, Scale,
+  X, Trash2, Edit3, Loader2, Flag, Ban, Scale, BadgeCheck, ShieldOff,
 } from 'lucide-react';
 import { REPORT_CATEGORIES } from '@/components/business/businessConstants';
 import type { Business } from '@/reducers/businessReducer';
@@ -176,6 +176,7 @@ export interface ContextMenuProps {
   biz: Business;
   menuPosition: { top: number; right: number };
   isOwnerOrAdmin: (b: Business) => boolean;
+  userRole?: string;
   user: any;
   reportedBusinesses: Set<string>;
   blockedUsers: Set<string>;
@@ -184,6 +185,7 @@ export interface ContextMenuProps {
   handleDeleteBusiness: (id: string) => void;
   openReportModal: (id: string) => void;
   openBlockConfirm: (ownerId: string, name: string) => void;
+  onVerifyToggle: (biz: Business) => void;
   dispatch: React.Dispatch<any>;
   selectedBusiness: Business | null;
 }
@@ -192,6 +194,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   biz,
   menuPosition,
   isOwnerOrAdmin,
+  userRole,
   user,
   reportedBusinesses,
   blockedUsers,
@@ -200,6 +203,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   handleDeleteBusiness,
   openReportModal,
   openBlockConfirm,
+  onVerifyToggle,
   dispatch,
   selectedBusiness,
 }) => {
@@ -256,6 +260,23 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
               <Trash2 size={16} aria-hidden="true" /> Delete Business
             </button>
           </>
+        )}
+        {userRole === 'admin' && (
+          <button
+            role="menuitem"
+            onClick={(e) => { e.stopPropagation(); closeMenu(); onVerifyToggle(biz); }}
+            className={`w-full flex items-center gap-3 text-left px-4 py-2.5 text-sm transition-colors focus-visible:outline-none ${
+              biz.verified
+                ? 'text-aurora-text-secondary hover:bg-aurora-surface-variant focus-visible:bg-aurora-surface-variant'
+                : 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 focus-visible:bg-blue-50'
+            }`}
+          >
+            {biz.verified ? (
+              <><ShieldOff size={16} aria-hidden="true" /> Remove Verification</>
+            ) : (
+              <><BadgeCheck size={16} aria-hidden="true" /> Verify Business</>
+            )}
+          </button>
         )}
         <button
           role="menuitem"

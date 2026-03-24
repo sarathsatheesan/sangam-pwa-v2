@@ -208,6 +208,17 @@ export function useBusinessData(
         viewCount: 0,
         contactClicks: 0,
         shareCount: 0,
+        // Verification — auto-verify if TIN is validated or user is admin
+        ...(userProfile?.tinValidationStatus === 'valid' || userRole === 'admin' ? {
+          verified: true,
+          verifiedAt: Timestamp.now(),
+          verificationMethod: userProfile?.tinValidationStatus === 'valid' ? 'tin' : 'admin',
+        } : {
+          verified: false,
+        }),
+        // Followers
+        followers: [],
+        followerCount: 0,
       });
       dispatch({ type: 'RESET_CREATE_FORM' });
       dispatch({ type: 'SET_LAST_DOC', payload: null });

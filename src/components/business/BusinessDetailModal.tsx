@@ -320,6 +320,22 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
         <div className="flex-1 overflow-y-auto">
           <div className="p-5 space-y-6">
 
+            {/* Verification Badge Banner */}
+            {business.verified && (
+              <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-500/10 rounded-xl px-4 py-2.5 border border-blue-200/50 dark:border-blue-500/20">
+                <BadgeCheck className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">Verified Business</p>
+                  <p className="text-[11px] text-blue-600/70 dark:text-blue-400/60">
+                    {business.verificationMethod === 'tin' ? 'Verified via TIN / Tax ID'
+                      : business.verificationMethod === 'admin' ? 'Verified by admin'
+                      : business.verificationMethod === 'document' ? 'Verified via document review'
+                      : 'Identity confirmed'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons Row: Message + Follow */}
             {user && business.ownerId && business.ownerId !== user.uid && (
               <div className="flex gap-2">

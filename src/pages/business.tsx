@@ -160,6 +160,32 @@ export default function BusinessPage() {
     }
   }, [state.businesses, dispatch]);
 
+  // ── Admin: Toggle business verification ──
+  const handleVerifyToggle = useCallback(async (biz: Business) => {
+    const newVerified = !biz.verified;
+    try {
+      const bizRef = doc(db, 'businesses', biz.id);
+      if (newVerified) {
+        await updateDoc(bizRef, {
+          verified: true,
+          verifiedAt: new Date(),
+          verificationMethod: 'admin',
+        });
+      } else {
+        await updateDoc(bizRef, {
+          verified: false,
+          verifiedAt: null,
+          verificationMethod: null,
+        });
+      }
+      dispatch({ type: 'UPDATE_BUSINESS', payload: { ...biz, verified: newVerified, verifiedAt: newVerified ? new Date() : null, verificationMethod: newVerified ? 'admin' : undefined } });
+      dispatch({ type: 'SET_TOAST', payload: newVerified ? `${biz.name} has been verified!` : `Verification removed from ${biz.name}` });
+    } catch (err) {
+      console.error('Failed to toggle verification:', err);
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to update verification. Please try again.' });
+    }
+  }, [dispatch]);
+
   // ── Load following state on mount ──
   useEffect(() => {
     if (!user?.uid || state.businesses.length === 0) return;
@@ -713,6 +739,7 @@ export default function BusinessPage() {
             biz={biz}
             menuPosition={state.menuPosition}
             isOwnerOrAdmin={isOwnerOrAdmin}
+            userRole={userRole}
             user={user}
             reportedBusinesses={state.reportedBusinesses}
             blockedUsers={state.blockedUsers}
@@ -721,6 +748,7 @@ export default function BusinessPage() {
             handleDeleteBusiness={handleDeleteBusiness}
             openReportModal={openReportModal}
             openBlockConfirm={openBlockConfirm}
+            onVerifyToggle={handleVerifyToggle}
             dispatch={dispatch}
             selectedBusiness={state.selectedBusiness}
           />
