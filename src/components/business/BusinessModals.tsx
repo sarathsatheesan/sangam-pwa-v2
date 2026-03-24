@@ -25,7 +25,12 @@ function useModalA11y(
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key === 'Escape') {
+        // Stop ESC from reaching parent modals (e.g. BusinessDetailModal)
+        e.stopImmediatePropagation();
+        onClose();
+        return;
+      }
       if (e.key === 'Tab' && ref.current) {
         const focusable = ref.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -40,11 +45,12 @@ function useModalA11y(
         }
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
+    // Use capture phase so this fires BEFORE parent modal listeners
+    document.addEventListener('keydown', handleKeyDown, true);
     const prev = document.activeElement as HTMLElement;
     ref.current?.focus();
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown, true);
       prev?.focus?.();
     };
   }, [ref, onClose]);
