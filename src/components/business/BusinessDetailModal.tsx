@@ -14,86 +14,39 @@ import { recordView, recordContactClick, recordShare } from '@/services/business
 import { parseOpenNow } from '@/components/business/businessUtils';
 
 // ── Photo carousel (local to detail modal) ──
+// Navigation arrows are rendered at hero-banner level (not inside this component)
+// so they sit above the gradient overlay z-index stacking context.
 const BusinessPhotoCarousel: React.FC<{
   photos: string[];
   title: string;
-}> = ({ photos, title }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showLightbox, setShowLightbox] = useState(false);
-  const touchStartRef = useRef<{ x: number; time: number } | null>(null);
+  currentIndex: number;
+  onShowLightbox: () => void;
+  onTouchStart: (e: React.TouchEvent) => void;
+  onTouchEnd: (e: React.TouchEvent) => void;
+}> = ({ photos, title, currentIndex, onShowLightbox, onTouchStart, onTouchEnd }) => {
   if (!photos.length) return null;
 
-  const goPrev = () => setCurrentIndex((p) => (p - 1 + photos.length) % photos.length);
-  const goNext = () => setCurrentIndex((p) => (p + 1) % photos.length);
-
-  // Touch swipe handlers for mobile (with safety checks for iOS/Android)
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (!e.touches || e.touches.length === 0) return;
-    touchStartRef.current = { x: e.touches[0].clientX, time: Date.now() };
-  };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStartRef.current || !e.changedTouches || e.changedTouches.length === 0) return;
-    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
-    const dt = Date.now() - touchStartRef.current.time;
-    if (Math.abs(dx) > 40 && dt < 400) {
-      if (dx > 0) goPrev();
-      else goNext();
-    }
-    touchStartRef.current = null;
-  };
-
   return (
-    <>
-      <div
-        className="relative w-full h-full z-[2]"
-        role="region"
-        aria-label={`Photo gallery for ${title}`}
-        aria-roledescription="carousel"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <img
-          src={photos[currentIndex]}
-          alt={`${title} — photo ${currentIndex + 1} of ${photos.length}`}
-          decoding="async"
-          className="w-full h-full object-cover cursor-pointer"
-          onClick={(e) => { e.stopPropagation(); setShowLightbox(true); }}
-          role="button"
-          tabIndex={0}
-          aria-label="Click to enlarge photo"
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setShowLightbox(true); } }}
-        />
-        {photos.length > 1 && (
-          <>
-            <button
-              onClick={(e) => { e.stopPropagation(); goPrev(); }}
-              aria-label="Previous photo"
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[3] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); goNext(); }}
-              aria-label="Next photo"
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[3] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2.5 py-0.5 rounded-full text-xs z-[3]" aria-live="polite" aria-atomic="true">
-              {currentIndex + 1} / {photos.length}
-            </div>
-          </>
-        )}
-      </div>
-      {showLightbox && (
-        <PhotoLightbox
-          photos={photos}
-          initialIndex={currentIndex}
-          title={title}
-          onClose={() => setShowLightbox(false)}
-        />
-      )}
-    </>
+    <div
+      className="relative w-full h-full z-[2]"
+      role="region"
+      aria-label={`Photo gallery for ${title}`}
+      aria-roledescription="carousel"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      <img
+        src={photos[currentIndex]}
+        alt={`${title} — photo ${currentIndex + 1} of ${photos.length}`}
+        decoding="async"
+        className="w-full h-full object-cover cursor-pointer"
+        onClick={(e) => { e.stopPropagation(); onShowLightbox(); }}
+        role="button"
+        tabIndex={0}
+        aria-label="Click to enlarge photo"
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onShowLightbox(); } }}
+      />
+    </div>
   );
 };
 
@@ -145,6 +98,34 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
   const [showDealForm, setShowDealForm] = useState(false);
   const [editingDeals, setEditingDeals] = useState<import('@/reducers/businessReducer').Deal[]>(business.deals || []);
   const [newDeal, setNewDeal] = useState({ title: '', description: '', discount: '', code: '', expiresAt: '' });
+
+  // ── Photo carousel state (lifted here so arrows render at hero-banner z-level) ──
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const carouselTouchRef = useRef<{ x: number; time: number } | null>(null);
+  const carouselPhotos = business.photos || [];
+  const carouselGoPrev = useCallback(() => {
+    if (carouselPhotos.length < 2) return;
+    setCarouselIndex((p) => (p - 1 + carouselPhotos.length) % carouselPhotos.length);
+  }, [carouselPhotos.length]);
+  const carouselGoNext = useCallback(() => {
+    if (carouselPhotos.length < 2) return;
+    setCarouselIndex((p) => (p + 1) % carouselPhotos.length);
+  }, [carouselPhotos.length]);
+  const handleCarouselTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!e.touches || e.touches.length === 0) return;
+    carouselTouchRef.current = { x: e.touches[0].clientX, time: Date.now() };
+  }, []);
+  const handleCarouselTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!carouselTouchRef.current || !e.changedTouches || e.changedTouches.length === 0) return;
+    const dx = e.changedTouches[0].clientX - carouselTouchRef.current.x;
+    const dt = Date.now() - carouselTouchRef.current.time;
+    if (Math.abs(dx) > 40 && dt < 400) {
+      if (dx > 0) carouselGoPrev();
+      else carouselGoNext();
+    }
+    carouselTouchRef.current = null;
+  }, [carouselGoPrev, carouselGoNext]);
 
   // Share business
   const handleShare = useCallback(async () => {
@@ -317,12 +298,41 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
             background: business.photos?.length ? '#000' : `linear-gradient(135deg, ${business.bgColor}, ${business.bgColor}cc)`,
           }}
         >
-          {business.photos && business.photos.length > 0 && (
+          {carouselPhotos.length > 0 && (
             <div className="absolute inset-0">
-              <BusinessPhotoCarousel photos={business.photos} title={business.name} />
+              <BusinessPhotoCarousel
+                photos={carouselPhotos}
+                title={business.name}
+                currentIndex={carouselIndex}
+                onShowLightbox={() => setShowLightbox(true)}
+                onTouchStart={handleCarouselTouchStart}
+                onTouchEnd={handleCarouselTouchEnd}
+              />
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent sm:rounded-t-2xl pointer-events-none z-[3]" />
+          {/* Carousel nav arrows — rendered at hero-banner level so they sit ABOVE the gradient overlay */}
+          {carouselPhotos.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); carouselGoPrev(); }}
+                aria-label="Previous photo"
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[4] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); carouselGoNext(); }}
+                aria-label="Next photo"
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors z-[4] focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2.5 py-0.5 rounded-full text-xs z-[4]" aria-live="polite" aria-atomic="true">
+                {carouselIndex + 1} / {carouselPhotos.length}
+              </div>
+            </>
+          )}
           {business.promoted && (
             <div className="absolute top-3 left-3 z-[4]">
               <span className="px-2.5 py-1 bg-amber-400 text-amber-900 text-[11px] font-bold rounded-lg flex items-center gap-1">
@@ -932,6 +942,15 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
           </div>
         )}
       </div>
+      {/* Photo lightbox — rendered outside modal container for full-screen overlay */}
+      {showLightbox && carouselPhotos.length > 0 && (
+        <PhotoLightbox
+          photos={carouselPhotos}
+          initialIndex={carouselIndex}
+          title={business.name}
+          onClose={() => setShowLightbox(false)}
+        />
+      )}
     </div>
   );
 };
