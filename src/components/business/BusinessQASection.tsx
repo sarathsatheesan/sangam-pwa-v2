@@ -278,36 +278,38 @@ const BusinessQASection: React.FC<BusinessQASectionProps> = ({ business, user, i
         <div className="space-y-2.5">
           {/* Cross-browser CSS for native <details>/<summary> — hides default marker, adds chevron rotation */}
           <style>{`
-            .qa-details summary { list-style: none; cursor: pointer; }
+            .qa-details summary { list-style: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
             .qa-details summary::-webkit-details-marker { display: none; }
             .qa-details summary::marker { display: none; content: ''; }
-            .qa-details .qa-chevron { transition: transform 0.2s ease; }
-            .qa-details[open] .qa-chevron { transform: rotate(180deg); }
+            .qa-details .qa-chevron { transition: transform 0.2s ease; transform: rotate(-90deg); }
+            .qa-details[open] .qa-chevron { transform: rotate(0deg); }
           `}</style>
           {filteredQuestions.map((q) => (
-            <details key={q.id} className="qa-details bg-aurora-surface-variant rounded-xl overflow-hidden group">
-              {/* Question — native collapsible summary */}
-              <summary className="px-4 py-3 flex items-start gap-3 hover:bg-aurora-border/20 transition-colors select-none">
-                <div className="w-7 h-7 rounded-full bg-aurora-indigo/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <User className="w-3.5 h-3.5 text-aurora-indigo" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-aurora-text leading-relaxed">{q.text}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[11px] text-aurora-text-muted">{q.userName}</span>
-                    <span className="text-[11px] text-aurora-text-muted">·</span>
-                    <span className="text-[11px] text-aurora-text-muted">{timeAgo(q.createdAt)}</span>
-                    {q.answers.length > 0 && (
-                      <>
-                        <span className="text-[11px] text-aurora-text-muted">·</span>
-                        <span className="text-[11px] font-medium text-aurora-indigo">
-                          {q.answers.length} answer{q.answers.length !== 1 ? 's' : ''}
-                        </span>
-                      </>
-                    )}
+            <details key={q.id} className="qa-details bg-aurora-surface-variant rounded-xl overflow-hidden">
+              {/* Question — native collapsible summary; inner div handles flex for iOS Safari compat */}
+              <summary className="select-none hover:bg-aurora-border/20 transition-colors">
+                <div className="px-4 py-3 flex items-start gap-3">
+                  <div className="w-7 h-7 rounded-full bg-aurora-indigo/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <User className="w-3.5 h-3.5 text-aurora-indigo" />
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-aurora-text leading-relaxed">{q.text}</p>
+                    <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-1.5">
+                      <span className="text-[11px] text-aurora-text-muted">{q.userName}</span>
+                      <span className="text-[11px] text-aurora-text-muted">·</span>
+                      <span className="text-[11px] text-aurora-text-muted">{timeAgo(q.createdAt)}</span>
+                      {q.answers.length > 0 && (
+                        <>
+                          <span className="text-[11px] text-aurora-text-muted">·</span>
+                          <span className="text-[11px] font-medium text-aurora-indigo">
+                            {q.answers.length} answer{q.answers.length !== 1 ? 's' : ''}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronDown className="qa-chevron w-4 h-4 text-aurora-text-muted flex-shrink-0 mt-1" />
                 </div>
-                <ChevronDown className="qa-chevron w-4 h-4 text-aurora-text-muted flex-shrink-0 mt-1 -rotate-90" />
               </summary>
 
               {/* Answers — visible when <details> is open */}
