@@ -62,6 +62,7 @@ import {
   Filter,
   AlertOctagon,
   MessageCircle,
+  BadgeCheck,
 } from 'lucide-react';
 
 // ─── Interfaces ──────────────────────────────────────────
@@ -74,6 +75,7 @@ interface Listing {
   posterName: string;
   posterId: string;
   isDisabled?: boolean;
+  verified?: boolean;
   createdAt?: any;
 }
 
@@ -754,6 +756,7 @@ export default function AdminPage() {
           posterName: data.ownerName || data.posterName || 'Unknown',
           posterId: data.ownerId || data.posterId || '',
           isDisabled: data.isDisabled || false,
+          verified: data.verified || false,
           createdAt: data.createdAt,
         });
       });
@@ -851,6 +854,31 @@ export default function AdminPage() {
         }
       }
     });
+  }
+
+  async function toggleVerifyListing(listing: Listing) {
+    if (listing.source !== 'business') return;
+    const newVerified = !listing.verified;
+    try {
+      if (newVerified) {
+        await updateDoc(doc(db, 'businesses', listing.id), {
+          verified: true,
+          verifiedAt: new Date(),
+          verificationMethod: 'admin',
+        });
+      } else {
+        await updateDoc(doc(db, 'businesses', listing.id), {
+          verified: false,
+          verifiedAt: null,
+          verificationMethod: null,
+        });
+      }
+      setListings((prev) => prev.map((l) => l.id === listing.id ? { ...l, verified: newVerified } : l));
+      setToastMessage(newVerified ? `${listing.title} has been verified!` : `Verification removed from ${listing.title}`);
+    } catch (error) {
+      console.error('Error toggling verification:', error);
+      setToastMessage('Failed to update verification status');
+    }
   }
 
   async function deleteAllListingsByUser(userId: string, userName: string) {
@@ -1781,6 +1809,9 @@ export default function AdminPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className={`font-semibold text-sm truncate ${listing.isDisabled ? 'text-[var(--aurora-text-secondary)] line-through' : 'text-[var(--aurora-text)]'}`}>{listing.title}</p>
+                            {listing.source === 'business' && listing.verified && (
+                              <BadgeCheck size={14} className="flex-shrink-0 text-blue-500" />
+                            )}
                             {listing.isDisabled && (
                               <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
                                 Disabled
@@ -1796,6 +1827,15 @@ export default function AdminPage() {
                           {sourceLabel(listing.source)}
                         </span>
                         <div className="flex items-center gap-1 flex-shrink-0">
+                          {listing.source === 'business' && (
+                            <button
+                              onClick={() => toggleVerifyListing(listing)}
+                              className={`p-2 rounded-lg transition ${listing.verified ? 'text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20' : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/40'}`}
+                              title={listing.verified ? 'Remove verification' : 'Verify business'}
+                            >
+                              <BadgeCheck size={16} />
+                            </button>
+                          )}
                           <button
                             onClick={() => toggleDisableListing(listing)}
                             className={`p-2 rounded-lg transition ${listing.isDisabled ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
