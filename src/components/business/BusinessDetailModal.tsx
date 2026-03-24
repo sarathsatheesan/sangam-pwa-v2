@@ -15,11 +15,37 @@ const BusinessPhotoCarousel: React.FC<{
 }> = ({ photos, title }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showLightbox, setShowLightbox] = useState(false);
+  const touchStartRef = useRef<{ x: number; time: number } | null>(null);
   if (!photos.length) return null;
+
+  const goPrev = () => setCurrentIndex((p) => (p - 1 + photos.length) % photos.length);
+  const goNext = () => setCurrentIndex((p) => (p + 1) % photos.length);
+
+  // Touch swipe handlers for mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, time: Date.now() };
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const dt = Date.now() - touchStartRef.current.time;
+    if (Math.abs(dx) > 40 && dt < 400) {
+      if (dx > 0) goPrev();
+      else goNext();
+    }
+    touchStartRef.current = null;
+  };
 
   return (
     <>
-      <div className="relative w-full h-full" role="region" aria-label={`Photo gallery for ${title}`} aria-roledescription="carousel">
+      <div
+        className="relative w-full h-full z-[2]"
+        role="region"
+        aria-label={`Photo gallery for ${title}`}
+        aria-roledescription="carousel"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <img
           src={photos[currentIndex]}
           alt={`${title} — photo ${currentIndex + 1} of ${photos.length}`}
@@ -34,16 +60,16 @@ const BusinessPhotoCarousel: React.FC<{
         {photos.length > 1 && (
           <>
             <button
-              onClick={(e) => { e.stopPropagation(); setCurrentIndex((p) => (p - 1 + photos.length) % photos.length); }}
+              onClick={(e) => { e.stopPropagation(); goPrev(); }}
               aria-label="Previous photo"
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              className="absolute left-2 bottom-8 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); setCurrentIndex((p) => (p + 1) % photos.length); }}
+              onClick={(e) => { e.stopPropagation(); goNext(); }}
               aria-label="Next photo"
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              className="absolute right-2 bottom-8 bg-black/50 text-white p-1.5 rounded-full hover:bg-black/70 transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -236,15 +262,15 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
               <BusinessPhotoCarousel photos={business.photos} title={business.name} />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent sm:rounded-t-2xl" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 to-transparent sm:rounded-t-2xl pointer-events-none z-[3]" />
           {business.promoted && (
-            <div className="absolute top-3 left-3">
+            <div className="absolute top-3 left-3 z-[4]">
               <span className="px-2.5 py-1 bg-amber-400 text-amber-900 text-[11px] font-bold rounded-lg flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> FEATURED
               </span>
             </div>
           )}
-          <div className="relative flex items-center gap-4">
+          <div className="relative z-[4] flex items-center gap-4">
             <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-3xl">
               {business.emoji}
             </div>
