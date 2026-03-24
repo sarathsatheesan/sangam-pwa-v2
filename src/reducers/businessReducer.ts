@@ -47,6 +47,13 @@ export interface Business {
   viewCount?: number;
   contactClicks?: number;
   shareCount?: number;
+  // Verification (#32)
+  verified?: boolean;
+  verifiedAt?: any;
+  verificationMethod?: 'tin' | 'admin' | 'document';
+  // Followers (#34)
+  followers?: string[];
+  followerCount?: number;
 }
 
 export interface Deal {
@@ -140,10 +147,11 @@ export interface BusinessState {
   searchQuery: string;
   debouncedSearchQuery: string;
   searchFocused: boolean;
-  activeCollection: 'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites';
+  activeCollection: 'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites' | 'following';
 
-  // Favorites
+  // Favorites & Following
   favorites: Set<string>;
+  following: Set<string>;
 
   // Edit state
   editData: any;
@@ -239,6 +247,7 @@ export function createInitialState(): BusinessState {
     activeCollection: 'all',
 
     favorites: new Set(),
+    following: new Set(),
 
     editData: {},
     editPhotos: [],
@@ -330,10 +339,12 @@ export type BusinessAction =
   | { type: 'SET_SEARCH_QUERY'; payload: string }
   | { type: 'SET_DEBOUNCED_SEARCH'; payload: string }
   | { type: 'SET_SEARCH_FOCUSED'; payload: boolean }
-  | { type: 'SET_ACTIVE_COLLECTION'; payload: 'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites' }
+  | { type: 'SET_ACTIVE_COLLECTION'; payload: 'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites' | 'following' }
 
-  // Favorites
+  // Favorites & Following
   | { type: 'SET_FAVORITES'; payload: Set<string> }
+  | { type: 'SET_FOLLOWING'; payload: Set<string> }
+  | { type: 'TOGGLE_FOLLOW'; payload: string }
 
   // Edit
   | { type: 'SET_EDIT_DATA'; payload: any }
@@ -459,9 +470,20 @@ export function businessReducer(state: BusinessState, action: BusinessAction): B
     case 'SET_ACTIVE_COLLECTION':
       return { ...state, activeCollection: action.payload };
 
-    // ── Favorites ──
+    // ── Favorites & Following ──
     case 'SET_FAVORITES':
       return { ...state, favorites: action.payload };
+    case 'SET_FOLLOWING':
+      return { ...state, following: action.payload };
+    case 'TOGGLE_FOLLOW': {
+      const nextFollowing = new Set(state.following);
+      if (nextFollowing.has(action.payload)) {
+        nextFollowing.delete(action.payload);
+      } else {
+        nextFollowing.add(action.payload);
+      }
+      return { ...state, following: nextFollowing };
+    }
 
     // ── Edit ──
     case 'SET_EDIT_DATA':

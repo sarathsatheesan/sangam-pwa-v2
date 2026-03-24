@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MapPin, Phone, Mail, Globe, Clock, Star, ChevronRight, ChevronLeft,
   X, Heart, Sparkles, ShoppingBag, ExternalLink, Trash2, Edit3,
-  MoreHorizontal, Share2, BarChart3,
+  MoreHorizontal, Share2, BarChart3, MessageCircle, BadgeCheck, UserPlus,
+  UserMinus, Plus, Calendar, Percent, Tag, Trash,
 } from 'lucide-react';
 import { getGoogleMapsUrl } from '@/components/business/businessValidation';
 import PhotoLightbox from '@/components/business/PhotoLightbox';
@@ -96,6 +97,7 @@ const BusinessPhotoCarousel: React.FC<{
 export interface BusinessDetailModalProps {
   business: Business;
   favorites: Set<string>;
+  following: Set<string>;
   businessReviews: BusinessReview[];
   showReviewForm: boolean;
   newReview: { rating: number; text: string };
@@ -103,10 +105,12 @@ export interface BusinessDetailModalProps {
   isOwnerOrAdmin: (b: Business) => boolean;
   dispatch: React.Dispatch<any>;
   toggleFavorite: (id: string, e: React.MouseEvent) => void;
+  toggleFollow: (id: string) => void;
   openMenu: (id: string, e: React.MouseEvent) => void;
   handleStartEdit: () => void;
   handleDeleteBusiness: (id: string) => void;
   handleAddReview: () => void;
+  handleSaveDeals: (businessId: string, deals: import('@/reducers/businessReducer').Deal[]) => void;
   // Analytics (owner dashboard)
   analyticsData: BusinessAnalytics | null;
   analyticsLoading: boolean;
@@ -115,6 +119,7 @@ export interface BusinessDetailModalProps {
 const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
   business,
   favorites,
+  following,
   businessReviews,
   showReviewForm,
   newReview,
@@ -122,16 +127,21 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
   isOwnerOrAdmin,
   dispatch,
   toggleFavorite,
+  toggleFollow,
   openMenu,
   handleStartEdit,
   handleDeleteBusiness,
   handleAddReview,
+  handleSaveDeals,
   analyticsData,
   analyticsLoading,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const [shareToast, setShareToast] = useState<string | null>(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showDealForm, setShowDealForm] = useState(false);
+  const [editingDeals, setEditingDeals] = useState<import('@/reducers/businessReducer').Deal[]>(business.deals || []);
+  const [newDeal, setNewDeal] = useState({ title: '', description: '', discount: '', code: '', expiresAt: '' });
 
   // Share business
   const handleShare = useCallback(async () => {
@@ -290,7 +300,12 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
               {business.emoji}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white leading-tight">{business.name}</h2>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-xl font-bold text-white leading-tight">{business.name}</h2>
+                {business.verified && (
+                  <BadgeCheck className="w-5 h-5 text-blue-400 flex-shrink-0" aria-label="Verified business" />
+                )}
+              </div>
               <p className="text-white/80 text-sm">{business.category}</p>
               <div className="flex items-center gap-2 mt-1">
                 <Star className="w-4 h-4 fill-amber-300 text-amber-300" />
@@ -304,6 +319,38 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-5 space-y-6">
+
+            {/* Action Buttons Row: Message + Follow */}
+            {user && business.ownerId && business.ownerId !== user.uid && (
+              <div className="flex gap-2">
+                <a
+                  href={`/messages?user=${business.ownerId}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    recordContactClick(business.id);
+                    window.location.href = `/messages?user=${business.ownerId}`;
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 bg-aurora-indigo text-white py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-indigo/90 transition-colors focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none"
+                  aria-label={`Message ${business.name}`}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Message Business
+                </a>
+                <button
+                  onClick={() => toggleFollow(business.id)}
+                  aria-label={following.has(business.id) ? `Unfollow ${business.name}` : `Follow ${business.name}`}
+                  aria-pressed={following.has(business.id)}
+                  className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none ${
+                    following.has(business.id)
+                      ? 'bg-aurora-indigo/10 text-aurora-indigo border border-aurora-indigo/30 hover:bg-aurora-indigo/20'
+                      : 'bg-aurora-surface-variant text-aurora-text hover:bg-aurora-border/30 border border-aurora-border'
+                  }`}
+                >
+                  {following.has(business.id) ? <UserMinus className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                  {following.has(business.id) ? 'Following' : 'Follow'}
+                </button>
+              </div>
+            )}
 
             {/* About */}
             {business.desc && (
@@ -449,21 +496,130 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
             )}
 
             {/* Deals */}
-            {business.deals && business.deals.length > 0 && (
+            {(business.deals && business.deals.length > 0) || isOwnerOrAdmin(business) ? (
               <div>
-                <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider mb-2">Current Deals</h4>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-semibold text-aurora-text-muted uppercase tracking-wider">Current Deals</h4>
+                  {isOwnerOrAdmin(business) && (
+                    <button
+                      onClick={() => setShowDealForm((v) => !v)}
+                      className="text-xs text-aurora-indigo font-medium hover:underline flex items-center gap-1"
+                      aria-expanded={showDealForm}
+                    >
+                      <Plus className="w-3.5 h-3.5" /> {showDealForm ? 'Cancel' : 'Manage Deals'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Deal creation form (owner only) */}
+                {showDealForm && isOwnerOrAdmin(business) && (
+                  <div className="space-y-3 bg-aurora-surface-variant rounded-xl p-4 border border-aurora-indigo/20 mb-3">
+                    <h5 className="text-sm font-semibold text-aurora-text">Add New Deal</h5>
+                    <input
+                      type="text"
+                      placeholder="Deal title (e.g., Grand Opening Special)"
+                      value={newDeal.title}
+                      onChange={(e) => setNewDeal({ ...newDeal, title: e.target.value })}
+                      className="w-full px-3 py-2 bg-aurora-surface border border-aurora-border rounded-lg text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                    />
+                    <textarea
+                      placeholder="Description (optional)"
+                      value={newDeal.description}
+                      onChange={(e) => setNewDeal({ ...newDeal, description: e.target.value })}
+                      className="w-full px-3 py-2 bg-aurora-surface border border-aurora-border rounded-lg text-sm text-aurora-text placeholder:text-aurora-text-muted resize-none focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                      rows={2}
+                    />
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="text-[10px] text-aurora-text-muted font-medium uppercase flex items-center gap-1 mb-1"><Percent className="w-3 h-3" /> Discount %</label>
+                        <input
+                          type="number"
+                          placeholder="e.g., 20"
+                          value={newDeal.discount}
+                          onChange={(e) => setNewDeal({ ...newDeal, discount: e.target.value })}
+                          className="w-full px-3 py-2 bg-aurora-surface border border-aurora-border rounded-lg text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-[10px] text-aurora-text-muted font-medium uppercase flex items-center gap-1 mb-1"><Tag className="w-3 h-3" /> Promo Code</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., SAVE20"
+                          value={newDeal.code}
+                          onChange={(e) => setNewDeal({ ...newDeal, code: e.target.value })}
+                          className="w-full px-3 py-2 bg-aurora-surface border border-aurora-border rounded-lg text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-aurora-text-muted font-medium uppercase flex items-center gap-1 mb-1"><Calendar className="w-3 h-3" /> Expires</label>
+                      <input
+                        type="date"
+                        value={newDeal.expiresAt}
+                        onChange={(e) => setNewDeal({ ...newDeal, expiresAt: e.target.value })}
+                        className="w-full px-3 py-2 bg-aurora-surface border border-aurora-border rounded-lg text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!newDeal.title.trim()) return;
+                        const deal = {
+                          id: `deal_${Date.now()}`,
+                          title: newDeal.title.trim(),
+                          description: newDeal.description.trim() || undefined,
+                          discount: newDeal.discount ? Number(newDeal.discount) : undefined,
+                          code: newDeal.code.trim() || undefined,
+                          expiresAt: newDeal.expiresAt || undefined,
+                        };
+                        const updatedDeals = [...editingDeals, deal];
+                        setEditingDeals(updatedDeals);
+                        handleSaveDeals(business.id, updatedDeals);
+                        setNewDeal({ title: '', description: '', discount: '', code: '', expiresAt: '' });
+                      }}
+                      disabled={!newDeal.title.trim()}
+                      className="w-full px-3 py-2.5 bg-aurora-indigo text-white rounded-xl text-sm font-medium hover:bg-aurora-indigo/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Add Deal
+                    </button>
+                  </div>
+                )}
+
+                {/* Display existing deals */}
                 <div className="space-y-2">
-                  {business.deals.map((deal, idx) => (
-                    <div key={idx} className="bg-red-50 dark:bg-red-500/10 rounded-xl p-4 border border-red-200/50 dark:border-red-500/20">
+                  {editingDeals.map((deal, idx) => (
+                    <div key={deal.id || idx} className="bg-red-50 dark:bg-red-500/10 rounded-xl p-4 border border-red-200/50 dark:border-red-500/20 relative">
                       <h5 className="font-semibold text-red-700 dark:text-red-400 text-sm">{deal.title}</h5>
                       {deal.description && <p className="text-sm text-red-600 dark:text-red-300/80 mt-1">{deal.description}</p>}
-                      {deal.discount && <p className="text-sm text-red-700 dark:text-red-400 font-bold mt-1">{deal.discount}% Off</p>}
-                      {deal.code && <p className="text-xs text-red-600 dark:text-red-300/60 mt-1">Code: <span className="font-mono font-bold">{deal.code}</span></p>}
+                      <div className="flex items-center gap-3 mt-1">
+                        {deal.discount != null && <span className="text-sm text-red-700 dark:text-red-400 font-bold">{deal.discount}% Off</span>}
+                        {deal.code && <span className="text-xs text-red-600 dark:text-red-300/60">Code: <span className="font-mono font-bold">{deal.code}</span></span>}
+                        {deal.expiresAt && <span className="text-xs text-red-500/60">Expires: {typeof deal.expiresAt === 'string' ? deal.expiresAt : ''}</span>}
+                      </div>
+                      {isOwnerOrAdmin(business) && showDealForm && (
+                        <button
+                          onClick={() => {
+                            const updatedDeals = editingDeals.filter((_, i) => i !== idx);
+                            setEditingDeals(updatedDeals);
+                            handleSaveDeals(business.id, updatedDeals);
+                          }}
+                          aria-label={`Remove deal: ${deal.title}`}
+                          className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-red-200/50 dark:hover:bg-red-500/20 transition-colors"
+                        >
+                          <Trash className="w-3.5 h-3.5 text-red-500" />
+                        </button>
+                      )}
                     </div>
                   ))}
+                  {editingDeals.length === 0 && isOwnerOrAdmin(business) && !showDealForm && (
+                    <div className="text-center py-4 bg-aurora-surface-variant rounded-xl">
+                      <Tag className="w-5 h-5 text-aurora-text-muted mx-auto mb-1.5" />
+                      <p className="text-xs text-aurora-text-muted">No active deals</p>
+                      <button onClick={() => setShowDealForm(true)} className="text-xs text-aurora-indigo font-medium hover:underline mt-1">Create your first deal</button>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            ) : null}
 
             <div className="border-t border-aurora-border" />
 

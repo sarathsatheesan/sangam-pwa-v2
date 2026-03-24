@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  MapPin, Phone, Heart, Sparkles, Store, Star, MoreHorizontal,
+  MapPin, Phone, Heart, Sparkles, Store, Star, MoreHorizontal, BadgeCheck,
 } from 'lucide-react';
 import { CATEGORY_ICONS } from '@/components/business/businessConstants';
 import type { Business } from '@/reducers/businessReducer';
@@ -123,8 +123,9 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
 
       {/* Card Info */}
       <div className="p-4">
-        <h3 className="font-semibold text-aurora-text text-[15px] leading-tight mb-0.5 line-clamp-1 group-hover:text-aurora-indigo transition-colors">
+        <h3 className="font-semibold text-aurora-text text-[15px] leading-tight mb-0.5 line-clamp-1 group-hover:text-aurora-indigo transition-colors flex items-center gap-1">
           {business.name}
+          {business.verified && <BadgeCheck className="w-4 h-4 text-blue-500 flex-shrink-0" aria-label="Verified" />}
         </h3>
         <p className="text-xs text-aurora-text-muted mb-2">{business.category}</p>
 

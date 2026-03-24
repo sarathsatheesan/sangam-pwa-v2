@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useCallback, useReducer, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 import {
   Search, MapPin, Phone, Star, X, Plus, Heart, Sparkles, Store,
-  Filter, Loader2, TrendingUp, Map, List, Navigation,
+  Filter, Loader2, TrendingUp, Map, List, Navigation, UserPlus,
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
@@ -116,6 +118,61 @@ export default function BusinessPage() {
     dispatch({ type: 'SELECT_BUSINESS', payload: business });
     dispatch({ type: 'SET_ACTIVE_TAB', payload: 'about' });
   }, [dispatch]);
+
+  // ── Follow/Unfollow business ──
+  const toggleFollow = useCallback(async (businessId: string) => {
+    if (!user?.uid) return;
+    const isFollowing = state.following.has(businessId);
+    dispatch({ type: 'TOGGLE_FOLLOW', payload: businessId });
+    try {
+      const bizRef = doc(db, 'businesses', businessId);
+      if (isFollowing) {
+        await updateDoc(bizRef, {
+          followers: arrayRemove(user.uid),
+          followerCount: increment(-1),
+        });
+      } else {
+        await updateDoc(bizRef, {
+          followers: arrayUnion(user.uid),
+          followerCount: increment(1),
+        });
+      }
+    } catch (err) {
+      console.error('Failed to toggle follow:', err);
+      dispatch({ type: 'TOGGLE_FOLLOW', payload: businessId }); // revert on failure
+    }
+  }, [user?.uid, state.following, dispatch]);
+
+  // ── Save deals for a business ──
+  const handleSaveDeals = useCallback(async (businessId: string, deals: import('@/reducers/businessReducer').Deal[]) => {
+    try {
+      const bizRef = doc(db, 'businesses', businessId);
+      await updateDoc(bizRef, { deals });
+      // Update local state
+      const biz = state.businesses.find((b) => b.id === businessId);
+      if (biz) {
+        dispatch({ type: 'UPDATE_BUSINESS', payload: { ...biz, deals } });
+      }
+      dispatch({ type: 'SET_TOAST', payload: 'Deals updated successfully!' });
+    } catch (err) {
+      console.error('Failed to save deals:', err);
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to save deals. Please try again.' });
+    }
+  }, [state.businesses, dispatch]);
+
+  // ── Load following state on mount ──
+  useEffect(() => {
+    if (!user?.uid || state.businesses.length === 0) return;
+    const followedIds = new Set<string>();
+    for (const biz of state.businesses) {
+      if (biz.followers?.includes(user.uid)) {
+        followedIds.add(biz.id);
+      }
+    }
+    if (followedIds.size > 0) {
+      dispatch({ type: 'SET_FOLLOWING', payload: followedIds });
+    }
+  }, [user?.uid, state.businesses.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-dismiss toast ──
   useEffect(() => {
@@ -253,13 +310,14 @@ export default function BusinessPage() {
             <div className="border-t border-aurora-border bg-aurora-surface">
               <div className="max-w-6xl mx-auto px-4 py-3">
                 <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
-                  {(['all', 'topRated', 'new', 'mostReviewed', 'favorites'] as const).map((collection) => {
-                    const labels = {
+                  {(['all', 'topRated', 'new', 'mostReviewed', 'favorites', 'following'] as const).map((collection) => {
+                    const labels: Record<string, string> = {
                       all: 'All',
                       topRated: 'Top Rated',
                       new: 'New',
                       mostReviewed: 'Most Reviewed',
                       favorites: 'Favorites',
+                      following: 'Following',
                     };
                     return (
                       <button
@@ -273,6 +331,7 @@ export default function BusinessPage() {
                       >
                         {collection === 'topRated' && <TrendingUp className="w-3 h-3" />}
                         {collection === 'favorites' && <Heart className="w-3 h-3" />}
+                        {collection === 'following' && <UserPlus className="w-3 h-3" />}
                         {labels[collection]}
                       </button>
                     );
@@ -405,11 +464,13 @@ export default function BusinessPage() {
                 <h3 className="text-lg font-semibold text-aurora-text mb-1">
                   {state.searchQuery ? 'No results found'
                     : state.activeCollection === 'favorites' ? 'No favorites yet'
+                    : state.activeCollection === 'following' ? 'Not following anyone yet'
                     : 'No businesses found'}
                 </h3>
                 <p className="text-sm text-aurora-text-secondary max-w-xs">
                   {state.searchQuery ? `We couldn't find anything matching "${state.searchQuery}". Try different keywords or browse categories.`
                     : state.activeCollection === 'favorites' ? 'Heart the businesses you love and they will appear here.'
+                    : state.activeCollection === 'following' ? 'Follow businesses to get updates and see them here.'
                     : state.selectedHeritage.length > 0
                     ? `No businesses under "${state.selectedHeritage.join(', ')}" heritage yet. Be the first to add one!`
                     : state.selectedCategory !== 'All'
@@ -570,6 +631,7 @@ export default function BusinessPage() {
         <BusinessDetailModal
           business={state.selectedBusiness}
           favorites={state.favorites}
+          following={state.following}
           businessReviews={state.businessReviews}
           showReviewForm={state.showReviewForm}
           newReview={state.newReview}
@@ -577,10 +639,12 @@ export default function BusinessPage() {
           isOwnerOrAdmin={isOwnerOrAdmin}
           dispatch={dispatch}
           toggleFavorite={toggleFavorite}
+          toggleFollow={toggleFollow}
           openMenu={openMenu}
           handleStartEdit={handleStartEdit}
           handleDeleteBusiness={handleDeleteBusiness}
           handleAddReview={handleAddReview}
+          handleSaveDeals={handleSaveDeals}
           analyticsData={state.analyticsData}
           analyticsLoading={state.analyticsLoading}
         />

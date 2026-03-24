@@ -57,6 +57,8 @@ export function useBusinessFilters(
       filtered = filtered.sort((a, b) => b.reviews - a.reviews);
     } else if (state.activeCollection === 'favorites') {
       filtered = filtered.filter((b) => state.favorites.has(b.id));
+    } else if (state.activeCollection === 'following') {
+      filtered = filtered.filter((b) => state.following.has(b.id));
     } else {
       filtered = filtered.sort((a, b) => {
         if (a.promoted && !b.promoted) return -1;
@@ -65,7 +67,7 @@ export function useBusinessFilters(
       });
     }
     return filtered;
-  }, [state.businesses, state.selectedCategory, state.selectedHeritage, state.debouncedSearchQuery, state.activeCollection, state.favorites, state.mutedBusinesses, state.blockedUsers]);
+  }, [state.businesses, state.selectedCategory, state.selectedHeritage, state.debouncedSearchQuery, state.activeCollection, state.favorites, state.following, state.mutedBusinesses, state.blockedUsers]);
 
   // ── Featured businesses ──
   const featuredBusinesses = useMemo(() => {
