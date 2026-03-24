@@ -17,12 +17,12 @@
   previously-fixed bugs.
 -->
 
-**Date:** March 23, 2026 (Last updated: Session 13)
+**Date:** March 23, 2026 (Last updated: Session 16)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** (pending) — refactor: extract 6 JSX components from business.tsx (Phase 2 Steps 7-8)
+**Latest Commit:** (pending) — feat: Phase 4 map view + analytics dashboard + map UX redesign
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix)
 
 ---
 
@@ -84,6 +84,17 @@
 - **#23 Share functionality**: Web Share API integration in BusinessDetailModal with clipboard fallback. Share button added to hero banner action buttons. Generates deep link URL (`/business?open={id}`). Shows toast "Link copied to clipboard!" when Web Share API not available. Graceful error handling for cancelled shares.
 
 New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line counts: `business.tsx` 598 lines (from 552), `BusinessDetailModal.tsx` 615 lines (from 496), `BusinessModals.tsx` 445 lines (from 315), `BusinessCard.tsx` 164 lines (from 153), `FeaturedCarousel.tsx` 108 lines (from 99), `BusinessCreateModal.tsx` 257 lines (from 245), `BusinessEditModal.tsx` 257 lines (from 243). Total business module: 2653 lines across 8 component files + orchestrator. Phase 3 is now COMPLETE. TypeScript compiles with zero errors. Files synced: `business.tsx` ↔ `main/business.tsx`.
+
+**Sessions 14-16 focused on:** Business module Phase 4 — Advanced Features (roadmap items #29 Map Integration and #30 Analytics Dashboard). This was a multi-session effort spanning map integration, live testing, bug fixing, and UX redesign:
+
+- **#29 Map View with Leaflet + OpenStreetMap**: Added a Map/List view toggle to the business page. The map component (`BusinessMapView.tsx`) dynamically loads Leaflet 1.9.4 from CDN (no npm dependency) using OpenStreetMap tiles. Custom colored markers based on business category. Near Me button for geolocation with distance badges. User location shown with a pulsing blue dot. React.lazy() + Suspense for code-splitting the map component.
+
+- **#30 Owner Analytics Dashboard**: New analytics service (`businessAnalytics.ts`) using Firestore subcollection pattern `businesses/{id}/analytics/{YYYY-MM-DD}` with daily event counters for views, contact clicks, shares, and favorites. Session-level debounce for views via `Set<string>`. New dashboard component (`BusinessAnalyticsTab.tsx`) with 4 stat cards and CSS-only bar charts. Gated by `isOwnerOrAdmin(business)` — only visible to the business owner or admin users.
+
+- **Bug fixes across Sessions 14-16**:
+  1. **Map markers race condition (zero markers on map)**: The markers `useEffect` ran before async Leaflet CDN load completed. Fixed by adding `mapReady` state flag set after map initialization, added to dependency arrays.
+  2. **Firestore analytics permissions error**: `firestore.rules` had no subcollection rules for `businesses/{id}/analytics/{dateKey}`. Fixed by adding nested match rule with read/write for authenticated users.
+  3. **Map marker click does nothing**: Custom `divIcon` click events didn't propagate to React state handler. Complete UX redesign: replaced React-based popup card with Leaflet native `bindPopup()` (rich HTML with photo, name, category, rating, description, action links) + `bindTooltip()` for hover. Added delegated click handler on map container for "View Details" buttons inside popups.
 
 ---
 
@@ -152,6 +163,30 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
 - **`handleSelectBusiness` memoized as new callback** — Previously, business selection was an inline arrow function `() => { dispatch(SELECT_BUSINESS); dispatch(SET_ACTIVE_TAB); }` repeated in grid cards, featured carousel, and merchant view. Extracted into a single `useCallback` for consistent behavior and to satisfy React.memo's prop comparison in BusinessCard.
 
 - **Phase 2 roadmap document** — `Phase2_Architecture_Refactor_Details.docx` in workspace folder defines all 9 items with recommended implementation order. Steps 1-8 are now complete. The document specified target file structure and line counts which closely matched the actual result.
+
+### Sessions 14-16: Business Phase 4 — Map Integration + Analytics Dashboard
+
+- **Leaflet + OpenStreetMap (not Google Maps)** — Leaflet is free, open-source, and has no API key requirement. Loaded dynamically from CDN (`unpkg.com/leaflet@1.9.4`) — no npm dependency, avoiding version mismatch issues in the build. OpenStreetMap tiles are free and community-maintained. Google Maps would require an API key and billing setup.
+
+- **CDN-loaded Leaflet (not npm installed)** — Leaflet is loaded at runtime via `<link>` and `<script>` tags injected into `<head>`. This avoids native module issues with Vite/Rollup (which already cause problems with Rollup in the Cowork VM). The `window.L` global is used after load confirmation via `script.onload`.
+
+- **`mapReady` state pattern for async initialization** — The map initialization is async (CDN load + map creation). A `mapReady` boolean state is set to `true` after the map instance is created. All dependent effects (marker rendering, user location) include `mapReady` in their dependency arrays. Without this, effects run before the map exists and silently exit, never re-running because their other deps don't change.
+
+- **Leaflet native `bindPopup()` over React state-based popups** — The initial implementation used a React state `selectedPin` to render a popup card as JSX at the bottom of the map. This didn't work because Leaflet's custom `divIcon` click events don't reliably propagate to React event handlers. The redesign uses Leaflet's native `bindPopup()` with raw HTML content. This is more reliable because Leaflet manages its own DOM and event lifecycle. A delegated event listener on the map container handles "View Details" button clicks inside popups.
+
+- **`bindTooltip()` for hover preview** — Each marker has a Leaflet tooltip showing the business name on hover. Uses `direction: 'top'` with offset to appear above the marker. This gives instant feedback before clicking.
+
+- **Delegated click handler for popup buttons** — Leaflet popups contain raw HTML, so React event handlers don't work inside them. A single `click` event listener is added to the map container div. It checks if the click target is (or is inside) a `.biz-popup-btn` element, reads `data-biz-index` attribute, and looks up the business from `bizIndexMapRef`. This pattern avoids memory leaks from per-popup listeners.
+
+- **CSS injection for popup styling** — `injectPopupStyles()` adds a `<style>` tag to `<head>` with custom CSS for `.biz-popup` and `.biz-tooltip` classes. Runs once (checked by `id="biz-popup-styles"`). This is necessary because Leaflet popups exist outside React's render tree, so Tailwind classes don't apply.
+
+- **Analytics subcollection pattern: `businesses/{id}/analytics/{YYYY-MM-DD}`** — Daily event counters stored as separate Firestore documents keyed by date. Each document has fields: `views`, `contactClicks`, `shares`, `favorites` (all numeric). Uses `increment()` for atomic counter updates. Separate documents per day allow efficient date-range queries without reading the entire analytics history.
+
+- **Session-level debounce for analytics view tracking** — `const viewedThisSession = new Set<string>()` in `businessAnalytics.ts` prevents the same user from inflating view counts by navigating back and forth. Each business is counted once per session. The Set is module-scoped (persists across component re-mounts but resets on page refresh).
+
+- **Analytics visibility: owner/admin only** — The analytics dashboard tab in `BusinessDetailModal.tsx` is gated by `isOwnerOrAdmin(business)`. Regular users cannot see view counts, click data, or engagement metrics. This prevents competitors from seeing each other's traffic.
+
+- **ESC handler on sub-modals uses capture phase** — `document.addEventListener('keydown', handler, true)` — capture phase with `stopImmediatePropagation()` ensures that when ESC is pressed on a sub-modal (e.g., Report modal inside Detail modal), only the sub-modal closes, not the parent.
 
 ### Session 13: Business Phase 3 — UX Polish & Accessibility
 
@@ -311,6 +346,70 @@ src/
     business.tsx              (598 lines — orchestrator + layout + ARIA)
     main/business.tsx         (598 lines — exact copy)
 ```
+
+### Sessions 14-16 (March 23, 2026) — Business Phase 4: Map View + Analytics Dashboard + Bug Fixes
+| Task | File(s) Changed/Created | Status |
+|------|------------------------|--------|
+| #29: Map/List view toggle with `role="radiogroup"` | `src/pages/business.tsx` | ✅ |
+| #29: BusinessMapView.tsx — Leaflet CDN load, OpenStreetMap tiles, custom markers | `src/components/business/BusinessMapView.tsx` (NEW, ~380 lines) | ✅ |
+| #29: React.lazy() + Suspense code-splitting for map component | `src/pages/business.tsx` | ✅ |
+| #29: Near Me geolocation button with distance badges | `src/components/business/BusinessMapView.tsx` | ✅ |
+| #29: User location pulsing blue dot on map | `src/components/business/BusinessMapView.tsx` | ✅ |
+| #29: Category-colored markers with CSS hover animation | `src/components/business/BusinessMapView.tsx` | ✅ |
+| #30: businessAnalytics.ts — analytics service with Firestore subcollection | `src/services/businessAnalytics.ts` (NEW, ~175 lines) | ✅ |
+| #30: BusinessAnalyticsTab.tsx — 4 stat cards + CSS bar charts | `src/components/business/BusinessAnalyticsTab.tsx` (NEW, ~195 lines) | ✅ |
+| #30: Analytics dashboard in BusinessDetailModal (owner/admin only) | `src/components/business/BusinessDetailModal.tsx` (~680 lines) | ✅ |
+| #30: Analytics tracking calls (recordView, recordShare, recordContactClick) | `src/components/business/BusinessDetailModal.tsx` | ✅ |
+| Fix: Map markers race condition — added `mapReady` state flag | `src/components/business/BusinessMapView.tsx` | ✅ |
+| Fix: Firestore analytics permissions — added `analytics/{dateKey}` subcollection rule | `firestore.rules` | ✅ |
+| Fix: Map marker click UX — replaced React popup with Leaflet native `bindPopup()` | `src/components/business/BusinessMapView.tsx` (REWRITTEN) | ✅ |
+| Fix: Added `bindTooltip()` for hover showing business name | `src/components/business/BusinessMapView.tsx` | ✅ |
+| Fix: Delegated click handler for popup "View Details" buttons | `src/components/business/BusinessMapView.tsx` | ✅ |
+| Fix: CSS injection for Leaflet popup styling | `src/components/business/BusinessMapView.tsx` | ✅ |
+| Added `viewMode`, `userLocation`, `geolocating`, `analyticsData`, `analyticsLoading` to reducer | `src/reducers/businessReducer.ts` (~580 lines) | ✅ |
+| Sync to main/business.tsx | `src/pages/main/business.tsx` | ✅ |
+
+**New files created in Sessions 14-16:**
+- `src/components/business/BusinessMapView.tsx` (~380 lines — complete rewrite from scratch)
+- `src/services/businessAnalytics.ts` (~175 lines)
+- `src/components/business/BusinessAnalyticsTab.tsx` (~195 lines)
+
+**Updated file line counts:**
+- `business.tsx`: 598 → ~630 lines (+32, map toggle + lazy import + geolocation handlers)
+- `BusinessDetailModal.tsx`: 615 → ~680 lines (+65, analytics tab + tracking calls)
+- `businessReducer.ts`: 514 → ~580 lines (+66, viewMode/userLocation/geolocating/analytics state + actions)
+- `firestore.rules`: added analytics subcollection rules (lines 94-98)
+
+**Business module file structure (Phase 4 in progress):**
+```
+src/
+  reducers/
+    businessReducer.ts        (~580 lines — state, actions, types + map/analytics state)
+  hooks/
+    useBusinessData.ts        (250 lines — CRUD, pagination, favorites)
+    useBusinessFilters.ts     (95 lines — search, filter, sort)
+    useBusinessModeration.ts  (170 lines — report, block, mute)
+    useBusinessReviews.ts     (110 lines — fetch, submit reviews)
+  services/
+    businessAnalytics.ts      (~175 lines — recordView, recordContactClick, recordShare, recordFavorite, fetchBusinessAnalytics)
+  components/business/
+    businessConstants.ts      (100 lines — categories, emojis, colors)
+    businessValidation.ts     (75 lines — form validation, helpers)
+    imageUtils.ts             (40 lines — compression, size limit)
+    BusinessCard.tsx           (164 lines — grid card, React.memo, ARIA)
+    FeaturedCarousel.tsx       (108 lines — featured scroll, React.memo, ARIA)
+    BusinessDetailModal.tsx    (~680 lines — detail + reviews + lightbox + share + analytics)
+    BusinessEditModal.tsx      (257 lines — edit form + photos + ESC)
+    BusinessCreateModal.tsx    (257 lines — create form + photos + ESC)
+    BusinessModals.tsx         (445 lines — TIN/Delete/Menu/Report/Block + focus trap)
+    PhotoLightbox.tsx          (209 lines — fullscreen gallery, zoom, swipe, keyboard)
+    BusinessMapView.tsx        (~380 lines — Leaflet map, custom markers, native popups, geolocation)
+    BusinessAnalyticsTab.tsx   (~195 lines — owner analytics dashboard, 4 stat cards, bar charts)
+  pages/
+    business.tsx              (~630 lines — orchestrator + layout + map toggle)
+    main/business.tsx         (~630 lines — exact copy)
+```
+**Total business module: ~3400 lines across 12 component files + orchestrator + service + reducer + 4 hooks**
 
 ### Session 13 (March 23, 2026) — Business Phase 3: UX Polish & Accessibility
 | Task | File(s) Changed/Created | Status |
@@ -559,7 +658,7 @@ src/
 | Home (landing) | `src/pages/main/home.tsx` | ~127 | Done |
 | Feed | `src/pages/feed.tsx` | 2,703 | Done |
 | Discover | `src/pages/discover.tsx` | 1,735 | Done |
-| Business | `src/pages/business.tsx` | 598 (was 2,500) | Done — Phase 2 refactor + Phase 3 a11y/UX complete (reducer + 4 hooks + 7 components + lightbox) |
+| Business | `src/pages/business.tsx` | ~630 (was 2,500) | Done — Phases 1-3 complete + Phase 4 in progress (map view + analytics done, remaining items #24-28, #31-42 pending) |
 | Housing | `src/pages/housing.tsx` | 2,825 | Done + 7 enhancements (state only) |
 | Events | `src/pages/events.tsx` | 2,788 | Done |
 | Travel | `src/pages/travel.tsx` | — | Done |
@@ -615,13 +714,15 @@ src/
 - **Batch 5:** ~~Disappearing Messages~~ ✅ COMPLETED (Session 7), ~~Voice-to-Text Transcription~~ ✅ COMPLETED (Session 8), ~~Group Video/Audio Calls~~ ✅ COMPLETED (Session 8, mesh WebRTC, max 8 participants) — **BATCH 5 COMPLETE**
 - **Admin Feature Toggles:** ✅ COMPLETED (Session 10) — All 23 messaging features toggleable from admin panel
 
-### Business Module Phase 2 Architecture Refactor — COMPLETED
-- **Phase 2 Steps 1-2 (useReducer):** ✅ COMPLETED — 48 useState → single useReducer with typed actions
-- **Phase 2 Steps 3-6 (custom hooks):** ✅ COMPLETED — 4 hooks extracted (data, filters, moderation, reviews)
-- **Phase 2 Steps 7-8 (components + memoize):** ✅ COMPLETED — 6 JSX components extracted, all handlers memoized
-- **Result:** `business.tsx` reduced from ~2,500 → 552 lines (78% reduction). Phase 2 COMPLETE.
-- **Remaining Phase 2 item (from roadmap):** Item 9 was "further optimization" — can be done if needed but business module is in excellent shape
-- **Future phases (3-4):** Performance optimization, lazy loading modals, virtual scrolling for large lists — not yet planned in detail
+### Business Module Phases 1-3 — COMPLETED
+- **Phase 1:** Critical fixes (pagination, debounce, validation, touch targets, error handling)
+- **Phase 2 Steps 1-8:** Architecture refactor — useReducer, 4 custom hooks, 6 JSX components, memoization. `business.tsx` reduced from ~2,500 → 552 lines (78% reduction).
+- **Phase 3 (#18-#23):** UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality.
+
+### Business Module Phase 4 — IN PROGRESS
+- **#29 Map View:** ✅ COMPLETED — Leaflet + OpenStreetMap with custom markers, native popups, geolocation
+- **#30 Analytics Dashboard:** ✅ COMPLETED — Firestore subcollection analytics, owner-only dashboard, 4 stat cards
+- **Remaining Phase 4 items (#24-#42 minus #29, #30):** NOT STARTED — includes ordering system, menu items with photos, deals management, SEO metadata, performance budgets, advanced search/filters, business hours, and more. See `Business_Module_Enhancement_Roadmap.docx` for full list.
 
 ### Duplicate Page Architecture (deferred cleanup — DO NOT TOUCH NOW)
 - `src/pages/main/` contains near-identical copies of 12 pages from `src/pages/`
@@ -668,36 +769,49 @@ src/
 ## 5. Exact Next Steps
 
 ### Immediate — Pending Deploys & Commits
-- **Session 11-13 changes need build + deploy** — Run `npm run build` from macOS terminal, then `firebase deploy --only hosting,functions,firestore`. Git commit/push needed for Sessions 11-13.
+- **Sessions 11-16 changes need build + deploy** — Run from macOS terminal:
+  ```bash
+  cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
+  git add -A && git commit -m "feat: Phase 4 map view + analytics dashboard + map UX redesign + Firestore analytics rules" && git push origin main
+  ./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build && firebase deploy --only hosting,functions,firestore
+  ```
+  **Important:** Also deploy Firestore rules separately to fix analytics permissions: `firebase deploy --only firestore:rules`
 - **Session 8–10 code is committed and pushed** — Commit `a01a5b3` on `main`.
 - **App is deployed and live** at `https://mithr-1e5f4.web.app`.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions already deployed** — `transcribeVoiceMessage` and `sendNewMessageNotification` are live on Cloud Run.
 
-### Next Up — Discover Page Improvements (38-item roadmap)
-- User has a 38-item Discover page improvement roadmap ready to begin
-- This is the next major feature work after Business Phases 2-3
+### Next Up — Continue Business Phase 4 (remaining items #24-#42)
+- **Items #29 (Maps) and #30 (Analytics) are COMPLETE** — tested and working
+- Remaining Phase 4 items from `Business_Module_Enhancement_Roadmap.docx` include:
+  - #24: Business ordering system (cart, checkout)
+  - #25: Menu items with photos
+  - #26: Deals/promotions management
+  - #27: Business hours display
+  - #28: Advanced search/filters
+  - #31-#42: SEO, performance budgets, virtual scrolling, and other advanced features
+- The architecture is solid for adding these features — reducer + hooks + components pattern is in place
 
-### Business Module — Future Phase 4 (not yet planned)
-- Phase 4 (roadmap items #24-#42): Advanced features (ordering, menu items with photos, business analytics dashboard, SEO, performance budgets, etc.)
-- Phases 1-3 are COMPLETE — architecture is solid and accessible for Phase 4
+### Discover Page Improvements (38-item roadmap)
+- User has a 38-item Discover page improvement roadmap ready to begin
+- This is the next major feature work after Business Phase 4
 
 ### Future Enhancement: SFU for 16+ Participants
 Current group calls use mesh topology (max 8). For 16+ participants, deploy an SFU server (mediasoup or LiveKit) on a VPS with public IP + UDP support. Cloud Run won't work for WebRTC media.
 
 ### High Priority
-1. **Wire up Housing UI for the 7 enhancements** — State is ready, just needs JSX.
-2. **Stabilize the call system** — Replace free TURN servers with paid provider.
-3. **Test E2EE thoroughly** — Cross-browser decryption verification.
+1. **Continue Business Phase 4** — Remaining roadmap items #24-#28, #31-#42.
+2. **Wire up Housing UI for the 7 enhancements** — State is ready, just needs JSX.
+3. **Stabilize the call system** — Replace free TURN servers with paid provider.
+4. **Test E2EE thoroughly** — Cross-browser decryption verification.
 
 ### Medium Priority
-4. **Clean up duplicate page architecture** — Delete 12 duplicate files from `src/pages/main/` (keep only `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`). Eliminates ~29,162 lines of dead code and the `cp` sync pattern. Cuts codebase from ~76k to ~47k lines. **User deferred in Session 10** — do this when the app is in a stable state.
-5. **Refactor large page files** — Messages (~5,744 lines), Admin (2,759), Housing (2,825), Events (2,788), Feed (2,703). Business is now the model to follow (useReducer + hooks + components pattern).
-6. **Add image upload to all modules** — Currently only profile photos and feed.
-7. **Add pagination** — Implement infinite scroll or cursor-based pagination.
+5. **Clean up duplicate page architecture** — Delete 12 duplicate files from `src/pages/main/` (keep only `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`). Eliminates ~29,162 lines of dead code and the `cp` sync pattern. Cuts codebase from ~76k to ~47k lines. **User deferred in Session 10** — do this when the app is in a stable state.
+6. **Refactor large page files** — Messages (~5,744 lines), Admin (2,759), Housing (2,825), Events (2,788), Feed (2,703). Business is now the model to follow (useReducer + hooks + components pattern).
+7. **Map integration for other modules** — Housing listings and event locations can reuse the Leaflet CDN pattern from BusinessMapView.
+8. **Add pagination** — Implement infinite scroll or cursor-based pagination in remaining modules.
 
 ### Lower Priority
-8. **Map integration** — For housing listings and event locations
 9. **Content moderation** — Wire utility into all submission flows
 10. **Testing** — No tests exist. Add unit tests for encryption utils.
 11. **npm vulnerability maintenance** — Upgrade transitive deps (test for breakage)
@@ -743,7 +857,7 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/pages/messages.tsx` | Main messages page (~5,500+ lines). ALL overlays have cross-browser touch handlers. Includes LinkPreviewCard, GifPicker, file sharing, URL linkification, push notifications, presence, disappearing messages, voice-to-text transcription. Undo toast code commented out. ALL 23 messaging features gated by `isFeatureEnabled()` flags. |
 | `src/pages/main/messages.tsx` | **DUPLICATE** of above — MUST be kept in sync via `cp` |
 | `src/index.css` | CSS variables for Aurora theme + dark mode. Lines 90–98 = light mode msg vars. Lines 104–142 = `:root.dark`. Lines 143–151 = `@media` for `--msg-header-bg`/`--msg-header-text`. |
-| `firestore.rules` | Security rules — lines 238–243 = messages subcollection (read/create/update/delete) |
+| `firestore.rules` | Security rules — messages subcollection (read/create/update/delete), businesses/analytics subcollection (lines 94-98), all collections for the app |
 | `src/components/layout/ModuleSelector.tsx` | Nav pill bar — auto-scroll to active pill + request badge |
 | `src/pages/main/home.tsx` | Landing page with module tiles + Discover request badge |
 | `src/hooks/useIncomingRequests.ts` | Real-time pending request count (Firestore listener) |
@@ -767,6 +881,9 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/components/business/BusinessCreateModal.tsx` | Create form with local FormInput/FormTextarea/PhotoUploader (~245 lines) |
 | `src/components/business/BusinessModals.tsx` | Named exports: TinVerificationModal, DeleteConfirmModal, ContextMenu, ReportModal, BlockConfirmModal + useModalA11y hook (~445 lines) |
 | `src/components/business/PhotoLightbox.tsx` | Full-screen photo gallery with zoom, swipe, keyboard nav, thumbnail strip (~209 lines) — NEW in Session 13 |
+| `src/components/business/BusinessMapView.tsx` | Leaflet map with custom markers, native popups, geolocation, delegated click handlers (~380 lines) — NEW in Sessions 14-16, REWRITTEN for popup UX |
+| `src/components/business/BusinessAnalyticsTab.tsx` | Owner-only analytics dashboard with 4 stat cards and CSS bar charts (~195 lines) — NEW in Sessions 14-16 |
+| `src/services/businessAnalytics.ts` | Analytics service: recordView, recordContactClick, recordShare, recordFavorite, fetchBusinessAnalytics. Uses Firestore subcollection `businesses/{id}/analytics/{YYYY-MM-DD}` with session-level view debounce (~175 lines) — NEW in Sessions 14-16 |
 | `src/components/business/businessConstants.ts` | CATEGORIES, CATEGORY_EMOJI_MAP, CATEGORY_COLORS, CATEGORY_ICONS, REPORT_CATEGORIES (~100 lines) |
 | `src/components/business/businessValidation.ts` | validateBusinessForm, fuzzyMatch, getGoogleMapsUrl (~75 lines) |
 | `src/components/business/imageUtils.ts` | compressImage, MAX_FILE_SIZE (~40 lines) |
@@ -810,6 +927,12 @@ git add <files> && git commit -m "message" && git push origin main
 - **`@/` path alias** — Configured in both `vite.config.ts` and `tsconfig.app.json`. Maps to `src/`. All new component/hook imports use this alias (e.g. `import { useBusinessData } from '@/hooks/useBusinessData'`).
 - **`useModalA11y` hook in BusinessModals.tsx** — Shared focus-trap + ESC-to-close hook used by TIN, Delete, Report, Block modals. Takes `(ref, onClose)`. Manages keyboard listener lifecycle and return-focus. Detail modal has its own inline version (more complex state).
 - **`focus-visible` not `focus` for keyboard rings** — All business module interactive elements use `focus-visible:ring-2` to show focus rings only during keyboard navigation (not mouse clicks). Consistent pattern across all 9 component files.
+- **Leaflet CDN loading pattern** — Leaflet is loaded dynamically in `BusinessMapView.tsx` by injecting `<link>` (CSS) and `<script>` (JS) tags into `<head>`. The `window.L` global is used after `script.onload` fires. Check if already loaded via `document.querySelector('link[href*="leaflet"]')` to avoid duplicate loads. This pattern can be reused for other modules needing maps.
+- **`mapReady` state for async map init** — CRITICAL pattern. The Leaflet map is created asynchronously (CDN load → `L.map()` → `L.tileLayer()`). Any `useEffect` that depends on the map instance MUST include `mapReady` in its dependency array, or it will run before the map exists and never re-run. This caused the zero-markers bug.
+- **Leaflet popups are raw HTML, not React** — `bindPopup()` accepts an HTML string. React event handlers (`onClick`, etc.) do NOT work inside popup content. Use delegated event listeners on the map container div. Pattern: `container.addEventListener('click', handler)` that checks `(e.target as HTMLElement).closest('.biz-popup-btn')`.
+- **`bizIndexMapRef` for popup-to-business lookup** — A `useRef<Map<number, Business>>()` maps integer indices to business objects. Each marker's popup "View Details" button has `data-biz-index={i}`. The delegated click handler reads this attribute and looks up the business. The ref is updated whenever businesses change.
+- **Firestore analytics subcollection rules** — `businesses/{businessId}/analytics/{dateKey}` requires its own nested match rule in `firestore.rules`. Without it, all analytics operations fail with `Missing or insufficient permissions`. The rule allows read/write for any authenticated user (analytics writes come from the client).
+- **Analytics session-level view debounce** — `viewedThisSession` Set in `businessAnalytics.ts` is module-scoped. It persists across component re-mounts (e.g., navigating away and back) but resets on full page refresh. This prevents inflated view counts from navigation without requiring server-side dedup.
 - **PhotoLightbox is standalone** — `PhotoLightbox.tsx` has no dependency on business state — just receives `photos[]`, `initialIndex`, `title`, `onClose`. Can be reused by other modules (housing, events, feed) if needed.
 
 ### Constraints
@@ -830,10 +953,11 @@ git add <files> && git commit -m "message" && git push origin main
 5. → Redirected to `/home` (module tiles landing page)
 
 ### Firestore Collections
-`users`, `posts` (+ subcollection `comments`), `businesses`, `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`
+`users`, `posts` (+ subcollection `comments`), `businesses` (+ subcollection `analytics`), `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`, `groupCalls` (+ subcollections `signals`, `candidates`), `businessMenuItems`, `businessReviews`, `businessOrders`, `forumThreads`, `forumReplies`, `forumLikes`, `marketplaceListings`, `marketplaceComments`, `announcements`, `moderationQueue`, `reports`, `notifications`, `userWarnings`
 
 ### Recent Commit History
 ```
+(pending) feat: Phase 4 map view + analytics dashboard + map UX redesign + Firestore analytics rules
 (pending) refactor: extract 6 JSX components from business.tsx (Phase 2 Steps 7-8)
 e715244 refactor: extract 4 custom hooks from business.tsx (Phase 2 Steps 3-6)
 efcba22 fix: resolve 42 TypeScript build errors from useReducer migration
@@ -888,4 +1012,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Generated March 23, 2026 (Session 13) — for continuing development in a new session. Business Phase 1-3 COMPLETE. Phase 4 (Advanced Features) is next.*
+*Generated March 23, 2026 (Session 16) — for continuing development in a new session. Business Phases 1-3 COMPLETE. Phase 4 IN PROGRESS — Map View (#29) and Analytics Dashboard (#30) done, remaining items #24-#28 and #31-#42 pending.*
