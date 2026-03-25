@@ -17,12 +17,12 @@
   previously-fixed bugs.
 -->
 
-**Date:** March 25, 2026 (Last updated: Session 18)
+**Date:** March 25, 2026 (Last updated: Session 19)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** (pending) — feat: Phase 4 high-impact UX features + carousel/deals/Q&A fixes
+**Latest Commit:** `c3fb1d3` — fix: cross-browser compatibility for Discover Phase 1 changes
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes)
 
 ---
 
@@ -102,7 +102,7 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
 - **Deals Save Fix**: Fixed "Failed to save deals" error when adding second deal — Firestore rejects `undefined` values. Deal objects now built without undefined fields, plus sanitization in the save handler.
 - **Q&A Search**: Appears when 3+ questions exist, debounced 250ms, filters across question text, answer text, and usernames. Clear button and "X of Y" count display.
 
-**Session 18 focused on:** Business module Phase 4 — Completing remaining high-impact features (#25, #37-#40):
+**Session 18 focused on:** Business module Phase 4 — Completing ALL remaining roadmap items (#25, #28, #37-#42), bringing the total to 42/42 items complete:
 
 - **#25 Filter Chips UI**: Active filter chips bar between results header and business grid. Shows active search (violet), category (emerald), heritage (amber, one per selection), and collection (indigo) as dismissible chips. "Clear all" button appears when 2+ filters active. Icons for each collection type (Heart for favorites, UserPlus for following, TrendingUp for top rated, Navigation for nearest).
 - **#37 CSV Bulk Import**: New `BusinessCSVImport.tsx` (~480 lines, lazy-loaded). 4-step wizard: drag-and-drop upload → table preview with row validation → Firestore batch writes (20 per batch with progress bar) → success summary. Smart column mapping via fuzzy header matching (e.g., "business name", "tel", "address" → canonical fields). Downloadable CSV template with example row. Multi-value fields split by semicolons.
@@ -113,6 +113,20 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
 - **#42 Advanced Search with Autocomplete**: Typeahead dropdown below search input showing 3 sections: recent searches (persisted in localStorage, max 5, "Clear all" button), category suggestions (with business counts), and business name/location matches (top 5 with emoji, category, verified badge). Keyboard support: Escape closes, Enter saves to recent. `onMouseDown` prevents blur race condition. ARIA `listbox`/`option` roles for accessibility.
 - **#28 Advanced Search/Filters**: Covered by combination of #42 autocomplete (quick category selection from typeahead) and #25 filter chips (visual active filter management with dismiss).
 - **Cross-browser geolocation fix**: Rewrote `handleRequestGeolocation` for iOS Safari, Firefox, Android Chrome. Two-phase approach: high-accuracy (8s) → low-accuracy fallback (10s) for iOS GPS cold start. iOS-specific error messages pointing to Settings → Privacy & Security. Firefox 20s safety timeout for dismissed prompts. HTTPS secure-context check.
+
+**Session 19 focused on:** Discover Page Enhancement Roadmap Phase 1 — Critical Fixes & Quick Wins (items 1.1–1.10). This is the first phase of a 38-item Discover page improvement roadmap (`Discover_Page_Enhancement_Roadmap.docx`). All changes to `src/pages/discover.tsx` (reduced from 1,846 → 1,716 lines), synced to `src/pages/main/discover.tsx` via `cp`:
+
+- **#1.1 Pending Tab Fix**: The Pending tab was incorrectly showing the same content as the Network tab because `handleTileClick('pending')` set `activeTab` to `'network'`. Added `'pending'` as a third value in the `activeTab` union type (`'discover' | 'network' | 'pending'`), created a dedicated filter branch in the `filteredPeople` useMemo that filters for incoming requests only (`status === 'pending' && detail.initiatedBy !== user?.uid`), and added Accept/Decline action buttons to pending grid cards.
+- **#1.2 Mutual Connection Pre-Computation**: Replaced the O(n²) `getMutualConnectionCount()` function (called 2-3x per card per render) with a pre-computed `useMemo` map (`Map<string, User[]>`). Single pass builds mutual connections based on shared heritage or city. `getMutualConnectionCount` and `getMutualConnections` are now `useCallback` wrappers for O(1) lookups.
+- **#1.3 MatchBadge Inline Prop**: Added `inline?: boolean` prop to the MatchBadge component. When `true`, renders flow-positioned in the flex row instead of `absolute top-3 right-3`, preventing overlap with the 3-dot menu button on cards.
+- **#1.4 Dead Code Removal**: Removed `viewMode` state (no toggle button existed — list view was unreachable), `hoveringDisconnect` state, entire list-view rendering branch (~150 lines), and unused imports (`UserCheck`, `Bookmark`). Net reduction: ~130 lines.
+- **#1.5 SkeletonCard Aurora Theme**: Updated skeleton loading cards to use Aurora design system variables (`bg-aurora-surface`, `border-[var(--aurora-border)]`, `bg-[var(--aurora-border)]`) instead of hardcoded gray values, ensuring correct appearance in both light and dark modes.
+- **#1.6 Refresh Button**: Extracted the people-fetching logic into a `useCallback`-wrapped `fetchPeople` function. Added a `RefreshCw` icon button next to the search bar with `refreshing` state that triggers a manual re-fetch with spin animation.
+- **#1.7 Toast Safe-Area Positioning**: Fixed toast notifications being obscured by the bottom nav bar on notched devices (iPhone X+). Uses Tailwind `bottom-24` as CSS fallback with inline `style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}` for devices that support `env()`.
+- **#1.8 Duplicate Connection Requests Removal**: Removed the Connection Requests section from the Discover tab's PYMK area (~80 lines). With the new dedicated Pending tab (#1.1), showing incoming requests in both places was redundant.
+- **#1.9 Search Ranking**: Added `searchRank()` function returning priority levels: prefix match (1) > word-start match (1) > substring (2) > fuzzy subsequence (3) > no match (0). Results are pre-sorted by rank before secondary sorting, so "Sa" correctly matches "Sarath" before "Sports" (which fuzzy matched s...a).
+- **#1.10 Accessibility**: Added `role="button"`, `tabIndex={0}`, `aria-label` (with name, profession, city), `focus-visible:ring-2 focus-visible:ring-blue-500`, and `onKeyDown` (Enter/Space) handlers to all 6 card interaction points: main grid cards, 3 PYMK carousel card types, incoming request cards, and sent request cards.
+- **Cross-browser compatibility audit**: Added `@supports not selector(:focus-visible)` CSS fallback in `index.css` for iOS Safari < 15.4 (applies `:focus` outline on `[role="button"]` elements). Verified `env(safe-area-inset-bottom)` has Tailwind class fallback for older Android WebViews. All other APIs (CSS custom properties, `String.startsWith/includes`, `Map`, `useMemo`, `onKeyDown`) verified safe across Chrome 49+, Safari 9.1+, Firefox 31+.
 
 - **Bug fixes across Sessions 14-16**:
   1. **Map markers race condition (zero markers on map)**: The markers `useEffect` ran before async Leaflet CDN load completed. Fixed by adding `mapReady` state flag set after map initialization, added to dependency arrays.
@@ -227,6 +241,24 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
 
 - **`parseOpenNow()` extracted to shared utility** — Initially inline in BusinessDetailModal, extracted to `businessUtils.ts` because it's used by BusinessCard, FeaturedCarousel, and BusinessDetailModal. Supports day ranges ("Mon-Fri"), 12h/24h time formats, bare numbers, and graceful failure via try/catch.
 
+### Session 19: Discover Page Phase 1 — Critical Fixes & Quick Wins
+
+- **Dedicated `'pending'` tab state (not reusing `'network'`)** — The pending tab was broken because clicking it set `activeTab` to `'network'`, showing the same connected users. Adding `'pending'` as a third union type value with its own filter branch was the cleanest fix. The filter checks both `status === 'pending'` AND `detail.initiatedBy !== user?.uid` to show only incoming requests (not requests you sent).
+
+- **Pre-computed mutual connections via `useMemo` Map (not per-render function calls)** — The original `getMutualConnectionCount()` iterated all connections for every card on every render, called 2-3 times per card (grid + PYMK + badge). With 100+ users, this was O(n²) per render cycle. The fix pre-computes all mutual connections in a single `useMemo` pass, producing a `Map<string, User[]>`. The `getMutualConnectionCount` and `getMutualConnections` functions are now `useCallback` wrappers returning O(1) lookups from the map. The map recomputes only when `people` or `connections` change.
+
+- **`searchRank()` with priority levels (not just fuzzy match)** — The original `fuzzyMatch` function did character-by-character subsequence matching, which meant "sa" matched "Sports" (s...a in "Sports"). The new `searchRank()` returns priority levels: prefix (1), word-start (1), substring (2), fuzzy (3), no match (0). Results are sorted by rank first, then by secondary criteria. This ensures "Sarath" appears before "Sports" when searching "sa".
+
+- **MatchBadge `inline` prop (not repositioning absolute)** — Rather than trying to find a non-overlapping absolute position for the match badge (which varies by card size and screen width), an `inline` boolean prop renders it as a flow element in the flex row. Simpler, more reliable, and works across all screen sizes.
+
+- **Dead `viewMode` code removed (not kept for future use)** — The list view toggle was removed entirely because no UI button to switch to list view exists. Keeping dead code adds maintenance burden and confusion. If a list view is needed in the future, it should be designed fresh as a separate component.
+
+- **`env(safe-area-inset-bottom)` with Tailwind fallback (not just one or the other)** — Toast positioning uses both: Tailwind `bottom-24` class as the base, plus inline `style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}`. If `env()` is unsupported (older Android WebViews), the Tailwind class applies. If supported, the inline style overrides with proper safe-area offset.
+
+- **`@supports not selector(:focus-visible)` CSS fallback (not JavaScript polyfill)** — iOS Safari < 15.4 doesn't support `:focus-visible`. Rather than adding a JavaScript polyfill, a pure CSS `@supports` rule applies `:focus` styles on `[role="button"]` elements only when `:focus-visible` is unsupported. This is simpler, has zero runtime cost, and degrades gracefully.
+
+- **`cp` sync pattern extended to discover.tsx** — `src/pages/discover.tsx` must stay identical to `src/pages/main/discover.tsx`, same as business.tsx and messages.tsx. After every edit: `cp src/pages/discover.tsx src/pages/main/discover.tsx`.
+
 ### Session 13: Business Phase 3 — UX Polish & Accessibility
 
 - **Shared `useModalA11y` hook for focus trap + ESC** — Rather than duplicating focus-trap and ESC-to-close logic in every modal, a single `useModalA11y(ref, onClose)` function is defined in `BusinessModals.tsx` and used by TIN, Delete, Report, and Block modals. The detail modal has its own inline version (needs to manage more complex state). Create and Edit modals use simpler ESC-only listeners since they're full-screen overlays (not popup dialogs).
@@ -337,6 +369,51 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
      on what was done in each specific session.
      ================================================================ -->
 ## 3. What Was Completed
+
+### Session 19 (March 25, 2026) — Discover Page Phase 1: Critical Fixes & Quick Wins (items 1.1–1.10)
+| Task | File(s) Changed | Status |
+|------|-----------------|--------|
+| #1.1: Pending tab fix — added `'pending'` to activeTab union, new filter branch, Accept/Decline buttons | `src/pages/discover.tsx` | ✅ |
+| #1.2: Mutual connection pre-computation — `useMemo` Map replacing O(n²) per-render calls | `src/pages/discover.tsx` | ✅ |
+| #1.3: MatchBadge inline prop — prevents overlap with 3-dot menu | `src/pages/discover.tsx` | ✅ |
+| #1.4: Dead code removal — `viewMode`, `hoveringDisconnect`, list view branch (~150 lines), unused imports | `src/pages/discover.tsx` | ✅ |
+| #1.5: SkeletonCard aurora theme — uses `var(--aurora-*)` CSS variables | `src/pages/discover.tsx` | ✅ |
+| #1.6: Refresh button — extracted `fetchPeople` useCallback, RefreshCw icon with spin animation | `src/pages/discover.tsx` | ✅ |
+| #1.7: Toast safe-area positioning — `env(safe-area-inset-bottom)` + Tailwind fallback | `src/pages/discover.tsx` | ✅ |
+| #1.8: Duplicate connection requests removal — removed from Discover tab PYMK area (~80 lines) | `src/pages/discover.tsx` | ✅ |
+| #1.9: Search ranking — `searchRank()` with prefix/word-start/substring/fuzzy priority levels | `src/pages/discover.tsx` | ✅ |
+| #1.10: Accessibility — `role="button"`, `tabIndex={0}`, `aria-label`, `focus-visible:ring-2`, `onKeyDown` on all 6 card types | `src/pages/discover.tsx` | ✅ |
+| Cross-browser: `@supports not selector(:focus-visible)` fallback for iOS Safari < 15.4 | `src/index.css` | ✅ |
+| Sync to main/discover.tsx | `src/pages/main/discover.tsx` | ✅ |
+| TypeScript check — zero errors | `tsc --noEmit` passes clean | ✅ |
+| Vite build — passes clean | `npm run build` passes clean | ✅ |
+
+**Git commits (Session 19):**
+- `bd6c412` — feat: Discover Page Phase 1 — Critical Fixes & Quick Wins (items 1.1–1.10)
+- `c3fb1d3` — fix: cross-browser compatibility for Discover Phase 1 changes
+
+**Line count change:** `discover.tsx` reduced from 1,846 → 1,716 lines (−130 lines, net after dead code removal and new features)
+
+**Key patterns introduced:**
+- `searchRank(text, query): number` — ranked search with priority levels (1=prefix/word-start, 2=substring, 3=fuzzy, 0=no match)
+- `mutualConnectionsMap: Map<string, User[]>` via `useMemo` — pre-computed mutual connections for O(1) lookups
+- `env(safe-area-inset-bottom)` + Tailwind class fallback pattern for notched device compatibility
+- `@supports not selector(:focus-visible)` CSS pattern for graceful degradation on older browsers
+
+### Session 18 (March 25, 2026) — Business Phase 4 Completion: ALL 42 Roadmap Items Done
+| Task | File(s) Changed/Created | Status |
+|------|------------------------|--------|
+| #25: Filter Chips UI — active filter chips bar with dismiss and clear-all | `src/pages/business.tsx` | ✅ |
+| #37: CSV Bulk Import — 4-step wizard with smart column mapping | `src/components/business/BusinessCSVImport.tsx` (NEW, ~480 lines) | ✅ |
+| #38: Distance-Based Sorting — Haversine formula, "Nearest" sort pill, distance badges | `src/components/business/businessUtils.ts`, `BusinessCard.tsx`, `FeaturedCarousel.tsx` | ✅ |
+| #39: Real-Time onSnapshot — replaced one-time getDocs with live listener | `src/hooks/useBusinessData.ts` | ✅ |
+| #40: List Virtualization — IntersectionObserver + content-visibility chunked grid | `src/components/business/VirtualizedBusinessGrid.tsx` (NEW, ~160 lines) | ✅ |
+| #41: Parallel Image Compression — `Promise.allSettled` with progress callback | `src/components/business/imageUtils.ts`, `BusinessCreateModal.tsx`, `BusinessEditModal.tsx` | ✅ |
+| #42: Advanced Search with Autocomplete — typeahead with recent searches, category suggestions, name matches | `src/pages/business.tsx` | ✅ |
+| #28: Advanced Search/Filters — covered by #42 autocomplete + #25 filter chips | Combined | ✅ |
+| Cross-browser geolocation fix — two-phase approach for iOS/Firefox/Android | `src/pages/business.tsx` | ✅ |
+| Sync to main/business.tsx | `src/pages/main/business.tsx` | ✅ |
+| TypeScript check — zero errors | `tsc --noEmit` passes clean | ✅ |
 
 ### Session 17 (March 24, 2026) — Business Phase 4 continued: High-Impact UX + Fixes
 | Task | File(s) Changed/Created | Status |
@@ -739,8 +816,8 @@ src/
 |------|------|-------|--------|
 | Home (landing) | `src/pages/main/home.tsx` | ~127 | Done |
 | Feed | `src/pages/feed.tsx` | 2,703 | Done |
-| Discover | `src/pages/discover.tsx` | 1,735 | Done |
-| Business | `src/pages/business.tsx` | ~630 (was 2,500) | Done — Phases 1-3 complete + Phase 4 in progress (map view, analytics, Q&A, booking, Open Now, admin verify done; remaining items #25, #28, #37-42 pending) |
+| Discover | `src/pages/discover.tsx` | 1,716 (was 1,846) | Done — Phase 1 Critical Fixes complete (10 items), Phase 2 pending |
+| Business | `src/pages/business.tsx` | ~680 (was 2,500) | Done — ALL 42 roadmap items complete across Phases 1-4 |
 | Housing | `src/pages/housing.tsx` | 2,825 | Done + 7 enhancements (state only) |
 | Events | `src/pages/events.tsx` | 2,788 | Done |
 | Travel | `src/pages/travel.tsx` | — | Done |
@@ -822,6 +899,27 @@ src/
 - **Cross-browser geolocation fix:** ✅ COMPLETED (Session 18) — Two-phase geolocation (high-accuracy → low-accuracy fallback), iOS Safari guidance, Firefox prompt dismissal safety timeout, HTTPS check
 - **ALL 42 ROADMAP ITEMS NOW COMPLETE** — Business module Phase 4 is finished.
 
+### Discover Page Enhancement Roadmap (38 items across 4 phases)
+
+**Source document:** `Discover_Page_Enhancement_Roadmap.docx` in workspace folder
+
+**Phase 1 — Critical Fixes & Quick Wins (items 1.1–1.10):** ✅ COMPLETE (Session 19)
+- #1.1 Pending tab fix, #1.2 Mutual pre-compute, #1.3 MatchBadge inline, #1.4 Dead code removal, #1.5 SkeletonCard aurora, #1.6 Refresh button, #1.7 Toast safe-area, #1.8 Duplicate requests removal, #1.9 Search ranking, #1.10 Accessibility
+
+**Phase 2 — Performance & Data Layer (items 2.1–2.9):** ❌ NOT STARTED
+- 2.1: Fix N+1 Firestore reads (batch `getDocs` for connections instead of per-user)
+- 2.2: Cursor-based pagination for people list (replace full `getDocs` with `startAfter` + `limit`)
+- 2.3: Mutual connection pre-compute refinement (already partially addressed in 1.2 — remaining: server-side pre-computation)
+- 2.4: Migration flag for connection data schema
+- 2.5: Match score memoization (cache computed scores)
+- 2.6: Map reference stability (avoid re-creating Maps on every render)
+- 2.7: `onSnapshot` for connections (real-time updates instead of polling)
+- 2.8: Redundant blocked users read elimination
+- 2.9: PYMK single-pass optimization
+
+**Phase 3 — UI/UX Enhancements:** ❌ NOT STARTED (items TBD from roadmap)
+**Phase 4 — Advanced Features:** ❌ NOT STARTED (items TBD from roadmap)
+
 ### Duplicate Page Architecture (deferred cleanup — DO NOT TOUCH NOW)
 - `src/pages/main/` contains near-identical copies of 12 pages from `src/pages/`
 - `App.tsx` only imports from `src/pages/` — the `main/` copies are dead code (~29,162 lines)
@@ -866,40 +964,39 @@ src/
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — Pending Deploys & Commits
-- **Session 18 changes need commit + push + build + deploy** — Run from macOS terminal:
+### Immediate — Deploy Session 19 Changes
+- **Session 19 commits are ready but need push + build + deploy** — 2 commits ahead of origin. Run from macOS terminal:
   ```bash
   cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
-  git add src/components/business/BusinessCSVImport.tsx src/components/business/VirtualizedBusinessGrid.tsx src/components/business/businessUtils.ts src/components/business/BusinessCard.tsx src/components/business/FeaturedCarousel.tsx src/components/business/BusinessCreateModal.tsx src/components/business/BusinessEditModal.tsx src/components/business/imageUtils.ts src/hooks/useBusinessData.ts src/hooks/useBusinessFilters.ts src/reducers/businessReducer.ts src/pages/business.tsx src/pages/main/business.tsx HANDOFF_NOTE.md
-  git commit -m "feat: Complete Business Phase 4 — all 42 roadmap items done (#25,#28,#37-#42, cross-browser geolocation)"
   git push origin main
   npm run build && firebase deploy --only hosting
   ```
-- **Session 17 changes also need commit** (if not already committed):
-  ```bash
-  git add src/components/business/BusinessQASection.tsx src/components/business/BusinessDetailModal.tsx src/components/business/BusinessCreateModal.tsx src/components/business/BusinessEditModal.tsx src/pages/admin.tsx firestore.rules
-  git commit -m "feat: Phase 4 Q&A system, Open Now indicator, booking URL, admin verification, carousel/deals fixes"
-  git push origin main
-  npm run build && firebase deploy --only hosting,firestore:rules
-  ```
-  **Important:** Session 17 deploy includes `firestore:rules` for Q&A subcollection permissions.
+- **Test all 10 Phase 1 items before proceeding to Phase 2** — User explicitly requested testing each change:
+  1. Pending tab shows only incoming requests with Accept/Decline buttons
+  2. Search ranking: "Sa" matches "Sarath" before "Sports"
+  3. Refresh button spins and re-fetches people
+  4. MatchBadge doesn't overlap 3-dot menu
+  5. Skeleton cards look correct in light and dark modes
+  6. Toast notifications positioned above bottom nav (especially on notched devices)
+  7. Keyboard navigation works on all cards (Tab + Enter/Space)
+  8. No duplicate connection requests between Discover and Pending tabs
+  9. No console errors, TypeScript compiles clean
+  10. Cross-browser: Chrome, Safari, Firefox desktop + iOS Safari + Android Chrome
 - **App is deployed and live** at `https://mithr-1e5f4.web.app`.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions already deployed** — `transcribeVoiceMessage` and `sendNewMessageNotification` are live on Cloud Run.
 
-### Next Up — Business Phase 4 COMPLETE, Begin Discover Page Improvements
-- **ALL 42 Business Module roadmap items are now COMPLETE** across Sessions 11-18
-- The business module is production-ready with: map view, analytics, Q&A, booking, distance sorting, real-time updates, virtualization, CSV import, autocomplete search, parallel image compression, and full accessibility
-
-### Discover Page Improvements (38-item roadmap)
-- User has a 38-item Discover page improvement roadmap ready to begin
-- This is the next major feature work after Business Phase 4
+### Next Up — Discover Page Phase 2: Performance & Data Layer (items 2.1–2.9)
+- **Phase 1 is COMPLETE** (10/10 items, Session 19). User wants to test before starting Phase 2.
+- Phase 2 focuses on Firestore read optimization, pagination, real-time listeners, and data layer improvements
+- Key items: N+1 read fix, cursor-based pagination, onSnapshot for connections, PYMK single-pass optimization
+- Full roadmap in `Discover_Page_Enhancement_Roadmap.docx`
 
 ### Future Enhancement: SFU for 16+ Participants
 Current group calls use mesh topology (max 8). For 16+ participants, deploy an SFU server (mediasoup or LiveKit) on a VPS with public IP + UDP support. Cloud Run won't work for WebRTC media.
 
 ### High Priority
-1. **Continue Business Phase 4** — Remaining roadmap items #25, #28, #37-#42.
+1. **Continue Discover Page Enhancement Roadmap** — Phase 2 (items 2.1–2.9: Performance & Data Layer) after testing Phase 1.
 2. **Wire up Housing UI for the 7 enhancements** — State is ready, just needs JSX.
 3. **Stabilize the call system** — Replace free TURN servers with paid provider.
 4. **Test E2EE thoroughly** — Cross-browser decryption verification.
@@ -987,7 +1084,10 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/components/business/businessUtils.ts` | Shared `parseOpenNow()` utility for business hours parsing, used by BusinessCard, FeaturedCarousel, BusinessDetailModal (~85 lines) — NEW in Session 17 |
 | `src/components/business/businessConstants.ts` | CATEGORIES, CATEGORY_EMOJI_MAP, CATEGORY_COLORS, CATEGORY_ICONS, REPORT_CATEGORIES (~100 lines) |
 | `src/components/business/businessValidation.ts` | validateBusinessForm, fuzzyMatch, getGoogleMapsUrl (~75 lines) |
-| `src/components/business/imageUtils.ts` | compressImage, MAX_FILE_SIZE (~40 lines) |
+| `src/components/business/imageUtils.ts` | compressImage, compressImagesParallel, MAX_FILE_SIZE (~40 lines) |
+| `src/pages/discover.tsx` | Discover page (~1,716 lines). Pending tab, mutual pre-compute, searchRank, refresh button, SkeletonCard aurora, accessibility. 22 useState hooks. `cp` synced to `main/discover.tsx`. |
+| `src/pages/main/discover.tsx` | **DUPLICATE** of above — MUST be kept in sync via `cp` |
+| `Discover_Page_Enhancement_Roadmap.docx` | 38-item roadmap across 4 phases. Phase 1 complete. Reference for Phase 2+ work. |
 | `public/firebase-messaging-sw.js` | FCM service worker — background push + notification click with Firefox postMessage fallback |
 | `functions/src/index.ts` | Cloud Functions: `sendNewMessageNotification` (push) + `transcribeVoiceMessage` (Speech-to-Text). Both deployed. |
 | `functions/package.json` | Node 22 engine, deps: firebase-admin, firebase-functions, @google-cloud/speech v6 |
@@ -998,7 +1098,7 @@ git add <files> && git commit -m "message" && git push origin main
 | `vite.config.ts` | Build config, PWA manifest, code splitting |
 
 ### Critical Gotchas & Patterns
-- **DUPLICATE PAGES (legacy — deferred cleanup):** `src/pages/main/` has near-identical copies of 12 pages from `src/pages/`. Only `src/pages/` is used by the router — the `main/` copies are dead code (~29,162 lines). Only `messages.tsx` is kept in sync via `cp src/pages/messages.tsx src/pages/main/messages.tsx`. The other 11 have drifted (2–181 lines different). 3 files are unique to `main/`: `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`. **DO NOT delete the duplicates yet** — user deferred this cleanup to a future session (Session 10 decision).
+- **DUPLICATE PAGES (legacy — deferred cleanup):** `src/pages/main/` has near-identical copies of 12 pages from `src/pages/`. Only `src/pages/` is used by the router — the `main/` copies are dead code (~29,162 lines). Three files are kept in sync via `cp`: `messages.tsx`, `business.tsx`, and `discover.tsx`. The other 9 have drifted (2–181 lines different). 3 files are unique to `main/`: `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`. **DO NOT delete the duplicates yet** — user deferred this cleanup to a future session (Session 10 decision). After every edit to discover.tsx: `cp src/pages/discover.tsx src/pages/main/discover.tsx`.
 - **iOS Safari touch events:** Every clickable non-button `<div>` needs `onClick` + `onTouchStart` + `cursor: 'pointer'` + `WebkitTapHighlightColor: 'transparent'`
 - **Safari backdrop blur:** Always use inline styles with BOTH `backdropFilter` and `WebkitBackdropFilter` (Tailwind's `backdrop-blur-*` doesn't produce the `-webkit-` prefix)
 - **Tailwind v4 `dark:sm:` is unreliable:** Use CSS custom properties with `@media` queries instead of stacking `dark:` and `sm:` variants
@@ -1022,7 +1122,7 @@ git add <files> && git commit -m "message" && git push origin main
 - **Timer picker popup needs `fixed` positioning** — Popups inside containers with `overflow: hidden` must use `fixed` positioning with `getBoundingClientRect()` to avoid being clipped. Never use `absolute` positioning for popups in the message area.
 - **Use `setDoc` with deterministic IDs for system-generated messages (call events, etc.)** — `addDoc` creates a random document ID each time, so even with in-memory dedup guards, race conditions can cause duplicates. `setDoc` with a deterministic ID (e.g. `call_${callId}`, `groupcall_${roomId}`) makes writes idempotent. Pattern: `await setDoc(doc(db, 'conversations', convId, 'messages', deterministicId), {...})`.
 - **Pointer events for cross-platform drag** — Use `onPointerDown/Move/Up` (not `onMouseDown/onTouchStart`) for drag interactions. Works on both mouse and touch. Use `setPointerCapture` for reliable tracking outside the element. A 5px movement threshold distinguishes intentional drags from taps.
-- **Business module `cp` sync** — `src/pages/business.tsx` must be identical to `src/pages/main/business.tsx`. After every edit: `cp src/pages/business.tsx src/pages/main/business.tsx`. Same pattern as messages.tsx.
+- **`cp` sync pattern for 3 files** — These files must be kept identical between `src/pages/` and `src/pages/main/`: `messages.tsx`, `business.tsx`, and `discover.tsx`. After every edit: `cp src/pages/<file>.tsx src/pages/main/<file>.tsx`.
 - **Business hooks pattern** — All 4 business hooks take `(state: BusinessState, dispatch: React.Dispatch<BusinessAction>, ...)` as params. They read state directly and dispatch actions — no internal useState for shared state. Only `BusinessPhotoUploader` (inside Edit/Create modals) uses local useState for upload-specific state.
 - **Firebase Storage NOT used** — The project doesn't use Firebase Storage at all. All images (profile photos, business photos, feed images, message attachments) are base64 data URLs stored in Firestore. Deploy with `firebase deploy --only hosting,functions,firestore` — including `storage` target will fail.
 - **`@/` path alias** — Configured in both `vite.config.ts` and `tsconfig.app.json`. Maps to `src/`. All new component/hook imports use this alias (e.g. `import { useBusinessData } from '@/hooks/useBusinessData'`).
@@ -1042,6 +1142,13 @@ git add <files> && git commit -m "message" && git push origin main
 - **`serverTimestamp()` not `new Date()` for Firestore timestamps** — Always use `serverTimestamp()` from Firebase for consistency across time zones. `new Date()` uses the client's local clock which can differ.
 - **Business `bookingUrl` field** — Added to Business interface, BusinessFormData, create/edit save paths, and detail modal contact section. Only shows when `business.bookingUrl` is set.
 - **PhotoLightbox is standalone** — `PhotoLightbox.tsx` has no dependency on business state — just receives `photos[]`, `initialIndex`, `title`, `onClose`. Can be reused by other modules (housing, events, feed) if needed.
+- **`searchRank()` pattern for ranked search** — Returns priority levels (1=prefix/word-start, 2=substring, 3=fuzzy, 0=no match). Pre-sort by rank before secondary sorting. This pattern can be reused in other modules that need ranked search (events, housing, forum, etc.).
+- **`env(safe-area-inset-bottom)` needs Tailwind fallback** — Not all browsers support `env()`. Always provide a Tailwind class as the base positioning (e.g., `bottom-24`) and use inline `style={{ bottom: 'calc(Xrem + env(safe-area-inset-bottom, 0px))' }}` as an enhancement. The inline style overrides the Tailwind class when supported.
+- **`@supports not selector(:focus-visible)` for older browsers** — Added to `src/index.css`. Applies `:focus` outline on `[role="button"]` elements when `:focus-visible` is not supported (iOS Safari < 15.4). Zero runtime cost CSS-only fallback.
+- **`Math.min()` with empty array spread is safe when other args exist** — `Math.min(...emptyArray, 1, 2, 3)` returns `1`, not `Infinity`. Verified safe in `searchRank` usage where name/city/profession always provide fallback values.
+- **`onKeyDown` on mobile only fires with external keyboards** — Adding `onKeyDown` handlers (Enter/Space) to cards is correct behavior — it won't interfere with touch interaction. Keyboard events only fire when a hardware keyboard is connected (Bluetooth keyboards, etc.).
+- **Discover page `activeTab` union type** — Must be `'discover' | 'network' | 'pending'`. The pending tab has its own filter that checks `detail.initiatedBy !== user?.uid` to show only incoming requests. Don't confuse with the Network tab which shows connected users.
+- **Discover Page Enhancement Roadmap** — `Discover_Page_Enhancement_Roadmap.docx` in workspace folder contains all 38 items across 4 phases. Phase 1 (10 items) is complete. Phase 2 (9 items) focuses on performance and data layer optimization.
 
 ### Constraints
 - **No Firebase Storage for profile images or file attachments** — Using base64 in Firestore (1MB doc limit, ~700KB raw file max)
@@ -1065,6 +1172,10 @@ git add <files> && git commit -m "message" && git push origin main
 
 ### Recent Commit History
 ```
+c3fb1d3 fix: cross-browser compatibility for Discover Phase 1 changes (Session 19)
+bd6c412 feat: Discover Page Phase 1 — Critical Fixes & Quick Wins (items 1.1–1.10) (Session 19)
+bef85b1 fix: autocomplete search dropdown not working on iOS Safari (Session 18)
+af92b3f feat: Complete Business Phase 4 — all 42 roadmap items done (Session 18)
 (pending) feat: Phase 4 Q&A system, Open Now indicator, booking URL, admin verification, carousel/deals fixes (Session 17)
 (pending) feat: Phase 4 map view + analytics dashboard + map UX redesign + Firestore analytics rules (Sessions 14-16)
 (pending) refactor: extract 6 JSX components from business.tsx (Phase 2 Steps 7-8)
@@ -1121,4 +1232,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Generated March 23, 2026 (Session 16) — for continuing development in a new session. Business Phases 1-3 COMPLETE. Phase 4 IN PROGRESS — Map View (#29) and Analytics Dashboard (#30) done, remaining items #24-#28 and #31-#42 pending.*
+*Updated March 25, 2026 (Session 19) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page Phase 1 COMPLETE (10/10 items, Session 19). Next: test Phase 1 changes, then begin Discover Phase 2 (Performance & Data Layer, items 2.1–2.9).*
