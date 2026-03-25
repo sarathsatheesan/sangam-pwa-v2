@@ -59,6 +59,9 @@ export default function BusinessPage() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const autocompleteRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Blur guard: prevents autocomplete from closing when tapping suggestions on iOS Safari
+  // When the user taps a suggestion, the input blurs — we use this flag to ignore that blur
+  const blurGuardRef = useRef(false);
 
   // ── Custom hooks (Phase 2 Steps 3-6) ──
   const {
@@ -126,18 +129,23 @@ export default function BusinessPage() {
     autocompleteSuggestions.recent.length > 0
   );
 
-  // Close autocomplete when clicking outside
+  // Close autocomplete when clicking/tapping outside (mousedown + touchstart for iOS Safari)
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
       if (
-        autocompleteRef.current && !autocompleteRef.current.contains(e.target as Node) &&
-        searchInputRef.current && !searchInputRef.current.contains(e.target as Node)
+        autocompleteRef.current && !autocompleteRef.current.contains(target) &&
+        searchInputRef.current && !searchInputRef.current.contains(target)
       ) {
         setShowAutocomplete(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   // Apply a search suggestion
@@ -430,7 +438,16 @@ export default function BusinessPage() {
                     dispatch({ type: 'SET_SEARCH_FOCUSED', payload: true });
                     setShowAutocomplete(true);
                   }}
-                  onBlur={() => dispatch({ type: 'SET_SEARCH_FOCUSED', payload: false })}
+                  onBlur={() => {
+                    dispatch({ type: 'SET_SEARCH_FOCUSED', payload: false });
+                    // Delay closing autocomplete so tap/click on suggestion can register first
+                    // This is critical for iOS Safari where blur fires before click
+                    if (!blurGuardRef.current) {
+                      setTimeout(() => {
+                        if (!blurGuardRef.current) setShowAutocomplete(false);
+                      }, 200);
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') { setShowAutocomplete(false); searchInputRef.current?.blur(); }
                     if (e.key === 'Enter' && state.searchQuery.trim()) {
@@ -453,12 +470,16 @@ export default function BusinessPage() {
                   </button>
                 )}
 
-                {/* ── #42: Autocomplete Dropdown ── */}
+                {/* ── #42: Autocomplete Dropdown (cross-browser: Chrome, Safari, Firefox, iOS Safari, Android Chrome) ── */}
                 {hasAutocompleteSuggestions && (
                   <div
                     ref={autocompleteRef}
                     id="business-autocomplete"
                     role="listbox"
+                    // Set blur guard on any interaction start — prevents input onBlur from closing dropdown
+                    // before onClick fires. Uses both mouse and touch events for cross-browser support.
+                    onMouseDown={() => { blurGuardRef.current = true; }}
+                    onTouchStart={() => { blurGuardRef.current = true; }}
                     className="absolute top-full left-0 right-0 mt-1 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg overflow-hidden z-50 max-h-[320px] overflow-y-auto"
                   >
                     {/* Recent Searches */}
@@ -468,7 +489,7 @@ export default function BusinessPage() {
                           <span className="text-[10px] font-semibold uppercase tracking-wider text-aurora-text-muted">Recent</span>
                           {!state.searchQuery && (
                             <button
-                              onMouseDown={(e) => { e.preventDefault(); clearRecentSearches(); setShowAutocomplete(false); }}
+                              onClick={() => { blurGuardRef.current = false; clearRecentSearches(); setShowAutocomplete(false); }}
                               className="text-[10px] text-aurora-text-muted hover:text-red-500 transition-colors"
                             >
                               Clear all
@@ -479,8 +500,8 @@ export default function BusinessPage() {
                           <button
                             key={`recent-${term}`}
                             role="option"
-                            onMouseDown={(e) => { e.preventDefault(); applySearchSuggestion(term, 'text'); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant transition-colors text-left"
+                            onClick={() => { blurGuardRef.current = false; applySearchSuggestion(term, 'text'); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant active:bg-aurora-surface-variant transition-colors text-left"
                           >
                             <Clock className="w-3.5 h-3.5 text-aurora-text-muted flex-shrink-0" />
                             <span className="truncate">{term}</span>
@@ -499,8 +520,8 @@ export default function BusinessPage() {
                           <button
                             key={`cat-${cat}`}
                             role="option"
-                            onMouseDown={(e) => { e.preventDefault(); applySearchSuggestion(cat, 'category'); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant transition-colors text-left"
+                            onClick={() => { blurGuardRef.current = false; applySearchSuggestion(cat, 'category'); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant active:bg-aurora-surface-variant transition-colors text-left"
                           >
                             <Filter className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
                             <span className="truncate">{cat}</span>
@@ -522,13 +543,13 @@ export default function BusinessPage() {
                           <button
                             key={`biz-${biz.id}`}
                             role="option"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
+                            onClick={() => {
+                              blurGuardRef.current = false;
                               setShowAutocomplete(false);
                               addRecentSearch(biz.name);
                               handleSelectBusiness(biz);
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant transition-colors text-left"
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant active:bg-aurora-surface-variant transition-colors text-left"
                           >
                             <span className="text-base flex-shrink-0">{biz.emoji}</span>
                             <div className="min-w-0 flex-1">
