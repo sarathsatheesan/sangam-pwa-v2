@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback, useReducer, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useReducer, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import {
   Search, MapPin, Phone, Star, X, Plus, Heart, Sparkles, Store,
-  Filter, Loader2, TrendingUp, Map, List, Navigation, UserPlus, Upload,
+  Filter, Loader2, TrendingUp, Map, List, Navigation, UserPlus, Upload, Clock,
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
@@ -55,6 +55,11 @@ export default function BusinessPage() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showCSVImport, setShowCSVImport] = useState(false);
 
+  // ── #42: Autocomplete state ──
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const autocompleteRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // ── Custom hooks (Phase 2 Steps 3-6) ──
   const {
     loadMoreRef, toggleFavorite, handleOpenCreateModal, handleAddBusiness,
@@ -66,6 +71,87 @@ export default function BusinessPage() {
   const { openReportModal, handleSubmitReport, handleBlockUser, openBlockConfirm } = useBusinessModeration(state, dispatch, user, userProfile);
 
   const { handleAddReview } = useBusinessReviews(state, dispatch, user, userProfile);
+
+  // ── #42: Recent searches (persisted in localStorage) ──
+  const RECENT_SEARCHES_KEY = 'ethniCity_recent_business_searches';
+  const MAX_RECENT = 5;
+
+  const getRecentSearches = useCallback((): string[] => {
+    try {
+      const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  }, []);
+
+  const addRecentSearch = useCallback((query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 2) return;
+    try {
+      const recent = getRecentSearches().filter((s) => s.toLowerCase() !== trimmed.toLowerCase());
+      recent.unshift(trimmed);
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recent.slice(0, MAX_RECENT)));
+    } catch { /* localStorage full or unavailable */ }
+  }, [getRecentSearches]);
+
+  const clearRecentSearches = useCallback(() => {
+    try { localStorage.removeItem(RECENT_SEARCHES_KEY); } catch { /* noop */ }
+  }, []);
+
+  // ── #42: Autocomplete suggestions ──
+  const autocompleteSuggestions = useMemo(() => {
+    const q = state.searchQuery.trim().toLowerCase();
+    if (!q) return { categories: [] as string[], businesses: [] as Business[], recent: getRecentSearches() };
+
+    // Category matches
+    const categories = CATEGORIES.filter((c) => c.toLowerCase().includes(q)).slice(0, 3);
+
+    // Business name/location matches (top 5)
+    const businesses = state.businesses
+      .filter((b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.location.toLowerCase().includes(q) ||
+        (b.specialtyTags || []).some((t) => t.toLowerCase().includes(q)),
+      )
+      .slice(0, 5);
+
+    // Recent searches that match
+    const recent = getRecentSearches().filter((s) => s.toLowerCase().includes(q));
+
+    return { categories, businesses, recent };
+  }, [state.searchQuery, state.businesses, getRecentSearches]);
+
+  const hasAutocompleteSuggestions = showAutocomplete && (
+    autocompleteSuggestions.categories.length > 0 ||
+    autocompleteSuggestions.businesses.length > 0 ||
+    autocompleteSuggestions.recent.length > 0
+  );
+
+  // Close autocomplete when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        autocompleteRef.current && !autocompleteRef.current.contains(e.target as Node) &&
+        searchInputRef.current && !searchInputRef.current.contains(e.target as Node)
+      ) {
+        setShowAutocomplete(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Apply a search suggestion
+  const applySearchSuggestion = useCallback((value: string, type: 'category' | 'text') => {
+    if (type === 'category') {
+      dispatch({ type: 'SET_SELECTED_CATEGORY', payload: value });
+      dispatch({ type: 'SET_SEARCH_QUERY', payload: '' });
+    } else {
+      dispatch({ type: 'SET_SEARCH_QUERY', payload: value });
+      addRecentSearch(value);
+    }
+    setShowAutocomplete(false);
+    searchInputRef.current?.blur();
+  }, [dispatch, addRecentSearch]);
 
   // ── Context menu (memoized) ──
   const openMenu = useCallback((businessId: string, e: React.MouseEvent) => {
@@ -89,31 +175,92 @@ export default function BusinessPage() {
     dispatch({ type: 'SET_ACTIVE_TAB', payload: 'about' });
   }, [dispatch]);
 
-  // ── Geolocation handler ──
+  // ── Geolocation handler (cross-browser: Chrome, Safari, Firefox, iOS Safari, Android Chrome) ──
   const handleRequestGeolocation = useCallback(() => {
     if (!navigator.geolocation) {
       dispatch({ type: 'SET_TOAST', payload: 'Geolocation is not supported by your browser.' });
       return;
     }
+
+    // HTTPS check — geolocation requires secure context (except localhost)
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+      dispatch({ type: 'SET_TOAST', payload: 'Location requires a secure (HTTPS) connection.' });
+      return;
+    }
+
     dispatch({ type: 'SET_GEOLOCATING', payload: true });
+
+    // Detect iOS for platform-specific error messages
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    const onSuccess = (position: GeolocationPosition) => {
+      dispatch({
+        type: 'SET_USER_LOCATION',
+        payload: { lat: position.coords.latitude, lng: position.coords.longitude },
+      });
+      dispatch({ type: 'SET_TOAST', payload: 'Location found! Showing nearest businesses.' });
+    };
+
+    const getErrorMessage = (error: GeolocationPositionError): string => {
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          return isIOS
+            ? 'Location access denied. Open Settings → Privacy & Security → Location Services and enable it for your browser.'
+            : 'Location access denied. Please allow location access in your browser settings and try again.';
+        case error.POSITION_UNAVAILABLE:
+          return isIOS
+            ? 'Could not determine your location. Check that Location Services is enabled in Settings → Privacy & Security.'
+            : 'Unable to determine your location. Check that location/GPS is enabled on your device.';
+        case error.TIMEOUT:
+          return ''; // Handled by fallback below
+        default:
+          return 'Could not get your location. Please try again.';
+      }
+    };
+
+    // Safety-net timeout for Firefox (dismissing the prompt doesn't always trigger the error callback)
+    // and for general hanging — 20s total max wait
+    const safetyTimeout = setTimeout(() => {
+      dispatch({ type: 'SET_GEOLOCATING', payload: false });
+      dispatch({ type: 'SET_TOAST', payload: 'Location request timed out. Please check your browser permissions and try again.' });
+    }, 20000);
+
+    const clearSafety = () => clearTimeout(safetyTimeout);
+
+    // Phase 1: Try high-accuracy (GPS) — works great on most devices
+    // But iOS Safari can timeout on GPS cold start, so we use a shorter timeout
+    // and fall back to low-accuracy (Wi-Fi/cell tower) if it fails
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        dispatch({
-          type: 'SET_USER_LOCATION',
-          payload: { lat: position.coords.latitude, lng: position.coords.longitude },
-        });
-        dispatch({ type: 'SET_TOAST', payload: 'Location found! Showing businesses near you.' });
+        clearSafety();
+        onSuccess(position);
       },
       (error) => {
+        // If it's a timeout, try again with low accuracy (Wi-Fi/cell tower)
+        // This is critical for iOS Safari where GPS cold start can take >10s
+        if (error.code === error.TIMEOUT) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              clearSafety();
+              onSuccess(position);
+            },
+            (fallbackError) => {
+              clearSafety();
+              dispatch({ type: 'SET_GEOLOCATING', payload: false });
+              const msg = getErrorMessage(fallbackError);
+              dispatch({ type: 'SET_TOAST', payload: msg || 'Location request timed out. Please check that location services are enabled and try again.' });
+            },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 },
+          );
+          return;
+        }
+        // Non-timeout error — show appropriate message
+        clearSafety();
         dispatch({ type: 'SET_GEOLOCATING', payload: false });
-        const messages: Record<number, string> = {
-          1: 'Location access denied. Please enable it in your browser settings.',
-          2: 'Unable to determine your location. Please try again.',
-          3: 'Location request timed out. Please try again.',
-        };
-        dispatch({ type: 'SET_TOAST', payload: messages[error.code] || 'Could not get your location.' });
+        dispatch({ type: 'SET_TOAST', payload: getErrorMessage(error) });
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 },
     );
   }, [dispatch]);
 
@@ -265,15 +412,32 @@ export default function BusinessPage() {
           {!merchantView && (
             <div className="relative flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted z-10" />
                 <input
+                  ref={searchInputRef}
                   type="search"
                   aria-label="Search businesses"
+                  aria-expanded={hasAutocompleteSuggestions}
+                  aria-autocomplete="list"
+                  aria-controls="business-autocomplete"
                   placeholder="Search restaurants, services, markets..."
                   value={state.searchQuery}
-                  onChange={(e) => dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
-                  onFocus={() => dispatch({ type: 'SET_SEARCH_FOCUSED', payload: true })}
+                  onChange={(e) => {
+                    dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value });
+                    setShowAutocomplete(true);
+                  }}
+                  onFocus={() => {
+                    dispatch({ type: 'SET_SEARCH_FOCUSED', payload: true });
+                    setShowAutocomplete(true);
+                  }}
                   onBlur={() => dispatch({ type: 'SET_SEARCH_FOCUSED', payload: false })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') { setShowAutocomplete(false); searchInputRef.current?.blur(); }
+                    if (e.key === 'Enter' && state.searchQuery.trim()) {
+                      addRecentSearch(state.searchQuery.trim());
+                      setShowAutocomplete(false);
+                    }
+                  }}
                   className={`w-full pl-11 pr-10 py-2.5 bg-aurora-surface border rounded-full
                              text-sm text-aurora-text placeholder:text-aurora-text-muted
                              focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all
@@ -281,12 +445,104 @@ export default function BusinessPage() {
                 />
                 {state.searchQuery && (
                   <button
-                    onClick={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
+                    onClick={() => { dispatch({ type: 'SET_SEARCH_QUERY', payload: '' }); setShowAutocomplete(false); }}
                     aria-label="Clear search"
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none rounded-full"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-aurora-text-muted hover:text-aurora-text focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none rounded-full z-10"
                   >
                     <X className="w-4 h-4" />
                   </button>
+                )}
+
+                {/* ── #42: Autocomplete Dropdown ── */}
+                {hasAutocompleteSuggestions && (
+                  <div
+                    ref={autocompleteRef}
+                    id="business-autocomplete"
+                    role="listbox"
+                    className="absolute top-full left-0 right-0 mt-1 bg-aurora-surface border border-aurora-border rounded-xl shadow-lg overflow-hidden z-50 max-h-[320px] overflow-y-auto"
+                  >
+                    {/* Recent Searches */}
+                    {autocompleteSuggestions.recent.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-aurora-text-muted">Recent</span>
+                          {!state.searchQuery && (
+                            <button
+                              onMouseDown={(e) => { e.preventDefault(); clearRecentSearches(); setShowAutocomplete(false); }}
+                              className="text-[10px] text-aurora-text-muted hover:text-red-500 transition-colors"
+                            >
+                              Clear all
+                            </button>
+                          )}
+                        </div>
+                        {autocompleteSuggestions.recent.map((term) => (
+                          <button
+                            key={`recent-${term}`}
+                            role="option"
+                            onMouseDown={(e) => { e.preventDefault(); applySearchSuggestion(term, 'text'); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant transition-colors text-left"
+                          >
+                            <Clock className="w-3.5 h-3.5 text-aurora-text-muted flex-shrink-0" />
+                            <span className="truncate">{term}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Category Suggestions */}
+                    {autocompleteSuggestions.categories.length > 0 && (
+                      <div>
+                        <div className="px-3 pt-2.5 pb-1">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-aurora-text-muted">Categories</span>
+                        </div>
+                        {autocompleteSuggestions.categories.map((cat) => (
+                          <button
+                            key={`cat-${cat}`}
+                            role="option"
+                            onMouseDown={(e) => { e.preventDefault(); applySearchSuggestion(cat, 'category'); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant transition-colors text-left"
+                          >
+                            <Filter className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                            <span className="truncate">{cat}</span>
+                            {categoryCounts[cat] != null && (
+                              <span className="ml-auto text-[10px] text-aurora-text-muted bg-aurora-surface-variant px-1.5 py-0.5 rounded-full">{categoryCounts[cat]}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Business Name Matches */}
+                    {autocompleteSuggestions.businesses.length > 0 && (
+                      <div>
+                        <div className="px-3 pt-2.5 pb-1">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider text-aurora-text-muted">Businesses</span>
+                        </div>
+                        {autocompleteSuggestions.businesses.map((biz) => (
+                          <button
+                            key={`biz-${biz.id}`}
+                            role="option"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setShowAutocomplete(false);
+                              addRecentSearch(biz.name);
+                              handleSelectBusiness(biz);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-aurora-text hover:bg-aurora-surface-variant transition-colors text-left"
+                          >
+                            <span className="text-base flex-shrink-0">{biz.emoji}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate font-medium">{biz.name}</div>
+                              <div className="truncate text-[11px] text-aurora-text-muted">{biz.category} · {biz.location}</div>
+                            </div>
+                            {biz.verified && (
+                              <span className="text-[10px] text-blue-500 font-semibold flex-shrink-0">✓</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -562,6 +818,43 @@ export default function BusinessPage() {
             {state.viewMode === 'list' && state.loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+              </div>
+            ) : state.viewMode === 'list' && state.activeCollection === 'nearest' && !state.userLocation ? (
+              /* Nearest selected but no location yet — show waiting/permission state */
+              <div className="flex flex-col items-center justify-center py-16 text-center" role="status">
+                <div className="w-24 h-24 mb-5">
+                  <svg viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <circle cx="48" cy="38" r="20" className="stroke-aurora-text-muted fill-aurora-surface-variant" strokeWidth="2.5" />
+                    <path d="M48 58C48 58 24 44 24 30C24 20 35 14 48 14C61 14 72 20 72 30C72 44 48 58 48 58Z" className="stroke-aurora-text-muted" strokeWidth="2.5" strokeLinejoin="round" />
+                    <circle cx="48" cy="32" r="6" className="stroke-aurora-border" strokeWidth="2" />
+                  </svg>
+                </div>
+                {state.geolocating ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Loader2 className="w-5 h-5 animate-spin text-aurora-indigo" />
+                      <h3 className="text-lg font-semibold text-aurora-text">Finding your location...</h3>
+                    </div>
+                    <p className="text-sm text-aurora-text-secondary max-w-xs">
+                      Please allow location access when your browser asks. This helps us show you the nearest businesses.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold text-aurora-text mb-1">Location needed</h3>
+                    <p className="text-sm text-aurora-text-secondary max-w-xs mb-4">
+                      We need your location to sort businesses by distance. Tap the button below to try again.
+                    </p>
+                    <button
+                      onClick={handleRequestGeolocation}
+                      className="px-5 py-2.5 bg-aurora-indigo text-white rounded-xl font-medium text-sm
+                                 hover:bg-aurora-indigo/90 shadow-sm flex items-center gap-2 mx-auto"
+                    >
+                      <Navigation className="w-4 h-4" />
+                      Enable Location
+                    </button>
+                  </>
+                )}
               </div>
             ) : state.viewMode === 'list' && filteredBusinesses.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center" role="status">

@@ -3,7 +3,7 @@ import {
   X, ArrowLeft, Loader2, Upload, Star,
 } from 'lucide-react';
 import { CATEGORIES } from '@/components/business/businessConstants';
-import { compressImage, MAX_FILE_SIZE } from '@/components/business/imageUtils';
+import { compressImagesParallel, MAX_FILE_SIZE } from '@/components/business/imageUtils';
 import type { BusinessFormData } from '@/reducers/businessReducer';
 
 // ── Local form helpers (kept outside component to avoid re-mount) ──
@@ -44,6 +44,7 @@ const BusinessPhotoUploader: React.FC<{
 }> = ({ photos, onPhotosChange, onCoverChange, coverIndex }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState({ completed: 0, total: 0 });
   const [photoError, setPhotoError] = useState<string | null>(null);
 
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,21 +63,17 @@ const BusinessPhotoUploader: React.FC<{
     }
 
     setPhotoUploading(true);
-    const newPhotos = [...photos];
-    let failCount = 0;
-    for (const file of toProcess) {
-      try {
-        const compressed = await compressImage(file);
-        newPhotos.push(compressed);
-      } catch (err) {
-        console.error('Error compressing image:', err);
-        failCount++;
-      }
-    }
+    setPhotoProgress({ completed: 0, total: toProcess.length });
+
+    const { images, failCount } = await compressImagesParallel(
+      toProcess,
+      (completed, total) => setPhotoProgress({ completed, total }),
+    );
+
     if (failCount > 0) {
-      setPhotoError(`${failCount} photo(s) failed to upload. Please try again.`);
+      setPhotoError(`${failCount} photo(s) failed to process. Please try again.`);
     }
-    onPhotosChange(newPhotos);
+    onPhotosChange([...photos, ...images]);
     if (fileInputRef.current) fileInputRef.current.value = '';
     setPhotoUploading(false);
   };
@@ -97,12 +94,23 @@ const BusinessPhotoUploader: React.FC<{
           className={`w-full border-2 border-dashed border-aurora-border rounded-xl p-4 flex flex-col items-center gap-2 text-aurora-text-muted hover:border-aurora-indigo hover:text-aurora-indigo transition-colors ${photoUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {photoUploading ? (
-            <Loader2 className="w-6 h-6 animate-spin" />
+            <>
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span className="text-sm">Compressing {photoProgress.completed}/{photoProgress.total}...</span>
+              <div className="w-full max-w-[200px] h-1.5 bg-aurora-border rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-aurora-indigo rounded-full transition-all duration-300"
+                  style={{ width: `${photoProgress.total > 0 ? (photoProgress.completed / photoProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+            </>
           ) : (
-            <Upload className="w-6 h-6" />
+            <>
+              <Upload className="w-6 h-6" />
+              <span className="text-sm">Click to upload photos</span>
+              <span className="text-xs text-aurora-text-muted">PNG, JPG up to 5MB each</span>
+            </>
           )}
-          <span className="text-sm">{photoUploading ? 'Uploading...' : 'Click to upload photos'}</span>
-          <span className="text-xs text-aurora-text-muted">PNG, JPG up to 5MB each</span>
         </button>
       )}
       <input

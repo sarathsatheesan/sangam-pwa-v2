@@ -39,3 +39,56 @@ export function compressImage(file: File, maxWidth = 800, quality = 0.7): Promis
     reader.readAsDataURL(file);
   });
 }
+
+// ── #41: Parallel Image Compression ─────────────────────────────────────────
+
+export interface CompressResult {
+  /** Successfully compressed base64 data-URLs */
+  images: string[];
+  /** Number of files that failed to compress */
+  failCount: number;
+}
+
+/**
+ * Compresses multiple images in parallel using Promise.allSettled.
+ * Calls onProgress after each image finishes (success or fail) with
+ * the count of completed items so far vs. total.
+ *
+ * @param files     Array of File objects to compress
+ * @param onProgress  Callback: (completed, total) => void
+ * @param maxWidth  Max pixel width (default 800)
+ * @param quality   JPEG quality 0-1 (default 0.7)
+ * @returns CompressResult with images array (in original order) and failCount
+ */
+export async function compressImagesParallel(
+  files: File[],
+  onProgress?: (completed: number, total: number) => void,
+  maxWidth = 800,
+  quality = 0.7,
+): Promise<CompressResult> {
+  const total = files.length;
+  let completed = 0;
+
+  const results = await Promise.allSettled(
+    files.map((file) =>
+      compressImage(file, maxWidth, quality).finally(() => {
+        completed++;
+        onProgress?.(completed, total);
+      }),
+    ),
+  );
+
+  const images: string[] = [];
+  let failCount = 0;
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      images.push(result.value);
+    } else {
+      console.error('Image compression failed:', result.reason);
+      failCount++;
+    }
+  }
+
+  return { images, failCount };
+}
