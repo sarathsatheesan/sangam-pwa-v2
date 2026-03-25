@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useCallback, useReducer, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useReducer, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import {
   Search, MapPin, Phone, Star, X, Plus, Heart, Sparkles, Store,
-  Filter, Loader2, TrendingUp, Map, List, Navigation, UserPlus,
+  Filter, Loader2, TrendingUp, Map, List, Navigation, UserPlus, Upload,
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
@@ -14,7 +14,7 @@ import {
 } from '@/components/business/businessConstants';
 import { businessReducer, createInitialState, type Business } from '@/reducers/businessReducer';
 import { useBusinessData } from '@/hooks/useBusinessData';
-import { useBusinessFilters } from '@/hooks/useBusinessFilters';
+import { useBusinessFilters, getBusinessDistance } from '@/hooks/useBusinessFilters';
 import { useBusinessModeration } from '@/hooks/useBusinessModeration';
 import { useBusinessReviews } from '@/hooks/useBusinessReviews';
 
@@ -35,6 +35,10 @@ import { recordFavorite } from '@/services/businessAnalytics';
 
 // Lazy-load map view (loads Leaflet CDN on demand)
 const BusinessMapView = lazy(() => import('@/components/business/BusinessMapView'));
+// Lazy-load CSV import modal (#37)
+const BusinessCSVImport = lazy(() => import('@/components/business/BusinessCSVImport'));
+// Lazy-load virtualized grid (#40)
+const VirtualizedBusinessGrid = lazy(() => import('@/components/business/VirtualizedBusinessGrid'));
 
 // ═════════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -49,6 +53,7 @@ export default function BusinessPage() {
   const photosEnabled = isFeatureEnabled('business_photos');
   const merchantView = false; // My Businesses moved to Profile page
   const menuRef = useRef<HTMLDivElement>(null);
+  const [showCSVImport, setShowCSVImport] = useState(false);
 
   // ── Custom hooks (Phase 2 Steps 3-6) ──
   const {
@@ -345,12 +350,13 @@ export default function BusinessPage() {
             <div className="border-t border-aurora-border bg-aurora-surface">
               <div className="max-w-6xl mx-auto px-4 py-3">
                 <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
-                  {(['all', 'topRated', 'new', 'mostReviewed', 'favorites', 'following'] as const).map((collection) => {
+                  {(['all', 'topRated', 'new', 'mostReviewed', 'nearest', 'favorites', 'following'] as const).map((collection) => {
                     const labels: Record<string, string> = {
                       all: 'All',
                       topRated: 'Top Rated',
                       new: 'New',
                       mostReviewed: 'Most Reviewed',
+                      nearest: 'Nearest',
                       favorites: 'Favorites',
                       following: 'Following',
                     };
@@ -358,16 +364,24 @@ export default function BusinessPage() {
                       <button
                         key={collection}
                         aria-pressed={state.activeCollection === collection}
-                        onClick={() => dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: collection })}
+                        onClick={() => {
+                          dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: collection });
+                          // Auto-trigger geolocation when "Nearest" is tapped and we don't have location yet
+                          if (collection === 'nearest' && !state.userLocation && !state.geolocating) {
+                            handleRequestGeolocation();
+                          }
+                        }}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none ${state.activeCollection === collection
                             ? 'bg-aurora-indigo text-white'
                             : 'bg-aurora-surface-variant text-aurora-text-secondary hover:text-aurora-text'
                         }`}
                       >
                         {collection === 'topRated' && <TrendingUp className="w-3 h-3" />}
+                        {collection === 'nearest' && <Navigation className="w-3 h-3" />}
                         {collection === 'favorites' && <Heart className="w-3 h-3" />}
                         {collection === 'following' && <UserPlus className="w-3 h-3" />}
                         {labels[collection]}
+                        {collection === 'nearest' && state.geolocating && <Loader2 className="w-3 h-3 animate-spin" />}
                       </button>
                     );
                   })}
@@ -382,26 +396,16 @@ export default function BusinessPage() {
           {/* ── Content ── */}
           <div className="max-w-6xl mx-auto px-4 py-5 pb-4">
             {/* Results Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
               <p className="text-sm text-aurora-text-secondary" aria-live="polite" aria-atomic="true">
                 {state.loading ? 'Loading...' : (
                   <>
                     <span className="font-semibold text-aurora-text">{filteredBusinesses.length}</span>
                     {' '}business{filteredBusinesses.length !== 1 ? 'es' : ''}
-                    {state.selectedCategory !== 'All' && <> in <span className="font-medium text-aurora-text">{state.selectedCategory}</span></>}
-                    {state.selectedHeritage.length > 0 && <> · {state.selectedHeritage.join(', ')}</>}
                   </>
                 )}
               </p>
               <div className="flex items-center gap-2">
-                {(state.selectedCategory !== 'All' || state.selectedHeritage.length > 0 || state.searchQuery || state.activeCollection !== 'all') && (
-                  <button
-                    onClick={() => { dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' }); dispatch({ type: 'SET_SELECTED_HERITAGE', payload: [] }); dispatch({ type: 'SET_SEARCH_QUERY', payload: '' }); dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: 'all' }); }}
-                    className="text-xs text-aurora-indigo font-medium flex items-center gap-1 hover:text-aurora-indigo/80"
-                  >
-                    <X className="w-3 h-3" /> Clear filters
-                  </button>
-                )}
                 {/* Map / List Toggle */}
                 <div className="flex bg-aurora-surface-variant rounded-lg p-0.5 border border-aurora-border" role="radiogroup" aria-label="View mode">
                   <button
@@ -436,6 +440,92 @@ export default function BusinessPage() {
               </div>
             </div>
 
+            {/* ── Active Filter Chips (#25) ── */}
+            {(() => {
+              const hasCategory = state.selectedCategory !== 'All';
+              const hasHeritage = state.selectedHeritage.length > 0;
+              const hasSearch = state.debouncedSearchQuery.trim().length > 0;
+              const hasCollection = state.activeCollection !== 'all';
+              const collectionLabels: Record<string, string> = { topRated: 'Top Rated', new: 'New', mostReviewed: 'Most Reviewed', nearest: 'Nearest', favorites: 'Favorites', following: 'Following' };
+              const anyActive = hasCategory || hasHeritage || hasSearch || hasCollection;
+              if (!anyActive) return null;
+              const chipCount = (hasCategory ? 1 : 0) + (hasSearch ? 1 : 0) + (hasCollection ? 1 : 0) + state.selectedHeritage.length;
+              return (
+                <div className="flex items-center gap-2 mb-3 flex-wrap" role="list" aria-label="Active filters">
+                  {hasSearch && (
+                    <span role="listitem" className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-medium bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                      <Search className="w-3 h-3" aria-hidden="true" />
+                      <span className="max-w-[120px] truncate">&ldquo;{state.debouncedSearchQuery.trim()}&rdquo;</span>
+                      <button
+                        onClick={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
+                        className="ml-0.5 p-0.5 rounded-full hover:bg-violet-200 dark:hover:bg-violet-800 transition-colors focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:outline-none"
+                        aria-label={`Remove search filter "${state.debouncedSearchQuery.trim()}"`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {hasCategory && (
+                    <span role="listitem" className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      {(() => { const IC = CATEGORY_ICONS[state.selectedCategory]; return IC ? <IC className="w-3 h-3" aria-hidden="true" /> : null; })()}
+                      {state.selectedCategory}
+                      <button
+                        onClick={() => dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' })}
+                        className="ml-0.5 p-0.5 rounded-full hover:bg-emerald-200 dark:hover:bg-emerald-800 transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
+                        aria-label={`Remove category filter "${state.selectedCategory}"`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {state.selectedHeritage.map((h) => (
+                    <span key={h} role="listitem" className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                      <Sparkles className="w-3 h-3" aria-hidden="true" />
+                      {h}
+                      <button
+                        onClick={() => dispatch({ type: 'SET_SELECTED_HERITAGE', payload: state.selectedHeritage.filter((x) => x !== h) })}
+                        className="ml-0.5 p-0.5 rounded-full hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none"
+                        aria-label={`Remove heritage filter "${h}"`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {hasCollection && (
+                    <span role="listitem" className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      {state.activeCollection === 'favorites' && <Heart className="w-3 h-3" aria-hidden="true" />}
+                      {state.activeCollection === 'following' && <UserPlus className="w-3 h-3" aria-hidden="true" />}
+                      {state.activeCollection === 'topRated' && <TrendingUp className="w-3 h-3" aria-hidden="true" />}
+                      {state.activeCollection === 'nearest' && <Navigation className="w-3 h-3" aria-hidden="true" />}
+                      {collectionLabels[state.activeCollection] || state.activeCollection}
+                      <button
+                        onClick={() => dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: 'all' })}
+                        className="ml-0.5 p-0.5 rounded-full hover:bg-indigo-200 dark:hover:bg-indigo-800 transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
+                        aria-label={`Remove "${collectionLabels[state.activeCollection]}" sort`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {chipCount > 1 && (
+                    <button
+                      onClick={() => {
+                        dispatch({ type: 'SET_SELECTED_CATEGORY', payload: 'All' });
+                        dispatch({ type: 'SET_SELECTED_HERITAGE', payload: [] });
+                        dispatch({ type: 'SET_SEARCH_QUERY', payload: '' });
+                        dispatch({ type: 'SET_ACTIVE_COLLECTION', payload: 'all' });
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-aurora-text-muted hover:text-aurora-text hover:bg-aurora-surface-variant border border-aurora-border transition-colors focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:outline-none"
+                      aria-label="Clear all filters"
+                    >
+                      <X className="w-3 h-3" />
+                      Clear all
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* ── Map View ── */}
             {state.viewMode === 'map' && !state.loading && (
               <Suspense fallback={
@@ -463,6 +553,7 @@ export default function BusinessPage() {
                     favorites={state.favorites}
                     toggleFavorite={toggleFavorite}
                     onSelect={handleSelectBusiness}
+                    getDistance={state.userLocation ? (b) => getBusinessDistance(b, state.userLocation) : undefined}
                   />
                 )}
               </>
@@ -533,19 +624,21 @@ export default function BusinessPage() {
                 </div>
               </div>
             ) : state.viewMode === 'list' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredBusinesses.map((business) => (
-                  <BusinessCard
-                    key={business.id}
-                    business={business}
-                    isFavorite={state.favorites.has(business.id)}
-                    toggleFavorite={toggleFavorite}
-                    openMenu={openMenu}
-                    onSelect={handleSelectBusiness}
-                    user={user}
-                  />
-                ))}
-              </div>
+              <Suspense fallback={
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+                </div>
+              }>
+                <VirtualizedBusinessGrid
+                  businesses={filteredBusinesses}
+                  favorites={state.favorites}
+                  toggleFavorite={toggleFavorite}
+                  openMenu={openMenu}
+                  onSelect={handleSelectBusiness}
+                  user={user}
+                  getDistanceMiles={state.userLocation ? (b: Business) => getBusinessDistance(b, state.userLocation) : undefined}
+                />
+              </Suspense>
             ) : null}
 
             {/* Infinite scroll sentinel (list view only) */}
@@ -698,17 +791,28 @@ export default function BusinessPage() {
         />
       )}
 
-      {/* ─── Floating Action Button ─── */}
+      {/* ─── Floating Action Buttons ─── */}
       {canAddBusiness && (
-        <button
-          onClick={handleOpenCreateModal}
-          aria-label="Add new business"
-          className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 w-14 h-14 aurora-gradient text-white rounded-full shadow-aurora-glow-lg flex items-center justify-center hover:shadow-aurora-4 transition-all z-10 btn-press focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:outline-none"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
+        <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-10 flex flex-col items-center gap-3">
+          {/* CSV Import FAB (secondary) */}
+          <button
+            onClick={() => setShowCSVImport(true)}
+            aria-label="Bulk import businesses from CSV"
+            className="w-11 h-11 bg-aurora-surface text-aurora-indigo rounded-full shadow-lg border border-aurora-border flex items-center justify-center hover:bg-aurora-surface-variant transition-all focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <Upload className="w-5 h-5" />
+          </button>
+          {/* Add Business FAB (primary) */}
+          <button
+            onClick={handleOpenCreateModal}
+            aria-label="Add new business"
+            className="w-14 h-14 aurora-gradient text-white rounded-full shadow-aurora-glow-lg flex items-center justify-center hover:shadow-aurora-4 transition-all btn-press focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {/* ===== Create Modal ===== */}
@@ -782,6 +886,26 @@ export default function BusinessPage() {
           dispatch={dispatch}
           handleBlockUser={handleBlockUser}
         />
+      )}
+
+      {/* CSV Bulk Import Modal (#37) */}
+      {showCSVImport && (
+        <Suspense fallback={null}>
+          <BusinessCSVImport
+            isOpen={showCSVImport}
+            onClose={() => setShowCSVImport(false)}
+            userId={user?.uid || ''}
+            userName={userProfile?.name || user?.displayName || 'Unknown'}
+            userRole={userRole || 'user'}
+            userHeritage={userProfile?.heritage}
+            onImportComplete={(count) => {
+              if (count > 0) {
+                dispatch({ type: 'SET_TOAST', payload: `Successfully imported ${count} business${count !== 1 ? 'es' : ''}!` });
+                // onSnapshot listener will automatically pick up new businesses — no reload needed
+              }
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Toast Notification */}

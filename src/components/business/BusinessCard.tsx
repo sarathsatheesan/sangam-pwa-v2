@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import {
-  MapPin, Phone, Heart, Sparkles, Store, Star, MoreHorizontal, BadgeCheck,
+  MapPin, Phone, Heart, Sparkles, Store, Star, MoreHorizontal, BadgeCheck, Navigation,
 } from 'lucide-react';
 import { CATEGORY_ICONS } from '@/components/business/businessConstants';
-import { parseOpenNow } from '@/components/business/businessUtils';
+import { parseOpenNow, formatDistance } from '@/components/business/businessUtils';
 import type { Business } from '@/reducers/businessReducer';
 
 // Re-use the StarRating helper inline (tiny, no need for a separate file)
@@ -22,6 +22,7 @@ export interface BusinessCardProps {
   openMenu: (id: string, e: React.MouseEvent) => void;
   onSelect: (business: Business) => void;
   user: any;
+  distanceMiles?: number | null;
 }
 
 const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
@@ -31,6 +32,7 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
   openMenu,
   onSelect,
   user,
+  distanceMiles,
 }) => {
   const CategoryIcon = CATEGORY_ICONS[business.category] || Store;
   const heritageArr = business.heritage
@@ -144,7 +146,15 @@ const BusinessCard: React.FC<BusinessCardProps> = React.memo(({
         </div>
 
         <div className="flex items-center justify-between mb-2.5">
-          <StarRating rating={business.rating} reviews={business.reviews} />
+          <div className="flex items-center gap-2">
+            <StarRating rating={business.rating} reviews={business.reviews} />
+            {distanceMiles != null && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded-full">
+                <Navigation className="w-2.5 h-2.5" />
+                {formatDistance(distanceMiles)}
+              </span>
+            )}
+          </div>
           {business.location && (
             <span className="text-xs text-aurora-text-muted flex items-center gap-0.5 truncate max-w-[140px]">
               <MapPin className="w-3 h-3 flex-shrink-0" /> {business.location}

@@ -17,12 +17,12 @@
   previously-fixed bugs.
 -->
 
-**Date:** March 23, 2026 (Last updated: Session 16)
+**Date:** March 25, 2026 (Last updated: Session 18)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** (pending) — feat: Phase 4 map view + analytics dashboard + map UX redesign
+**Latest Commit:** (pending) — feat: Phase 4 high-impact UX features + carousel/deals/Q&A fixes
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor)
 
 ---
 
@@ -90,6 +90,25 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
 - **#29 Map View with Leaflet + OpenStreetMap**: Added a Map/List view toggle to the business page. The map component (`BusinessMapView.tsx`) dynamically loads Leaflet 1.9.4 from CDN (no npm dependency) using OpenStreetMap tiles. Custom colored markers based on business category. Near Me button for geolocation with distance badges. User location shown with a pulsing blue dot. React.lazy() + Suspense for code-splitting the map component.
 
 - **#30 Owner Analytics Dashboard**: New analytics service (`businessAnalytics.ts`) using Firestore subcollection pattern `businesses/{id}/analytics/{YYYY-MM-DD}` with daily event counters for views, contact clicks, shares, and favorites. Session-level debounce for views via `Set<string>`. New dashboard component (`BusinessAnalyticsTab.tsx`) with 4 stat cards and CSS-only bar charts. Gated by `isOwnerOrAdmin(business)` — only visible to the business owner or admin users.
+
+**Session 17 focused on:** Business module Phase 4 continued — High-impact UX features (#24 Open Now, #35 Customer Q&A, #36 Booking/Reservation) plus admin verification toggle, cross-browser testing, and multiple bug fixes:
+
+- **Admin Verification Toggle**: Added a badge/toggle button in the admin Listings section next to disable/delete buttons. Writes `verified`, `verifiedAt` (serverTimestamp), `verificationMethod` fields to Firestore. Fixed verification not appearing on business page (missing field mapping in `useBusinessData.ts`).
+- **#35 Customer Q&A System**: New `BusinessQASection.tsx` component (~384 lines) with Firestore subcollection (`businesses/{id}/questions`), optimistic UI, debounced search (250ms), owner badge ("Owner" pill), reply form. Refactored to use native HTML `<details>`/`<summary>` for collapsible questions with animated chevron icon. Firestore security rules added for Q&A subcollection.
+- **#36 Booking/Reservation**: Added `bookingUrl` field to Business interface, form data, create/edit modals, and detail modal contact section. Shows "Book a Reservation / Schedule online" link with CalendarClock icon.
+- **#24 Open Now Indicator**: Shared `parseOpenNow()` utility in `businessUtils.ts` (~85 lines) — parses business hours strings including day ranges ("Mon-Fri"), 12h/24h formats, with try/catch safety. Shows Open/Closed status pill on BusinessCard tiles, FeaturedCarousel cards, and BusinessDetailModal next to Hours heading.
+- **Photo Carousel Refactor**: Removed prev/next arrows from hero banner entirely — was causing persistent overlap with action buttons (X, share, heart, menu) on both mobile and desktop due to compact 224px hero height. Navigation now via swipe (touch) + "1/2" counter + lightbox (click image to open full-screen with arrows). Carousel state lifted from `BusinessPhotoCarousel` to `BusinessDetailModal` for proper z-index management.
+- **Featured Carousel Background Fix**: Removed `bg-aurora-surface` from bottom info section, added subtle `bgColor` gradient tint to entire card wrapper for cohesive appearance in both light and dark modes.
+- **Deals Save Fix**: Fixed "Failed to save deals" error when adding second deal — Firestore rejects `undefined` values. Deal objects now built without undefined fields, plus sanitization in the save handler.
+- **Q&A Search**: Appears when 3+ questions exist, debounced 250ms, filters across question text, answer text, and usernames. Clear button and "X of Y" count display.
+
+**Session 18 focused on:** Business module Phase 4 — Completing remaining high-impact features (#25, #37-#40):
+
+- **#25 Filter Chips UI**: Active filter chips bar between results header and business grid. Shows active search (violet), category (emerald), heritage (amber, one per selection), and collection (indigo) as dismissible chips. "Clear all" button appears when 2+ filters active. Icons for each collection type (Heart for favorites, UserPlus for following, TrendingUp for top rated, Navigation for nearest).
+- **#37 CSV Bulk Import**: New `BusinessCSVImport.tsx` (~480 lines, lazy-loaded). 4-step wizard: drag-and-drop upload → table preview with row validation → Firestore batch writes (20 per batch with progress bar) → success summary. Smart column mapping via fuzzy header matching (e.g., "business name", "tel", "address" → canonical fields). Downloadable CSV template with example row. Multi-value fields split by semicolons.
+- **#38 Distance-Based Sorting**: Haversine formula in `businessUtils.ts` (`getDistanceMiles`). New "Nearest" sort pill in collection tabs that auto-triggers browser geolocation. Distance caching via `Map<string, number>` keyed by `${businessId}_${lat}_${lng}`. Distance badges (indigo pill with Navigation icon) on BusinessCard and FeaturedCarousel. Added `'nearest'` to `activeCollection` union type in reducer.
+- **#39 Real-Time onSnapshot**: Replaced one-time `getDocs` initial fetch with Firestore `onSnapshot` listener in `useBusinessData.ts`. Business list now auto-updates when businesses are added, edited, or deleted from any client. "Load more" pagination still uses `getDocs` with `startAfter` cursor. Removed `window.location.reload()` from CSV import completion handler.
+- **#40 List Virtualization**: New `VirtualizedBusinessGrid.tsx` using IntersectionObserver + CSS `content-visibility: auto` for zero-dependency virtual scrolling. Chunks business list into groups of 12, only renders chunks near the viewport (400px margin). Falls back to plain CSS grid for ≤12 items. Works seamlessly with responsive grid layouts (1/2/3 columns).
 
 - **Bug fixes across Sessions 14-16**:
   1. **Map markers race condition (zero markers on map)**: The markers `useEffect` ran before async Leaflet CDN load completed. Fixed by adding `mapReady` state flag set after map initialization, added to dependency arrays.
@@ -187,6 +206,22 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
 - **Analytics visibility: owner/admin only** — The analytics dashboard tab in `BusinessDetailModal.tsx` is gated by `isOwnerOrAdmin(business)`. Regular users cannot see view counts, click data, or engagement metrics. This prevents competitors from seeing each other's traffic.
 
 - **ESC handler on sub-modals uses capture phase** — `document.addEventListener('keydown', handler, true)` — capture phase with `stopImmediatePropagation()` ensures that when ESC is pressed on a sub-modal (e.g., Report modal inside Detail modal), only the sub-modal closes, not the parent.
+
+### Session 17: Business Phase 4 continued — High-Impact UX + Fixes
+
+- **Native `<details>`/`<summary>` for Q&A (not custom useState toggle)** — User requested collapsible questions using native HTML elements. This removes the need for `expandedQ` state management and provides built-in accessibility (keyboard support, screen reader announce). CSS hides default browser disclosure triangle (`summary::-webkit-details-marker`, `summary::marker`). Chevron icon animates via CSS `details[open] .qa-chevron { transform: rotate(0deg) }`. Inner `<div>` inside `<summary>` handles flex layout because iOS Safari doesn't properly support `display: flex` directly on `<summary>` elements.
+
+- **Carousel arrows removed entirely (not repositioned)** — After multiple attempts to reposition the `<`/`>` arrows (bottom-8, top-1/2, hidden on mobile), they always visually clashed with the 4 action buttons (share, heart, menu, close) in the compact 224px hero banner. The definitive fix: remove arrows completely. Photo navigation uses swipe (mobile), "1/2" counter (visual cue), and tap-to-open lightbox (which has its own full-screen arrows). This matches Google Maps, Yelp, and Airbnb patterns for compact hero carousels.
+
+- **Carousel state lifted to modal level (not inside carousel component)** — The `BusinessPhotoCarousel` component previously managed its own `currentIndex`, `showLightbox`, and touch handlers internally. This was refactored so all state lives in `BusinessDetailModal` and is passed as props. This ensures the photo counter, lightbox, and any future features all share the same state without prop tunneling.
+
+- **Firestore rejects `undefined` values — always omit instead** — When building objects for Firestore `updateDoc`/`setDoc`, never use `field: value || undefined`. Instead, conditionally add fields: `if (value) obj.field = value`. This applies to deals, Q&A, and any future features. The deals save handler also sanitizes existing deals before writing to handle legacy data with undefined fields.
+
+- **`serverTimestamp()` for admin verification (not `new Date()`)** — Admin verification writes `verifiedAt: serverTimestamp()` for consistency across time zones. Cross-browser testing caught a `new Date()` usage that was corrected.
+
+- **Share API fallback chain: `navigator.share` → `clipboard.writeText` → `execCommand('copy')`** — Firefox desktop doesn't support `navigator.clipboard.writeText` without HTTPS or user gesture. Added hidden textarea + `document.execCommand('copy')` as ultimate fallback.
+
+- **`parseOpenNow()` extracted to shared utility** — Initially inline in BusinessDetailModal, extracted to `businessUtils.ts` because it's used by BusinessCard, FeaturedCarousel, and BusinessDetailModal. Supports day ranges ("Mon-Fri"), 12h/24h time formats, bare numbers, and graceful failure via try/catch.
 
 ### Session 13: Business Phase 3 — UX Polish & Accessibility
 
@@ -299,6 +334,45 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
      ================================================================ -->
 ## 3. What Was Completed
 
+### Session 17 (March 24, 2026) — Business Phase 4 continued: High-Impact UX + Fixes
+| Task | File(s) Changed/Created | Status |
+|------|------------------------|--------|
+| Admin verification toggle in Listings section | `src/pages/admin.tsx` | ✅ |
+| Fix verification not showing on business page (missing field mapping) | `src/hooks/useBusinessData.ts` | ✅ |
+| #35: Customer Q&A — Firestore subcollection, optimistic UI, search | `src/components/business/BusinessQASection.tsx` (NEW, ~384 lines) | ✅ |
+| #35: Q&A Firestore security rules | `firestore.rules` | ✅ |
+| #35: Q&A refactored to native `<details>`/`<summary>` with chevron | `src/components/business/BusinessQASection.tsx` | ✅ |
+| #35: Q&A search bar (debounced 250ms, appears at 3+ questions) | `src/components/business/BusinessQASection.tsx` | ✅ |
+| #36: Booking/Reservation URL field + display in detail modal | `src/reducers/businessReducer.ts`, `src/hooks/useBusinessData.ts`, `BusinessCreateModal`, `BusinessEditModal`, `BusinessDetailModal` | ✅ |
+| #24: Open Now indicator — shared `parseOpenNow()` utility | `src/components/business/businessUtils.ts` (NEW, ~85 lines) | ✅ |
+| #24: Open/Closed status pill on BusinessCard tiles | `src/components/business/BusinessCard.tsx` | ✅ |
+| #24: Open/Closed status in FeaturedCarousel cards | `src/components/business/FeaturedCarousel.tsx` | ✅ |
+| #24: Open Now indicator in BusinessDetailModal next to Hours heading | `src/components/business/BusinessDetailModal.tsx` | ✅ |
+| Fix: Photo carousel arrows removed — was overlapping action buttons | `src/components/business/BusinessDetailModal.tsx` | ✅ |
+| Fix: Carousel state lifted to modal level for z-index management | `src/components/business/BusinessDetailModal.tsx` | ✅ |
+| Fix: Featured carousel background color gap (light/dark mode) | `src/components/business/FeaturedCarousel.tsx` | ✅ |
+| Fix: "Failed to save deals" — Firestore undefined value rejection | `src/components/business/BusinessDetailModal.tsx`, `src/pages/business.tsx` | ✅ |
+| Fix: Share API `execCommand('copy')` fallback for Firefox desktop | `src/components/business/BusinessDetailModal.tsx` | ✅ |
+| Fix: iOS Safari modal scroll bleed-through (position:fixed body) | `src/components/business/BusinessDetailModal.tsx` | ✅ |
+| Fix: Touch event safety checks (`touches.length` guard) | `src/components/business/BusinessDetailModal.tsx` | ✅ |
+| Fix: `verifiedAt: new Date()` → `serverTimestamp()` in admin.tsx | `src/pages/admin.tsx` | ✅ |
+| Cross-browser testing (Chrome, Safari, Firefox, iOS Safari, Android Chrome) | All business files | ✅ |
+| Sync to main/business.tsx | `src/pages/main/business.tsx` | ✅ |
+| TypeScript check — zero errors | `tsc --noEmit` passes clean | ✅ |
+
+**New files created in Session 17:**
+- `src/components/business/BusinessQASection.tsx` (~384 lines — Q&A with Firestore, search, details/summary)
+- `src/components/business/businessUtils.ts` (~85 lines — shared parseOpenNow utility)
+
+**Updated file line counts:**
+- `BusinessDetailModal.tsx`: ~680 → ~920 lines (+240, Q&A integration, booking link, carousel refactor, iOS fixes)
+- `BusinessCard.tsx`: 164 → ~170 lines (+6, Open/Closed status pill)
+- `FeaturedCarousel.tsx`: 108 → ~120 lines (+12, Open/Closed status, background fix)
+- `businessReducer.ts`: ~580 → ~600 lines (+20, bookingUrl field)
+- `useBusinessData.ts`: ~250 → ~340 lines (+90, missing field mapping fix, bookingUrl)
+- `admin.tsx`: ~2780 → ~2820 lines (+40, verification toggle)
+- `firestore.rules`: added Q&A subcollection rules
+
 ### Session 12 (March 23, 2026) — Business Phase 2 Steps 7-8: Component Extraction + Memoization
 | Task | File(s) Changed/Created | Status |
 |------|------------------------|--------|
@@ -380,14 +454,14 @@ src/
 - `businessReducer.ts`: 514 → ~580 lines (+66, viewMode/userLocation/geolocating/analytics state + actions)
 - `firestore.rules`: added analytics subcollection rules (lines 94-98)
 
-**Business module file structure (Phase 4 in progress):**
+**Business module file structure (Phase 4 in progress — Session 17):**
 ```
 src/
   reducers/
-    businessReducer.ts        (~580 lines — state, actions, types + map/analytics state)
+    businessReducer.ts        (~600 lines — state, actions, types + map/analytics/booking state)
   hooks/
-    useBusinessData.ts        (250 lines — CRUD, pagination, favorites)
-    useBusinessFilters.ts     (95 lines — search, filter, sort)
+    useBusinessData.ts        (~390 lines — CRUD, onSnapshot listener, pagination, favorites) ← UPDATED Session 18
+    useBusinessFilters.ts     (~130 lines — search, filter, sort, distance caching) ← UPDATED Session 18
     useBusinessModeration.ts  (170 lines — report, block, mute)
     useBusinessReviews.ts     (110 lines — fetch, submit reviews)
   services/
@@ -395,21 +469,25 @@ src/
   components/business/
     businessConstants.ts      (100 lines — categories, emojis, colors)
     businessValidation.ts     (75 lines — form validation, helpers)
+    businessUtils.ts          (~120 lines — parseOpenNow, getDistanceMiles, formatDistance) ← UPDATED Session 18
     imageUtils.ts             (40 lines — compression, size limit)
-    BusinessCard.tsx           (164 lines — grid card, React.memo, ARIA)
-    FeaturedCarousel.tsx       (108 lines — featured scroll, React.memo, ARIA)
-    BusinessDetailModal.tsx    (~680 lines — detail + reviews + lightbox + share + analytics)
-    BusinessEditModal.tsx      (257 lines — edit form + photos + ESC)
-    BusinessCreateModal.tsx    (257 lines — create form + photos + ESC)
+    BusinessCard.tsx           (~190 lines — grid card + Open/Closed + distance badge, React.memo) ← UPDATED Session 18
+    FeaturedCarousel.tsx       (~135 lines — featured scroll + Open/Closed + distance badge, React.memo) ← UPDATED Session 18
+    BusinessCSVImport.tsx      (~480 lines — 4-step CSV import wizard, lazy-loaded) ← NEW Session 18
+    VirtualizedBusinessGrid.tsx (~160 lines — IntersectionObserver + content-visibility grid) ← NEW Session 18
+    BusinessDetailModal.tsx    (~920 lines — detail + reviews + Q&A + booking + lightbox + share + analytics + carousel refactor)
+    BusinessEditModal.tsx      (257 lines — edit form + photos + booking URL + ESC)
+    BusinessCreateModal.tsx    (257 lines — create form + photos + booking URL + ESC)
     BusinessModals.tsx         (445 lines — TIN/Delete/Menu/Report/Block + focus trap)
     PhotoLightbox.tsx          (209 lines — fullscreen gallery, zoom, swipe, keyboard)
+    BusinessQASection.tsx      (~384 lines — Q&A with Firestore, search, details/summary) ← NEW Session 17
     BusinessMapView.tsx        (~380 lines — Leaflet map, custom markers, native popups, geolocation)
     BusinessAnalyticsTab.tsx   (~195 lines — owner analytics dashboard, 4 stat cards, bar charts)
   pages/
-    business.tsx              (~630 lines — orchestrator + layout + map toggle)
-    main/business.tsx         (~630 lines — exact copy)
+    business.tsx              (~680 lines — orchestrator + layout + map toggle + filter chips + CSV import) ← UPDATED Session 18
+    main/business.tsx         (~680 lines — exact copy)
 ```
-**Total business module: ~3400 lines across 12 component files + orchestrator + service + reducer + 4 hooks**
+**Total business module: ~4500+ lines across 16 component files + orchestrator + service + reducer + 4 hooks**
 
 ### Session 13 (March 23, 2026) — Business Phase 3: UX Polish & Accessibility
 | Task | File(s) Changed/Created | Status |
@@ -658,7 +736,7 @@ src/
 | Home (landing) | `src/pages/main/home.tsx` | ~127 | Done |
 | Feed | `src/pages/feed.tsx` | 2,703 | Done |
 | Discover | `src/pages/discover.tsx` | 1,735 | Done |
-| Business | `src/pages/business.tsx` | ~630 (was 2,500) | Done — Phases 1-3 complete + Phase 4 in progress (map view + analytics done, remaining items #24-28, #31-42 pending) |
+| Business | `src/pages/business.tsx` | ~630 (was 2,500) | Done — Phases 1-3 complete + Phase 4 in progress (map view, analytics, Q&A, booking, Open Now, admin verify done; remaining items #25, #28, #37-42 pending) |
 | Housing | `src/pages/housing.tsx` | 2,825 | Done + 7 enhancements (state only) |
 | Events | `src/pages/events.tsx` | 2,788 | Done |
 | Travel | `src/pages/travel.tsx` | — | Done |
@@ -722,7 +800,19 @@ src/
 ### Business Module Phase 4 — IN PROGRESS
 - **#29 Map View:** ✅ COMPLETED — Leaflet + OpenStreetMap with custom markers, native popups, geolocation
 - **#30 Analytics Dashboard:** ✅ COMPLETED — Firestore subcollection analytics, owner-only dashboard, 4 stat cards
-- **Remaining Phase 4 items (#24-#42 minus #29, #30):** NOT STARTED — includes ordering system, menu items with photos, deals management, SEO metadata, performance budgets, advanced search/filters, business hours, and more. See `Business_Module_Enhancement_Roadmap.docx` for full list.
+- **#24 Open Now Indicator:** ✅ COMPLETED — parseOpenNow utility, status pills on cards/carousel/detail
+- **#35 Customer Q&A:** ✅ COMPLETED — Firestore subcollection, optimistic UI, search, details/summary
+- **#36 Booking/Reservation:** ✅ COMPLETED — bookingUrl field, create/edit/detail integration
+- **Admin Verification Toggle:** ✅ COMPLETED — toggle in admin listings, verified badge on business page
+- **#25 Filter Chips UI:** ✅ COMPLETED (Session 18) — Active filter chips bar with search/category/heritage/collection chips, clear-all button
+- **#31 Direct Messaging to Business:** ✅ COMPLETED (verified Session 18) — Message button wired to messaging system
+- **#33 Deals/Promotions Creation UI:** ✅ COMPLETED (verified Session 18) — Full deal creation in create/edit modals
+- **#34 Follow/Subscribe to Business:** ✅ COMPLETED (verified Session 18) — Follow button with Firestore arrayUnion/arrayRemove
+- **#37 CSV Bulk Import:** ✅ COMPLETED (Session 18) — 4-step import wizard (upload → preview/validate → batch write → done), smart column mapping, lazy-loaded
+- **#38 Distance-Based Sorting:** ✅ COMPLETED (Session 18) — Haversine formula, "Nearest" sort pill with auto-geolocation, distance badges on cards/carousel, distance caching
+- **#39 Real-Time onSnapshot:** ✅ COMPLETED (Session 18) — Switched from one-time getDocs to live onSnapshot listener for auto-updating business list, kept getDocs for "load more" pagination
+- **#40 List Virtualization:** ✅ COMPLETED (Session 18) — IntersectionObserver + content-visibility chunked grid, zero-dependency, seamless with CSS Grid responsive layouts
+- **Remaining Phase 4 items (#28, #41-#42):** NOT STARTED — includes advanced search/filters (#28) and additional advanced features. See `Business_Module_Enhancement_Roadmap.docx` for full list.
 
 ### Duplicate Page Architecture (deferred cleanup — DO NOT TOUCH NOW)
 - `src/pages/main/` contains near-identical copies of 12 pages from `src/pages/`
@@ -769,27 +859,31 @@ src/
 ## 5. Exact Next Steps
 
 ### Immediate — Pending Deploys & Commits
-- **Sessions 11-16 changes need build + deploy** — Run from macOS terminal:
+- **Session 18 changes need commit + push + build + deploy** — Run from macOS terminal:
   ```bash
   cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
-  git add -A && git commit -m "feat: Phase 4 map view + analytics dashboard + map UX redesign + Firestore analytics rules" && git push origin main
-  ./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build && firebase deploy --only hosting,functions,firestore
+  git add src/components/business/BusinessCSVImport.tsx src/components/business/VirtualizedBusinessGrid.tsx src/components/business/businessUtils.ts src/components/business/BusinessCard.tsx src/components/business/FeaturedCarousel.tsx src/hooks/useBusinessData.ts src/hooks/useBusinessFilters.ts src/reducers/businessReducer.ts src/pages/business.tsx src/pages/main/business.tsx
+  git commit -m "feat: Phase 4 filter chips, CSV import, distance sorting, real-time onSnapshot, list virtualization (#25,#37-#40)"
+  git push origin main
+  npm run build && firebase deploy --only hosting
   ```
-  **Important:** Also deploy Firestore rules separately to fix analytics permissions: `firebase deploy --only firestore:rules`
-- **Session 8–10 code is committed and pushed** — Commit `a01a5b3` on `main`.
+- **Session 17 changes also need commit** (if not already committed):
+  ```bash
+  git add src/components/business/BusinessQASection.tsx src/components/business/BusinessDetailModal.tsx src/components/business/BusinessCreateModal.tsx src/components/business/BusinessEditModal.tsx src/pages/admin.tsx firestore.rules
+  git commit -m "feat: Phase 4 Q&A system, Open Now indicator, booking URL, admin verification, carousel/deals fixes"
+  git push origin main
+  npm run build && firebase deploy --only hosting,firestore:rules
+  ```
+  **Important:** Session 17 deploy includes `firestore:rules` for Q&A subcollection permissions.
 - **App is deployed and live** at `https://mithr-1e5f4.web.app`.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions already deployed** — `transcribeVoiceMessage` and `sendNewMessageNotification` are live on Cloud Run.
 
-### Next Up — Continue Business Phase 4 (remaining items #24-#42)
-- **Items #29 (Maps) and #30 (Analytics) are COMPLETE** — tested and working
-- Remaining Phase 4 items from `Business_Module_Enhancement_Roadmap.docx` include:
-  - #24: Business ordering system (cart, checkout)
-  - #25: Menu items with photos
-  - #26: Deals/promotions management
-  - #27: Business hours display
+### Next Up — Continue Business Phase 4 (remaining items #28, #41-#42)
+- **Most Phase 4 items are now COMPLETE** — only #28 (Advanced search/filters) and #41-#42 (additional advanced features) remain
+- Remaining items from `Business_Module_Enhancement_Roadmap.docx`:
   - #28: Advanced search/filters
-  - #31-#42: SEO, performance budgets, virtual scrolling, and other advanced features
+  - #41-#42: Additional advanced features
 - The architecture is solid for adding these features — reducer + hooks + components pattern is in place
 
 ### Discover Page Improvements (38-item roadmap)
@@ -800,7 +894,7 @@ src/
 Current group calls use mesh topology (max 8). For 16+ participants, deploy an SFU server (mediasoup or LiveKit) on a VPS with public IP + UDP support. Cloud Run won't work for WebRTC media.
 
 ### High Priority
-1. **Continue Business Phase 4** — Remaining roadmap items #24-#28, #31-#42.
+1. **Continue Business Phase 4** — Remaining roadmap items #25, #28, #37-#42.
 2. **Wire up Housing UI for the 7 enhancements** — State is ready, just needs JSX.
 3. **Stabilize the call system** — Replace free TURN servers with paid provider.
 4. **Test E2EE thoroughly** — Cross-browser decryption verification.
@@ -884,6 +978,8 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/components/business/BusinessMapView.tsx` | Leaflet map with custom markers, native popups, geolocation, delegated click handlers (~380 lines) — NEW in Sessions 14-16, REWRITTEN for popup UX |
 | `src/components/business/BusinessAnalyticsTab.tsx` | Owner-only analytics dashboard with 4 stat cards and CSS bar charts (~195 lines) — NEW in Sessions 14-16 |
 | `src/services/businessAnalytics.ts` | Analytics service: recordView, recordContactClick, recordShare, recordFavorite, fetchBusinessAnalytics. Uses Firestore subcollection `businesses/{id}/analytics/{YYYY-MM-DD}` with session-level view debounce (~175 lines) — NEW in Sessions 14-16 |
+| `src/components/business/BusinessQASection.tsx` | Q&A component with Firestore subcollection, optimistic UI, debounced search, native `<details>`/`<summary>` with chevron animation (~384 lines) — NEW in Session 17 |
+| `src/components/business/businessUtils.ts` | Shared `parseOpenNow()` utility for business hours parsing, used by BusinessCard, FeaturedCarousel, BusinessDetailModal (~85 lines) — NEW in Session 17 |
 | `src/components/business/businessConstants.ts` | CATEGORIES, CATEGORY_EMOJI_MAP, CATEGORY_COLORS, CATEGORY_ICONS, REPORT_CATEGORIES (~100 lines) |
 | `src/components/business/businessValidation.ts` | validateBusinessForm, fuzzyMatch, getGoogleMapsUrl (~75 lines) |
 | `src/components/business/imageUtils.ts` | compressImage, MAX_FILE_SIZE (~40 lines) |
@@ -933,6 +1029,13 @@ git add <files> && git commit -m "message" && git push origin main
 - **`bizIndexMapRef` for popup-to-business lookup** — A `useRef<Map<number, Business>>()` maps integer indices to business objects. Each marker's popup "View Details" button has `data-biz-index={i}`. The delegated click handler reads this attribute and looks up the business. The ref is updated whenever businesses change.
 - **Firestore analytics subcollection rules** — `businesses/{businessId}/analytics/{dateKey}` requires its own nested match rule in `firestore.rules`. Without it, all analytics operations fail with `Missing or insufficient permissions`. The rule allows read/write for any authenticated user (analytics writes come from the client).
 - **Analytics session-level view debounce** — `viewedThisSession` Set in `businessAnalytics.ts` is module-scoped. It persists across component re-mounts (e.g., navigating away and back) but resets on full page refresh. This prevents inflated view counts from navigation without requiring server-side dedup.
+- **Firestore does NOT accept `undefined` values** — When building objects for `updateDoc`/`setDoc`, never use `field: value || undefined`. Instead, conditionally add fields: `if (value) obj.field = value`. This caused the "Failed to save deals" bug where the second deal failed because the deals array contained objects with undefined optional fields.
+- **iOS Safari doesn't support `display: flex` on `<summary>` elements** — Safari injects an internal marker pseudo-element that disrupts flex layout. Fix: put the flex container as a `<div>` inside `<summary>`, not on `<summary>` itself.
+- **`<details>`/`<summary>` marker removal requires 3 CSS rules** — `summary { list-style: none }`, `summary::-webkit-details-marker { display: none }` (Chrome/Safari), `summary::marker { display: none; content: '' }` (Firefox). All three are needed for cross-browser support.
+- **Compact hero banners should NOT have carousel arrows** — The 224px hero with 4 action buttons leaves no safe position for prev/next arrows on any screen size. Use swipe + counter + lightbox instead. This was the resolution after multiple attempts to reposition arrows.
+- **Q&A subcollection in Firestore needs explicit security rules** — `businesses/{id}/questions/{questionId}` requires its own nested match rule in `firestore.rules`. Without it, all Q&A operations fail with permission denied.
+- **`serverTimestamp()` not `new Date()` for Firestore timestamps** — Always use `serverTimestamp()` from Firebase for consistency across time zones. `new Date()` uses the client's local clock which can differ.
+- **Business `bookingUrl` field** — Added to Business interface, BusinessFormData, create/edit save paths, and detail modal contact section. Only shows when `business.bookingUrl` is set.
 - **PhotoLightbox is standalone** — `PhotoLightbox.tsx` has no dependency on business state — just receives `photos[]`, `initialIndex`, `title`, `onClose`. Can be reused by other modules (housing, events, feed) if needed.
 
 ### Constraints
@@ -953,11 +1056,12 @@ git add <files> && git commit -m "message" && git push origin main
 5. → Redirected to `/home` (module tiles landing page)
 
 ### Firestore Collections
-`users`, `posts` (+ subcollection `comments`), `businesses` (+ subcollection `analytics`), `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`, `groupCalls` (+ subcollections `signals`, `candidates`), `businessMenuItems`, `businessReviews`, `businessOrders`, `forumThreads`, `forumReplies`, `forumLikes`, `marketplaceListings`, `marketplaceComments`, `announcements`, `moderationQueue`, `reports`, `notifications`, `userWarnings`
+`users`, `posts` (+ subcollection `comments`), `businesses` (+ subcollections `analytics`, `questions`), `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`, `groupCalls` (+ subcollections `signals`, `candidates`), `businessMenuItems`, `businessReviews`, `businessOrders`, `forumThreads`, `forumReplies`, `forumLikes`, `marketplaceListings`, `marketplaceComments`, `announcements`, `moderationQueue`, `reports`, `notifications`, `userWarnings`
 
 ### Recent Commit History
 ```
-(pending) feat: Phase 4 map view + analytics dashboard + map UX redesign + Firestore analytics rules
+(pending) feat: Phase 4 Q&A system, Open Now indicator, booking URL, admin verification, carousel/deals fixes (Session 17)
+(pending) feat: Phase 4 map view + analytics dashboard + map UX redesign + Firestore analytics rules (Sessions 14-16)
 (pending) refactor: extract 6 JSX components from business.tsx (Phase 2 Steps 7-8)
 e715244 refactor: extract 4 custom hooks from business.tsx (Phase 2 Steps 3-6)
 efcba22 fix: resolve 42 TypeScript build errors from useReducer migration

@@ -1,12 +1,13 @@
 // ═════════════════════════════════════════════════════════════════════════════════
 // useBusinessData — Encapsulates Firestore CRUD, pagination, and favorites
 // Phase 2 Step 3: Extract from business.tsx
+// #39: Real-time onSnapshot listener for live business list updates
 // ═════════════════════════════════════════════════════════════════════════════════
 
 import { useCallback, useEffect, useRef } from 'react';
 import {
   collection, getDocs, addDoc, deleteDoc, doc, updateDoc,
-  Timestamp, query, limit, orderBy, startAfter,
+  Timestamp, query, limit, orderBy, startAfter, onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
@@ -17,6 +18,55 @@ import { recordFavorite } from '@/services/businessAnalytics';
 
 const PAGE_SIZE = 20;
 
+/** Map a Firestore document snapshot to our Business interface */
+function mapDocToBusiness(docSnap: { id: string; data: () => any }): Business | null {
+  const d = docSnap.data();
+  if (d.isHidden) return null;
+  return {
+    id: docSnap.id,
+    name: d.name || '',
+    emoji: d.emoji || CATEGORY_EMOJI_MAP[d.category] || '💼',
+    category: d.category || '',
+    desc: d.desc || '',
+    location: d.location || '',
+    phone: d.phone || '',
+    website: d.website || '',
+    email: d.email || '',
+    hours: d.hours || '',
+    rating: d.rating || 4.5,
+    reviews: d.reviews || 0,
+    promoted: d.promoted || false,
+    bgColor: d.bgColor || CATEGORY_COLORS[d.category] || '#999',
+    ownerId: d.ownerId,
+    heritage: d.heritage,
+    menu: d.menu || '',
+    services: d.services || '',
+    createdAt: d.createdAt,
+    priceRange: d.priceRange,
+    yearEstablished: d.yearEstablished,
+    specialtyTags: d.specialtyTags || [],
+    paymentMethods: d.paymentMethods || [],
+    deliveryOptions: d.deliveryOptions || [],
+    deals: d.deals || [],
+    photos: d.photos || [],
+    coverPhotoIndex: d.coverPhotoIndex || 0,
+    isHidden: d.isHidden || false,
+    hiddenAt: d.hiddenAt || '',
+    hiddenReason: d.hiddenReason || '',
+    verified: d.verified || false,
+    verifiedAt: d.verifiedAt || null,
+    verificationMethod: d.verificationMethod || null,
+    followers: d.followers || [],
+    followerCount: d.followerCount || 0,
+    bookingUrl: d.bookingUrl || '',
+    latitude: d.latitude,
+    longitude: d.longitude,
+    viewCount: d.viewCount,
+    contactClicks: d.contactClicks,
+    shareCount: d.shareCount,
+  };
+}
+
 export function useBusinessData(
   state: BusinessState,
   dispatch: React.Dispatch<BusinessAction>,
@@ -25,69 +75,70 @@ export function useBusinessData(
   userProfile: any,
 ) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
 
-  // ── Fetch businesses (paginated) ──
-  const fetchBusinesses = useCallback(async (isLoadMore = false) => {
+  // ── Real-time onSnapshot listener (replaces initial getDocs) ──
+  useEffect(() => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+
+    const q = query(
+      collection(db, 'businesses'),
+      orderBy('createdAt', 'desc'),
+      limit(PAGE_SIZE),
+    );
+
+    unsubRef.current = onSnapshot(
+      q,
+      (snapshot) => {
+        const data: Business[] = [];
+        snapshot.forEach((docSnap) => {
+          const biz = mapDocToBusiness(docSnap);
+          if (biz) data.push(biz);
+        });
+
+        if (snapshot.docs.length < PAGE_SIZE) {
+          dispatch({ type: 'SET_HAS_MORE', payload: false });
+        } else {
+          dispatch({ type: 'SET_HAS_MORE', payload: true });
+        }
+        if (snapshot.docs.length > 0) {
+          dispatch({ type: 'SET_LAST_DOC', payload: snapshot.docs[snapshot.docs.length - 1] });
+        }
+
+        dispatch({ type: 'SET_BUSINESSES', payload: data });
+        dispatch({ type: 'SET_LOADING', payload: false });
+      },
+      (error) => {
+        console.error('Business onSnapshot error:', error);
+        dispatch({ type: 'SET_TOAST', payload: 'Failed to load businesses. Please try again.' });
+        dispatch({ type: 'SET_LOADING', payload: false });
+      },
+    );
+
+    return () => {
+      if (unsubRef.current) {
+        unsubRef.current();
+        unsubRef.current = null;
+      }
+    };
+  }, [dispatch]);
+
+  // ── Load more (paginated, one-time getDocs — extends beyond live window) ──
+  const fetchMoreBusinesses = useCallback(async () => {
+    if (!state.lastDoc || state.loadingMore || !state.hasMore) return;
+    dispatch({ type: 'SET_LOADING_MORE', payload: true });
     try {
-      if (isLoadMore) dispatch({ type: 'SET_LOADING_MORE', payload: true }); else dispatch({ type: 'SET_LOADING', payload: true });
-
-      let q = query(
+      const q = query(
         collection(db, 'businesses'),
         orderBy('createdAt', 'desc'),
+        startAfter(state.lastDoc),
         limit(PAGE_SIZE),
       );
-      if (isLoadMore && state.lastDoc) {
-        q = query(
-          collection(db, 'businesses'),
-          orderBy('createdAt', 'desc'),
-          startAfter(state.lastDoc),
-          limit(PAGE_SIZE),
-        );
-      }
-
       const snapshot = await getDocs(q);
       const data: Business[] = [];
       snapshot.forEach((docSnap) => {
-        const d = docSnap.data();
-        if (d.isHidden) return;
-        data.push({
-          id: docSnap.id,
-          name: d.name || '',
-          emoji: d.emoji || CATEGORY_EMOJI_MAP[d.category] || '💼',
-          category: d.category || '',
-          desc: d.desc || '',
-          location: d.location || '',
-          phone: d.phone || '',
-          website: d.website || '',
-          email: d.email || '',
-          hours: d.hours || '',
-          rating: d.rating || 4.5,
-          reviews: d.reviews || 0,
-          promoted: d.promoted || false,
-          bgColor: d.bgColor || CATEGORY_COLORS[d.category] || '#999',
-          ownerId: d.ownerId,
-          heritage: d.heritage,
-          menu: d.menu || '',
-          services: d.services || '',
-          createdAt: d.createdAt,
-          priceRange: d.priceRange,
-          yearEstablished: d.yearEstablished,
-          specialtyTags: d.specialtyTags || [],
-          paymentMethods: d.paymentMethods || [],
-          deliveryOptions: d.deliveryOptions || [],
-          deals: d.deals || [],
-          photos: d.photos || [],
-          coverPhotoIndex: d.coverPhotoIndex || 0,
-          isHidden: d.isHidden || false,
-          hiddenAt: d.hiddenAt || '',
-          hiddenReason: d.hiddenReason || '',
-          verified: d.verified || false,
-          verifiedAt: d.verifiedAt || null,
-          verificationMethod: d.verificationMethod || null,
-          followers: d.followers || [],
-          followerCount: d.followerCount || 0,
-          bookingUrl: d.bookingUrl || '',
-        });
+        const biz = mapDocToBusiness(docSnap);
+        if (biz) data.push(biz);
       });
 
       if (snapshot.docs.length < PAGE_SIZE) {
@@ -96,25 +147,19 @@ export function useBusinessData(
       if (snapshot.docs.length > 0) {
         dispatch({ type: 'SET_LAST_DOC', payload: snapshot.docs[snapshot.docs.length - 1] });
       }
-
-      if (isLoadMore) {
-        dispatch({ type: 'APPEND_BUSINESSES', payload: data });
-      } else {
-        dispatch({ type: 'SET_BUSINESSES', payload: data });
-      }
+      dispatch({ type: 'APPEND_BUSINESSES', payload: data });
     } catch (error) {
-      console.error('Error fetching businesses:', error);
-      dispatch({ type: 'SET_TOAST', payload: 'Failed to load businesses. Please try again.' });
+      console.error('Error loading more businesses:', error);
+      dispatch({ type: 'SET_TOAST', payload: 'Failed to load more businesses.' });
     } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
       dispatch({ type: 'SET_LOADING_MORE', payload: false });
     }
-  }, [state.lastDoc, dispatch]);
+  }, [state.lastDoc, state.loadingMore, state.hasMore, dispatch]);
 
-  // ── Initial fetch ──
-  useEffect(() => {
-    fetchBusinesses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Keep a stable reference to fetchBusinesses for backward compat (used after add)
+  const fetchBusinesses = useCallback(async () => {
+    // With onSnapshot the list auto-updates; this is now a no-op.
+    // Kept for API compatibility with handleAddBusiness / CSV import.
   }, []);
 
   // ── Infinite scroll observer ──
@@ -123,14 +168,14 @@ export function useBusinessData(
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && state.hasMore && !state.loadingMore && !state.loading) {
-          fetchBusinesses(true);
+          fetchMoreBusinesses();
         }
       },
       { threshold: 0.1 },
     );
     observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [state.hasMore, state.loadingMore, state.loading, state.lastDoc, fetchBusinesses]);
+  }, [state.hasMore, state.loadingMore, state.loading, fetchMoreBusinesses]);
 
   // ── Load favorites from localStorage cache ──
   useEffect(() => {
@@ -228,16 +273,14 @@ export function useBusinessData(
         followerCount: 0,
       });
       dispatch({ type: 'RESET_CREATE_FORM' });
-      dispatch({ type: 'SET_LAST_DOC', payload: null });
-      dispatch({ type: 'SET_HAS_MORE', payload: true });
-      await fetchBusinesses();
+      // onSnapshot will automatically pick up the new business — no manual refetch needed
     } catch (error) {
       console.error('Error adding business:', error);
       dispatch({ type: 'SET_TOAST', payload: 'Failed to add business. Please try again.' });
     } finally {
       dispatch({ type: 'SET_SAVING', payload: false });
     }
-  }, [state.formData, state.formPhotos, state.coverPhotoIndex, user, userProfile, dispatch, fetchBusinesses]);
+  }, [state.formData, state.formPhotos, state.coverPhotoIndex, user, userProfile, userRole, dispatch]);
 
   // ── Delete business ──
   const handleDeleteBusiness = useCallback((businessId: string) => {

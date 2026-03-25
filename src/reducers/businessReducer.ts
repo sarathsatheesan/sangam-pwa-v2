@@ -150,7 +150,7 @@ export interface BusinessState {
   searchQuery: string;
   debouncedSearchQuery: string;
   searchFocused: boolean;
-  activeCollection: 'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites' | 'following';
+  activeCollection: 'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites' | 'following' | 'nearest';
 
   // Favorites & Following
   favorites: Set<string>;
@@ -343,7 +343,7 @@ export type BusinessAction =
   | { type: 'SET_SEARCH_QUERY'; payload: string }
   | { type: 'SET_DEBOUNCED_SEARCH'; payload: string }
   | { type: 'SET_SEARCH_FOCUSED'; payload: boolean }
-  | { type: 'SET_ACTIVE_COLLECTION'; payload: 'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites' | 'following' }
+  | { type: 'SET_ACTIVE_COLLECTION'; payload: 'all' | 'topRated' | 'new' | 'mostReviewed' | 'favorites' | 'following' | 'nearest' }
 
   // Favorites & Following
   | { type: 'SET_FAVORITES'; payload: Set<string> }

@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import {
-  MapPin, Heart, Sparkles, Star,
+  MapPin, Heart, Sparkles, Star, Navigation,
 } from 'lucide-react';
-import { parseOpenNow } from '@/components/business/businessUtils';
+import { parseOpenNow, formatDistance } from '@/components/business/businessUtils';
 import type { Business } from '@/reducers/businessReducer';
 
 export interface FeaturedCarouselProps {
@@ -10,6 +10,7 @@ export interface FeaturedCarouselProps {
   favorites: Set<string>;
   toggleFavorite: (id: string, e: React.MouseEvent) => void;
   onSelect: (business: Business) => void;
+  getDistance?: (business: Business) => number | null;
 }
 
 const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
@@ -17,6 +18,7 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
   favorites,
   toggleFavorite,
   onSelect,
+  getDistance,
 }) => {
   if (businesses.length === 0) return null;
 
@@ -108,9 +110,17 @@ const FeaturedCarousel: React.FC<FeaturedCarouselProps> = React.memo(({
                     </span>
                   );
                 })()}
-                <span className="text-xs text-aurora-text-muted flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> {business.location || 'No location'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-aurora-text-muted flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> {business.location || 'No location'}
+                  </span>
+                  {(() => { const d = getDistance?.(business); return d != null ? (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                      <Navigation className="w-2.5 h-2.5" />
+                      {formatDistance(d)}
+                    </span>
+                  ) : null; })()}
+                </div>
               </div>
             </div>
           </div>
