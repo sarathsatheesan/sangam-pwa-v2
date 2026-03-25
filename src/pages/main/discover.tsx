@@ -6,10 +6,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
 import { HERITAGE_OPTIONS } from '@/constants/config';
 import {
-  Search, MapPin, Users, UserPlus, UserCheck, UserMinus,
+  Search, MapPin, Users, UserPlus, UserMinus,
   X, ChevronDown, MessageCircle, Sparkles,
-  Globe, Loader2,
-  Clock, Check, Bookmark, Ban, MoreVertical,
+  Globe, Loader2, RefreshCw,
+  Clock, Check, Ban, MoreVertical,
 } from 'lucide-react';
 
 // Interfaces
@@ -91,16 +91,29 @@ const computeMatchScore = (person: User, currentUserProfile: any, mutualCount: n
   return Math.min(score, 100);
 };
 
-const fuzzyMatch = (text: string, query: string): boolean => {
+/** #1.9: Ranked search — returns priority (1 = prefix, 2 = substring, 3 = fuzzy, 0 = no match) */
+const searchRank = (text: string, query: string): number => {
   const t = text.toLowerCase();
   const q = query.toLowerCase();
+  if (!q) return 0;
+  // Prefix match (highest priority)
+  if (t.startsWith(q)) return 1;
+  // Word-start match (e.g., "dev" matches "Software Developer")
+  if (t.includes(' ' + q)) return 1;
+  // Substring match
+  if (t.includes(q)) return 2;
+  // Fuzzy match (character-by-character subsequence)
   let idx = 0;
   for (const char of q) {
     idx = t.indexOf(char, idx);
-    if (idx === -1) return false;
+    if (idx === -1) return 0;
     idx++;
   }
-  return true;
+  return 3;
+};
+
+const fuzzyMatch = (text: string, query: string): boolean => {
+  return searchRank(text, query) > 0;
 };
 
 const renderAvatar = (avatar: string | undefined, name: string): React.ReactNode => {
@@ -113,11 +126,11 @@ const renderAvatar = (avatar: string | undefined, name: string): React.ReactNode
   return name.charAt(0).toUpperCase() || '👤';
 };
 
-const MatchBadge: React.FC<{ score: number }> = ({ score }) => {
+const MatchBadge: React.FC<{ score: number; inline?: boolean }> = ({ score, inline = false }) => {
   if (score < 40) return null;
   const color = score >= 75 ? 'from-green-400 to-emerald-500' : 'from-blue-400 to-cyan-500';
   return (
-    <div className={`absolute top-3 right-3 bg-gradient-to-r ${color} text-white text-xs font-bold px-2 py-1 rounded-full`}>
+    <div className={`${inline ? '' : 'absolute top-3 right-3'} bg-gradient-to-r ${color} text-white text-xs font-bold px-2 py-1 rounded-full`}>
       {score}%
     </div>
   );
@@ -140,12 +153,12 @@ const isRecentlyActive = (person: User): boolean => {
 };
 
 const SkeletonCard: React.FC = () => (
-  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 animate-pulse">
-    <div className="w-16 h-16 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4" />
-    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded mb-3" />
-    <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded mb-3" />
-    <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded mb-4" />
-    <div className="h-10 bg-gray-300 dark:bg-gray-600 rounded" />
+  <div className="bg-aurora-surface rounded-2xl border border-[var(--aurora-border)] p-4 animate-pulse">
+    <div className="w-12 h-12 bg-[var(--aurora-border)] rounded-full mx-auto mb-3" />
+    <div className="h-3.5 bg-[var(--aurora-border)] rounded mb-2.5" />
+    <div className="h-3 bg-[var(--aurora-border)] rounded mb-2.5 w-3/4" />
+    <div className="h-3 bg-[var(--aurora-border)] rounded mb-3 w-1/2" />
+    <div className="h-8 bg-[var(--aurora-border)] rounded-lg" />
   </div>
 );
 
@@ -177,10 +190,8 @@ export default function DiscoverPage() {
   const [connectionDetails, setConnectionDetails] = useState<Map<string, ConnectionDetail>>(new Map());
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<User | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'match' | 'name' | 'recent'>('match');
-  const [hoveringDisconnect, setHoveringDisconnect] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'discover' | 'network'>('discover');
+  const [activeTab, setActiveTab] = useState<'discover' | 'network' | 'pending'>('discover');
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const [disconnectPersonId, setDisconnectPersonId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -237,6 +248,8 @@ export default function DiscoverPage() {
     setActiveTile(tile);
     if (tile === 'members') {
       setActiveTab('discover');
+    } else if (tile === 'pending') {
+      setActiveTab('pending');
     } else {
       setActiveTab('network');
     }
@@ -266,12 +279,13 @@ export default function DiscoverPage() {
   };
 
   // Fetch people data
-  useEffect(() => {
-    const fetchPeople = async () => {
-      try {
-        setFetchError(null);
-        const q = query(collection(db, 'users'), limit(100));
-        const snapshot = await getDocs(q);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchPeople = useCallback(async () => {
+    try {
+      setFetchError(null);
+      const q = query(collection(db, 'users'), limit(100));
+      const snapshot = await getDocs(q);
 
         const settingsPromises: Promise<{ uid: string; settings: any } | null>[] = [];
         const usersData: { docId: string; data: any }[] = [];
@@ -322,10 +336,18 @@ export default function DiscoverPage() {
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchPeople();
   }, [user?.uid]);
+
+  useEffect(() => {
+    fetchPeople();
+  }, [fetchPeople]);
+
+  // Manual refresh handler
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchPeople();
+    setRefreshing(false);
+  }, [fetchPeople]);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -559,7 +581,6 @@ export default function DiscoverPage() {
     return false;
   }).length;
 
-  // Get mutual connection count
   // Helper: render heritage badge(s) for a person, hidden if "Prefer Not to Say"
   const renderHeritage = (person: User, size: 'xs' | 'sm' = 'xs') => {
     const raw = Array.isArray(person.heritage) ? person.heritage : [person.heritage];
@@ -572,54 +593,55 @@ export default function DiscoverPage() {
     );
   };
 
-  const getMutualConnectionCount = (personId: string): number => {
-    let count = 0;
-    const targetPerson = people.find((p) => p.id === personId);
-    if (!targetPerson) return 0;
+  // ── #1.2: Pre-computed mutual connections (single pass, O(n) instead of O(n²)) ──
+  // Build a Map<personId, User[]> of mutual connections in one pass.
+  // "Mutual" = a person you're connected to who shares heritage or city with the target.
+  const mutualConnectionsMap = useMemo(() => {
+    const map = new Map<string, User[]>();
+    if (!people.length) return map;
 
+    // Build a people lookup for O(1) access
+    const peopleLookup = new Map<string, User>();
+    for (const p of people) peopleLookup.set(p.id, p);
+
+    // Collect connected user IDs
+    const connectedUsers: User[] = [];
     connections.forEach((status, uid) => {
-      if (status === 'connected' && uid !== personId) {
-        const connectedPerson = people.find((p) => p.id === uid);
-        if (connectedPerson) {
-          const tHeritage = Array.isArray(targetPerson.heritage)
-            ? targetPerson.heritage
-            : [targetPerson.heritage];
-          const cHeritage = Array.isArray(connectedPerson.heritage)
-            ? connectedPerson.heritage
-            : [connectedPerson.heritage];
-          const sharedHeritage = tHeritage.some((h) => cHeritage.includes(h));
-          const sharedCity = targetPerson.city === connectedPerson.city;
-          if (sharedHeritage || sharedCity) count++;
-        }
+      if (status === 'connected') {
+        const p = peopleLookup.get(uid);
+        if (p) connectedUsers.push(p);
       }
     });
-    return count;
-  };
 
-  // Get actual mutual connection User objects
-  const getMutualConnections = (personId: string): User[] => {
-    const mutuals: User[] = [];
-    const targetPerson = people.find((p) => p.id === personId);
-    if (!targetPerson) return mutuals;
+    // For each person in the people list, check which of your connected users
+    // share heritage or city with them
+    for (const target of people) {
+      const tHeritage = Array.isArray(target.heritage) ? target.heritage : [target.heritage];
+      const mutuals: User[] = [];
 
-    connections.forEach((status, uid) => {
-      if (status === 'connected' && uid !== personId) {
-        const connectedPerson = people.find((p) => p.id === uid);
-        if (connectedPerson) {
-          const tHeritage = Array.isArray(targetPerson.heritage)
-            ? targetPerson.heritage
-            : [targetPerson.heritage];
-          const cHeritage = Array.isArray(connectedPerson.heritage)
-            ? connectedPerson.heritage
-            : [connectedPerson.heritage];
-          const sharedHeritage = tHeritage.some((h) => cHeritage.includes(h));
-          const sharedCity = targetPerson.city === connectedPerson.city;
-          if (sharedHeritage || sharedCity) mutuals.push(connectedPerson);
-        }
+      for (const conn of connectedUsers) {
+        if (conn.id === target.id) continue;
+        const cHeritage = Array.isArray(conn.heritage) ? conn.heritage : [conn.heritage];
+        const sharedHeritage = tHeritage.some((h) => cHeritage.includes(h));
+        const sharedCity = target.city && conn.city && target.city.toLowerCase() === conn.city.toLowerCase();
+        if (sharedHeritage || sharedCity) mutuals.push(conn);
       }
-    });
-    return mutuals;
-  };
+
+      if (mutuals.length > 0) map.set(target.id, mutuals);
+    }
+
+    return map;
+  }, [people, connections]);
+
+  /** Get pre-computed mutual connection count for a person */
+  const getMutualConnectionCount = useCallback((personId: string): number => {
+    return mutualConnectionsMap.get(personId)?.length || 0;
+  }, [mutualConnectionsMap]);
+
+  /** Get actual mutual connection User objects */
+  const getMutualConnections = useCallback((personId: string): User[] => {
+    return mutualConnectionsMap.get(personId) || [];
+  }, [mutualConnectionsMap]);
 
   // Filtered people
   const filteredPeople = useMemo(() => {
@@ -636,8 +658,15 @@ export default function DiscoverPage() {
         const status = connections.get(p.id);
         if (!status) return true; // not connected
         if (status === 'pending' && connectionDetails.get(p.id)?.initiatedBy !== user?.uid)
-          return false; // incoming request shows in network
+          return false; // incoming request shows in pending tab
         return status === 'pending' && connectionDetails.get(p.id)?.initiatedBy === user?.uid; // sent pending still shows
+      });
+    } else if (activeTab === 'pending') {
+      // Pending tab: only incoming requests (initiated by the other person)
+      filtered = filtered.filter((p) => {
+        const status = connections.get(p.id);
+        const detail = connectionDetails.get(p.id);
+        return status === 'pending' && detail?.initiatedBy && detail.initiatedBy !== user?.uid;
       });
     } else {
       // My Network: only connected people
@@ -660,8 +689,25 @@ export default function DiscoverPage() {
           fuzzyMatch(person.profession, q) ||
           person.interests.some((i) => fuzzyMatch(i, q))
       );
+      // #1.9: Sort by best search match (prefix > substring > fuzzy) before other sorting
+      filtered = filtered.sort((a, b) => {
+        const rankA = Math.min(
+          searchRank(a.name, q) || 99,
+          searchRank(a.city, q) || 99,
+          searchRank(a.profession, q) || 99,
+          ...a.interests.map((i) => searchRank(i, q) || 99),
+        );
+        const rankB = Math.min(
+          searchRank(b.name, q) || 99,
+          searchRank(b.city, q) || 99,
+          searchRank(b.profession, q) || 99,
+          ...b.interests.map((i) => searchRank(i, q) || 99),
+        );
+        return rankA - rankB;
+      });
     }
 
+    // Apply sort (search results already ranked by relevance, secondary sort applies otherwise)
     return filtered.sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       if (sortBy === 'recent') {
@@ -677,6 +723,8 @@ export default function DiscoverPage() {
             : 0;
         return bTime - aTime;
       }
+      // Default: match score sort (skipped when search query active — already sorted by relevance)
+      if (searchQuery.trim()) return 0;
       const mutualA = getMutualConnectionCount(a.id);
       const mutualB = getMutualConnectionCount(b.id);
       return (
@@ -841,22 +889,36 @@ export default function DiscoverPage() {
         )}
 
         {/* Results Header */}
-        <div className="mb-6">
+        <div className="mb-6 flex items-start justify-between">
+          <div>
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-            {activeTab === 'discover' ? 'Discover' : 'Network'}
+            {activeTab === 'discover' ? 'Discover' : activeTab === 'pending' ? 'Pending Requests' : 'Network'}
           </h2>
           <p className="text-gray-600 dark:text-gray-300">
             {loading
               ? 'Loading...'
               : activeTab === 'discover'
                 ? `${filteredPeople.length} people match your filters`
-                : selectedHeritage.length > 0
-                  ? `${filteredPeople.length} of ${connectedCount} connections`
-                  : `${connectedCount} connections`}
+                : activeTab === 'pending'
+                  ? `${filteredPeople.length} incoming request${filteredPeople.length !== 1 ? 's' : ''}`
+                  : selectedHeritage.length > 0
+                    ? `${filteredPeople.length} of ${connectedCount} connections`
+                    : `${connectedCount} connections`}
           </p>
+          </div>
+          {/* Refresh button (#1.6) */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+            aria-label="Refresh people"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-5 h-5 text-gray-500 dark:text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
-        {/* Incoming Requests Section */}
+        {/* Incoming Requests Section — shows in Network tab only (not pending tab, which has its own grid) */}
         {activeTab === 'network' && incomingRequests.length > 0 && (
           <div className="mb-8">
             <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">
@@ -864,8 +926,10 @@ export default function DiscoverPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {incomingRequests.map((person) => (
-                <div key={person.id} className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer"
+                <div key={person.id} role="button" tabIndex={0} aria-label={`View profile of ${person.name} — incoming request`}
+                  className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer"
                   onClick={() => setSelectedPerson(person)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
                 >
                   <div className="bg-gradient-to-r from-orange-400 to-amber-400 px-3 py-2.5">
                     <div className="flex items-center gap-2">
@@ -924,8 +988,10 @@ export default function DiscoverPage() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {sentRequests.map((person) => (
-                <div key={person.id} className="bg-aurora-surface rounded-2xl border border-purple-200 dark:border-purple-500/30 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer"
+                <div key={person.id} role="button" tabIndex={0} aria-label={`View profile of ${person.name} — sent request`}
+                  className="bg-aurora-surface rounded-2xl border border-purple-200 dark:border-purple-500/30 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer"
                   onClick={() => setSelectedPerson(person)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
                 >
                   <div className="bg-gradient-to-r from-purple-500 to-blue-400 px-3 py-2.5">
                     <div className="flex items-center gap-2">
@@ -972,90 +1038,7 @@ export default function DiscoverPage() {
         {/* PYMK Carousels */}
         {activeTab === 'discover' && !loading && (
           <>
-            {/* Connection Requests — prominent section at top */}
-            {incomingRequests.length > 0 && (
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <UserPlus className="w-5 h-5 text-orange-500" />
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-bold w-3.5 h-3.5 flex items-center justify-center rounded-full">
-                        {incomingRequests.length}
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Connection Requests</h3>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {incomingRequests.map((person) => {
-                    const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
-                    return (
-                      <div key={`req-${person.id}`} className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer"
-                        onClick={() => setSelectedPerson(person)}
-                      >
-                        {/* Gradient header — simple row of badges */}
-                        <div className="bg-gradient-to-r from-orange-400 to-amber-400 relative px-3 py-2.5">
-                          <div className="flex items-center gap-2">
-                            {isNewMember(person) && (
-                              <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md">NEW</span>
-                            )}
-                            <div className="bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                              <UserPlus className="w-3 h-3" /> Wants to connect
-                            </div>
-                          </div>
-                          <MatchBadge score={score} />
-                        </div>
-                        {/* Card body */}
-                        <div className="p-3 flex flex-col flex-1">
-                          {/* Avatar + Name side by side */}
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-lg border-2 border-orange-300 shrink-0 shadow-sm">
-                              {renderAvatar(person.avatar, person.name)}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <h4 className="font-bold text-[var(--aurora-text)] text-sm leading-tight truncate">{person.name}</h4>
-                              {person.profession && <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
-                            </div>
-                          </div>
-                          <div className="mt-2 space-y-0.5">
-                            {renderHeritage(person)}
-                            {person.showLocation && (
-                              <p className="text-xs text-[var(--aurora-text-muted)] flex items-center gap-1">
-                                <MapPin className="w-3 h-3 shrink-0" /> <span className="truncate">{person.city}</span>
-                              </p>
-                            )}
-                            {getMutualConnectionCount(person.id) > 0 && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setMutualListFor(person.id); }}
-                                className="text-[11px] text-blue-600 font-medium hover:text-blue-800 hover:underline cursor-pointer transition-colors text-left"
-                              >
-                                {getMutualConnectionCount(person.id)} mutual connections
-                              </button>
-                            )}
-                          </div>
-                          <div className="mt-auto pt-2.5 flex gap-1.5">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
-                              disabled={connectingId === person.id}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
-                            >
-                              <Check className="w-3.5 h-3.5" /> Accept
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
-                              disabled={connectingId === person.id}
-                              className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1.5 rounded-lg font-medium text-xs disabled:opacity-50 flex items-center justify-center gap-1"
-                            >
-                              <X className="w-3.5 h-3.5" /> Decline
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* #1.8: Connection Requests removed from Discover tab — now in dedicated Pending tab */}
             {pymkGroups.sameCity.length >= 1 && (
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
@@ -1067,8 +1050,12 @@ export default function DiscoverPage() {
                     {pymkGroups.sameCity.map((person) => (
                       <div
                         key={person.id}
-                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-blue-200 dark:border-blue-500/30 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View profile of ${person.name}`}
+                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-blue-200 dark:border-blue-500/30 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
                         onClick={() => setSelectedPerson(person)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
                       >
                         <div className="bg-gradient-to-r from-blue-500 to-blue-400 px-3 py-2">
                           <div className="bg-blue-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
@@ -1136,8 +1123,12 @@ export default function DiscoverPage() {
                     {pymkGroups.sameHeritage.map((person) => (
                       <div
                         key={person.id}
-                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-orange-200 dark:border-orange-500/30 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View profile of ${person.name}`}
+                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-orange-200 dark:border-orange-500/30 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
                         onClick={() => setSelectedPerson(person)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
                       >
                         <div className="bg-gradient-to-r from-orange-500 to-amber-400 px-3 py-2">
                           <div className="bg-orange-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
@@ -1205,8 +1196,12 @@ export default function DiscoverPage() {
                     {pymkGroups.similarInterests.map((person) => (
                       <div
                         key={person.id}
-                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-purple-200 dark:border-purple-500/30 overflow-hidden hover:shadow-lg transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View profile of ${person.name}`}
+                        className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-purple-200 dark:border-purple-500/30 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
                         onClick={() => setSelectedPerson(person)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
                       >
                         <div className="bg-gradient-to-r from-purple-500 to-violet-400 px-3 py-2">
                           <div className="bg-purple-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
@@ -1266,14 +1261,14 @@ export default function DiscoverPage() {
         )}
 
         {/* Main Grid/List View */}
-        {!loading && filteredPeople.length > 0 && (
+        {!loading && filteredPeople.length > 0 && activeTab !== 'pending' && (
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5 text-green-600" />
             <h3 className="text-xl font-bold text-gray-800 dark:text-white">My Connects</h3>
           </div>
         )}
         {loading ? (
-          <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3' : 'space-y-4'}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {[...Array(9)].map((_, i) => (
               <SkeletonCard key={i} />
             ))}
@@ -1282,15 +1277,17 @@ export default function DiscoverPage() {
           <div className="text-center py-16">
             <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-600 dark:text-gray-300 mb-2">
-              {activeTab === 'discover' ? 'No people found' : 'No connections yet'}
+              {activeTab === 'discover' ? 'No people found' : activeTab === 'pending' ? 'No pending requests' : 'No connections yet'}
             </h3>
             <p className="text-gray-500 dark:text-gray-400">
               {activeTab === 'discover'
                 ? 'Try adjusting your filters or search terms'
-                : 'Start connecting with people to build your network'}
+                : activeTab === 'pending'
+                  ? 'You\'re all caught up! No incoming connection requests right now.'
+                  : 'Start connecting with people to build your network'}
             </p>
           </div>
-        ) : viewMode === 'grid' ? (
+        ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredPeople.map((person) => {
               const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
@@ -1299,18 +1296,22 @@ export default function DiscoverPage() {
               return (
                 <div
                   key={person.id}
-                  className="group bg-aurora-surface rounded-2xl border border-green-200 dark:border-green-500/30 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200 flex flex-col"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View profile of ${person.name}${person.profession ? `, ${person.profession}` : ''}${person.city ? `, ${person.city}` : ''}`}
+                  className="group bg-aurora-surface rounded-2xl border border-green-200 dark:border-green-500/30 overflow-hidden cursor-pointer hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col"
                   style={{ WebkitTapHighlightColor: 'transparent' }}
                   onClick={() => setSelectedPerson(person)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
                   onTouchStart={() => {}}
                 >
                   {/* Short gradient header */}
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-400 px-2 py-1.5 flex items-center justify-between">
+                  <div className={`bg-gradient-to-r ${activeTab === 'pending' ? 'from-orange-400 to-amber-400' : 'from-green-500 to-emerald-400'} px-2 py-1.5 flex items-center justify-between`}>
                     {isNewMember(person) && (
                       <span className="bg-green-700 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full leading-none">NEW</span>
                     )}
                     <div className="flex items-center gap-1 ml-auto">
-                      <MatchBadge score={score} />
+                      <MatchBadge score={score} inline />
                       <div className="relative">
                         <button
                           onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
@@ -1362,7 +1363,24 @@ export default function DiscoverPage() {
                     </div>
                     {/* Action button — pinned to bottom via mt-auto */}
                     <div className="mt-auto pt-2.5">
-                      {status === 'connected' ? (
+                      {activeTab === 'pending' ? (
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleAcceptConnection(person.id); }}
+                            disabled={connectingId === person.id}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <Check className="w-3 h-3" /> Accept
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeclineConnection(person.id); }}
+                            disabled={connectingId === person.id}
+                            className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 py-1.5 rounded-lg font-medium text-[10px] disabled:opacity-50 flex items-center justify-center gap-1"
+                          >
+                            <X className="w-3 h-3" /> Decline
+                          </button>
+                        </div>
+                      ) : status === 'connected' ? (
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/messages?user=${person.id}`); }}
                           className="w-full bg-green-600 hover:bg-green-700 text-white py-1.5 rounded-lg font-medium text-[10px] flex items-center justify-center gap-1"
@@ -1387,157 +1405,6 @@ export default function DiscoverPage() {
                         </button>
                       )}
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredPeople.map((person) => {
-              const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
-              const status = connections.get(person.id);
-              const isHovering = hoveringDisconnect === person.id && status === 'connected';
-
-              return (
-                <div key={person.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow flex flex-col sm:flex-row gap-4">
-                  <div className="relative flex-shrink-0 self-center sm:self-start">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-blue-500 text-white flex items-center justify-center font-bold text-xl sm:text-2xl">
-                      {renderAvatar(person.avatar, person.name)}
-                    </div>
-                    {isRecentlyActive(person) && (
-                      <div className="absolute w-4 h-4 bg-green-500 rounded-full border-2 border-white bottom-0 right-0" />
-                    )}
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-bold text-gray-800 dark:text-white">{person.name}</h3>
-                        {isNewMember(person) && (
-                          <span className="inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs font-bold px-2 py-0.5 rounded">
-                            New
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {score >= 40 && (
-                          <div className="text-right">
-                            <div className={`text-lg font-bold ${score >= 75 ? 'text-green-600' : 'text-blue-600'}`}>
-                              {score}%
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">Match</div>
-                          </div>
-                        )}
-                        <div className="relative">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
-                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-                            aria-label="More options"
-                          >
-                            <MoreVertical className="w-4 h-4 text-gray-500" />
-                          </button>
-                          {openMenuId === person.id && (
-                            <div className="absolute right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] z-20">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); openBlockConfirm(person.id, person.name); }}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              >
-                                <Ban className="w-4 h-4" /> Block User
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {person.profession && <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">{person.profession}</p>}
-                    {renderHeritage(person, 'sm')}
-                    {person.showLocation && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mb-2">
-                        <MapPin className="w-3 h-3" /> {person.city}
-                      </p>
-                    )}
-
-                    {getMutualConnectionCount(person.id) > 0 && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setMutualListFor(person.id); }}
-                        className="text-xs text-blue-600 font-medium mb-2 hover:text-blue-800 hover:underline cursor-pointer transition-colors text-left"
-                      >
-                        {getMutualConnectionCount(person.id)} mutual connections
-                      </button>
-                    )}
-
-                    {person.interests && person.interests.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {person.interests.slice(0, 3).map((interest) => (
-                          <span key={interest} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 dark:text-gray-200 px-2 py-1 rounded">
-                            {interest}
-                          </span>
-                        ))}
-                        {person.interests.length > 3 && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">+{person.interests.length - 3} more</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-row sm:flex-col gap-2 flex-shrink-0">
-                    {status === 'connected' ? (
-                      <>
-                        <button
-                          onClick={() => navigate(`/messages?user=${person.id}`)}
-                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded font-medium text-sm flex items-center justify-center gap-1 whitespace-nowrap"
-                        >
-                          <MessageCircle className="w-4 h-4" /> Message
-                        </button>
-                        <button
-                          onMouseEnter={() => setHoveringDisconnect(person.id)}
-                          onMouseLeave={() => setHoveringDisconnect(null)}
-                          onTouchStart={(e) => {
-                            e.stopPropagation();
-                            if (isHovering) {
-                              // Second touch - execute disconnect
-                              handleConnect(person.id);
-                            } else {
-                              // First touch - show button
-                              setHoveringDisconnect(person.id);
-                            }
-                          }}
-                          onClick={() => { if (isHovering) handleConnect(person.id); }}
-                          disabled={connectingId === person.id}
-                          className={`px-3 py-2 rounded font-medium text-sm disabled:opacity-50 transition-colors whitespace-nowrap flex items-center justify-center gap-1 ${
-                            isHovering
-                              ? 'bg-red-100 hover:bg-red-200 text-red-600 border border-red-300'
-                              : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600'
-                          }`}
-                          title={isHovering ? 'Tap to disconnect' : 'Tap to show disconnect'}
-                        >
-                          {isHovering ? (
-                            <><UserMinus className="w-4 h-4" /> Disconnect</>
-                          ) : (
-                            <><UserCheck className="w-4 h-4" /> Connected</>
-                          )}
-                        </button>
-                      </>
-                    ) : status === 'pending' ? (
-                      <button
-                        onClick={() => handleConnect(person.id)}
-                        disabled={connectingId === person.id}
-                        className="bg-amber-100 hover:bg-amber-200 text-amber-700 border border-amber-300 px-3 py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1 whitespace-nowrap"
-                        title="Click to withdraw request"
-                      >
-                        <Clock className="w-4 h-4" /> Pending
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleConnect(person.id)}
-                        disabled={connectingId === person.id}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded font-medium text-sm disabled:opacity-50 flex items-center justify-center gap-1 whitespace-nowrap"
-                      >
-                        <UserPlus className="w-4 h-4" /> Connect
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -1835,9 +1702,12 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* Toast Notification (#1.7: safe-area-aware positioning) */}
       {toastMessage && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[70] text-sm font-medium animate-fade-in">
+        <div
+          className="fixed left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[70] text-sm font-medium animate-fade-in max-w-[90vw]"
+          style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
+        >
           {toastMessage}
         </div>
       )}
