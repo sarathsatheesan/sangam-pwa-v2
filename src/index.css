@@ -237,6 +237,14 @@
 .dark .text-white { color: #FFFFFF !important; }
 .dark .ring-white { --tw-ring-color: var(--aurora-surface) !important; }
 
+/* ── Focus-visible fallback for older browsers (iOS <15.4) ── */
+@supports not selector(:focus-visible) {
+  [role="button"]:focus {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+  }
+}
+
 @layer utilities {
   /* ── Aurora Backgrounds ── */
   .aurora-bg {

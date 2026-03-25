@@ -1702,11 +1702,11 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      {/* Toast Notification (#1.7: safe-area-aware positioning) */}
+      {/* Toast Notification (#1.7: safe-area-aware positioning, cross-browser) */}
       {toastMessage && (
         <div
-          className="fixed left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[70] text-sm font-medium animate-fade-in max-w-[90vw]"
-          style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[70] text-sm font-medium animate-fade-in max-w-[90vw]"
+          style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
         >
           {toastMessage}
         </div>
