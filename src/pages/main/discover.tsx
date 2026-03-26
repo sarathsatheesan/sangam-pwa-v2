@@ -8,8 +8,8 @@ import { HERITAGE_OPTIONS } from '@/constants/config';
 import {
   Search, MapPin, Users, UserPlus, UserMinus,
   X, ChevronDown, MessageCircle, Sparkles,
-  Globe, Loader2, RefreshCw,
-  Clock, Check, Ban, MoreVertical,
+  Globe, Loader2, RefreshCw, ArrowUpDown,
+  Clock, Check, Ban, MoreVertical, PartyPopper,
 } from 'lucide-react';
 
 // Interfaces
@@ -35,11 +35,22 @@ interface ConnectionDetail {
   status: 'pending' | 'connected';
   initiatedBy: string;
   connectedAt?: any;
+  createdAt?: any; // #3.4: When the request was sent
 }
 
 // Constants
+// #3.10: Expanded heritage color map — covers all major heritage groups
 const HERITAGE_COLORS: Record<string, string> = {
+  // South Asia
   'Indian': 'from-orange-400/20 to-green-400/20',
+  'Malayali': 'from-orange-400/20 to-green-400/20',
+  'Tamil': 'from-orange-400/20 to-green-400/20',
+  'Telugu': 'from-orange-400/20 to-green-400/20',
+  'Kannada': 'from-orange-400/20 to-green-400/20',
+  'Bengali': 'from-orange-400/20 to-green-400/20',
+  'Gujarati': 'from-orange-400/20 to-green-400/20',
+  'Punjabi': 'from-orange-400/20 to-green-400/20',
+  'Marathi': 'from-orange-400/20 to-green-400/20',
   'Pakistani': 'from-green-500/20 to-white/10',
   'Bangladeshi': 'from-green-400/20 to-red-400/20',
   'Sri Lankan': 'from-yellow-400/20 to-red-500/20',
@@ -47,6 +58,71 @@ const HERITAGE_COLORS: Record<string, string> = {
   'Bhutanese': 'from-orange-400/20 to-yellow-400/20',
   'Maldivian': 'from-red-400/20 to-green-400/20',
   'Afghan': 'from-green-400/20 to-red-400/20',
+  // East Asia
+  'Han Chinese': 'from-red-500/20 to-yellow-400/20',
+  'Chinese': 'from-red-500/20 to-yellow-400/20',
+  'Japanese': 'from-red-400/20 to-white/10',
+  'Korean': 'from-blue-400/20 to-red-400/20',
+  'Taiwanese': 'from-red-500/20 to-blue-400/20',
+  'Mongolian': 'from-blue-500/20 to-red-400/20',
+  // Southeast Asia
+  'Filipino': 'from-blue-500/20 to-red-400/20',
+  'Vietnamese': 'from-red-500/20 to-yellow-400/20',
+  'Thai': 'from-blue-400/20 to-red-400/20',
+  'Indonesian': 'from-red-400/20 to-white/10',
+  'Malaysian': 'from-blue-400/20 to-yellow-400/20',
+  'Cambodian': 'from-blue-500/20 to-red-400/20',
+  'Burmese': 'from-yellow-400/20 to-green-400/20',
+  // Middle East
+  'Lebanese': 'from-red-400/20 to-green-400/20',
+  'Syrian': 'from-red-400/20 to-green-400/20',
+  'Iraqi': 'from-red-400/20 to-green-400/20',
+  'Iranian': 'from-green-400/20 to-red-400/20',
+  'Turkish': 'from-red-500/20 to-white/10',
+  'Palestinian': 'from-green-400/20 to-red-400/20',
+  'Saudi': 'from-green-500/20 to-white/10',
+  'Emirati': 'from-green-400/20 to-red-400/20',
+  // Africa
+  'Nigerian': 'from-green-500/20 to-white/10',
+  'Ghanaian': 'from-red-400/20 to-yellow-400/20',
+  'Ethiopian': 'from-green-400/20 to-yellow-400/20',
+  'Kenyan': 'from-green-400/20 to-red-400/20',
+  'South African': 'from-green-400/20 to-yellow-400/20',
+  'Egyptian': 'from-red-400/20 to-yellow-400/20',
+  'Moroccan': 'from-red-400/20 to-green-400/20',
+  'Somali': 'from-blue-400/20 to-white/10',
+  'Sub-Saharan African': 'from-green-400/20 to-yellow-400/20',
+  'North African Arab': 'from-red-400/20 to-green-400/20',
+  // Europe
+  'French': 'from-blue-500/20 to-red-400/20',
+  'German': 'from-yellow-400/20 to-red-400/20',
+  'Italian': 'from-green-400/20 to-red-400/20',
+  'Spanish': 'from-red-400/20 to-yellow-400/20',
+  'Portuguese': 'from-green-400/20 to-red-400/20',
+  'Greek': 'from-blue-400/20 to-white/10',
+  'Irish': 'from-green-400/20 to-orange-400/20',
+  'English': 'from-red-400/20 to-blue-400/20',
+  'Scottish': 'from-blue-400/20 to-white/10',
+  'Polish': 'from-red-400/20 to-white/10',
+  'Ukrainian': 'from-blue-400/20 to-yellow-400/20',
+  'Russian': 'from-blue-400/20 to-red-400/20',
+  // Americas
+  'Mexican': 'from-green-500/20 to-red-400/20',
+  'Brazilian': 'from-green-400/20 to-yellow-400/20',
+  'Colombian': 'from-yellow-400/20 to-blue-400/20',
+  'Puerto Rican': 'from-red-400/20 to-blue-400/20',
+  'Cuban': 'from-blue-400/20 to-red-400/20',
+  'Jamaican': 'from-green-400/20 to-yellow-400/20',
+  'Hispanic or Latino': 'from-red-400/20 to-yellow-400/20',
+  // Oceania
+  'Australian': 'from-blue-400/20 to-yellow-400/20',
+  'Maori': 'from-red-400/20 to-black/10',
+  'Aboriginal Australian': 'from-red-500/20 to-yellow-400/20',
+  'Samoan': 'from-blue-400/20 to-red-400/20',
+  'Fijian': 'from-blue-400/20 to-white/10',
+  // Indigenous
+  'Native American': 'from-red-500/20 to-yellow-400/20',
+  'First Nations': 'from-red-400/20 to-white/10',
 };
 
 // Helper Functions
@@ -116,14 +192,23 @@ const fuzzyMatch = (text: string, query: string): boolean => {
   return searchRank(text, query) > 0;
 };
 
-const renderAvatar = (avatar: string | undefined, name: string): React.ReactNode => {
-  if (avatar && (avatar.startsWith('http') || avatar.startsWith('data:'))) {
-    return <img src={avatar} alt={name} className="w-full h-full rounded-full object-cover" />;
+// #3.1: Enhanced avatar rendering with photo support
+const renderAvatar = (avatar: string | undefined, name: string, size: 'sm' | 'md' | 'lg' = 'sm'): React.ReactNode => {
+  const isPhoto = avatar && (avatar.startsWith('http') || avatar.startsWith('data:'));
+  if (isPhoto) {
+    return <img src={avatar} alt={name} className="w-full h-full rounded-full object-cover" loading="lazy" />;
   }
   if (avatar && /\p{Emoji}/u.test(avatar)) {
-    return avatar;
+    const emojiSize = size === 'lg' ? 'text-3xl' : size === 'md' ? 'text-xl' : 'text-base';
+    return <span className={emojiSize}>{avatar}</span>;
   }
-  return name.charAt(0).toUpperCase() || '👤';
+  const textSize = size === 'lg' ? 'text-2xl' : size === 'md' ? 'text-lg' : 'text-sm';
+  return <span className={`${textSize} font-bold`}>{name.charAt(0).toUpperCase() || '👤'}</span>;
+};
+
+/** Check if avatar is an actual photo (URL) vs emoji/initial */
+const hasPhotoAvatar = (avatar: string | undefined): boolean => {
+  return !!(avatar && (avatar.startsWith('http') || avatar.startsWith('data:')));
 };
 
 const MatchBadge: React.FC<{ score: number; inline?: boolean }> = ({ score, inline = false }) => {
@@ -152,6 +237,39 @@ const isRecentlyActive = (person: User): boolean => {
   return updated > sevenDaysAgo;
 };
 
+/** #3.6: Highlight matching text in search results */
+const HighlightText: React.FC<{ text: string; query: string; className?: string }> = ({ text, query, className = '' }) => {
+  if (!query.trim() || !text) return <span className={className}>{text}</span>;
+  const q = query.trim().toLowerCase();
+  const idx = text.toLowerCase().indexOf(q);
+  if (idx === -1) return <span className={className}>{text}</span>;
+  return (
+    <span className={className}>
+      {text.slice(0, idx)}
+      <mark className="bg-yellow-200 dark:bg-yellow-500/30 text-inherit rounded-sm px-0.5">{text.slice(idx, idx + q.length)}</mark>
+      {text.slice(idx + q.length)}
+    </span>
+  );
+};
+
+/** #3.4: Format connection request timestamp */
+const formatRequestTime = (timestamp: any): string => {
+  if (!timestamp) return '';
+  const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 4) return `${diffWeeks}w ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
 const SkeletonCard: React.FC = () => (
   <div className="bg-aurora-surface rounded-2xl border border-[var(--aurora-border)] p-4 animate-pulse">
     <div className="w-12 h-12 bg-[var(--aurora-border)] rounded-full mx-auto mb-3" />
@@ -175,16 +293,7 @@ export default function DiscoverPage() {
   const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
   const heritageDisplayCount = selectedHeritage.length;
 
-  // Pre-select user's heritage ethnicities on load
-  useEffect(() => {
-    if (!userProfile?.heritage) return;
-    const raw = Array.isArray(userProfile.heritage)
-      ? userProfile.heritage
-      : [userProfile.heritage];
-    const validSet = new Set(HERITAGE_OPTIONS);
-    const unique = [...new Set(raw.filter((h: string) => validSet.has(h)))];
-    if (unique.length > 0) setSelectedHeritage(unique);
-  }, [userProfile?.heritage]);
+  // #3.8: Default heritage filter to "All" — no pre-selection so users discover cross-heritage connections
 
   const [connections, setConnections] = useState<Map<string, 'pending' | 'connected'>>(new Map());
   const [connectionDetails, setConnectionDetails] = useState<Map<string, ConnectionDetail>>(new Map());
@@ -206,6 +315,11 @@ export default function DiscoverPage() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const PAGE_SIZE = 30;
+  // #3.5: PYMK "View All" expansion state
+  const [expandedPymk, setExpandedPymk] = useState<Record<string, boolean>>({});
+  const PYMK_PREVIEW = 6; // Show first 6 in carousel, expand for more
+  // #3.9: Accept animation state
+  const [acceptAnimatingId, setAcceptAnimatingId] = useState<string | null>(null);
 
   // #2.8: Load blocked users from userProfile (already fetched by AuthContext — eliminates extra Firestore read)
   useEffect(() => {
@@ -441,6 +555,7 @@ export default function DiscoverPage() {
             status,
             initiatedBy: data.initiatedBy || '',
             connectedAt: data.connectedAt || null,
+            createdAt: data.createdAt || null, // #3.4: track request timestamp
           });
         }
       });
@@ -602,7 +717,10 @@ export default function DiscoverPage() {
           connectedAt: new Date(),
         })
       );
-      setToastMessage('Connection accepted!');
+      // #3.9: Trigger accept animation
+      setAcceptAnimatingId(personId);
+      setTimeout(() => setAcceptAnimatingId(null), 2000);
+      setToastMessage('Connection accepted! 🎉');
     } catch (err) {
       console.error('Error accepting connection:', err);
       setToastMessage('Failed to accept connection. Please try again.');
@@ -832,19 +950,19 @@ export default function DiscoverPage() {
       if (status === 'connected') continue;
       if (status === 'pending' && connectionDetails.get(p.id)?.initiatedBy !== user?.uid) continue;
 
-      // City match
-      if (sameCity.length < 10 && p.city && userCity && p.city.toLowerCase() === userCity) {
+      // City match (#3.5: raised cap from 10 to 30 for View All)
+      if (sameCity.length < 30 && p.city && userCity && p.city.toLowerCase() === userCity) {
         sameCity.push(p);
       }
       // Heritage match
-      if (sameHeritage.length < 10) {
+      if (sameHeritage.length < 30) {
         const pH = (Array.isArray(p.heritage) ? p.heritage : [p.heritage]).filter(Boolean);
         if (pH.some((h: string) => userHeritage.includes(h.toLowerCase()))) {
           sameHeritage.push(p);
         }
       }
       // Shared interests (>= 2)
-      if (similarInterests.length < 10) {
+      if (similarInterests.length < 30) {
         let shared = 0;
         for (const i of (p.interests || [])) {
           if (userInterestsSet.has(i)) shared++;
@@ -984,16 +1102,56 @@ export default function DiscoverPage() {
                     : `${connectedCount} connections`}
           </p>
           </div>
-          {/* Refresh button (#1.6) */}
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing || loading}
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
-            aria-label="Refresh people"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-5 h-5 text-gray-500 dark:text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* #3.7: Sort selector — visible UI for existing sort state */}
+            {activeTab === 'discover' && (
+              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+                <button
+                  onClick={() => setSortBy('match')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    sortBy === 'match'
+                      ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                  title="Sort by match score"
+                >
+                  <Sparkles className="w-3.5 h-3.5 inline mr-1" />Match
+                </button>
+                <button
+                  onClick={() => setSortBy('name')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    sortBy === 'name'
+                      ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                  title="Sort alphabetically"
+                >
+                  A–Z
+                </button>
+                <button
+                  onClick={() => setSortBy('recent')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    sortBy === 'recent'
+                      ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                  title="Sort by recently active"
+                >
+                  <Clock className="w-3.5 h-3.5 inline mr-1" />Recent
+                </button>
+              </div>
+            )}
+            {/* Refresh button (#1.6) */}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing || loading}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+              aria-label="Refresh people"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-5 h-5 text-gray-500 dark:text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* Incoming Requests Section — shows in Network tab only (not pending tab, which has its own grid) */}
@@ -1005,10 +1163,22 @@ export default function DiscoverPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               {incomingRequests.map((person) => (
                 <div key={person.id} role="button" tabIndex={0} aria-label={`View profile of ${person.name} — incoming request`}
-                  className="bg-aurora-surface rounded-2xl border-2 border-orange-300 dark:border-orange-500/40 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer"
+                  className={`bg-aurora-surface rounded-2xl border-2 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer relative ${
+                    acceptAnimatingId === person.id
+                      ? 'border-green-400 dark:border-green-500/60 scale-[1.02]'
+                      : 'border-orange-300 dark:border-orange-500/40'
+                  }`}
                   onClick={() => setSelectedPerson(person)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
                 >
+                  {/* #3.9: Accept animation overlay */}
+                  {acceptAnimatingId === person.id && (
+                    <div className="absolute inset-0 bg-green-500/10 z-10 flex items-center justify-center rounded-2xl animate-pulse">
+                      <div className="bg-green-500 text-white rounded-full p-3 shadow-lg animate-bounce">
+                        <Check className="w-6 h-6" />
+                      </div>
+                    </div>
+                  )}
                   <div className="bg-gradient-to-r from-orange-400 to-amber-400 px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <div className="bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -1019,8 +1189,10 @@ export default function DiscoverPage() {
                   <div className="p-3 flex flex-col flex-1">
                     {/* Avatar + Name side by side */}
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-lg border-2 border-orange-300 shrink-0 shadow-sm">
-                        {renderAvatar(person.avatar, person.name)}
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg border-2 shrink-0 shadow-sm ${
+                        hasPhotoAvatar(person.avatar) ? 'border-white/50' : 'bg-orange-500 text-white border-orange-300'
+                      }`}>
+                        {renderAvatar(person.avatar, person.name, 'md')}
                       </div>
                       <div className="min-w-0 flex-1">
                         <h4 className="font-bold text-[var(--aurora-text)] text-sm leading-tight truncate">{person.name}</h4>
@@ -1119,13 +1291,25 @@ export default function DiscoverPage() {
             {/* #1.8: Connection Requests removed from Discover tab — now in dedicated Pending tab */}
             {pymkGroups.sameCity.length >= 1 && (
               <div className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <MapPin className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">From Your City</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">From Your City</h3>
+                    <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{pymkGroups.sameCity.length}</span>
+                  </div>
+                  {/* #3.5: View All toggle */}
+                  {pymkGroups.sameCity.length > PYMK_PREVIEW && (
+                    <button
+                      onClick={() => setExpandedPymk((prev) => ({ ...prev, city: !prev.city }))}
+                      className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                    >
+                      {expandedPymk.city ? 'Show Less' : `View All (${pymkGroups.sameCity.length})`}
+                    </button>
+                  )}
                 </div>
                 <div className="overflow-x-auto pb-4 scrollbar-hide">
-                  <div className="flex gap-4 w-max">
-                    {pymkGroups.sameCity.map((person) => (
+                  <div className={expandedPymk.city ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'flex gap-4 w-max'}>
+                    {(expandedPymk.city ? pymkGroups.sameCity : pymkGroups.sameCity.slice(0, PYMK_PREVIEW)).map((person) => (
                       <div
                         key={person.id}
                         role="button"
@@ -1192,13 +1376,24 @@ export default function DiscoverPage() {
 
             {pymkGroups.sameHeritage.length >= 1 && (
               <div className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <Globe className="w-5 h-5 text-orange-600" />
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">Same Heritage</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-orange-600" />
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Same Heritage</h3>
+                    <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{pymkGroups.sameHeritage.length}</span>
+                  </div>
+                  {pymkGroups.sameHeritage.length > PYMK_PREVIEW && (
+                    <button
+                      onClick={() => setExpandedPymk((prev) => ({ ...prev, heritage: !prev.heritage }))}
+                      className="text-xs font-medium text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 transition-colors"
+                    >
+                      {expandedPymk.heritage ? 'Show Less' : `View All (${pymkGroups.sameHeritage.length})`}
+                    </button>
+                  )}
                 </div>
                 <div className="overflow-x-auto pb-4 scrollbar-hide">
-                  <div className="flex gap-4 w-max">
-                    {pymkGroups.sameHeritage.map((person) => (
+                  <div className={expandedPymk.heritage ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'flex gap-4 w-max'}>
+                    {(expandedPymk.heritage ? pymkGroups.sameHeritage : pymkGroups.sameHeritage.slice(0, PYMK_PREVIEW)).map((person) => (
                       <div
                         key={person.id}
                         role="button"
@@ -1265,13 +1460,24 @@ export default function DiscoverPage() {
 
             {pymkGroups.similarInterests.length >= 1 && (
               <div className="mb-8">
-                <div className="flex items-center gap-2 mb-4">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-white">Similar Interests</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">Similar Interests</h3>
+                    <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">{pymkGroups.similarInterests.length}</span>
+                  </div>
+                  {pymkGroups.similarInterests.length > PYMK_PREVIEW && (
+                    <button
+                      onClick={() => setExpandedPymk((prev) => ({ ...prev, interests: !prev.interests }))}
+                      className="text-xs font-medium text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
+                    >
+                      {expandedPymk.interests ? 'Show Less' : `View All (${pymkGroups.similarInterests.length})`}
+                    </button>
+                  )}
                 </div>
                 <div className="overflow-x-auto pb-4 scrollbar-hide">
-                  <div className="flex gap-4 w-max">
-                    {pymkGroups.similarInterests.map((person) => (
+                  <div className={expandedPymk.interests ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'flex gap-4 w-max'}>
+                    {(expandedPymk.interests ? pymkGroups.similarInterests : pymkGroups.similarInterests.slice(0, PYMK_PREVIEW)).map((person) => (
                       <div
                         key={person.id}
                         role="button"
@@ -1335,6 +1541,18 @@ export default function DiscoverPage() {
                 </div>
               </div>
             )}
+            {/* #3.3: Empty state when all PYMK carousels are empty */}
+            {pymkGroups.sameCity.length === 0 && pymkGroups.sameHeritage.length === 0 && pymkGroups.similarInterests.length === 0 && (
+              <div className="text-center py-10 mb-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-900/10 dark:to-blue-900/10 rounded-2xl border border-dashed border-purple-200 dark:border-purple-800">
+                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-white dark:bg-gray-800 shadow-sm flex items-center justify-center">
+                  <Sparkles className="w-8 h-8 text-purple-400" />
+                </div>
+                <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-1">Suggestions coming soon</h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+                  As more people join and you update your profile, we'll suggest people who share your city, heritage, and interests.
+                </p>
+              </div>
+            )}
           </>
         )}
 
@@ -1353,17 +1571,45 @@ export default function DiscoverPage() {
           </div>
         ) : filteredPeople.length === 0 ? (
           <div className="text-center py-16">
-            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-600 dark:text-gray-300 mb-2">
-              {activeTab === 'discover' ? 'No people found' : activeTab === 'pending' ? 'No pending requests' : 'No connections yet'}
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400">
-              {activeTab === 'discover'
-                ? 'Try adjusting your filters or search terms'
-                : activeTab === 'pending'
-                  ? 'You\'re all caught up! No incoming connection requests right now.'
-                  : 'Start connecting with people to build your network'}
-            </p>
+            {activeTab === 'discover' ? (
+              <>
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 flex items-center justify-center">
+                  <Search className="w-10 h-10 text-purple-400" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-600 dark:text-gray-300 mb-2">No people found</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4">Try adjusting your filters or search terms</p>
+                {selectedHeritage.length > 0 && (
+                  <button
+                    onClick={() => setSelectedHeritage([])}
+                    className="text-sm text-purple-600 hover:text-purple-800 dark:text-purple-400 font-medium"
+                  >
+                    Clear heritage filter
+                  </button>
+                )}
+              </>
+            ) : activeTab === 'pending' ? (
+              <>
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 flex items-center justify-center">
+                  <Check className="w-10 h-10 text-green-400" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-600 dark:text-gray-300 mb-2">All caught up!</h3>
+                <p className="text-gray-500 dark:text-gray-400">No incoming connection requests right now.</p>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 flex items-center justify-center">
+                  <Users className="w-10 h-10 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-600 dark:text-gray-300 mb-2">No connections yet</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4">Start connecting with people to build your network</p>
+                <button
+                  onClick={() => setActiveTab('discover')}
+                  className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Discover People
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -1412,14 +1658,24 @@ export default function DiscoverPage() {
                   </div>
                   {/* Content wrapper — flex-1 to stretch, flex-col to pin button at bottom */}
                   <div className="p-3 flex flex-col flex-1" style={{ minHeight: 0 }}>
-                    {/* Avatar + Name/Title side by side */}
+                    {/* Avatar + Name/Title side by side (#3.1: enhanced photo avatars) */}
                     <div className="flex items-center gap-2.5 mb-2">
-                      <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm shrink-0 ${
+                        hasPhotoAvatar(person.avatar)
+                          ? 'ring-2 ring-green-400/50 ring-offset-1'
+                          : 'bg-blue-500 text-white font-bold text-sm'
+                      }`}>
                         {renderAvatar(person.avatar, person.name)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">{person.name}</h4>
-                        {person.profession && <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">{person.profession}</p>}
+                        <h4 className="font-bold text-[var(--aurora-text)] text-xs truncate leading-tight">
+                          <HighlightText text={person.name} query={searchQuery} />
+                        </h4>
+                        {person.profession && (
+                          <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
+                            <HighlightText text={person.profession} query={searchQuery} />
+                          </p>
+                        )}
                       </div>
                     </div>
                     {/* Heritage + location + mutual */}
@@ -1427,7 +1683,7 @@ export default function DiscoverPage() {
                       {renderHeritage(person)}
                       {person.showLocation && (
                         <p className="text-[10px] text-[var(--aurora-text-muted)] flex items-center gap-0.5 truncate">
-                          <MapPin className="w-2.5 h-2.5 shrink-0" /> {person.city}
+                          <MapPin className="w-2.5 h-2.5 shrink-0" /> <HighlightText text={person.city} query={searchQuery} />
                         </p>
                       )}
                       {getMutualConnectionCount(person.id) > 0 && (
@@ -1437,6 +1693,12 @@ export default function DiscoverPage() {
                         >
                           {getMutualConnectionCount(person.id)} mutual
                         </button>
+                      )}
+                      {/* #3.4: Show request timestamp for pending connections */}
+                      {activeTab === 'pending' && connectionDetails.get(person.id)?.createdAt && (
+                        <p className="text-[9px] text-[var(--aurora-text-muted)] flex items-center gap-0.5">
+                          <Clock className="w-2.5 h-2.5 shrink-0" /> {formatRequestTime(connectionDetails.get(person.id)?.createdAt)}
+                        </p>
                       )}
                     </div>
                     {/* Action button — pinned to bottom via mt-auto */}
@@ -1540,8 +1802,10 @@ export default function DiscoverPage() {
             <div className="p-6">
 
               <div className="relative mb-4">
-                <div className="w-24 h-24 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-4xl -mt-16 relative z-10 border-4 border-white mx-auto">
-                  {renderAvatar(selectedPerson.avatar, selectedPerson.name)}
+                <div className={`w-24 h-24 rounded-full flex items-center justify-center -mt-16 relative z-10 border-4 border-white mx-auto ${
+                  hasPhotoAvatar(selectedPerson.avatar) ? '' : 'bg-blue-500 text-white font-bold text-4xl'
+                }`}>
+                  {renderAvatar(selectedPerson.avatar, selectedPerson.name, 'lg')}
                 </div>
                 {isRecentlyActive(selectedPerson) && (
                   <div className="absolute w-5 h-5 bg-green-500 rounded-full border-2 border-white bottom-0 right-1/3" />
@@ -1590,7 +1854,41 @@ export default function DiscoverPage() {
                 </button>
               )}
 
-              <div className="mb-4" />
+              {/* #3.2: Activity stats — social proof indicators */}
+              <div className="flex items-center justify-center gap-6 py-3 mb-4 border-y border-gray-100 dark:border-gray-700">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-800 dark:text-white">
+                    {(() => {
+                      // Count connections this person has
+                      let count = 0;
+                      connections.forEach((status, uid) => {
+                        if (status === 'connected' && uid === selectedPerson.id) count++;
+                      });
+                      // They're connected to us? That's at least 1. Use mutual count as proxy for their connections.
+                      return getMutualConnectionCount(selectedPerson.id) || '—';
+                    })()}
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">Connections</p>
+                </div>
+                <div className="w-px h-8 bg-gray-200 dark:bg-gray-600" />
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-800 dark:text-white">
+                    {selectedPerson.interests?.length || 0}
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">Interests</p>
+                </div>
+                <div className="w-px h-8 bg-gray-200 dark:bg-gray-600" />
+                <div className="text-center">
+                  <p className="text-lg font-bold text-gray-800 dark:text-white">
+                    {(() => {
+                      if (!selectedPerson.createdAt) return '—';
+                      const d = selectedPerson.createdAt?.toDate ? selectedPerson.createdAt.toDate() : new Date(selectedPerson.createdAt);
+                      return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    })()}
+                  </p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">Joined</p>
+                </div>
+              </div>
 
               {/* Bio */}
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
