@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, writeBatch, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, query, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, writeBatch, arrayUnion, onSnapshot, orderBy, startAfter, type DocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
@@ -201,22 +201,17 @@ export default function DiscoverPage() {
   const [blockTargetUser, setBlockTargetUser] = useState<{ id: string; name: string } | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [mutualListFor, setMutualListFor] = useState<string | null>(null);
+  // #2.2: Cursor-based pagination state
+  const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_SIZE = 30;
 
-  // Load blocked users from Firestore
+  // #2.8: Load blocked users from userProfile (already fetched by AuthContext — eliminates extra Firestore read)
   useEffect(() => {
-    if (!user) return;
-    const loadBlocked = async () => {
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setBlockedUsers(userDoc.data().blockedUsers || []);
-        }
-      } catch (err) {
-        console.error('Failed to load blocked users:', err);
-      }
-    };
-    loadBlocked();
-  }, [user]);
+    if (!userProfile) return;
+    setBlockedUsers((userProfile as any).blockedUsers || []);
+  }, [userProfile]);
 
   // Block user handler
   const handleBlockUser = async () => {
@@ -281,70 +276,133 @@ export default function DiscoverPage() {
   // Fetch people data
   const [refreshing, setRefreshing] = useState(false);
 
+  // #2.2: Helper to process raw Firestore user docs into User[] with batched settings
+  const processUsersWithSettings = useCallback(async (usersData: { docId: string; data: any }[]): Promise<User[]> => {
+    // #2.1: Batch fetch userSettings instead of N+1 individual getDoc calls
+    const settingsMap = new Map<string, any>();
+    const userIds = usersData.map((u) => u.docId);
+    const BATCH_SIZE = 30;
+    for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
+      const batch = userIds.slice(i, i + BATCH_SIZE);
+      try {
+        const settingsSnap = await getDocs(
+          query(collection(db, 'userSettings'), where('__name__', 'in', batch))
+        );
+        settingsSnap.forEach((d) => settingsMap.set(d.id, d.data()));
+      } catch {
+        // Fallback: if batch fails, settings stay empty (privacy defaults apply)
+      }
+    }
+
+    const peopleData: User[] = [];
+    for (const { docId, data } of usersData) {
+      const privacy = settingsMap.get(docId)?.privacy;
+      if (privacy?.searchable === false) continue;
+      if (privacy?.profileVisibility === 'private') continue;
+
+      peopleData.push({
+        id: docId,
+        name: data.name || '',
+        avatar: data.avatar || '👤',
+        heritage: data.heritage || 'Other',
+        city: data.city || 'Earth',
+        profession: (data.profession && data.profession !== 'N/A' && data.profession !== 'n/a') ? data.profession : '',
+        bio: data.bio || '',
+        interests: Array.isArray(data.interests) ? data.interests : [],
+        email: data.email || '',
+        phone: data.phone || '',
+        showLocation: privacy?.showLocation !== false,
+        showEmail: privacy?.showEmail === true,
+        showPhone: privacy?.showPhone === true,
+        updatedAt: data.updatedAt || null,
+        createdAt: data.createdAt || null,
+      });
+    }
+    return peopleData;
+  }, []);
+
+  // #2.2: Cursor-based pagination — initial fetch
   const fetchPeople = useCallback(async () => {
     try {
       setFetchError(null);
-      const q = query(collection(db, 'users'), limit(100));
+      const q = query(collection(db, 'users'), orderBy('name'), limit(PAGE_SIZE));
       const snapshot = await getDocs(q);
 
-        const settingsPromises: Promise<{ uid: string; settings: any } | null>[] = [];
-        const usersData: { docId: string; data: any }[] = [];
-
-        snapshot.forEach((d) => {
-          if (d.id !== user?.uid) {
-            usersData.push({ docId: d.id, data: d.data() });
-            settingsPromises.push(
-              getDoc(doc(db, 'userSettings', d.id))
-                .then((snap) => ({ uid: d.id, settings: snap.exists() ? snap.data() : null }))
-                .catch(() => ({ uid: d.id, settings: null }))
-            );
-          }
-        });
-
-        const allSettings = await Promise.all(settingsPromises);
-        const settingsMap = new Map(allSettings.filter(Boolean).map((s) => [s!.uid, s!.settings]));
-
-        const peopleData: User[] = [];
-        for (const { docId, data } of usersData) {
-          const privacy = settingsMap.get(docId)?.privacy;
-          if (privacy?.searchable === false) continue;
-          if (privacy?.profileVisibility === 'private') continue;
-
-          peopleData.push({
-            id: docId,
-            name: data.name || '',
-            avatar: data.avatar || '👤',
-            heritage: data.heritage || 'Other',
-            city: data.city || 'Earth',
-            profession: (data.profession && data.profession !== 'N/A' && data.profession !== 'n/a') ? data.profession : '',
-            bio: data.bio || '',
-            interests: Array.isArray(data.interests) ? data.interests : [],
-            email: data.email || '',
-            phone: data.phone || '',
-            showLocation: privacy?.showLocation !== false,
-            showEmail: privacy?.showEmail === true,
-            showPhone: privacy?.showPhone === true,
-            updatedAt: data.updatedAt || null,
-            createdAt: data.createdAt || null,
-          });
+      const usersData: { docId: string; data: any }[] = [];
+      snapshot.forEach((d) => {
+        if (d.id !== user?.uid) {
+          usersData.push({ docId: d.id, data: d.data() });
         }
+      });
 
-        setPeople(peopleData);
-      } catch (error) {
-        console.error('Error fetching people:', error);
-        setFetchError('Failed to load people. Please try again later.');
-      } finally {
-        setLoading(false);
+      const peopleData = await processUsersWithSettings(usersData);
+      setPeople(peopleData);
+
+      // Track last doc for cursor pagination
+      if (snapshot.docs.length < PAGE_SIZE) {
+        setHasMore(false);
+      } else {
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMore(true);
       }
-  }, [user?.uid]);
+    } catch (error) {
+      console.error('Error fetching people:', error);
+      setFetchError('Failed to load people. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.uid, processUsersWithSettings]);
+
+  // #2.2: Load more people (next page)
+  const loadMorePeople = useCallback(async () => {
+    if (!lastDoc || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, 'users'),
+        orderBy('name'),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
+      const snapshot = await getDocs(q);
+
+      const usersData: { docId: string; data: any }[] = [];
+      snapshot.forEach((d) => {
+        if (d.id !== user?.uid) {
+          usersData.push({ docId: d.id, data: d.data() });
+        }
+      });
+
+      const morePeople = await processUsersWithSettings(usersData);
+      setPeople((prev) => {
+        // Deduplicate by ID
+        const existingIds = new Set(prev.map((p) => p.id));
+        const newPeople = morePeople.filter((p) => !existingIds.has(p.id));
+        return [...prev, ...newPeople];
+      });
+
+      if (snapshot.docs.length < PAGE_SIZE) {
+        setHasMore(false);
+      } else {
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+      }
+    } catch (error) {
+      console.error('Error loading more people:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [lastDoc, loadingMore, hasMore, user?.uid, processUsersWithSettings]);
 
   useEffect(() => {
     fetchPeople();
   }, [fetchPeople]);
 
-  // Manual refresh handler
+  // Manual refresh handler — resets pagination
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
+    setLastDoc(null);
+    setHasMore(true);
+    setPeople([]);
     await fetchPeople();
     setRefreshing(false);
   }, [fetchPeople]);
@@ -361,62 +419,71 @@ export default function DiscoverPage() {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [selectedPerson]);
 
-  // Load connections
+  // #2.7: Real-time connections via onSnapshot (replaces one-time getDocs)
+  // #2.4: Legacy migration runs once per mount, gated by localStorage + ref
+  const migrationAttemptedRef = useRef(false);
   useEffect(() => {
     if (!user?.uid) return;
-    const loadConnections = async () => {
-      try {
-        const q1 = query(collection(db, 'connections'), where('users', 'array-contains', user.uid));
-        const connSnap = await getDocs(q1);
-        const connMap = new Map<string, 'pending' | 'connected'>();
-        const detailsMap = new Map<string, ConnectionDetail>();
+    migrationAttemptedRef.current = false;
+    const q1 = query(collection(db, 'connections'), where('users', 'array-contains', user.uid));
 
-        connSnap.forEach((d) => {
-          const data = d.data();
-          const otherUid = (data.users as string[]).find((uid: string) => uid !== user.uid);
-          if (otherUid) {
-            const status = data.status || 'connected';
-            connMap.set(otherUid, status);
-            detailsMap.set(otherUid, {
-              status,
-              initiatedBy: data.initiatedBy || '',
-              connectedAt: data.connectedAt || null,
-            });
-          }
-        });
+    const unsubscribe = onSnapshot(q1, async (connSnap) => {
+      const connMap = new Map<string, 'pending' | 'connected'>();
+      const detailsMap = new Map<string, ConnectionDetail>();
 
-        // Legacy migration
-        try {
-          const legacySnap = await getDocs(collection(db, 'users', user.uid, 'connections'));
-          for (const d of legacySnap.docs) {
-            if (!connMap.has(d.id)) {
-              const connId = getConnectionId(user.uid, d.id);
-              try {
-                await setDoc(doc(db, 'connections', connId), {
-                  users: [user.uid, d.id].sort(),
-                  status: 'connected',
-                  connectedAt: d.data().connectedAt || serverTimestamp(),
-                  migratedAt: serverTimestamp(),
-                });
-                connMap.set(d.id, 'connected');
-                detailsMap.set(d.id, { status: 'connected', initiatedBy: '', connectedAt: d.data().connectedAt });
-              } catch {
-                connMap.set(d.id, d.data().status || 'connected');
-                detailsMap.set(d.id, { status: d.data().status || 'connected', initiatedBy: '' });
+      connSnap.forEach((d) => {
+        const data = d.data();
+        const otherUid = (data.users as string[]).find((uid: string) => uid !== user.uid);
+        if (otherUid) {
+          const status = data.status || 'connected';
+          connMap.set(otherUid, status);
+          detailsMap.set(otherUid, {
+            status,
+            initiatedBy: data.initiatedBy || '',
+            connectedAt: data.connectedAt || null,
+          });
+        }
+      });
+
+      // Legacy migration: only attempt once per mount + localStorage gate
+      if (!migrationAttemptedRef.current) {
+        migrationAttemptedRef.current = true;
+        const migrationKey = `discover_migrated_${user.uid}`;
+        if (localStorage.getItem(migrationKey) !== 'true') {
+          try {
+            const legacySnap = await getDocs(collection(db, 'users', user.uid, 'connections'));
+            for (const d of legacySnap.docs) {
+              if (!connMap.has(d.id)) {
+                const connId = getConnectionId(user.uid, d.id);
+                try {
+                  await setDoc(doc(db, 'connections', connId), {
+                    users: [user.uid, d.id].sort(),
+                    status: 'connected',
+                    connectedAt: d.data().connectedAt || serverTimestamp(),
+                    migratedAt: serverTimestamp(),
+                  });
+                  connMap.set(d.id, 'connected');
+                  detailsMap.set(d.id, { status: 'connected', initiatedBy: '', connectedAt: d.data().connectedAt });
+                } catch {
+                  connMap.set(d.id, d.data().status || 'connected');
+                  detailsMap.set(d.id, { status: d.data().status || 'connected', initiatedBy: '' });
+                }
               }
             }
+          } catch {
+            // Legacy subcollection may not exist
           }
-        } catch {
-          // Legacy subcollection may not exist
+          localStorage.setItem(migrationKey, 'true');
         }
-
-        setConnections(connMap);
-        setConnectionDetails(detailsMap);
-      } catch (err) {
-        console.error('Error loading connections:', err);
       }
-    };
-    loadConnections();
+
+      setConnections(connMap);
+      setConnectionDetails(detailsMap);
+    }, (err) => {
+      console.error('Error listening to connections:', err);
+    });
+
+    return () => unsubscribe();
   }, [user?.uid]);
 
   // Handle connect
@@ -643,13 +710,24 @@ export default function DiscoverPage() {
     return mutualConnectionsMap.get(personId) || [];
   }, [mutualConnectionsMap]);
 
+  // #2.5: Pre-computed match scores — cached in a Map to avoid recomputing during sort/render
+  const matchScoreMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!userProfile) return map;
+    for (const p of people) {
+      map.set(p.id, computeMatchScore(p, userProfile, getMutualConnectionCount(p.id)));
+    }
+    return map;
+  }, [people, userProfile, getMutualConnectionCount]);
+
   // Filtered people
   const filteredPeople = useMemo(() => {
     let filtered = people;
 
-    // Filter out blocked users
+    // Filter out blocked users (#2.6: use Set for O(1) lookups instead of Array.includes)
     if (blockedUsers.length > 0) {
-      filtered = filtered.filter((p) => !blockedUsers.includes(p.id));
+      const blockedSet = new Set(blockedUsers);
+      filtered = filtered.filter((p) => !blockedSet.has(p.id));
     }
 
     // Tab filtering
@@ -663,6 +741,7 @@ export default function DiscoverPage() {
       });
     } else if (activeTab === 'pending') {
       // Pending tab: only incoming requests (initiated by the other person)
+      // Bonus: Skip heritage filter for pending tab — incoming requests should always be visible
       filtered = filtered.filter((p) => {
         const status = connections.get(p.id);
         const detail = connectionDetails.get(p.id);
@@ -673,7 +752,8 @@ export default function DiscoverPage() {
       filtered = filtered.filter((p) => connections.get(p.id) === 'connected');
     }
 
-    if (selectedHeritage.length > 0) {
+    // Heritage filter — skip for pending tab (incoming requests should always show)
+    if (selectedHeritage.length > 0 && activeTab !== 'pending') {
       filtered = filtered.filter((person) => {
         if (Array.isArray(person.heritage)) return person.heritage.some((h: string) => selectedHeritage.includes(h));
         return person.heritage ? selectedHeritage.includes(person.heritage) : false;
@@ -707,7 +787,7 @@ export default function DiscoverPage() {
       });
     }
 
-    // Apply sort (search results already ranked by relevance, secondary sort applies otherwise)
+    // Apply sort — uses cached match scores (#2.5) for O(1) lookups
     return filtered.sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       if (sortBy === 'recent') {
@@ -725,55 +805,53 @@ export default function DiscoverPage() {
       }
       // Default: match score sort (skipped when search query active — already sorted by relevance)
       if (searchQuery.trim()) return 0;
-      const mutualA = getMutualConnectionCount(a.id);
-      const mutualB = getMutualConnectionCount(b.id);
-      return (
-        computeMatchScore(b, userProfile, mutualB) - computeMatchScore(a, userProfile, mutualA)
-      );
+      return (matchScoreMap.get(b.id) || 0) - (matchScoreMap.get(a.id) || 0);
     });
-  }, [people, selectedHeritage, searchQuery, userProfile, sortBy, connections, connectionDetails, activeTab, user?.uid, blockedUsers]);
+  }, [people, selectedHeritage, searchQuery, matchScoreMap, sortBy, connections, connectionDetails, activeTab, user?.uid, blockedUsers]);
 
-  // PYMK Groups
+  // #2.9: PYMK Groups — single-pass optimization (was 3 separate filter passes)
   const pymkGroups = useMemo(() => {
     if (activeTab !== 'discover' || !userProfile)
       return { sameCity: [], sameHeritage: [], similarInterests: [] };
 
-    // Include unconnected users AND pending requests sent by current user
-    // (mirrors the Discover tab filter so sections don't disappear after sending requests)
-    const discoverable = people.filter((p) => {
-      const status = connections.get(p.id);
-      if (!status) return true; // not connected at all
-      if (status === 'pending') {
-        return connectionDetails.get(p.id)?.initiatedBy === user?.uid; // sent by me
-      }
-      return false; // exclude fully connected
-    });
-
-    const userCity = userProfile.city || '';
+    const userCity = (userProfile.city || '').toLowerCase();
     const userHeritage = (Array.isArray(userProfile.heritage)
       ? userProfile.heritage
       : [userProfile.heritage].filter(Boolean)
     ).map((h: string) => h.toLowerCase());
-    const userInterests: string[] = userProfile.interests || [];
+    const userInterestsSet = new Set<string>(userProfile.interests || []);
 
-    const sameCity = discoverable
-      .filter(
-        (p) =>
-          p.city && userCity && p.city.toLowerCase() === userCity.toLowerCase()
-      )
-      .slice(0, 10);
-    const sameHeritage = discoverable
-      .filter((p) => {
+    const sameCity: User[] = [];
+    const sameHeritage: User[] = [];
+    const similarInterests: User[] = [];
+
+    // Single pass: classify each discoverable person into PYMK groups
+    for (const p of people) {
+      const status = connections.get(p.id);
+      // Discoverable: not connected, or pending sent by me
+      if (status === 'connected') continue;
+      if (status === 'pending' && connectionDetails.get(p.id)?.initiatedBy !== user?.uid) continue;
+
+      // City match
+      if (sameCity.length < 10 && p.city && userCity && p.city.toLowerCase() === userCity) {
+        sameCity.push(p);
+      }
+      // Heritage match
+      if (sameHeritage.length < 10) {
         const pH = (Array.isArray(p.heritage) ? p.heritage : [p.heritage]).filter(Boolean);
-        return pH.some((h: string) => userHeritage.includes(h.toLowerCase()));
-      })
-      .slice(0, 10);
-    const similarInterests = discoverable
-      .filter((p) => {
-        const shared = (p.interests || []).filter((i: string) => userInterests.includes(i));
-        return shared.length >= 2;
-      })
-      .slice(0, 10);
+        if (pH.some((h: string) => userHeritage.includes(h.toLowerCase()))) {
+          sameHeritage.push(p);
+        }
+      }
+      // Shared interests (>= 2)
+      if (similarInterests.length < 10) {
+        let shared = 0;
+        for (const i of (p.interests || [])) {
+          if (userInterestsSet.has(i)) shared++;
+          if (shared >= 2) { similarInterests.push(p); break; }
+        }
+      }
+    }
 
     return { sameCity, sameHeritage, similarInterests };
   }, [people, connections, connectionDetails, userProfile, activeTab, user?.uid]);
@@ -1290,7 +1368,7 @@ export default function DiscoverPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredPeople.map((person) => {
-              const score = computeMatchScore(person, userProfile, getMutualConnectionCount(person.id));
+              const score = matchScoreMap.get(person.id) || 0; // #2.5: use cached score
               const status = connections.get(person.id);
 
               return (
@@ -1411,6 +1489,23 @@ export default function DiscoverPage() {
             })}
           </div>
         )}
+
+        {/* #2.2: Load More button for pagination */}
+        {!loading && hasMore && activeTab === 'discover' && filteredPeople.length > 0 && (
+          <div className="text-center mt-6">
+            <button
+              onClick={loadMorePeople}
+              disabled={loadingMore}
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+            >
+              {loadingMore ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Loading...</>
+              ) : (
+                'Load More People'
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Profile Detail Modal */}
@@ -1465,7 +1560,7 @@ export default function DiscoverPage() {
                   </span>
                 )}
                 {(() => {
-                  const matchScore = computeMatchScore(selectedPerson, userProfile, getMutualConnectionCount(selectedPerson.id));
+                  const matchScore = matchScoreMap.get(selectedPerson.id) || 0; // #2.5: use cached score
                   return matchScore > 0 ? (
                     <span className="inline-block bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-bold px-3 py-1 rounded">
                       {matchScore}% Match
