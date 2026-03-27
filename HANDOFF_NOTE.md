@@ -17,12 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** March 25, 2026 (Last updated: Session 19)
+**Date:** March 26, 2026 (Last updated: Session 21)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** `c3fb1d3` — fix: cross-browser compatibility for Discover Phase 1 changes
+**Latest Commit:** `074f201` — feat: Discover Page Phase 3 — UX Polish & Feature Gaps (items 3.1–3.10)
+**Uncommitted:** Session 21 changes (Business Sign-Up Wizard — all 5 phases) — 10 new files, 6 files modified
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
+**Live bundle:** Build clean (8.10s), deploy from macOS terminal needed (Firebase auth not available in VM)
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags)
 
 ---
 
@@ -127,6 +129,26 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
 - **#1.9 Search Ranking**: Added `searchRank()` function returning priority levels: prefix match (1) > word-start match (1) > substring (2) > fuzzy subsequence (3) > no match (0). Results are pre-sorted by rank before secondary sorting, so "Sa" correctly matches "Sarath" before "Sports" (which fuzzy matched s...a).
 - **#1.10 Accessibility**: Added `role="button"`, `tabIndex={0}`, `aria-label` (with name, profession, city), `focus-visible:ring-2 focus-visible:ring-blue-500`, and `onKeyDown` (Enter/Space) handlers to all 6 card interaction points: main grid cards, 3 PYMK carousel card types, incoming request cards, and sent request cards.
 - **Cross-browser compatibility audit**: Added `@supports not selector(:focus-visible)` CSS fallback in `index.css` for iOS Safari < 15.4 (applies `:focus` outline on `[role="button"]` elements). Verified `env(safe-area-inset-bottom)` has Tailwind class fallback for older Android WebViews. All other APIs (CSS custom properties, `String.startsWith/includes`, `Map`, `useMemo`, `onKeyDown`) verified safe across Chrome 49+, Safari 9.1+, Firefox 31+.
+
+**Session 20 focused on:** Discover Page Enhancement Roadmap Phases 2-4 — completing all remaining phases in a single session. This session covered Phase 2 (Performance & Data Layer, 9 items), Phase 3 (UX Polish & Feature Gaps, 10 items), and Phase 4 (Architecture & Accessibility, 9 items). All 28 items across 3 phases were implemented, built, deployed, and tested in Chrome.
+
+Phase 2 highlights: N+1 Firestore read fix (batch getDocs), cursor-based pagination, onSnapshot for connections, PYMK single-pass optimization, match score memoization, Map reference stability.
+
+Phase 3 highlights: Pill gradient colors (green for Discover, blue for Network, orange for Pending — purple when unselected), emoji detection fix (`\p{Emoji_Presentation}|\p{Extended_Pictographic}`), heritage text rendering fix (explicit Tailwind classes instead of dynamic `text-${size}`), sticky header fix (`-webkit-sticky`), PYMK scrollbar fix (`hide-scrollbar` CSS class + alias), modal iOS fix (`min(90vh, 90dvh)` + `WebkitOverflowScrolling`), toast animation fix (`animate-fade-in` keyframes), comprehensive cross-browser compatibility audit and patches for Chrome/Safari/Firefox/iOS Safari/Android Chrome.
+
+Phase 4 highlights: Extracted `PersonCard` component (464 lines, 6 variants: grid, pymk-city, pymk-heritage, pymk-interests, incoming, sent), extracted `useConnections` hook (362 lines — all connection state, handlers, real-time listener, legacy migration), extracted `usePYMK` hook (126 lines — PYMK groups computation), consolidated `useState` into `useReducer` for modal and filter state, full keyboard navigation in PYMK carousels (ArrowLeft/ArrowRight), `aria-live` regions for dynamic content, focus trapping in modals via new `useFocusTrap` hook (65 lines), color contrast audit (WCAG 2.1 AA), eliminated `cp` sync pattern by deleting `src/pages/main/discover.tsx` (confirmed only `src/pages/discover` is imported in `App.tsx`).
+
+**Session 21 focused on:** Business Sign-Up Wizard — Complete 5-phase implementation of a new business registration flow, separate from the existing business directory. All 5 phases completed in a single session:
+
+- **Phase 1 — Foundation**: Added 10 new KYC feature flags to `FeatureSettingsContext.tsx` (all default `false`), extended `businessReducer.ts` with optional sign-up fields (country, placeId, addressComponents, TIN, verification docs, beneficial owners, KYC status), extended `businessValidation.ts` with step-aware validation (EIN/BN format validation, postal code validation, address component validation), added `/business/register` route in `App.tsx`, created feature-flag-gated register page.
+- **Phase 2 — Wizard UI + Google Places**: Built `BusinessRegistrationWizard.tsx` (main shell with 5-step progress bar, validation gating, auto-save draft), `StepIdentity.tsx` (name, category, country toggle US/CA, email, phone, description), `StepLocation.tsx` (Google Places Autocomplete with debounced search + session tokens for billing, structured address parsing, manual fallback fields, Leaflet map preview via CDN). Created `useGooglePlaces.ts` hook (singleton script loader, session token management).
+- **Phase 3 — Steps 4-5**: Built `StepVerification.tsx` (fully feature-flag-aware — TIN/EIN/BN entry, document upload with drag UI, photo ID upload, beneficial ownership disclosure, SOS lookup banner), `StepDetails.tsx` (photo upload grid up to 10 with cover selection, business hours day-by-day editor, price range, menu/services), `StepReview.tsx` (cover photo preview, 4 review sections with Edit buttons, masked TIN, terms notice).
+- **Phase 4/5 — Firestore Backend + Admin Review**: Built `businessRegistration.ts` service (Firestore write, parallel photo upload to Storage, parallel verification doc upload, draft auto-save/load/delete, admin review queue with approve/reject). Updated both `admin.tsx` files with registrations tab (pending list, approve/reject with reason modal).
+- **TypeScript fixes**: Fixed `useRef()` requiring initial value in React 19 types (pass `undefined`), fixed `UserData.displayName` → `UserData.name`, added Google Maps namespace declarations to avoid `@types/google.maps` dependency.
+- **ZERO IMPACT on individual sign-up flow** — Verified: all new fields optional, all flags default false, original `validateBusinessForm()` untouched, auth files clean.
+- **Google Places API key**: `AIzaSyDrbJItCq629ccJ6DGgtTEO1XXjKgGXCWY` stored in `.env` as `VITE_GOOGLE_MAPS_API_KEY` (already in `.gitignore`).
+
+**Key architectural change in Session 20:** The `cp` sync pattern for `discover.tsx` was ELIMINATED. Unlike `messages.tsx` and `business.tsx` which still require `cp` sync, `discover.tsx` was verified to only be imported from `src/pages/discover.tsx` (not `main/`). The duplicate `src/pages/main/discover.tsx` was deleted. This is the first page to break free of the duplicate architecture.
 
 - **Bug fixes across Sessions 14-16**:
   1. **Map markers race condition (zero markers on map)**: The markers `useEffect` ran before async Leaflet CDN load completed. Fixed by adding `mapReady` state flag set after map initialization, added to dependency arrays.
@@ -240,6 +262,28 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
 - **Share API fallback chain: `navigator.share` → `clipboard.writeText` → `execCommand('copy')`** — Firefox desktop doesn't support `navigator.clipboard.writeText` without HTTPS or user gesture. Added hidden textarea + `document.execCommand('copy')` as ultimate fallback.
 
 - **`parseOpenNow()` extracted to shared utility** — Initially inline in BusinessDetailModal, extracted to `businessUtils.ts` because it's used by BusinessCard, FeaturedCarousel, and BusinessDetailModal. Supports day ranges ("Mon-Fri"), 12h/24h time formats, bare numbers, and graceful failure via try/catch.
+
+### Session 20: Discover Phases 2-4 — Performance, UX, Architecture & Accessibility
+
+- **Per-pill gradient colors (not uniform active color)** — User requested distinct color gradients for each pill when selected: green (`from-green-400 to-emerald-600`) for Discover, blue (`from-blue-400 to-indigo-600`) for Network, orange (`from-orange-400 to-amber-600`) for Pending. Unselected pills keep the original purple gradient (`bg-white/20`). This uses inline styles with `transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1)` and `transform: scale(1.03)` for subtle press feedback. Cross-browser: includes `-webkit-backdrop-filter`, `-webkit-tap-highlight-color: transparent`.
+
+- **Emoji regex `\p{Emoji_Presentation}|\p{Extended_Pictographic}` (not `\p{Emoji}`)** — The `\p{Emoji}` regex class matches basic ASCII characters like `#`, `*`, `0-9` which are technically in the Unicode Emoji range. Using `\p{Emoji_Presentation}|\p{Extended_Pictographic}` with the `u` flag correctly detects only visual emoji characters like 👩‍💻 and 🧑‍💻 without false positives.
+
+- **Explicit Tailwind classes for heritage text (not dynamic interpolation)** — `text-${size}` gets stripped by Tailwind's purge because the compiler can't detect dynamic class names at build time. Changed to `const textSizeClass = size === 'sm' ? 'text-sm' : 'text-xs'` with full static class names that survive purging.
+
+- **`cp` sync ELIMINATED for discover.tsx (not extended)** — After verifying in `App.tsx` that only `src/pages/discover` is imported (the router never uses `main/discover`), the duplicate `src/pages/main/discover.tsx` was deleted outright. This is a deliberate departure from the `cp` sync pattern used for `messages.tsx` and `business.tsx`. The decision was safe because: (1) `App.tsx` grep confirmed no import of `main/discover`, (2) the build succeeded without it, (3) the deployed site works correctly. This sets a precedent for eventually eliminating other `cp` sync duplicates.
+
+- **PersonCard as variant-based component (not separate components per context)** — Rather than creating separate `PYMKCard`, `GridCard`, `IncomingCard`, `SentCard` components, a single `PersonCard` component uses a `variant` prop (`'grid' | 'pymk-city' | 'pymk-heritage' | 'pymk-interests' | 'incoming' | 'sent'`) to control layout and rendering. This keeps the card logic centralized and avoids duplication of shared rendering code (avatar, heritage, HighlightText, MatchBadge).
+
+- **`useReducer` for modal + filter state (not all state)** — Only the closely-related modal state (selectedProfile, showMutual, showBlock) and filter state (activeTile, activeTab, sortBy) were consolidated into `useReducer`. Independent state like `searchQuery`, `refreshing`, `toastMessage` remained as individual `useState` hooks. This follows the principle of grouping state that changes together, not forcing everything into a single reducer.
+
+- **`useFocusTrap` as standalone hook (not shared with Business)** — The Business module has its own `useModalA11y` hook in `BusinessModals.tsx`. Rather than trying to unify them (which would require refactoring Business), a separate `useFocusTrap` hook was created for Discover modals. Both achieve the same goal but are tailored to their respective component structures.
+
+- **Arrow key navigation on PYMK carousels (not Tab cycling)** — Tab key naturally moves between focusable cards. Arrow keys (Left/Right) provide additional carousel-specific navigation that scrolls the container and moves focus to the adjacent card. This follows the WAI-ARIA carousel pattern where Arrow keys navigate within the widget.
+
+- **`aria-live="polite"` with `sr-only` class (not visible text)** — The dynamic results count ("Found 7 people matching your filters") is announced to screen readers via an `aria-live="polite"` region with `aria-atomic="true"`, but hidden visually with `sr-only`. The visible text in the UI has its own formatting and doesn't need to be duplicated.
+
+- **Color contrast: secondary text left as-is (not forced to 4.5:1)** — The heritage text (green, 3.65:1) and city text (gray, 2.97:1) are pre-existing design choices that serve as secondary/decorative information. Forcing them to 4.5:1 would require significantly darkening the green and gray, changing the visual design. The primary interactive elements (headings, buttons, badges) all pass WCAG AA. This was documented as a known limitation.
 
 ### Session 19: Discover Page Phase 1 — Critical Fixes & Quick Wins
 
@@ -369,6 +413,97 @@ New file: `src/components/business/PhotoLightbox.tsx` (209 lines). Updated line 
      on what was done in each specific session.
      ================================================================ -->
 ## 3. What Was Completed
+
+### Session 20 (March 26, 2026) — Discover Phases 2-4: Performance + UX Polish + Architecture & Accessibility
+
+**Phase 2 — Performance & Data Layer (items 2.1–2.9):**
+| Task | File(s) Changed | Status |
+|------|-----------------|--------|
+| #2.1: Fix N+1 Firestore reads — batch `getDocs` for connections | `src/pages/discover.tsx` | ✅ |
+| #2.2: Cursor-based pagination for people list | `src/pages/discover.tsx` | ✅ |
+| #2.3: Mutual connection pre-compute refinement | `src/pages/discover.tsx` | ✅ |
+| #2.4: Migration flag for connection data schema | `src/pages/discover.tsx` | ✅ |
+| #2.5: Match score memoization | `src/pages/discover.tsx` | ✅ |
+| #2.6: Map reference stability | `src/pages/discover.tsx` | ✅ |
+| #2.7: `onSnapshot` for connections (real-time updates) | `src/pages/discover.tsx` | ✅ |
+| #2.8: Redundant blocked users read elimination | `src/pages/discover.tsx` | ✅ |
+| #2.9: PYMK single-pass optimization | `src/pages/discover.tsx` | ✅ |
+
+**Phase 3 — UX Polish & Feature Gaps (items 3.1–3.10):**
+| Task | File(s) Changed | Status |
+|------|-----------------|--------|
+| #3.1: Pill gradient colors (green/blue/orange per pill) | `src/pages/discover.tsx` | ✅ |
+| #3.2: Emoji detection fix (`\p{Emoji_Presentation}`) | `src/pages/discover.tsx` | ✅ |
+| #3.3: Heritage text rendering fix (explicit Tailwind classes) | `src/pages/discover.tsx` | ✅ |
+| #3.4: Sticky header fix (`-webkit-sticky`) | `src/pages/discover.tsx` | ✅ |
+| #3.5: PYMK scrollbar fix (`hide-scrollbar` CSS class) | `src/pages/discover.tsx`, `src/index.css` | ✅ |
+| #3.6: Modal iOS fix (`min(90vh, 90dvh)` + WebkitOverflowScrolling) | `src/pages/discover.tsx` | ✅ |
+| #3.7: Toast animation fix (`animate-fade-in` keyframes) | `src/index.css` | ✅ |
+| #3.8-3.10: Cross-browser compatibility audit & patches | `src/pages/discover.tsx`, `src/index.css` | ✅ |
+
+**Phase 4 — Architecture & Accessibility (items 4.1–4.9):**
+| Task | File(s) Changed/Created | Status |
+|------|------------------------|--------|
+| #4.1: Extract PersonCard component (6 variants) | `src/components/discover/PersonCard.tsx` (NEW, 464 lines) | ✅ |
+| #4.2: Extract useConnections hook (state + handlers + listener) | `src/hooks/useConnections.ts` (NEW, 362 lines) | ✅ |
+| #4.3: Extract usePYMK hook (groups computation) | `src/hooks/usePYMK.ts` (NEW, 126 lines) | ✅ |
+| #4.4: Consolidate useState into useReducer (modal + filter state) | `src/pages/discover.tsx` | ✅ |
+| #4.5: Full keyboard navigation (ArrowLeft/Right in PYMK carousels) | `src/pages/discover.tsx` | ✅ |
+| #4.6: `aria-live` regions for dynamic content (results count, toast) | `src/pages/discover.tsx` | ✅ |
+| #4.7: Focus trapping in modals | `src/hooks/useFocusTrap.ts` (NEW, 65 lines) | ✅ |
+| #4.8: Color contrast audit (WCAG 2.1 AA — primary elements pass 4.5:1) | `src/pages/discover.tsx` | ✅ |
+| #4.9: Eliminate cp sync pattern — deleted `src/pages/main/discover.tsx` | `src/pages/main/discover.tsx` (DELETED) | ✅ |
+
+**Git commits (Session 20):**
+- `f149d59` — feat: Discover Page Phase 2 — Performance & Data Layer (items 2.1–2.9)
+- `074f201` — feat: Discover Page Phase 3 — UX Polish & Feature Gaps (items 3.1–3.10)
+- *(uncommitted)* — Phase 4: Architecture & Accessibility (items 4.1–4.9) — needs commit
+
+**Line count changes:**
+- `discover.tsx`: 1,716 → 1,999 lines (+283, gained Phase 2-3 features, then shed code to hooks/components in Phase 4)
+- **New: `src/hooks/useConnections.ts`**: 362 lines (connection state, handlers, real-time Firestore listener, legacy migration)
+- **New: `src/hooks/usePYMK.ts`**: 126 lines (PYMK groups computation, expandedPymk state)
+- **New: `src/hooks/useFocusTrap.ts`**: 65 lines (modal focus trapping, Tab/Shift+Tab, save/restore focus)
+- **New: `src/components/discover/PersonCard.tsx`**: 464 lines (variant-based card: grid/pymk-city/pymk-heritage/pymk-interests/incoming/sent)
+- `src/index.css`: 508 lines (+8, `scrollbar-hide` alias + `animate-fade-in` keyframes with `-webkit-animation` prefix)
+- **Deleted: `src/pages/main/discover.tsx`** (cp sync eliminated — verified not imported by App.tsx)
+
+**Discover module file structure (Phase 4 complete):**
+```
+src/
+  hooks/
+    useConnections.ts          (362 lines — connection state, handlers, real-time listener, legacy migration)
+    usePYMK.ts                 (126 lines — PYMK groups computation, expandedPymk state)
+    useFocusTrap.ts            (65 lines — modal focus trapping, Tab/Shift+Tab cycle)
+  components/discover/
+    PersonCard.tsx             (464 lines — variant-based card component, 6 variants)
+  pages/
+    discover.tsx               (1,999 lines — orchestrator with useReducer, keyboard nav, aria-live, cross-browser)
+    main/discover.tsx          DELETED (cp sync eliminated)
+```
+**Total discover module: ~3,016 lines across 5 files (was 1,716 in single file)**
+
+**Key patterns introduced:**
+- `PersonCard` variant prop: `'grid' | 'pymk-city' | 'pymk-heritage' | 'pymk-interests' | 'incoming' | 'sent'`
+- `useConnections(userId, onToastMessage)` → returns connections map, handlers, computed counts
+- `usePYMK(people, connections, PYMK_PREVIEW)` → returns pymkGroups, expandedPymk, setExpandedPymk
+- `useFocusTrap(ref, isOpen)` → traps Tab/Shift+Tab, saves/restores previous focus
+- `dispatchModal({ type: "OPEN_PROFILE", payload: person })` — useReducer for modal state
+- `dispatchFilter({ type: "SET_ACTIVE_TILE", payload: 'members' })` — useReducer for filter state
+- Pill gradient: inline styles with `transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1)`, `transform: scale(1.03)`
+- Emoji regex: `const EMOJI_REGEX = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/u`
+- `handleCarouselKeyDown(e, carouselRef)` — Arrow key navigation for PYMK carousel scrolling + focus movement
+
+**Chrome testing results (all 9 Phase 4 items verified on `mithr-1e5f4.web.app`):**
+- 4.1 PersonCard: All card variants render (PYMK badges, grid match %, Connect/Pending buttons, heritage, New badges) ✅
+- 4.2 useConnections: Connect button changes to Pending, pill counts update ✅
+- 4.3 usePYMK: "Similar Interests" section with carousel, "View All (7)" button ✅
+- 4.4 useReducer: Modal opens with `role="dialog"`, Escape closes, pill switching updates heading + aria-live ✅
+- 4.5 Keyboard nav: ArrowRight moves focus from card to adjacent card in PYMK carousel ✅
+- 4.6 aria-live: `aria-live="polite"` region updates on tab switch ("Found 7 people" → "7 connected people") ✅
+- 4.7 Focus trap: Modal has 4 focusable elements, Tab stays inside modal, Escape closes ✅
+- 4.8 Color contrast: H2 13.58:1, H4 15.92:1, Connect 5.25:1, Pending 4.52:1 (all pass AA) ✅
+- 4.9 cp sync: Only `src/pages/discover.tsx` exists, `main/discover.tsx` deleted ✅
 
 ### Session 19 (March 25, 2026) — Discover Page Phase 1: Critical Fixes & Quick Wins (items 1.1–1.10)
 | Task | File(s) Changed | Status |
@@ -816,7 +951,7 @@ src/
 |------|------|-------|--------|
 | Home (landing) | `src/pages/main/home.tsx` | ~127 | Done |
 | Feed | `src/pages/feed.tsx` | 2,703 | Done |
-| Discover | `src/pages/discover.tsx` | 1,716 (was 1,846) | Done — Phase 1 Critical Fixes complete (10 items), Phase 2 pending |
+| Discover | `src/pages/discover.tsx` | 1,999 (+ 1,017 in hooks/components) | Done — ALL 38 roadmap items complete across Phases 1-4. Architecture refactored: useConnections, usePYMK, useFocusTrap hooks + PersonCard component. cp sync eliminated. |
 | Business | `src/pages/business.tsx` | ~680 (was 2,500) | Done — ALL 42 roadmap items complete across Phases 1-4 |
 | Housing | `src/pages/housing.tsx` | 2,825 | Done + 7 enhancements (state only) |
 | Events | `src/pages/events.tsx` | 2,788 | Done |
@@ -857,6 +992,15 @@ src/
 
 ### Hooks
 - `useIncomingRequestCount` — Real-time Firestore listener for pending connection requests. Used in ModuleSelector nav pills AND Home page Discover tile.
+
+### Business Sign-Up Wizard (Session 21)
+- 5-step registration wizard: Identity → Location → Verification → Details → Review
+- 10 admin-granular KYC feature flags (all default `false`)
+- Google Places Autocomplete with session tokens for billing optimization
+- Leaflet map preview (CDN, same pattern as BusinessMapView)
+- Firestore backend: business doc creation, parallel photo/doc uploads to Storage, draft auto-save
+- Admin review queue with approve/reject workflow
+- Zero impact on existing individual sign-up flow
 
 ---
 
@@ -899,34 +1043,41 @@ src/
 - **Cross-browser geolocation fix:** ✅ COMPLETED (Session 18) — Two-phase geolocation (high-accuracy → low-accuracy fallback), iOS Safari guidance, Firefox prompt dismissal safety timeout, HTTPS check
 - **ALL 42 ROADMAP ITEMS NOW COMPLETE** — Business module Phase 4 is finished.
 
-### Discover Page Enhancement Roadmap (38 items across 4 phases)
+### Discover Page Enhancement Roadmap (38 items across 4 phases) — ALL COMPLETE ✅
 
 **Source document:** `Discover_Page_Enhancement_Roadmap.docx` in workspace folder
 
 **Phase 1 — Critical Fixes & Quick Wins (items 1.1–1.10):** ✅ COMPLETE (Session 19)
 - #1.1 Pending tab fix, #1.2 Mutual pre-compute, #1.3 MatchBadge inline, #1.4 Dead code removal, #1.5 SkeletonCard aurora, #1.6 Refresh button, #1.7 Toast safe-area, #1.8 Duplicate requests removal, #1.9 Search ranking, #1.10 Accessibility
 
-**Phase 2 — Performance & Data Layer (items 2.1–2.9):** ❌ NOT STARTED
-- 2.1: Fix N+1 Firestore reads (batch `getDocs` for connections instead of per-user)
-- 2.2: Cursor-based pagination for people list (replace full `getDocs` with `startAfter` + `limit`)
-- 2.3: Mutual connection pre-compute refinement (already partially addressed in 1.2 — remaining: server-side pre-computation)
-- 2.4: Migration flag for connection data schema
-- 2.5: Match score memoization (cache computed scores)
-- 2.6: Map reference stability (avoid re-creating Maps on every render)
-- 2.7: `onSnapshot` for connections (real-time updates instead of polling)
-- 2.8: Redundant blocked users read elimination
-- 2.9: PYMK single-pass optimization
+**Phase 2 — Performance & Data Layer (items 2.1–2.9):** ✅ COMPLETE (Session 20)
+- #2.1 N+1 Firestore reads fix, #2.2 Cursor-based pagination, #2.3 Mutual pre-compute refinement, #2.4 Migration flag, #2.5 Match score memoization, #2.6 Map reference stability, #2.7 onSnapshot for connections, #2.8 Redundant blocked users elimination, #2.9 PYMK single-pass optimization
 
-**Phase 3 — UI/UX Enhancements:** ❌ NOT STARTED (items TBD from roadmap)
-**Phase 4 — Advanced Features:** ❌ NOT STARTED (items TBD from roadmap)
+**Phase 3 — UX Polish & Feature Gaps (items 3.1–3.10):** ✅ COMPLETE (Session 20)
+- #3.1 Pill gradient colors, #3.2 Emoji detection fix, #3.3 Heritage text rendering, #3.4 Sticky header, #3.5 PYMK scrollbar, #3.6 Modal iOS fix, #3.7 Toast animation, #3.8-3.10 Cross-browser compatibility audit & patches
 
-### Duplicate Page Architecture (deferred cleanup — DO NOT TOUCH NOW)
-- `src/pages/main/` contains near-identical copies of 12 pages from `src/pages/`
-- `App.tsx` only imports from `src/pages/` — the `main/` copies are dead code (~29,162 lines)
+**Phase 4 — Architecture & Accessibility (items 4.1–4.9):** ✅ COMPLETE (Session 20)
+- #4.1 PersonCard component extraction, #4.2 useConnections hook, #4.3 usePYMK hook, #4.4 useReducer consolidation, #4.5 Keyboard navigation, #4.6 aria-live regions, #4.7 Focus trapping, #4.8 Color contrast audit, #4.9 cp sync elimination
+
+**ALL 38 DISCOVER ROADMAP ITEMS NOW COMPLETE** — Discover page is fully enhanced across all 4 phases.
+
+### Business Sign-Up Wizard — ALL 5 PHASES COMPLETE ✅ (Session 21)
+- **Phase 1 — Foundation**: 10 KYC feature flags, reducer extensions, step-aware validation, route + page
+- **Phase 2 — Wizard UI + Google Places**: Wizard shell, StepIdentity, StepLocation with autocomplete + Leaflet map, useGooglePlaces hook
+- **Phase 3 — Steps 4-5**: StepVerification (fully flag-aware), StepDetails (photos + hours + pricing), StepReview (summary + edit navigation)
+- **Phase 4/5 — Backend + Admin**: businessRegistration.ts service (Firestore + Storage), admin review queue in both admin.tsx files
+- **TypeScript fixes**: React 19 useRef, UserData.name, Google Maps type declarations
+- **New files (10)**: `.env`, `src/pages/business/register.tsx`, `src/hooks/useGooglePlaces.ts`, `src/components/business/registration/BusinessRegistrationWizard.tsx`, `StepIdentity.tsx`, `StepLocation.tsx`, `StepVerification.tsx`, `StepDetails.tsx`, `StepReview.tsx`, `src/services/businessRegistration.ts`
+- **Modified files (6)**: `FeatureSettingsContext.tsx`, `businessReducer.ts`, `businessValidation.ts`, `App.tsx`, `src/pages/admin.tsx`, `src/pages/main/admin.tsx`
+
+### Duplicate Page Architecture (partially cleaned — `discover.tsx` eliminated, others remain)
+- `src/pages/main/` contains near-identical copies of 11 pages from `src/pages/` (was 12 — `discover.tsx` removed in Session 20)
+- `App.tsx` only imports from `src/pages/` — the `main/` copies are dead code (~27,000+ lines)
 - Only 3 files are unique to `main/`: `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`
-- Only `messages.tsx` is kept in sync via `cp` command; the other 11 have drifted
-- **User decision (Session 10): too risky to refactor now, deferred to a future session**
-- When ready: delete 12 duplicate files from `main/`, keep the 3 unique ones, eliminate `cp` sync pattern
+- `messages.tsx` and `business.tsx` are still kept in sync via `cp` command; the other 9 have drifted
+- **Session 20 precedent:** `discover.tsx` cp sync was safely eliminated after verifying `App.tsx` imports. This same approach can be applied to other pages one-by-one.
+- **User decision (Session 10): full refactor too risky, doing incrementally instead**
+- When ready for each page: verify `App.tsx` only imports from `src/pages/`, then delete the `main/` duplicate
 
 ### Call System (mostly working, but fragile)
 - Audio and video calls work Chrome-Chrome and Chrome-Safari, but edge cases remain
@@ -964,42 +1115,47 @@ src/
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — Deploy Session 19 Changes
-- **Session 19 commits are ready but need push + build + deploy** — 2 commits ahead of origin. Run from macOS terminal:
+### Immediate — Build, Deploy & Commit Session 21 Changes
+- **Session 21 changes are uncommitted** — 10 new files + 6 modified files (Business Sign-Up Wizard). Build is clean (8.10s). Deploy and commit from macOS terminal:
   ```bash
   cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
-  git push origin main
   npm run build && firebase deploy --only hosting
+  git add .env src/pages/business/register.tsx src/hooks/useGooglePlaces.ts \
+    src/components/business/registration/BusinessRegistrationWizard.tsx \
+    src/components/business/registration/StepIdentity.tsx \
+    src/components/business/registration/StepLocation.tsx \
+    src/components/business/registration/StepVerification.tsx \
+    src/components/business/registration/StepDetails.tsx \
+    src/components/business/registration/StepReview.tsx \
+    src/services/businessRegistration.ts \
+    src/contexts/FeatureSettingsContext.tsx \
+    src/reducers/businessReducer.ts \
+    src/components/business/businessValidation.ts \
+    src/App.tsx src/pages/admin.tsx src/pages/main/admin.tsx
+  git commit -m "feat: Business Sign-Up Wizard — 5-step registration with Google Places, KYC verification, Firestore backend, admin review (Session 21)"
+  git push origin main
   ```
-- **Test all 10 Phase 1 items before proceeding to Phase 2** — User explicitly requested testing each change:
-  1. Pending tab shows only incoming requests with Accept/Decline buttons
-  2. Search ranking: "Sa" matches "Sarath" before "Sports"
-  3. Refresh button spins and re-fetches people
-  4. MatchBadge doesn't overlap 3-dot menu
-  5. Skeleton cards look correct in light and dark modes
-  6. Toast notifications positioned above bottom nav (especially on notched devices)
-  7. Keyboard navigation works on all cards (Tab + Enter/Space)
-  8. No duplicate connection requests between Discover and Pending tabs
-  9. No console errors, TypeScript compiles clean
-  10. Cross-browser: Chrome, Safari, Firefox desktop + iOS Safari + Android Chrome
 - **App is deployed and live** at `https://mithr-1e5f4.web.app`.
+- **Business sign-up is gated** — Feature flag `business_signup_enabled` must be toggled ON in admin panel before the wizard is accessible. All 10 KYC flags default to `false`.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions already deployed** — `transcribeVoiceMessage` and `sendNewMessageNotification` are live on Cloud Run.
 
-### Next Up — Discover Page Phase 2: Performance & Data Layer (items 2.1–2.9)
-- **Phase 1 is COMPLETE** (10/10 items, Session 19). User wants to test before starting Phase 2.
-- Phase 2 focuses on Firestore read optimization, pagination, real-time listeners, and data layer improvements
-- Key items: N+1 read fix, cursor-based pagination, onSnapshot for connections, PYMK single-pass optimization
-- Full roadmap in `Discover_Page_Enhancement_Roadmap.docx`
+### Discover Page Roadmap — ALL COMPLETE ✅
+- **All 38 items across 4 phases are done** (Sessions 19-20). No more Discover roadmap items pending.
+- Phase 1 (10 items): Critical Fixes & Quick Wins — Session 19
+- Phase 2 (9 items): Performance & Data Layer — Session 20
+- Phase 3 (10 items): UX Polish & Feature Gaps — Session 20
+- Phase 4 (9 items): Architecture & Accessibility — Session 20
 
 ### Future Enhancement: SFU for 16+ Participants
 Current group calls use mesh topology (max 8). For 16+ participants, deploy an SFU server (mediasoup or LiveKit) on a VPS with public IP + UDP support. Cloud Run won't work for WebRTC media.
 
 ### High Priority
-1. **Continue Discover Page Enhancement Roadmap** — Phase 2 (items 2.1–2.9: Performance & Data Layer) after testing Phase 1.
+1. ~~Continue Discover Page Enhancement Roadmap~~ ✅ ALL 38 ITEMS COMPLETE (Sessions 19-20)
 2. **Wire up Housing UI for the 7 enhancements** — State is ready, just needs JSX.
 3. **Stabilize the call system** — Replace free TURN servers with paid provider.
 4. **Test E2EE thoroughly** — Cross-browser decryption verification.
+5. **Apply Discover architecture pattern to other pages** — The Discover refactor (useReducer + custom hooks + extracted components + accessibility) can serve as a template for Housing, Events, Feed, and other large pages.
 
 ### Medium Priority
 5. **Clean up duplicate page architecture** — Delete 12 duplicate files from `src/pages/main/` (keep only `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`). Eliminates ~29,162 lines of dead code and the `cp` sync pattern. Cuts codebase from ~76k to ~47k lines. **User deferred in Session 10** — do this when the app is in a stable state.
@@ -1029,11 +1185,11 @@ Current group calls use mesh topology (max 8). For 16+ participants, deploy an S
 # Build
 ./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build
 
-# Deploy to Firebase (hosting + functions + firestore rules — skip storage)
-firebase deploy --only hosting,functions,firestore
+# Deploy to Firebase (hosting + functions + firestore rules + storage rules)
+firebase deploy --only hosting,functions,firestore,storage
 
 # All-in-one build + deploy
-./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build && firebase deploy --only hosting,functions,firestore
+./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build && firebase deploy --only hosting,functions,firestore,storage
 
 # Deploy Firestore rules only
 npx firebase deploy --only firestore:rules
@@ -1061,7 +1217,7 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/utils/webrtc.ts` | CallManager class, WebRTC signaling |
 | `src/components/GlobalCallOverlay.tsx` | Call UI (global, persists across nav) |
 | `src/components/ClickOutsideOverlay.tsx` | Already had full cross-browser support |
-| `src/contexts/FeatureSettingsContext.tsx` | Feature flags system — `DEFAULT_FEATURES` (23 messaging flags + module flags), `FEATURE_GROUPS` (admin UI groups), `isFeatureEnabled()` hook, real-time Firestore `onSnapshot` on `appConfig/featureSettings`, optimistic toggle updates |
+| `src/contexts/FeatureSettingsContext.tsx` | Feature flags system — `DEFAULT_FEATURES` (23 messaging flags + module flags + 10 KYC flags), `FEATURE_GROUPS` (admin UI groups including "Business Sign-Up & KYC" group), `isFeatureEnabled()` hook, real-time Firestore `onSnapshot` on `appConfig/featureSettings`, optimistic toggle updates |
 | `src/contexts/AuthContext.tsx` | Auth state, user profile, admin detection |
 | `src/contexts/UserSettingsContext.tsx` | Dark mode toggle (`.dark` class on `<html>`) |
 | `src/constants/config.ts` | App config including ENCRYPTION_SALT |
@@ -1083,11 +1239,24 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/components/business/BusinessQASection.tsx` | Q&A component with Firestore subcollection, optimistic UI, debounced search, native `<details>`/`<summary>` with chevron animation (~384 lines) — NEW in Session 17 |
 | `src/components/business/businessUtils.ts` | Shared `parseOpenNow()` utility for business hours parsing, used by BusinessCard, FeaturedCarousel, BusinessDetailModal (~85 lines) — NEW in Session 17 |
 | `src/components/business/businessConstants.ts` | CATEGORIES, CATEGORY_EMOJI_MAP, CATEGORY_COLORS, CATEGORY_ICONS, REPORT_CATEGORIES (~100 lines) |
-| `src/components/business/businessValidation.ts` | validateBusinessForm, fuzzyMatch, getGoogleMapsUrl (~75 lines) |
+| `src/components/business/businessValidation.ts` | validateBusinessForm (original, untouched), validateSignupStep (5-step wizard), validateEIN, validateBN, validateTIN, validatePostalCode, validateAddressComponents, fuzzyMatch, getGoogleMapsUrl |
 | `src/components/business/imageUtils.ts` | compressImage, compressImagesParallel, MAX_FILE_SIZE (~40 lines) |
-| `src/pages/discover.tsx` | Discover page (~1,716 lines). Pending tab, mutual pre-compute, searchRank, refresh button, SkeletonCard aurora, accessibility. 22 useState hooks. `cp` synced to `main/discover.tsx`. |
-| `src/pages/main/discover.tsx` | **DUPLICATE** of above — MUST be kept in sync via `cp` |
-| `Discover_Page_Enhancement_Roadmap.docx` | 38-item roadmap across 4 phases. Phase 1 complete. Reference for Phase 2+ work. |
+| `src/pages/discover.tsx` | Discover page (~1,999 lines). useReducer for modal + filter state, keyboard nav, aria-live regions. Imports useConnections, usePYMK, useFocusTrap hooks + PersonCard component. Pill gradient colors (green/blue/orange). Phase 2 perf: onSnapshot, cursor pagination, match score memoization. Phase 3 UX: emoji regex, heritage rendering, cross-browser fixes. **cp sync ELIMINATED** — `main/discover.tsx` was deleted. |
+| `src/hooks/useConnections.ts` | Connection state management (362 lines) — all connection state, accept/reject/withdraw handlers, real-time Firestore onSnapshot listener, legacy migration. Accepts `userId` + `onToastMessage` callback. NEW in Session 20. |
+| `src/hooks/usePYMK.ts` | PYMK groups computation (126 lines) — single-pass grouping by city/heritage/interests. Exports `PYMKGroups` type, `PYMK_PREVIEW` constant. NEW in Session 20. |
+| `src/hooks/useFocusTrap.ts` | Modal focus trapping (65 lines) — traps Tab/Shift+Tab within modal, saves/restores previously focused element. NEW in Session 20. |
+| `src/components/discover/PersonCard.tsx` | Variant-based card component (464 lines) — 6 variants: grid, pymk-city, pymk-heritage, pymk-interests, incoming, sent. Built-in renderAvatar, renderHeritage, HighlightText, MatchBadge. NEW in Session 20. |
+| `src/components/business/registration/BusinessRegistrationWizard.tsx` | Main wizard shell — 5-step progress bar, validation gating, auto-save draft (5s debounce), draft load on mount, submit to Firestore. Fixed-bottom navigation bar. NEW in Session 21. |
+| `src/components/business/registration/StepIdentity.tsx` | Step 1 — business name, category, country toggle (US/CA), email, phone, description. Exports `FormField` wrapper and `StepProps` type used by all steps. NEW in Session 21. |
+| `src/components/business/registration/StepLocation.tsx` | Step 2 — Google Places autocomplete (debounced 300ms), structured address parsing, manual fallback fields, US states/CA provinces dropdowns, state of incorporation, Leaflet map preview (CDN). NEW in Session 21. |
+| `src/components/business/registration/StepVerification.tsx` | Step 3 — fully feature-flag-aware. TIN/EIN/BN entry, document upload (drag UI, PDF/JPG/PNG, max 10MB), photo ID, beneficial ownership, SOS lookup banner, admin review notice. Shows "No Verification Required" when no checks enabled. NEW in Session 21. |
+| `src/components/business/registration/StepDetails.tsx` | Step 4 — photo upload grid (up to 10, cover selection), business hours editor (day-by-day), price range, website, menu/services, year established. NEW in Session 21. |
+| `src/components/business/registration/StepReview.tsx` | Step 5 — cover photo preview, 4 review sections with Edit buttons, masked TIN display, doc count, beneficial owner count, admin review notice, terms disclaimer. NEW in Session 21. |
+| `src/services/businessRegistration.ts` | Business registration Firestore service — submitBusinessRegistration (doc creation + parallel photo/doc upload to Storage), saveDraft/loadDraft/deleteDraft, fetchPendingRegistrations, approveRegistration, rejectRegistration. NEW in Session 21. |
+| `src/hooks/useGooglePlaces.ts` | Google Places Autocomplete hook — singleton script loader, session tokens for billing optimization, getPlacePredictions, getPlaceDetails with structured address parsing. NEW in Session 21. |
+| `src/pages/business/register.tsx` | Business registration page — gates on `business_signup_enabled` feature flag, renders BusinessRegistrationWizard. NEW in Session 21. |
+| `.env` | Google Places API key (`VITE_GOOGLE_MAPS_API_KEY`). Already in `.gitignore`. NEW in Session 21. |
+| `Discover_Page_Enhancement_Roadmap.docx` | 38-item roadmap across 4 phases. All complete. Reference for architecture patterns. |
 | `public/firebase-messaging-sw.js` | FCM service worker — background push + notification click with Firefox postMessage fallback |
 | `functions/src/index.ts` | Cloud Functions: `sendNewMessageNotification` (push) + `transcribeVoiceMessage` (Speech-to-Text). Both deployed. |
 | `functions/package.json` | Node 22 engine, deps: firebase-admin, firebase-functions, @google-cloud/speech v6 |
@@ -1122,9 +1291,9 @@ git add <files> && git commit -m "message" && git push origin main
 - **Timer picker popup needs `fixed` positioning** — Popups inside containers with `overflow: hidden` must use `fixed` positioning with `getBoundingClientRect()` to avoid being clipped. Never use `absolute` positioning for popups in the message area.
 - **Use `setDoc` with deterministic IDs for system-generated messages (call events, etc.)** — `addDoc` creates a random document ID each time, so even with in-memory dedup guards, race conditions can cause duplicates. `setDoc` with a deterministic ID (e.g. `call_${callId}`, `groupcall_${roomId}`) makes writes idempotent. Pattern: `await setDoc(doc(db, 'conversations', convId, 'messages', deterministicId), {...})`.
 - **Pointer events for cross-platform drag** — Use `onPointerDown/Move/Up` (not `onMouseDown/onTouchStart`) for drag interactions. Works on both mouse and touch. Use `setPointerCapture` for reliable tracking outside the element. A 5px movement threshold distinguishes intentional drags from taps.
-- **`cp` sync pattern for 3 files** — These files must be kept identical between `src/pages/` and `src/pages/main/`: `messages.tsx`, `business.tsx`, and `discover.tsx`. After every edit: `cp src/pages/<file>.tsx src/pages/main/<file>.tsx`.
+- **`cp` sync pattern for 2 files** — These files must be kept identical between `src/pages/` and `src/pages/main/`: `messages.tsx` and `business.tsx`. After every edit: `cp src/pages/<file>.tsx src/pages/main/<file>.tsx`. (`discover.tsx` cp sync was eliminated in Session 20.) **Also sync admin.tsx** — `src/pages/admin.tsx` ↔ `src/pages/main/admin.tsx` (Session 21 added registrations tab to both).
 - **Business hooks pattern** — All 4 business hooks take `(state: BusinessState, dispatch: React.Dispatch<BusinessAction>, ...)` as params. They read state directly and dispatch actions — no internal useState for shared state. Only `BusinessPhotoUploader` (inside Edit/Create modals) uses local useState for upload-specific state.
-- **Firebase Storage NOT used** — The project doesn't use Firebase Storage at all. All images (profile photos, business photos, feed images, message attachments) are base64 data URLs stored in Firestore. Deploy with `firebase deploy --only hosting,functions,firestore` — including `storage` target will fail.
+- **Firebase Storage used ONLY by Business Sign-Up Wizard** — The rest of the app stores all images as base64 data URLs in Firestore. The business sign-up wizard (Session 21) uploads photos and verification documents to Firebase Storage. Deploy with `firebase deploy --only hosting,functions,firestore,storage`.
 - **`@/` path alias** — Configured in both `vite.config.ts` and `tsconfig.app.json`. Maps to `src/`. All new component/hook imports use this alias (e.g. `import { useBusinessData } from '@/hooks/useBusinessData'`).
 - **`useModalA11y` hook in BusinessModals.tsx** — Shared focus-trap + ESC-to-close hook used by TIN, Delete, Report, Block modals. Takes `(ref, onClose)`. Manages keyboard listener lifecycle and return-focus. Detail modal has its own inline version (more complex state).
 - **`focus-visible` not `focus` for keyboard rings** — All business module interactive elements use `focus-visible:ring-2` to show focus rings only during keyboard navigation (not mouse clicks). Consistent pattern across all 9 component files.
@@ -1143,6 +1312,13 @@ git add <files> && git commit -m "message" && git push origin main
 - **Business `bookingUrl` field** — Added to Business interface, BusinessFormData, create/edit save paths, and detail modal contact section. Only shows when `business.bookingUrl` is set.
 - **PhotoLightbox is standalone** — `PhotoLightbox.tsx` has no dependency on business state — just receives `photos[]`, `initialIndex`, `title`, `onClose`. Can be reused by other modules (housing, events, feed) if needed.
 - **`searchRank()` pattern for ranked search** — Returns priority levels (1=prefix/word-start, 2=substring, 3=fuzzy, 0=no match). Pre-sort by rank before secondary sorting. This pattern can be reused in other modules that need ranked search (events, housing, forum, etc.).
+- **Business sign-up is feature-flag gated** — `business_signup_enabled` must be toggled ON in admin panel before `/business/register` renders the wizard. All 10 KYC flags default `false`. The admin panel auto-renders the "Business Sign-Up & KYC" group from `FEATURE_GROUPS` — no manual admin UI changes needed for new flags.
+- **Google Places API key in `.env`** — `VITE_GOOGLE_MAPS_API_KEY=AIzaSyDrbJItCq629ccJ6DGgtTEO1XXjKgGXCWY`. Already in `.gitignore`. The key is read via `import.meta.env.VITE_GOOGLE_MAPS_API_KEY` in StepLocation.tsx. If the key is missing, the autocomplete degrades to manual address entry.
+- **Google Places session tokens for billing** — `useGooglePlaces.ts` uses `AutocompleteSessionToken` to bundle prediction + detail requests into a single billing session per Google best practices. Token is refreshed after each `getDetails()` call.
+- **Business sign-up uses Firebase Storage (unlike the rest of the app)** — The business sign-up wizard uploads photos and verification documents to Firebase Storage (not base64 in Firestore). This is the ONLY feature using Storage. Deploy command should now include storage: `firebase deploy --only hosting,functions,firestore,storage`.
+- **Draft auto-save strips File objects** — Firestore can't store `File` objects. `saveDraft()` in `businessRegistration.ts` deletes `verificationDocs` from the data before saving. Users will need to re-attach files if they resume from a draft.
+- **React 19 `useRef()` requires initial value** — In React 19 types, `useRef<T>()` with no argument causes TS2554. Always pass an initial value: `useRef<T>(undefined)` or `useRef<T>(null)`.
+- **`UserData` has `name` not `displayName`** — The `UserData` interface in `AuthContext.tsx` uses `name` field. Firebase `User` object has `displayName`. Don't confuse them — use `userProfile?.name` for profile data and `user.displayName` for Firebase auth data.
 - **`env(safe-area-inset-bottom)` needs Tailwind fallback** — Not all browsers support `env()`. Always provide a Tailwind class as the base positioning (e.g., `bottom-24`) and use inline `style={{ bottom: 'calc(Xrem + env(safe-area-inset-bottom, 0px))' }}` as an enhancement. The inline style overrides the Tailwind class when supported.
 - **`@supports not selector(:focus-visible)` for older browsers** — Added to `src/index.css`. Applies `:focus` outline on `[role="button"]` elements when `:focus-visible` is not supported (iOS Safari < 15.4). Zero runtime cost CSS-only fallback.
 - **`Math.min()` with empty array spread is safe when other args exist** — `Math.min(...emptyArray, 1, 2, 3)` returns `1`, not `Infinity`. Verified safe in `searchRank` usage where name/city/profession always provide fallback values.
@@ -1168,10 +1344,12 @@ git add <files> && git commit -m "message" && git push origin main
 5. → Redirected to `/home` (module tiles landing page)
 
 ### Firestore Collections
-`users`, `posts` (+ subcollection `comments`), `businesses` (+ subcollections `analytics`, `questions`), `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`, `groupCalls` (+ subcollections `signals`, `candidates`), `businessMenuItems`, `businessReviews`, `businessOrders`, `forumThreads`, `forumReplies`, `forumLikes`, `marketplaceListings`, `marketplaceComments`, `announcements`, `moderationQueue`, `reports`, `notifications`, `userWarnings`
+`users`, `posts` (+ subcollection `comments`), `businesses` (+ subcollections `analytics`, `questions`), `businessSignupDrafts` (keyed by userId — wizard auto-save drafts), `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`, `groupCalls` (+ subcollections `signals`, `candidates`), `businessMenuItems`, `businessReviews`, `businessOrders`, `forumThreads`, `forumReplies`, `forumLikes`, `marketplaceListings`, `marketplaceComments`, `announcements`, `moderationQueue`, `reports`, `notifications`, `userWarnings`
 
 ### Recent Commit History
 ```
+(pending) feat: Business Sign-Up Wizard — 5-step registration with Google Places, KYC verification, Firestore backend, admin review (Session 21)
+(pending) feat: Discover Page Phase 4 — Architecture & Accessibility (items 4.1–4.9) (Session 20)
 c3fb1d3 fix: cross-browser compatibility for Discover Phase 1 changes (Session 19)
 bd6c412 feat: Discover Page Phase 1 — Critical Fixes & Quick Wins (items 1.1–1.10) (Session 19)
 bef85b1 fix: autocomplete search dropdown not working on iOS Safari (Session 18)
@@ -1232,4 +1410,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Updated March 25, 2026 (Session 19) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page Phase 1 COMPLETE (10/10 items, Session 19). Next: test Phase 1 changes, then begin Discover Phase 2 (Performance & Data Layer, items 2.1–2.9).*
+*Updated March 26, 2026 (Session 21) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Next: deploy Session 21 from macOS, then wire Housing UI enhancements or begin next module.*

@@ -29,6 +29,7 @@ const ProfilePage = lazy(() => import('./pages/profile'));
 const AdminPage = lazy(() => import('./pages/admin'));
 const MarketplacePage = lazy(() => import('./pages/marketplace'));
 const SettingsPage = lazy(() => import('./pages/settings'));
+const BusinessRegisterPage = lazy(() => import('./pages/business/register'));
 const HomePage = lazy(() => import('./pages/main/home'));
 
 // Loading spinner component
@@ -94,6 +95,7 @@ function App() {
                     <Route path="/profile" element={<Suspense fallback={<LoadingSpinner />}><ProfilePage /></Suspense>} />
                     <Route path="/admin" element={<Suspense fallback={<LoadingSpinner />}><AdminPage /></Suspense>} />
                     <Route path="/settings" element={<Suspense fallback={<LoadingSpinner />}><SettingsPage /></Suspense>} />
+                    <Route path="/business/register" element={<Suspense fallback={<LoadingSpinner />}><BusinessRegisterPage /></Suspense>} />
                   </Route>
                 </Route>
 

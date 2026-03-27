@@ -131,6 +131,19 @@ export const DEFAULT_FEATURES: Record<string, boolean> = {
   forum_flairs: true,
   forum_reporting: true,
 
+  // Business Sign-Up & KYC Verification
+  // All default to false — zero impact on existing flows until admin enables them
+  business_signup_enabled: false,
+  business_tin_required: false,
+  business_tin_validation: false,
+  business_doc_upload_required: false,
+  business_doc_upload_count: false,
+  business_sos_lookup: false,
+  business_photo_id_required: false,
+  business_beneficial_ownership: false,
+  business_identity_verification: false,
+  business_admin_review_required: false,
+
   // Authentication & Verification
   auth_emailVerification: false,
   auth_phoneOTP: false,
@@ -222,6 +235,23 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { key: 'business_contactInfo', name: 'Contact Info', description: 'Display phone, email, and website on listings' },
       { key: 'business_merchantView', name: 'Merchant Dashboard', description: 'Enable merchant view for business owners' },
       { key: 'business_photos', name: 'Business Photos', description: 'Allow photo uploads on business listings' },
+    ],
+  },
+  {
+    id: 'business_signup',
+    title: 'Business Sign-Up & KYC',
+    icon: '📋',
+    features: [
+      { key: 'business_signup_enabled', name: 'Business Sign-Up', description: 'Enable the multi-step business registration wizard' },
+      { key: 'business_tin_required', name: 'TIN / EIN / BN Required', description: 'Require Tax ID Number (US EIN or Canada BN) during registration' },
+      { key: 'business_tin_validation', name: 'TIN Server Validation', description: 'Validate TIN/EIN/BN against IRS or CRA databases' },
+      { key: 'business_doc_upload_required', name: 'Document Upload Required', description: 'Require upload of business registration documents' },
+      { key: 'business_doc_upload_count', name: 'Require 2+ Documents', description: 'Require at least two verification documents instead of one' },
+      { key: 'business_sos_lookup', name: 'SOS / Registry Lookup', description: 'Verify against Secretary of State or Provincial Registry' },
+      { key: 'business_photo_id_required', name: 'Government Photo ID', description: 'Require government-issued photo ID for owner verification' },
+      { key: 'business_beneficial_ownership', name: 'Beneficial Ownership', description: 'Require disclosure of beneficial owners (25%+ stake)' },
+      { key: 'business_identity_verification', name: 'Identity Verification', description: 'Use Stripe Identity / Persona for real-time ID verification' },
+      { key: 'business_admin_review_required', name: 'Admin Review Required', description: 'Require admin approval before business listing goes live' },
     ],
   },
   {

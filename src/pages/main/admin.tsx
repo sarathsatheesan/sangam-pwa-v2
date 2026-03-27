@@ -62,7 +62,14 @@ import {
   Filter,
   AlertOctagon,
   MessageCircle,
+  FileText,
 } from 'lucide-react';
+import {
+  fetchPendingRegistrations,
+  approveRegistration,
+  rejectRegistration,
+  type PendingBusiness,
+} from '@/services/businessRegistration';
 
 // ─── Interfaces ──────────────────────────────────────────
 interface Listing {
@@ -291,6 +298,12 @@ export default function AdminPage() {
   const [selectedSection, setSelectedSection] = useState<string>('dashboard');
   const [loading, setLoading] = useState(false);
 
+  // ─── Business Registrations state ──────────────────────────────
+  const [pendingRegistrations, setPendingRegistrations] = useState<PendingBusiness[]>([]);
+  const [registrationsLoading, setRegistrationsLoading] = useState(false);
+  const [rejectModalId, setRejectModalId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+
   // ─── Users state ───────────────────────────────
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [bannedUserIds, setBannedUserIds] = useState<string[]>([]);
@@ -368,6 +381,17 @@ export default function AdminPage() {
   useEffect(() => {
     if (selectedSection === 'dashboard' && isAdmin) {
       loadDashboardData();
+    }
+  }, [selectedSection, isAdmin]);
+
+  // ─── Load pending registrations ─────────────────
+  useEffect(() => {
+    if (selectedSection === 'registrations' && isAdmin) {
+      setRegistrationsLoading(true);
+      fetchPendingRegistrations()
+        .then(setPendingRegistrations)
+        .catch((err) => console.error('Failed to load registrations:', err))
+        .finally(() => setRegistrationsLoading(false));
     }
   }, [selectedSection, isAdmin]);
 
@@ -1302,6 +1326,7 @@ export default function AdminPage() {
     { id: 'users', label: 'Users', icon: Users },
     { id: 'listings', label: 'Listings', icon: ClipboardList },
     { id: 'events', label: 'Events', icon: Calendar },
+    { id: 'registrations', label: 'Registrations', icon: FileText },
     { id: 'features', label: 'Features', icon: Settings },
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
     { id: 'moderation', label: 'Moderation', icon: Flag },
@@ -1929,6 +1954,145 @@ export default function AdminPage() {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ══════════ REGISTRATIONS ══════════ */}
+            {selectedSection === 'registrations' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Business Registrations</h2>
+                  <p className="text-sm text-[var(--aurora-text-secondary)]">Review and approve pending business sign-up applications</p>
+                </div>
+
+                {registrationsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="w-8 h-8 border-3 border-[var(--aurora-border)] border-t-[var(--aurora-accent)] rounded-full animate-spin" />
+                  </div>
+                ) : pendingRegistrations.length === 0 ? (
+                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-8 text-center">
+                    <div className="text-4xl mb-3">📋</div>
+                    <h3 className="font-bold text-[var(--aurora-text)] mb-1">No Pending Registrations</h3>
+                    <p className="text-sm text-[var(--aurora-text-secondary)]">
+                      All business registrations have been reviewed. New applications will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingRegistrations.map((biz) => (
+                      <div
+                        key={biz.id}
+                        className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-5"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h3 className="font-bold text-[var(--aurora-text)]">{biz.name}</h3>
+                            <p className="text-xs text-[var(--aurora-text-secondary)]">
+                              {biz.category} &middot; {biz.country === 'CA' ? '🇨🇦' : '🇺🇸'} &middot; {biz.ownerName}
+                            </p>
+                          </div>
+                          <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">
+                            Pending
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                          <div>
+                            <span className="text-[var(--aurora-text-secondary)]">Email: </span>
+                            <span className="text-[var(--aurora-text)]">{biz.email}</span>
+                          </div>
+                          <div>
+                            <span className="text-[var(--aurora-text-secondary)]">Phone: </span>
+                            <span className="text-[var(--aurora-text)]">{biz.phone}</span>
+                          </div>
+                          {biz.tin && (
+                            <div>
+                              <span className="text-[var(--aurora-text-secondary)]">TIN: </span>
+                              <span className="text-[var(--aurora-text)] font-mono">
+                                {biz.tin.slice(0, 2)}{'•'.repeat(Math.max(0, biz.tin.length - 4))}{biz.tin.slice(-2)}
+                              </span>
+                            </div>
+                          )}
+                          {biz.verificationDocs && biz.verificationDocs.length > 0 && (
+                            <div>
+                              <span className="text-[var(--aurora-text-secondary)]">Docs: </span>
+                              <span className="text-[var(--aurora-text)]">{biz.verificationDocs.length} uploaded</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Verification docs links */}
+                        {biz.verificationDocs && biz.verificationDocs.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {biz.verificationDocs.map((vdoc: any, i: number) => (
+                              <a
+                                key={i}
+                                href={vdoc.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] px-2 py-1 rounded-lg bg-[var(--aurora-surface-alt)] text-[var(--aurora-accent)] font-medium hover:underline"
+                              >
+                                📄 {vdoc.name || `Document ${i + 1}`}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={async () => {
+                              await approveRegistration(biz.id);
+                              setPendingRegistrations((prev) => prev.filter((b) => b.id !== biz.id));
+                              setToastMessage(`${biz.name} approved!`);
+                            }}
+                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-green-500 hover:bg-green-600 transition-colors"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => { setRejectModalId(biz.id); setRejectReason(''); }}
+                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"
+                          >
+                            Reject
+                          </button>
+                        </div>
+
+                        {/* Reject reason modal (inline) */}
+                        {rejectModalId === biz.id && (
+                          <div className="mt-3 p-3 rounded-xl border border-red-200 bg-red-50">
+                            <textarea
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                              placeholder="Reason for rejection (visible to applicant)..."
+                              className="w-full px-3 py-2 text-sm rounded-lg border border-red-200 outline-none resize-none mb-2"
+                              rows={2}
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  await rejectRegistration(biz.id, rejectReason);
+                                  setPendingRegistrations((prev) => prev.filter((b) => b.id !== biz.id));
+                                  setRejectModalId(null);
+                                  setToastMessage(`${biz.name} rejected.`);
+                                }}
+                                disabled={!rejectReason.trim()}
+                                className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-red-500 disabled:opacity-40"
+                              >
+                                Confirm Reject
+                              </button>
+                              <button
+                                onClick={() => setRejectModalId(null)}
+                                className="flex-1 py-2 rounded-lg text-xs font-semibold border border-gray-300"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

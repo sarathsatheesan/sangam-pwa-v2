@@ -56,6 +56,40 @@ export interface Business {
   followerCount?: number;
   // Booking (#36)
   bookingUrl?: string;
+  // ── Business Sign-Up / KYC fields (Phase 1) ──
+  country?: 'US' | 'CA';
+  placeId?: string;
+  addressComponents?: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+  tin?: string;
+  tinType?: 'EIN' | 'BN';
+  tinVerified?: boolean;
+  stateOfIncorp?: string;
+  verificationDocs?: {
+    url: string;
+    name: string;
+    type: string;
+    uploadedAt: any;
+  }[];
+  kycStatus?: 'pending' | 'in_review' | 'approved' | 'rejected';
+  kycRejectionReason?: string;
+  beneficialOwners?: {
+    name: string;
+    title: string;
+    ownershipPct: number;
+    dob?: string;
+  }[];
+  registrationStatus?: 'draft' | 'submitted' | 'approved' | 'rejected';
+  signupDraft?: {
+    currentStep: number;
+    lastSavedAt: any;
+    completedSteps: number[];
+  };
 }
 
 export interface Deal {
@@ -119,6 +153,37 @@ export interface BusinessFormData {
   latitude: number | '';
   longitude: number | '';
   bookingUrl: string;
+  // ── Sign-up wizard fields (optional — unused by existing create modal) ──
+  country?: 'US' | 'CA' | '';
+  placeId?: string;
+  addressComponents?: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+  tin?: string;
+  tinType?: 'EIN' | 'BN' | '';
+  stateOfIncorp?: string;
+  verificationDocs?: File[];
+  beneficialOwners?: {
+    name: string;
+    title: string;
+    ownershipPct: number;
+    dob?: string;
+  }[];
+}
+
+// ── Sign-up wizard draft (auto-save to Firestore) ──
+
+export interface BusinessSignupDraft {
+  currentStep: number;
+  completedSteps: number[];
+  formData: Partial<BusinessFormData>;
+  photos: string[];
+  lastSavedAt: any;
+  userId: string;
 }
 
 // ── State shape ──
