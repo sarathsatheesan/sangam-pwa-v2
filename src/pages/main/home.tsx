@@ -4,7 +4,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   Home, Users, Briefcase, Building2, ShoppingBag, Calendar,
-  Plane, MessageSquare, Mail, UserCircle, Shield,
+  Plane, MessageSquare, Mail, UserCircle, Shield, ChefHat,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
@@ -25,6 +25,7 @@ const tiles: ModuleTile[] = [
   { path: '/discover', label: 'Discover', desc: 'Find & connect with people', icon: <Users size={22} />, emoji: '👥', gradient: 'from-violet-500 to-purple-500', feature: 'modules_discover' },
   { path: '/business', label: 'Business', desc: 'Local business directory', icon: <Briefcase size={22} />, emoji: '💼', gradient: 'from-emerald-500 to-teal-500', feature: 'modules_business' },
   { path: '/housing', label: 'Housing', desc: 'Rentals & roommates', icon: <Building2 size={22} />, emoji: '🏢', gradient: 'from-amber-500 to-orange-500', feature: 'modules_housing' },
+  { path: '/catering', label: 'Catering', desc: 'Order catering & menus', icon: <ChefHat size={22} />, emoji: '🍽️', gradient: 'from-orange-500 to-red-500', feature: 'modules_catering' },
   { path: '/marketplace', label: 'Marketplace', desc: 'Buy & sell items', icon: <ShoppingBag size={22} />, emoji: '🛍️', gradient: 'from-pink-500 to-rose-500', feature: 'modules_marketplace' },
   { path: '/events', label: 'Events', desc: 'Community events', icon: <Calendar size={22} />, emoji: '📅', gradient: 'from-cyan-500 to-blue-500', feature: 'modules_events' },
   { path: '/travel', label: 'Travel', desc: 'Travel groups & tips', icon: <Plane size={22} />, emoji: '✈️', gradient: 'from-indigo-500 to-violet-500', feature: 'modules_travel' },
@@ -39,6 +40,7 @@ const gradientColors: Record<string, string> = {
   'from-violet-500 to-purple-500': '#8B5CF6, #A855F7',
   'from-emerald-500 to-teal-500': '#10B981, #14B8A6',
   'from-amber-500 to-orange-500': '#F59E0B, #F97316',
+  'from-orange-500 to-red-500': '#F97316, #EF4444',
   'from-pink-500 to-rose-500': '#EC4899, #F43F5E',
   'from-cyan-500 to-blue-500': '#06B6D4, #3B82F6',
   'from-indigo-500 to-violet-500': '#6366F1, #8B5CF6',

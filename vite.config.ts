@@ -81,6 +81,8 @@ export default defineConfig({
     },
   },
   build: {
+    // Explicit browser targets for cross-browser compatibility
+    target: ['es2020', 'chrome87', 'firefox78', 'safari14', 'edge88'],
     rollupOptions: {
       output: {
         manualChunks: {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { copyToClipboard } from '@/utils/clipboard';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
   collection, query, where, orderBy, getDocs, getDoc, addDoc, deleteDoc,
@@ -1251,7 +1252,7 @@ export default function EventsPage() {
       try { await navigator.share({ title: event.title, text }); } catch { /* cancelled */ }
     } else {
       try {
-        await navigator.clipboard.writeText(text);
+        await copyToClipboard(text);
         setToastMessage('Event details copied to clipboard!');
       } catch (error) {
         console.error('Failed to copy to clipboard:', error);

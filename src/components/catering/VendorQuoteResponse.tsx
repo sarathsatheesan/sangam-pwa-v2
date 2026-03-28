@@ -1,0 +1,574 @@
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  Package, Clock, Users, MapPin, Send, Loader2,
+  ChevronDown, ChevronUp, ShieldCheck, Plus, Trash2, DollarSign,
+  Bell, CheckCircle2, XCircle, Check,
+} from 'lucide-react';
+import type { CateringQuoteRequest, CateringQuoteResponse, QuotedItem } from '@/services/cateringService';
+import {
+  fetchQuoteRequestsForBusiness,
+  subscribeToBusinessQuoteResponses,
+  createQuoteResponse,
+  formatPrice,
+} from '@/services/cateringService';
+import { useToast } from '@/contexts/ToastContext';
+
+interface VendorQuoteResponseProps {
+  businessId: string;
+  businessName: string;
+  businessHeritage?: string;
+  businessRating?: number;
+}
+
+export default function VendorQuoteResponse({
+  businessId,
+  businessName,
+  businessHeritage,
+  businessRating,
+}: VendorQuoteResponseProps) {
+  const { addToast } = useToast();
+  const [requests, setRequests] = useState<CateringQuoteRequest[]>([]);
+  const [myResponses, setMyResponses] = useState<CateringQuoteResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+
+  // Track previous response statuses to detect real-time changes
+  const prevResponseStatusRef = useRef<Record<string, string>>({});
+
+  // Quote form state per request
+  const [quoteForms, setQuoteForms] = useState<Record<string, {
+    items: QuotedItem[];
+    serviceFee: number;
+    deliveryFee: number;
+    estimatedPrepTime: string;
+    message: string;
+  }>>({});
+
+  // ── Load open quote requests (one-time) ──
+  useEffect(() => {
+    setLoading(true);
+    fetchQuoteRequestsForBusiness(businessId)
+      .then((reqs) => setRequests(reqs))
+      .catch((err) => console.error('Failed to load quote requests:', err))
+      .finally(() => setLoading(false));
+  }, [businessId]);
+
+  // ── Real-time subscription for vendor's own quote responses ──
+  useEffect(() => {
+    const unsub = subscribeToBusinessQuoteResponses(businessId, (responses) => {
+      // Detect status changes for notifications
+      const prevStatuses = prevResponseStatusRef.current;
+      for (const resp of responses) {
+        const prev = prevStatuses[resp.id];
+        if (prev && prev !== resp.status) {
+          // Status changed — notify vendor
+          if (resp.status === 'accepted') {
+            addToast(
+              `Your quote was accepted! Customer ${resp.customerName || ''} has shared their contact details.`,
+              'success',
+              8000,
+            );
+          } else if (resp.status === 'partially_accepted') {
+            const itemCount = resp.acceptedItemNames?.length || 0;
+            addToast(
+              `${itemCount} item${itemCount > 1 ? 's' : ''} accepted from your quote! Customer contact details shared.`,
+              'success',
+              8000,
+            );
+          } else if (resp.status === 'declined') {
+            addToast('A customer has declined your quote.', 'info', 5000);
+          }
+        }
+      }
+
+      // Update previous statuses
+      const newStatuses: Record<string, string> = {};
+      for (const resp of responses) {
+        newStatuses[resp.id] = resp.status;
+      }
+      prevResponseStatusRef.current = newStatuses;
+
+      setMyResponses(responses);
+    });
+    return unsub;
+  }, [businessId, addToast]);
+
+  const getFormForRequest = (requestId: string, request: CateringQuoteRequest) => {
+    if (!quoteForms[requestId]) {
+      const items: QuotedItem[] = request.items.map((ri) => ({
+        name: ri.name,
+        qty: ri.qty,
+        unitPrice: 0,
+        pricingType: ri.pricingType,
+      }));
+      setQuoteForms((prev) => ({
+        ...prev,
+        [requestId]: {
+          items,
+          serviceFee: 0,
+          deliveryFee: 0,
+          estimatedPrepTime: '',
+          message: '',
+        },
+      }));
+      return { items, serviceFee: 0, deliveryFee: 0, estimatedPrepTime: '', message: '' };
+    }
+    return quoteForms[requestId];
+  };
+
+  const updateQuoteForm = (requestId: string, updates: Partial<typeof quoteForms[string]>) => {
+    setQuoteForms((prev) => ({
+      ...prev,
+      [requestId]: { ...prev[requestId], ...updates },
+    }));
+  };
+
+  const updateQuoteItem = (requestId: string, index: number, updates: Partial<QuotedItem>) => {
+    setQuoteForms((prev) => {
+      const form = prev[requestId];
+      if (!form) return prev;
+      const items = [...form.items];
+      items[index] = { ...items[index], ...updates };
+      return { ...prev, [requestId]: { ...form, items } };
+    });
+  };
+
+  const handleSubmitQuote = async (request: CateringQuoteRequest) => {
+    const form = quoteForms[request.id];
+    if (!form) return;
+
+    const subtotal = form.items.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+    if (subtotal === 0) {
+      addToast('Please enter prices for at least one item', 'error');
+      return;
+    }
+
+    const total = subtotal + (form.serviceFee || 0) + (form.deliveryFee || 0);
+
+    setSubmittingId(request.id);
+    try {
+      await createQuoteResponse({
+        quoteRequestId: request.id,
+        businessId,
+        businessName,
+        businessRating,
+        businessHeritage,
+        quotedItems: form.items.filter((i) => i.unitPrice > 0),
+        subtotal,
+        serviceFee: form.serviceFee || undefined,
+        deliveryFee: form.deliveryFee || undefined,
+        total,
+        estimatedPrepTime: form.estimatedPrepTime || undefined,
+        message: form.message || undefined,
+        status: 'submitted',
+      });
+      addToast('Quote submitted successfully!', 'success');
+      // Reload requests to update the open/responded lists
+      fetchQuoteRequestsForBusiness(businessId).then(setRequests).catch(() => {});
+    } catch (err: any) {
+      addToast(err.message || 'Failed to submit quote', 'error');
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const hasRespondedTo = (requestId: string) =>
+    myResponses.some((r) => r.quoteRequestId === requestId);
+
+  // Filter out requests already responded to
+  const openRequests = requests.filter((r) => !hasRespondedTo(r.id));
+  const respondedRequests = requests.filter((r) => hasRespondedTo(r.id));
+
+  // Separate accepted responses for prominent display
+  const acceptedResponses = myResponses.filter((r) => r.status === 'accepted' || r.status === 'partially_accepted');
+  const pendingResponses = myResponses.filter((r) => r.status === 'submitted');
+  const declinedResponses = myResponses.filter((r) => r.status === 'declined');
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+        <span className="ml-2 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>Loading quote requests...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Privacy notice */}
+      <div
+        className="flex items-start gap-3 p-3 rounded-xl"
+        style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)' }}
+      >
+        <ShieldCheck size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+        <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+          Customer details are hidden until they accept your quote. You'll be notified in real-time when a customer accepts.
+        </p>
+      </div>
+
+      {/* ══ Accepted quotes — prominent section ══ */}
+      {acceptedResponses.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: '#059669' }}>
+            <CheckCircle2 size={16} />
+            Accepted ({acceptedResponses.length})
+          </h3>
+          <div className="space-y-3">
+            {acceptedResponses.map((response) => {
+              const request = requests.find((r) => r.id === response.quoteRequestId);
+              const isPartial = response.status === 'partially_accepted';
+
+              return (
+                <div
+                  key={response.id}
+                  className="p-4 rounded-2xl border-2"
+                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: '#059669' }}
+                >
+                  {/* Status badge */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
+                    >
+                      <CheckCircle2 size={12} />
+                      {isPartial ? 'Partially Accepted' : 'Accepted'}
+                    </span>
+                    <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
+                      {formatPrice(response.total)}
+                    </span>
+                  </div>
+
+                  {/* Request details */}
+                  {request && (
+                    <div className="flex items-center gap-3 text-xs mb-3" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      <span>{request.cuisineCategory}</span>
+                      <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
+                      <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
+                    </div>
+                  )}
+
+                  {/* Accepted items */}
+                  {response.acceptedItemNames && response.acceptedItemNames.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        Accepted Items
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {response.acceptedItemNames.map((name) => (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                            style={{ backgroundColor: 'rgba(5, 150, 105, 0.1)', color: '#059669' }}
+                          >
+                            <Check size={10} />
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Customer contact details — the key info vendors need */}
+                  {response.customerName && (
+                    <div
+                      className="p-3 rounded-xl"
+                      style={{ backgroundColor: '#D1FAE5' }}
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#059669' }}>
+                        Customer Contact
+                      </p>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium" style={{ color: '#065F46' }}>
+                          {response.customerName}
+                        </p>
+                        {response.customerPhone && (
+                          <p className="text-xs" style={{ color: '#065F46' }}>
+                            Phone: {response.customerPhone}
+                          </p>
+                        )}
+                        {response.customerEmail && (
+                          <p className="text-xs" style={{ color: '#065F46' }}>
+                            Email: {response.customerEmail}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══ Open requests (not yet responded to) ══ */}
+      <div>
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--aurora-text)' }}>
+          Open Requests ({openRequests.length})
+        </h3>
+
+        {openRequests.length === 0 ? (
+          <div className="text-center py-8">
+            <Package size={32} className="mx-auto mb-2 opacity-20" />
+            <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>No open quote requests right now</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {openRequests.map((request) => {
+              const isExpanded = expandedId === request.id;
+              const form = getFormForRequest(request.id, request);
+              const formSubtotal = form.items.reduce((s, i) => s + i.unitPrice * i.qty, 0);
+              const formTotal = formSubtotal + (form.serviceFee || 0) + (form.deliveryFee || 0);
+
+              return (
+                <div
+                  key={request.id}
+                  className="rounded-2xl border overflow-hidden"
+                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
+                >
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : request.id)}
+                    className="w-full flex items-center justify-between p-4 text-left"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                          {request.cuisineCategory} Catering
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: '#D1FAE5', color: '#059669' }}>
+                          {request.status === 'partially_accepted' ? 'Partial' : 'Open'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
+                        <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} />
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString() : request.eventDate}
+                        </span>
+                      </div>
+                    </div>
+                    {isExpanded ? <ChevronUp size={18} className="opacity-40" /> : <ChevronDown size={18} className="opacity-40" />}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="px-4 pb-4 space-y-4 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                      {/* Requested items */}
+                      <div className="pt-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                          Requested Items
+                        </p>
+                        {request.items.map((ri, i) => {
+                          // Show if this item is already assigned to another vendor
+                          const assignment = (request.itemAssignments || []).find((a) => a.itemName === ri.name);
+                          return (
+                            <div key={i} className="flex items-center gap-3 text-sm mb-1" style={{ color: 'var(--aurora-text)', opacity: assignment ? 0.5 : 1 }}>
+                              <span>
+                                {assignment ? <CheckCircle2 size={12} className="inline mr-1" style={{ color: '#059669' }} /> : ''}
+                                {ri.name} (qty: {ri.qty}, {ri.pricingType.replace('_', ' ')})
+                              </span>
+                              {ri.dietaryTags && ri.dietaryTags.length > 0 && (
+                                <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#D1FAE520', color: '#059669' }}>
+                                  {ri.dietaryTags.join(', ')}
+                                </span>
+                              )}
+                              {assignment && (
+                                <span className="text-[9px] ml-auto px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#D1FAE5', color: '#059669' }}>
+                                  Assigned to {assignment.businessName}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {request.specialInstructions && (
+                          <p className="text-xs mt-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
+                            Note: {request.specialInstructions}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Quote form */}
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6366F1' }}>
+                          Your Quote
+                        </p>
+                        {form.items.map((qi, idx) => (
+                          <div key={idx} className="flex items-center gap-3">
+                            <span className="flex-1 text-sm" style={{ color: 'var(--aurora-text)' }}>
+                              {qi.name} x {qi.qty}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <DollarSign size={14} style={{ color: 'var(--aurora-text-secondary)' }} />
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={qi.unitPrice ? (qi.unitPrice / 100).toFixed(2) : ''}
+                                onChange={(e) => {
+                                  const cents = Math.round(parseFloat(e.target.value || '0') * 100);
+                                  updateQuoteItem(request.id, idx, { unitPrice: cents });
+                                }}
+                                placeholder="0.00"
+                                className="w-24 rounded-lg border px-2 py-1.5 text-sm text-right outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                              />
+                              <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>/unit</span>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Fees */}
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                          <div>
+                            <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Service fee ($)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={form.serviceFee ? (form.serviceFee / 100).toFixed(2) : ''}
+                              onChange={(e) => updateQuoteForm(request.id, { serviceFee: Math.round(parseFloat(e.target.value || '0') * 100) })}
+                              placeholder="0.00"
+                              className="w-full rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 mt-1"
+                              style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Delivery fee ($)</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={form.deliveryFee ? (form.deliveryFee / 100).toFixed(2) : ''}
+                              onChange={(e) => updateQuoteForm(request.id, { deliveryFee: Math.round(parseFloat(e.target.value || '0') * 100) })}
+                              placeholder="0.00"
+                              className="w-full rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 mt-1"
+                              style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Prep time & message */}
+                        <input
+                          type="text"
+                          value={form.estimatedPrepTime}
+                          onChange={(e) => updateQuoteForm(request.id, { estimatedPrepTime: e.target.value })}
+                          placeholder="Estimated prep time (e.g. 2-3 hours)"
+                          className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                        />
+                        <textarea
+                          value={form.message}
+                          onChange={(e) => updateQuoteForm(request.id, { message: e.target.value })}
+                          placeholder="Personal message to the customer (optional)"
+                          rows={2}
+                          className="w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none focus:ring-2 focus:ring-indigo-500/30"
+                          style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                        />
+
+                        {/* Total preview */}
+                        <div className="flex justify-between items-center p-3 rounded-xl" style={{ backgroundColor: 'var(--aurora-bg)' }}>
+                          <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Quote Total</span>
+                          <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
+                            {formTotal > 0 ? formatPrice(formTotal) : '$0.00'}
+                          </span>
+                        </div>
+
+                        {/* Submit */}
+                        <button
+                          onClick={() => handleSubmitQuote(request)}
+                          disabled={submittingId === request.id || formSubtotal === 0}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
+                          style={{ backgroundColor: '#6366F1' }}
+                        >
+                          {submittingId === request.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Send size={16} />
+                          )}
+                          Submit Quote
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ══ Pending quotes (submitted, awaiting customer decision) ══ */}
+      {pendingResponses.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: '#6366F1' }}>
+            Awaiting Decision ({pendingResponses.length})
+          </h3>
+          <div className="space-y-2">
+            {pendingResponses.map((response) => {
+              const request = requests.find((r) => r.id === response.quoteRequestId);
+              return (
+                <div
+                  key={response.id}
+                  className="flex items-center justify-between p-4 rounded-xl border"
+                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
+                >
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
+                      {request?.cuisineCategory || 'Catering'} · {request?.headcount || '?'} guests · {request?.deliveryCity || ''}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Your quote: {formatPrice(response.total)}
+                    </p>
+                  </div>
+                  <span
+                    className="px-2.5 py-1 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: '#EEF2FF', color: '#6366F1' }}
+                  >
+                    Pending
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══ Declined quotes ══ */}
+      {declinedResponses.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--aurora-text-secondary)' }}>
+            Declined ({declinedResponses.length})
+          </h3>
+          <div className="space-y-2">
+            {declinedResponses.map((response) => {
+              const request = requests.find((r) => r.id === response.quoteRequestId);
+              return (
+                <div
+                  key={response.id}
+                  className="flex items-center justify-between p-4 rounded-xl border opacity-60"
+                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
+                >
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
+                      {request?.cuisineCategory || 'Catering'} · {request?.headcount || '?'} guests · {request?.deliveryCity || ''}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Your quote: {formatPrice(response.total)}
+                    </p>
+                  </div>
+                  <span
+                    className="px-2.5 py-1 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: '#FEE2E2', color: '#EF4444' }}
+                  >
+                    Declined
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

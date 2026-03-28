@@ -438,7 +438,7 @@ export const SignupPage: React.FC = () => {
     // Upload verification docs
     for (const file of formData.verificationDocs) {
       try {
-        const storageRef = ref(storage, `business-verification/${uid}/docs/${Date.now()}_${file.name}`);
+        const storageRef = ref(storage!, `business-verification/${uid}/docs/${Date.now()}_${file.name}`);
         await uploadBytes(storageRef, file);
         const url = await getDownloadURL(storageRef);
         docUrls.push(url);
@@ -450,7 +450,7 @@ export const SignupPage: React.FC = () => {
     // Upload photo ID
     if (formData.photoIdFile) {
       try {
-        const storageRef = ref(storage, `business-verification/${uid}/photo-id/${Date.now()}_${formData.photoIdFile.name}`);
+        const storageRef = ref(storage!, `business-verification/${uid}/photo-id/${Date.now()}_${formData.photoIdFile.name}`);
         await uploadBytes(storageRef, formData.photoIdFile);
         photoIdUrl = await getDownloadURL(storageRef);
       } catch (err) {

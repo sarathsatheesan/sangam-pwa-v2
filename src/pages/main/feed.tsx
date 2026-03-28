@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { copyToClipboard } from '@/utils/clipboard';
 import {
   collection,
   query,
@@ -809,7 +810,7 @@ export default function FeedPage() {
       }
     } else {
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        await copyToClipboard(window.location.href);
         alert('Link copied to clipboard!');
       } catch (err) {
         console.error('Copy failed:', err);
@@ -1145,7 +1146,7 @@ export default function FeedPage() {
       } catch { /* user cancelled */ }
     } else {
       try {
-        await navigator.clipboard.writeText(lightboxImage);
+        await copyToClipboard(lightboxImage);
         setToastMessage('Image link copied to clipboard');
         setTimeout(() => setToastMessage(null), 3000);
       } catch {

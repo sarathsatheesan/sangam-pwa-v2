@@ -506,3 +506,53 @@
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+/* ── Cross-browser mobile fixes ── */
+
+/* Smooth scrolling for iOS momentum scroll */
+.scroll-smooth-ios {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent rubber-band overscroll on main layout (Chrome 63+, Firefox 59+, Safari 16+) */
+html, body {
+  overscroll-behavior-y: none;
+}
+
+/* Prevent long-press callout on iOS for interactive elements */
+button, a, [role="button"] {
+  -webkit-touch-callout: none;
+}
+
+/* Fix iOS input zoom — ensure font-size >= 16px on inputs */
+@supports (-webkit-touch-callout: none) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Webkit prefix for animations used in older Safari */
+@keyframes slideInRight {
+  from { -webkit-transform: translateX(100%); transform: translateX(100%); }
+  to { -webkit-transform: translateX(0); transform: translateX(0); }
+}
+
+@keyframes slideUp {
+  from { -webkit-transform: translateY(100%); transform: translateY(100%); opacity: 0; }
+  to { -webkit-transform: translateY(0); transform: translateY(0); opacity: 1; }
+}
+
+/* Flexbox gap fallback for Safari < 14.1 */
+@supports not (gap: 1px) {
+  .flex > * + * {
+    margin-left: 0.5rem;
+  }
+}

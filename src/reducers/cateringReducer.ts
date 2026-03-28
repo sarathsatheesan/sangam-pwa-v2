@@ -5,13 +5,13 @@
 // ═════════════════════════════════════════════════════════════════════════════════
 
 import { QueryDocumentSnapshot } from 'firebase/firestore';
-import type { CateringMenuItem, CateringOrder, OrderItem, DeliveryAddress, OrderForContext } from '@/services/cateringService';
+import type { CateringMenuItem, CateringOrder, OrderItem, DeliveryAddress, OrderForContext, CateringQuoteRequest, CateringQuoteResponse, QuoteRequestItem, ItemAssignment } from '@/services/cateringService';
 
 // ── State shape ──
 
 export interface CateringState {
   // Navigation
-  view: 'categories' | 'items' | 'checkout' | 'orders' | 'vendor';
+  view: 'categories' | 'items' | 'checkout' | 'orders' | 'vendor' | 'rfp' | 'quotes';
   selectedCategory: string | null;
 
   // Menu & Catalog
@@ -48,6 +48,20 @@ export interface CateringState {
   // Search & filtering
   searchQuery: string;
   dietaryFilter: string[];
+
+  // Quote requests (Phase 2 - RFP)
+  quoteRequests: CateringQuoteRequest[];
+  quoteResponses: CateringQuoteResponse[];
+  activeQuoteRequestId: string | null;
+  rfpForm: {
+    deliveryCity: string;
+    eventDate: string;
+    headcount: number;
+    specialInstructions: string;
+    items: QuoteRequestItem[];
+    orderForContext: OrderForContext;
+    targetBusinessIds: string[];
+  };
 }
 
 // ── Initial state factory ──
@@ -85,6 +99,19 @@ export function createInitialState(): CateringState {
 
     searchQuery: '',
     dietaryFilter: [],
+
+    quoteRequests: [],
+    quoteResponses: [],
+    activeQuoteRequestId: null,
+    rfpForm: {
+      deliveryCity: '',
+      eventDate: '',
+      headcount: 0,
+      specialInstructions: '',
+      items: [],
+      orderForContext: { type: 'self' as const },
+      targetBusinessIds: [],
+    },
   };
 }
 
@@ -92,7 +119,7 @@ export function createInitialState(): CateringState {
 
 export type CateringAction =
   // Navigation
-  | { type: 'SET_VIEW'; payload: 'categories' | 'items' | 'checkout' | 'orders' | 'vendor' }
+  | { type: 'SET_VIEW'; payload: 'categories' | 'items' | 'checkout' | 'orders' | 'vendor' | 'rfp' | 'quotes' }
   | { type: 'SET_CATEGORY'; payload: string | null }
 
   // Menu & Catalog
@@ -136,6 +163,16 @@ export type CateringAction =
   // Search & filtering
   | { type: 'SET_SEARCH_QUERY'; payload: string }
   | { type: 'TOGGLE_DIETARY_FILTER'; payload: string }
+
+  // RFP (Phase 2)
+  | { type: 'SET_QUOTE_REQUESTS'; payload: CateringQuoteRequest[] }
+  | { type: 'SET_QUOTE_RESPONSES'; payload: CateringQuoteResponse[] }
+  | { type: 'SET_ACTIVE_QUOTE_REQUEST'; payload: string | null }
+  | { type: 'UPDATE_RFP_FORM'; payload: Partial<CateringState['rfpForm']> }
+  | { type: 'ADD_RFP_ITEM'; payload: QuoteRequestItem }
+  | { type: 'UPDATE_RFP_ITEM'; payload: { index: number; item: QuoteRequestItem } }
+  | { type: 'REMOVE_RFP_ITEM'; payload: number }
+  | { type: 'CLEAR_RFP_FORM' }
 
   // Reset
   | { type: 'RESET' };
@@ -259,6 +296,47 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
       }
       return { ...state, dietaryFilter: nextFilter };
     }
+
+    // ── RFP (Phase 2) ──
+    case 'SET_QUOTE_REQUESTS':
+      return { ...state, quoteRequests: action.payload };
+
+    case 'SET_QUOTE_RESPONSES':
+      return { ...state, quoteResponses: action.payload };
+
+    case 'SET_ACTIVE_QUOTE_REQUEST':
+      return { ...state, activeQuoteRequestId: action.payload };
+
+    case 'UPDATE_RFP_FORM':
+      return { ...state, rfpForm: { ...state.rfpForm, ...action.payload } };
+
+    case 'ADD_RFP_ITEM':
+      return { ...state, rfpForm: { ...state.rfpForm, items: [...state.rfpForm.items, action.payload] } };
+
+    case 'UPDATE_RFP_ITEM': {
+      const items = [...state.rfpForm.items];
+      items[action.payload.index] = action.payload.item;
+      return { ...state, rfpForm: { ...state.rfpForm, items } };
+    }
+
+    case 'REMOVE_RFP_ITEM': {
+      const items = state.rfpForm.items.filter((_, i) => i !== action.payload);
+      return { ...state, rfpForm: { ...state.rfpForm, items } };
+    }
+
+    case 'CLEAR_RFP_FORM':
+      return {
+        ...state,
+        rfpForm: {
+          deliveryCity: '',
+          eventDate: '',
+          headcount: 0,
+          specialInstructions: '',
+          items: [],
+          orderForContext: { type: 'self' as const },
+          targetBusinessIds: [],
+        },
+      };
 
     // ── Reset ──
     case 'RESET':

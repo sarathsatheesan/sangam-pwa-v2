@@ -5,6 +5,7 @@ import {
   MoreHorizontal, Share2, BarChart3, MessageCircle, BadgeCheck, UserPlus,
   UserMinus, Plus, Calendar, Percent, Tag, Trash, CalendarClock,
 } from 'lucide-react';
+import { copyToClipboard } from '@/utils/clipboard';
 import { getGoogleMapsUrl } from '@/components/business/businessValidation';
 import PhotoLightbox from '@/components/business/PhotoLightbox';
 import BusinessAnalyticsTab from '@/components/business/BusinessAnalyticsTab';
@@ -134,23 +135,6 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
       title: business.name,
       text: `Check out ${business.name} — ${business.category} on Sangam`,
       url: shareUrl,
-    };
-
-    // Helper: copy to clipboard with fallback for older browsers / Firefox
-    const copyToClipboard = async (text: string) => {
-      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-        await navigator.clipboard.writeText(text);
-      } else {
-        // Fallback: execCommand (works on older Firefox, Safari, etc.)
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-      }
     };
 
     try {

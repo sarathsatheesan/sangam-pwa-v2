@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { copyToClipboard } from '@/utils/clipboard';
 import {
   collection,
   getDocs,
@@ -1074,7 +1075,7 @@ export default function HousingPage() {
       }
     } else {
       try {
-        await navigator.clipboard.writeText(text);
+        await copyToClipboard(text);
         setToastMessage('Listing link copied to clipboard!');
       } catch (error) {
         setToastMessage('Failed to copy listing link. Please try again.');

@@ -7,6 +7,7 @@ import {
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
+import { copyToClipboard } from '@/utils/clipboard';
 import {
   getGroupCallManager,
   type GroupCallState, type GroupCallEndedEvent, type GroupCallType,
@@ -462,14 +463,14 @@ export default function GroupCallOverlay() {
               if (navigator.share) {
                 await navigator.share({ title: 'Join Group Call', text: 'Join the group call on ethniCity', url: link });
               } else {
-                await navigator.clipboard.writeText(link);
+                await copyToClipboard(link);
                 setLinkCopied(true);
                 setTimeout(() => setLinkCopied(false), 2000);
               }
             } catch {
               // Fallback if share is cancelled or clipboard fails
               try {
-                await navigator.clipboard.writeText(link);
+                await copyToClipboard(link);
                 setLinkCopied(true);
                 setTimeout(() => setLinkCopied(false), 2000);
               } catch { /* ignore */ }
@@ -483,7 +484,7 @@ export default function GroupCallOverlay() {
             if (navigator.share) {
               navigator.share({ title: 'Join Group Call', text: 'Join the group call on ethniCity', url: link }).catch(() => {});
             } else {
-              navigator.clipboard.writeText(link).then(() => {
+              copyToClipboard(link).then(() => {
                 setLinkCopied(true);
                 setTimeout(() => setLinkCopied(false), 2000);
               }).catch(() => {});

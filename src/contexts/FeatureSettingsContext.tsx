@@ -14,6 +14,7 @@ export const DEFAULT_FEATURES: Record<string, boolean> = {
   modules_discover: true,
   modules_messages: true,
   modules_marketplace: true,
+  modules_catering: true,
 
   // Marketplace module features
   marketplace_addListing: true,
@@ -131,6 +132,13 @@ export const DEFAULT_FEATURES: Record<string, boolean> = {
   forum_flairs: true,
   forum_reporting: true,
 
+  // Catering module features
+  catering_placeOrder: true,
+  catering_requestForPrice: false,
+  catering_vendorDashboard: true,
+  catering_dietaryFilters: true,
+  catering_menuSearch: true,
+
   // Business Sign-Up & KYC Verification
   // All default to false — zero impact on existing flows until admin enables them
   business_signup_enabled: false,
@@ -187,6 +195,7 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { key: 'modules_messages', name: 'Messages', description: 'Direct messaging tab' },
       { key: 'modules_forum', name: 'Community Forum', description: 'Forum discussions tab' },
       { key: 'modules_marketplace', name: 'Marketplace', description: 'Buy & sell items marketplace tab' },
+      { key: 'modules_catering', name: 'Catering', description: 'Catering orders and menu browsing tab' },
     ],
   },
   {
@@ -235,6 +244,18 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
       { key: 'business_contactInfo', name: 'Contact Info', description: 'Display phone, email, and website on listings' },
       { key: 'business_merchantView', name: 'Merchant Dashboard', description: 'Enable merchant view for business owners' },
       { key: 'business_photos', name: 'Business Photos', description: 'Allow photo uploads on business listings' },
+    ],
+  },
+  {
+    id: 'catering',
+    title: 'Catering Features',
+    icon: '🍽️',
+    features: [
+      { key: 'catering_placeOrder', name: 'Place Order', description: 'Allow customers to place catering orders directly' },
+      { key: 'catering_requestForPrice', name: 'Request for Price', description: 'Enable privacy-first quote request flow (Phase 2)' },
+      { key: 'catering_vendorDashboard', name: 'Vendor Dashboard', description: 'Enable caterer order management dashboard' },
+      { key: 'catering_dietaryFilters', name: 'Dietary Filters', description: 'Enable dietary tag filtering (vegan, halal, etc.)' },
+      { key: 'catering_menuSearch', name: 'Menu Search', description: 'Enable search within catering menu items' },
     ],
   },
   {

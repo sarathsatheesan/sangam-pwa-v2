@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { copyToClipboard } from '@/utils/clipboard';
 import {
   collection,
   query,
@@ -1302,7 +1303,7 @@ export default function ForumScreen() {
     if (navigator.share) {
       try { await navigator.share({ title, text }); } catch {}
     } else {
-      await navigator.clipboard.writeText(text);
+      await copyToClipboard(text);
       setToastMessage('Copied to clipboard!');
     }
   };

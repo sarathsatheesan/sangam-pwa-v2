@@ -17,14 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** March 26, 2026 (Last updated: Session 21)
+**Date:** March 28, 2026 (Last updated: Session 22)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
 **Latest Commit:** `074f201` — feat: Discover Page Phase 3 — UX Polish & Feature Gaps (items 3.1–3.10)
-**Uncommitted:** Session 21 changes (Business Sign-Up Wizard — all 5 phases) — 10 new files, 6 files modified
+**Uncommitted:** Session 21 changes + Session 22 changes (Catering Module Phase 1 + Phase 2 RFP + all bug fixes)
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
-**Live bundle:** Build clean (8.10s), deploy from macOS terminal needed (Firebase auth not available in VM)
+**Live bundle:** Build clean, deploy from macOS terminal needed (Firebase auth not available in VM). Deploy command: `firebase deploy --only firestore:rules,hosting`
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements)
 
 ---
 
@@ -148,6 +148,26 @@ Phase 4 highlights: Extracted `PersonCard` component (464 lines, 6 variants: gri
 - **ZERO IMPACT on individual sign-up flow** — Verified: all new fields optional, all flags default false, original `validateBusinessForm()` untouched, auth files clean.
 - **Google Places API key**: `AIzaSyDrbJItCq629ccJ6DGgtTEO1XXjKgGXCWY` stored in `.env` as `VITE_GOOGLE_MAPS_API_KEY` (already in `.gitignore`).
 
+**Session 22 focused on:** Catering Module — Complete implementation spanning Phase 1 (Place Order flow) and Phase 2 (Request for Price / RFP flow), plus extensive Firestore bug fixes, vendor UX improvements, and cross-browser compatibility:
+
+- **Phase 1 — Place Order (Direct)**: Built full catering ordering flow: `CateringCategoryGrid.tsx` (cuisine category cards), `CateringItemList.tsx` (menu items grouped by business), `CateringCart.tsx` (slide-out cart panel), `CateringCheckout.tsx` (multi-section checkout form), `OrderForSelector.tsx` (radio card selector). State managed via `cateringReducer.ts` with `useReducer`. Service layer in `cateringService.ts` with Firestore CRUD for `cateringMenuItems`, `cateringOrders`. Vendor dashboard in `VendorCateringDashboard.tsx` for managing incoming direct orders. Feature flag `modules_catering` added to `DEFAULT_FEATURES` and `FEATURE_GROUPS` in `FeatureSettingsContext.tsx`. Catering tile added to home page grid and ModuleSelector nav.
+
+- **Phase 2 — Request for Price (Privacy-First RFP)**: Built `RequestForPriceForm.tsx` with cuisine-type dropdown + multi-select checkbox food item picker (17 cuisine categories, 200+ food items from `cateringFoodItems.ts`). Users submit RFPs sharing only delivery city — caterer names hidden until quotes received. `QuoteComparison.tsx` for customers to view/compare received quotes. `VendorQuoteResponse.tsx` for vendors to view open RFPs and submit quotes. Firestore collections: `cateringQuoteRequests`, `cateringQuoteResponses`. Firestore rules and composite indexes added.
+
+- **Cuisine Food Item Catalog**: New `src/constants/cateringFoodItems.ts` — comprehensive catalog with 17 cuisine categories (American, Asian BBQ, Beverages, Breakfast & Brunch, Caribbean, Chinese, Desserts & Sweets, Healthy, Indian, Italian, Japanese, Mediterranean, Mexican, Pizza & Flatbreads, Sandwiches & Wraps, Soul Food & Southern, Thai). Each item has `name`, `pricingType` (per_person/per_tray/flat_rate), and optional `dietaryTags`. Categories sourced from ezCater for industry-standard coverage.
+
+- **Firestore Bug Fixes (4 critical issues)**:
+  1. `addDoc()` with `undefined` fields — Firestore rejects undefined values. Fixed `specialInstructions: rfpForm.specialInstructions || undefined` → `|| ''` and `targetBusinessIds` using spread syntax.
+  2. `stripUndefined` corrupting `serverTimestamp()` — The recursive utility treated Firebase's `FieldValue` sentinel as a regular object, producing `{}` instead of the proper sentinel. `createdAt` was stored as `{}`, breaking all `orderBy('createdAt')` queries. **Removed `stripUndefined` entirely**, replaced with explicit payload builders.
+  3. `businessHeritage: undefined` in quote responses — `createQuoteResponse` spread `...response` which included undefined optional fields. Fixed with explicit payload builder.
+  4. Missing composite indexes — Queries combining `where()` + `orderBy()` silently failed. **Removed `orderBy()` from ALL queries** across `cateringService.ts`, sorting client-side instead.
+
+- **Vendor UX Improvements**: Moved Vendor pill to top-level header next to My Quotes for one-click access (was buried in two-step process). Made Vendor pill visible for ALL approved business owners (not just catering-enabled), since RFP system will expand to grocery, events, restaurants, etc. Added `userOwnedBusiness` state with broader Firestore query checking all approved businesses by `ownerId`.
+
+- **Cross-Browser Compatibility**: Clipboard API fallbacks for quote sharing, CSS mobile Safari fixes, explicit Vite build targets `['es2020', 'chrome87', 'firefox78', 'safari14', 'edge88']`.
+
+- **Admin Catering Section**: Added Catering tab to admin panel with catering orders list, stats, caterer businesses view, and order management.
+
 **Key architectural change in Session 20:** The `cp` sync pattern for `discover.tsx` was ELIMINATED. Unlike `messages.tsx` and `business.tsx` which still require `cp` sync, `discover.tsx` was verified to only be imported from `src/pages/discover.tsx` (not `main/`). The duplicate `src/pages/main/discover.tsx` was deleted. This is the first page to break free of the duplicate architecture.
 
 - **Bug fixes across Sessions 14-16**:
@@ -164,6 +184,26 @@ Phase 4 highlights: Extracted `PersonCard` component (464 lines, 6 variants: gri
      accidentally revert something that was done intentionally.
      ================================================================ -->
 ## 2. Decisions Made and Why
+
+### Session 22: Catering Module — Phase 1 + Phase 2 RFP + Firestore Fixes
+
+- **Explicit payload builders over object spread for Firestore writes** — The `...response` spread pattern includes all object properties, including `undefined` optional fields that Firestore rejects. Explicit payload builders (`const payload: Record<string, any> = { field1: value1, ... }; if (optionalField) payload.optionalField = optionalField;`) are safer because they only include fields with actual values. This also avoids corrupting Firebase sentinel values like `serverTimestamp()` which look like regular objects to generic utilities but must be passed through unmodified. Applied to both `createQuoteRequest` and `createQuoteResponse` in `cateringService.ts`.
+
+- **Client-side sorting over composite indexes** — Firestore composite indexes are required for queries combining `where()` + `orderBy()` on different fields. Without them, queries silently fail (return empty results, not errors). Building indexes takes time and requires deployment. Decision: remove `orderBy()` from ALL Firestore queries in `cateringService.ts` and sort results client-side with `Array.sort()`. This works immediately with zero infrastructure changes. Composite indexes still defined in `firestore.indexes.json` for long-term optimization but are no longer a runtime dependency.
+
+- **`stripUndefined` removed entirely (not fixed)** — The recursive `stripUndefined(obj)` utility used `Object.entries()` to traverse and filter an object. Firebase's `serverTimestamp()` returns a `FieldValue` sentinel that has internal properties. When `Object.entries()` processes it, it produces `{}` instead of the proper sentinel, corrupting the timestamp. Rather than adding a special case for FieldValue, the function was removed and replaced with explicit payload builders — a more robust pattern that makes each field's inclusion deliberate.
+
+- **Vendor pill visible for ALL business owners (not just catering)** — The RFP/quote system is designed to expand beyond catering to grocery, restaurants, event management, etc. Making the Vendor pill visible for any approved business owner (not just `isCateringEnabled` businesses) future-proofs the UX. Detection uses a two-step approach: first checks already-loaded catering businesses (fast), then falls back to a broader Firestore query for any approved business with matching `ownerId`.
+
+- **Privacy-first RFP architecture (no caterer names until quotes received)** — Users submit RFPs sharing only delivery city and food requirements. Caterer names, contact details, and business information are hidden from the customer until the caterer submits a quote. This protects vendor privacy and encourages quote competition. The "Target Caterers" section was built but commented out (preserved for future repurposing when the platform matures).
+
+- **Cuisine food item picker over free-text entry** — Users repeatedly entering the same food items creates friction and inconsistency. Pre-populated cuisine categories with 200+ food items (sourced from ezCater's industry-standard categories) let users select items via checkboxes. Manual "Add a custom item" form preserved as a collapsible toggle for items not in the catalog.
+
+- **Price stored in cents (not dollars)** — All price values (e.g., `pricePerUnit`, `totalPrice`) stored as integers representing cents (1299 = $12.99). This avoids floating-point precision issues in calculations and is the standard pattern for financial data.
+
+- **`useReducer` for catering state management** — Single reducer (`cateringReducer.ts`) manages all catering state including view navigation, cart, orders, RFP form, quote requests/responses. View union type: `'categories' | 'items' | 'checkout' | 'orders' | 'vendor' | 'rfp' | 'quotes'`. Consistent with the business module pattern.
+
+- **Catering module feature flag: `modules_catering`** — Added to both `DEFAULT_FEATURES` (default `true`) and `FEATURE_GROUPS` in `FeatureSettingsContext.tsx`. Module visibility in navigation gated by `isFeatureEnabled('modules_catering')`. Admin can toggle it off to hide the entire catering module.
 
 ### Session 8: Voice-to-Text, Timer Picker, Undo Removal
 
@@ -413,6 +453,114 @@ Phase 4 highlights: Extracted `PersonCard` component (464 lines, 6 variants: gri
      on what was done in each specific session.
      ================================================================ -->
 ## 3. What Was Completed
+
+### Session 22 (March 28, 2026) — Catering Module: Phase 1 Place Order + Phase 2 RFP + Firestore Fixes
+
+**Phase 1 — Place Order (Direct Ordering):**
+| Task | File(s) Changed/Created | Status |
+|------|------------------------|--------|
+| Catering feature flag (`modules_catering`) in FeatureSettings | `src/contexts/FeatureSettingsContext.tsx` | ✅ |
+| Catering reducer (state, actions, types) | `src/reducers/cateringReducer.ts` (NEW) | ✅ |
+| Catering service (Firestore CRUD for menus, orders, quotes) | `src/services/cateringService.ts` (NEW) | ✅ |
+| Category grid component | `src/components/catering/CateringCategoryGrid.tsx` (NEW) | ✅ |
+| Item list component (grouped by business) | `src/components/catering/CateringItemList.tsx` (NEW) | ✅ |
+| Cart panel component (slide-out) | `src/components/catering/CateringCart.tsx` (NEW) | ✅ |
+| Checkout form component (multi-section) | `src/components/catering/CateringCheckout.tsx` (NEW) | ✅ |
+| Order-for selector component (radio cards) | `src/components/catering/OrderForSelector.tsx` (NEW) | ✅ |
+| Vendor catering dashboard | `src/components/catering/VendorCateringDashboard.tsx` (NEW) | ✅ |
+| Catering main page (orchestrator) | `src/pages/catering.tsx` (NEW) | ✅ |
+| Home page catering tile | `src/pages/main/home.tsx` | ✅ |
+| ModuleSelector nav catering entry | `src/components/layout/ModuleSelector.tsx` | ✅ |
+| Admin catering tab (orders, stats, caterers) | `src/pages/admin.tsx` | ✅ |
+
+**Phase 2 — Request for Price (Privacy-First RFP):**
+| Task | File(s) Changed/Created | Status |
+|------|------------------------|--------|
+| Cuisine food item catalog (17 categories, 200+ items) | `src/constants/cateringFoodItems.ts` (NEW) | ✅ |
+| RFP form with cuisine picker + multi-select checkboxes | `src/components/catering/RequestForPriceForm.tsx` (NEW, MAJOR REWRITE) | ✅ |
+| Quote comparison view (customer side) | `src/components/catering/QuoteComparison.tsx` (NEW) | ✅ |
+| Vendor quote response form | `src/components/catering/VendorQuoteResponse.tsx` (NEW) | ✅ |
+| Firestore rules for catering collections | `firestore.rules` | ✅ |
+| Firestore composite indexes | `firestore.indexes.json` (NEW) | ✅ |
+| Target Caterers section commented out (privacy-first) | `src/components/catering/RequestForPriceForm.tsx` | ✅ |
+
+**Firestore Bug Fixes:**
+| Task | File(s) Changed | Status |
+|------|-----------------|--------|
+| Fix `addDoc()` with undefined `specialInstructions` | `src/pages/catering.tsx` | ✅ |
+| Fix `addDoc()` with undefined `targetBusinessIds` | `src/pages/catering.tsx` | ✅ |
+| Remove `stripUndefined` (corrupted `serverTimestamp()`) | `src/services/cateringService.ts` | ✅ |
+| Explicit payload builder for `createQuoteRequest` | `src/services/cateringService.ts` | ✅ |
+| Explicit payload builder for `createQuoteResponse` | `src/services/cateringService.ts` | ✅ |
+| Fix `businessHeritage: undefined` in quote submission | `src/services/cateringService.ts` | ✅ |
+| Remove `orderBy()` from ALL queries (client-side sort) | `src/services/cateringService.ts` | ✅ |
+| Add error callbacks to all `onSnapshot` subscriptions | `src/services/cateringService.ts` | ✅ |
+
+**Vendor UX Improvements:**
+| Task | File(s) Changed | Status |
+|------|-----------------|--------|
+| Vendor pill moved to top-level header (next to My Quotes) | `src/pages/catering.tsx` | ✅ |
+| Vendor pill visible for ALL approved business owners | `src/pages/catering.tsx` | ✅ |
+| Broader business detection (not just catering-enabled) | `src/pages/catering.tsx` | ✅ |
+
+**Cross-Browser Compatibility:**
+| Task | File(s) Changed | Status |
+|------|-----------------|--------|
+| Clipboard API fallbacks for quote sharing | `src/utils/copyToClipboard.ts` | ✅ |
+| CSS mobile Safari fixes | Various | ✅ |
+| Explicit Vite build targets | `vite.config.ts` | ✅ |
+
+**New files created in Session 22:**
+- `src/constants/cateringFoodItems.ts` — Cuisine food item catalog (17 categories, 200+ items)
+- `src/reducers/cateringReducer.ts` — Catering state management (views, cart, orders, RFP, quotes)
+- `src/services/cateringService.ts` — Firestore CRUD for catering menus, orders, quote requests/responses
+- `src/pages/catering.tsx` — Catering module orchestrator page
+- `src/components/catering/CateringCategoryGrid.tsx` — Cuisine category cards grid
+- `src/components/catering/CateringItemList.tsx` — Menu items grouped by business
+- `src/components/catering/CateringCart.tsx` — Slide-out cart panel
+- `src/components/catering/CateringCheckout.tsx` — Multi-section checkout form
+- `src/components/catering/OrderForSelector.tsx` — Radio card selector for order type
+- `src/components/catering/VendorCateringDashboard.tsx` — Vendor dashboard for direct orders
+- `src/components/catering/RequestForPriceForm.tsx` — RFP form with cuisine picker
+- `src/components/catering/QuoteComparison.tsx` — Customer quote comparison view
+- `src/components/catering/VendorQuoteResponse.tsx` — Vendor RFP response form
+- `firestore.indexes.json` — Composite indexes for catering collections
+
+**Catering module file structure:**
+```
+src/
+  constants/
+    cateringFoodItems.ts          (cuisine catalog — 17 categories, 200+ items)
+  reducers/
+    cateringReducer.ts            (state, actions, types — views/cart/orders/RFP/quotes)
+  services/
+    cateringService.ts            (Firestore CRUD — menus, orders, quotes)
+  components/catering/
+    CateringCategoryGrid.tsx      (cuisine category cards)
+    CateringItemList.tsx          (menu items by business)
+    CateringCart.tsx               (slide-out cart)
+    CateringCheckout.tsx           (checkout form)
+    OrderForSelector.tsx           (radio card selector)
+    VendorCateringDashboard.tsx    (vendor direct orders)
+    RequestForPriceForm.tsx        (RFP form + cuisine picker)
+    QuoteComparison.tsx            (customer quote comparison)
+    VendorQuoteResponse.tsx        (vendor quote response)
+  pages/
+    catering.tsx                   (orchestrator — nav pills, view routing, vendor detection)
+```
+
+**Firestore collections added:**
+- `cateringMenuItems` — Menu items with `businessId`, `category`, `name`, `priceInCents`, `pricingType`
+- `cateringOrders` — Direct orders with `customerId`, `businessId`, `items`, `status`, `totalInCents`
+- `cateringQuoteRequests` — RFPs with `customerId`, `deliveryCity`, `cuisineCategory`, `items`, `headcount`, `eventDate`, `status`
+- `cateringQuoteResponses` — Vendor quotes with `requestId`, `businessId`, `pricePerPerson`, `totalPrice`, `message`
+
+**Key patterns introduced in Session 22:**
+- Explicit Firestore payload builders — build each field individually, only add optional fields when present
+- Client-side sorting — fetch without `orderBy()`, sort with `Array.sort()` post-fetch
+- Broader business detection — two-step: check loaded catering businesses first, fallback to general approved business query
+- Cuisine picker UX — dropdown → multi-select checkboxes with search, dietary tags, pricing type badges
+- RFP privacy architecture — customer identity hidden from vendors, only delivery city shared
 
 ### Session 20 (March 26, 2026) — Discover Phases 2-4: Performance + UX Polish + Architecture & Accessibility
 
@@ -1256,6 +1404,14 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/hooks/useGooglePlaces.ts` | Google Places Autocomplete hook — singleton script loader, session tokens for billing optimization, getPlacePredictions, getPlaceDetails with structured address parsing. NEW in Session 21. |
 | `src/pages/business/register.tsx` | Business registration page — gates on `business_signup_enabled` feature flag, renders BusinessRegistrationWizard. NEW in Session 21. |
 | `.env` | Google Places API key (`VITE_GOOGLE_MAPS_API_KEY`). Already in `.gitignore`. NEW in Session 21. |
+| `src/pages/catering.tsx` | Catering module orchestrator. Nav pills (categories, My Quotes, Vendor), view routing via cateringReducer, vendor detection for all approved business owners, RFP submission, quote handling. Session 22. |
+| `src/reducers/cateringReducer.ts` | Catering state: views (`categories`/`items`/`checkout`/`orders`/`vendor`/`rfp`/`quotes`), cart, orders, RFP form with `items: QuoteRequestItem[]`, quote requests/responses. Session 22. |
+| `src/services/cateringService.ts` | All Firestore CRUD for catering. Explicit payload builders (no spread). Client-side sorting (no `orderBy()`). Collections: `cateringMenuItems`, `cateringOrders`, `cateringQuoteRequests`, `cateringQuoteResponses`. Session 22. |
+| `src/constants/cateringFoodItems.ts` | 17 cuisine categories, 200+ food items. Each with `name`, `pricingType`, optional `dietaryTags`. Exports `CUISINE_CATEGORIES` and `CUISINE_CATEGORY_KEYS`. Session 22. |
+| `src/components/catering/RequestForPriceForm.tsx` | RFP form with cuisine dropdown, multi-select checkbox item picker, search filter, quantity controls, manual custom item toggle. Target Caterers section commented out. Session 22. |
+| `src/components/catering/QuoteComparison.tsx` | Customer view for comparing received vendor quotes. Session 22. |
+| `src/components/catering/VendorQuoteResponse.tsx` | Vendor view for open RFPs and quote submission. Session 22. |
+| `firestore.indexes.json` | 6 composite indexes for catering collections. Not a runtime dependency (all sorting is client-side) but needed for Firestore console and future optimization. Session 22. |
 | `Discover_Page_Enhancement_Roadmap.docx` | 38-item roadmap across 4 phases. All complete. Reference for architecture patterns. |
 | `public/firebase-messaging-sw.js` | FCM service worker — background push + notification click with Firefox postMessage fallback |
 | `functions/src/index.ts` | Cloud Functions: `sendNewMessageNotification` (push) + `transcribeVoiceMessage` (Speech-to-Text). Both deployed. |
@@ -1321,6 +1477,12 @@ git add <files> && git commit -m "message" && git push origin main
 - **`UserData` has `name` not `displayName`** — The `UserData` interface in `AuthContext.tsx` uses `name` field. Firebase `User` object has `displayName`. Don't confuse them — use `userProfile?.name` for profile data and `user.displayName` for Firebase auth data.
 - **`env(safe-area-inset-bottom)` needs Tailwind fallback** — Not all browsers support `env()`. Always provide a Tailwind class as the base positioning (e.g., `bottom-24`) and use inline `style={{ bottom: 'calc(Xrem + env(safe-area-inset-bottom, 0px))' }}` as an enhancement. The inline style overrides the Tailwind class when supported.
 - **`@supports not selector(:focus-visible)` for older browsers** — Added to `src/index.css`. Applies `:focus` outline on `[role="button"]` elements when `:focus-visible` is not supported (iOS Safari < 15.4). Zero runtime cost CSS-only fallback.
+- **Firebase `serverTimestamp()` is a FieldValue sentinel, not a plain object** — NEVER pass it through generic object utilities like `stripUndefined`, `Object.entries()`, `JSON.parse(JSON.stringify())`, or any recursive traversal. These will destroy the sentinel, producing `{}` instead of a server timestamp. Always handle `serverTimestamp()` as a top-level field in explicit payload builders, never as part of a spread or generic object transformation.
+- **Firestore queries with `where()` + `orderBy()` on different fields require composite indexes** — Without them, queries silently return empty results (not errors). Two solutions: (1) create composite indexes in `firestore.indexes.json` and deploy, or (2) remove `orderBy()` and sort client-side. Session 22 chose option 2 for all catering queries as the pragmatic immediate solution.
+- **Catering price values are in cents (integers)** — 1299 = $12.99. Format for display with `(priceInCents / 100).toFixed(2)`. Never use floating-point for price calculations.
+- **RFP Target Caterers section is commented out, not deleted** — Preserved in `RequestForPriceForm.tsx` with JSX comment block `{/* ... */}` for future repurposing when the platform matures and vendor directory is established.
+- **Vendor pill visibility uses two-step detection** — First checks `allCateringBusinesses` (already loaded, O(1)), then falls back to a Firestore query for any approved business with matching `ownerId`. This ensures the pill appears even if the user's business isn't catering-enabled.
+- **`isCateringEnabled` field on businesses collection** — Boolean field to mark businesses that participate in the catering module. Used by catering category grid to show relevant vendors. Not required for vendor pill visibility (which checks any approved business).
 - **`Math.min()` with empty array spread is safe when other args exist** — `Math.min(...emptyArray, 1, 2, 3)` returns `1`, not `Infinity`. Verified safe in `searchRank` usage where name/city/profession always provide fallback values.
 - **`onKeyDown` on mobile only fires with external keyboards** — Adding `onKeyDown` handlers (Enter/Space) to cards is correct behavior — it won't interfere with touch interaction. Keyboard events only fire when a hardware keyboard is connected (Bluetooth keyboards, etc.).
 - **Discover page `activeTab` union type** — Must be `'discover' | 'network' | 'pending'`. The pending tab has its own filter that checks `detail.initiatedBy !== user?.uid` to show only incoming requests. Don't confuse with the Network tab which shows connected users.
@@ -1344,10 +1506,11 @@ git add <files> && git commit -m "message" && git push origin main
 5. → Redirected to `/home` (module tiles landing page)
 
 ### Firestore Collections
-`users`, `posts` (+ subcollection `comments`), `businesses` (+ subcollections `analytics`, `questions`), `businessSignupDrafts` (keyed by userId — wizard auto-save drafts), `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`, `groupCalls` (+ subcollections `signals`, `candidates`), `businessMenuItems`, `businessReviews`, `businessOrders`, `forumThreads`, `forumReplies`, `forumLikes`, `marketplaceListings`, `marketplaceComments`, `announcements`, `moderationQueue`, `reports`, `notifications`, `userWarnings`
+`users`, `posts` (+ subcollection `comments`), `businesses` (+ subcollections `analytics`, `questions`), `businessSignupDrafts` (keyed by userId — wizard auto-save drafts), `listings`, `events`, `travelPosts`, `conversations` (+ subcollection `messages`), `connections`, `appConfig`, `bannedUsers`, `disabledUsers`, `userSettings`, `groupCalls` (+ subcollections `signals`, `candidates`), `businessMenuItems`, `businessReviews`, `businessOrders`, `cateringMenuItems` (Session 22), `cateringOrders` (Session 22), `cateringQuoteRequests` (Session 22 — RFP), `cateringQuoteResponses` (Session 22 — vendor quotes), `forumThreads`, `forumReplies`, `forumLikes`, `marketplaceListings`, `marketplaceComments`, `announcements`, `moderationQueue`, `reports`, `notifications`, `userWarnings`
 
 ### Recent Commit History
 ```
+(pending) feat: Catering Module Phase 1 + Phase 2 RFP + cuisine picker + Firestore bug fixes + vendor UX (Session 22)
 (pending) feat: Business Sign-Up Wizard — 5-step registration with Google Places, KYC verification, Firestore backend, admin review (Session 21)
 (pending) feat: Discover Page Phase 4 — Architecture & Accessibility (items 4.1–4.9) (Session 20)
 c3fb1d3 fix: cross-browser compatibility for Discover Phase 1 changes (Session 19)
@@ -1410,4 +1573,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Updated March 26, 2026 (Session 21) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Next: deploy Session 21 from macOS, then wire Housing UI enhancements or begin next module.*
+*Updated March 28, 2026 (Session 22) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (Request for Price / RFP) COMPLETE (Session 22). Next: deploy latest from macOS (`firebase deploy --only firestore:rules,hosting`), then Phase 3 — Notifications & Real-Time Updates (push notifications for new quotes, real-time order status, vendor alerts). Long-term roadmap: expand RFP/quote system to other business types (grocery, restaurants, event management).*

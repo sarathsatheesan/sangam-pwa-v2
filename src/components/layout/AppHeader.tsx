@@ -7,6 +7,7 @@ import { useLocation } from '../../contexts/LocationContext';
 import { signOutUser } from '../../services/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import { LocationPicker } from '../shared/LocationPicker';
+import { copyToClipboard } from '@/utils/clipboard';
 
 // Announcement type
 interface Announcement {
@@ -128,7 +129,7 @@ export const AppHeader: React.FC = () => {
       }
     } else {
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        await copyToClipboard(window.location.href);
         alert('Link copied to clipboard!');
       } catch (error) {
         console.error('Error copying to clipboard:', error);

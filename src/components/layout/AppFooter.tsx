@@ -1,5 +1,6 @@
 import React from 'react';
 import { Mail, Share2, Phone } from 'lucide-react';
+import { copyToClipboard } from '@/utils/clipboard';
 
 // Social media SVG icons
 const InstagramIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
@@ -46,7 +47,7 @@ export const AppFooter: React.FC = () => {
       }
     } else {
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        await copyToClipboard(window.location.href);
         alert('Link copied to clipboard!');
       } catch (error) {
         console.error('Error copying to clipboard:', error);
