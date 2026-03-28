@@ -9,7 +9,7 @@
 //   - Vendor dashboard (for business owners)
 // ═════════════════════════════════════════════════════════════════════════════════
 
-import React, { useReducer, useCallback, useEffect, useState } from 'react';
+import React, { useReducer, useCallback, useEffect, useState, useRef } from 'react';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store,
   Send, FileText,
@@ -50,6 +50,11 @@ export default function CateringPage() {
   const [submitting, setSubmitting] = useState(false);
   const [vendorTab, setVendorTab] = useState<'orders' | 'quotes'>('orders');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
+  const selectedQuoteRequestRef = useRef<CateringQuoteRequest | null>(null);
+  // Keep ref in sync with state so real-time subscription callback can access latest value
+  useEffect(() => {
+    selectedQuoteRequestRef.current = selectedQuoteRequest;
+  }, [selectedQuoteRequest]);
 
   // ── Load all catering businesses on mount (for counts + vendor detection) ──
   useEffect(() => {
@@ -116,8 +121,10 @@ export default function CateringPage() {
     const unsub = subscribeToCustomerQuoteRequests(user.uid, (requests) => {
       dispatch({ type: 'SET_QUOTE_REQUESTS', payload: requests });
       // Keep selectedQuoteRequest in sync with latest data (item assignments, status)
-      if (selectedQuoteRequest) {
-        const updated = requests.find((r) => r.id === selectedQuoteRequest.id);
+      // Use ref to avoid stale closure — the effect only runs once per user
+      const current = selectedQuoteRequestRef.current;
+      if (current) {
+        const updated = requests.find((r) => r.id === current.id);
         if (updated) setSelectedQuoteRequest(updated);
       }
     });

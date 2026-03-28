@@ -423,15 +423,15 @@ export default function RequestForPriceForm({
                   {/* Footer with count */}
                   {filteredCuisineItems.length > 0 && (
                     <div
-                      className="px-4 py-2 border-t text-xs font-medium flex items-center justify-between"
+                      className="px-4 py-3 border-t text-xs font-medium flex items-center justify-between"
                       style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
                     >
                       <span>
                         {rfpForm.items.length} item{rfpForm.items.length !== 1 ? 's' : ''} selected
                       </span>
                       <button
-                        onClick={() => setItemPickerOpen(false)}
-                        className="px-3 py-1 rounded-lg text-xs font-semibold"
+                        onClick={(e) => { e.stopPropagation(); setItemPickerOpen(false); }}
+                        className="px-4 py-1.5 rounded-lg text-xs font-semibold"
                         style={{ backgroundColor: '#6366F1', color: '#fff' }}
                       >
                         Done
