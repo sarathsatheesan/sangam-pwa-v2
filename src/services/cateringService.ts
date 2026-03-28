@@ -611,14 +611,22 @@ export async function acceptQuoteResponse(
     ...customerDetails,
   });
 
-  // 2. Mark the quote request as accepted
+  // 2. Mark the quote request as accepted + write itemAssignments for all quoted items
   const responseSnap = await getDoc(responseRef);
   const responseData = responseSnap.data();
+  const quotedItems: { name: string }[] = responseData?.quotedItems || [];
   const requestRef = doc(db, QUOTE_REQUESTS_COL, requestId);
   await updateDoc(requestRef, {
     status: 'accepted',
     selectedResponseId: responseId,
     selectedBusinessId: responseData?.businessId,
+    itemAssignments: quotedItems.map((qi) => ({
+      itemName: qi.name,
+      responseId,
+      businessId: responseData?.businessId,
+      businessName: responseData?.businessName,
+      assignedAt: serverTimestamp(),
+    })),
   });
 
   // 3. Decline all other responses for this request

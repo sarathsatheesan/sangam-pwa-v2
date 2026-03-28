@@ -39,13 +39,44 @@ export default function QuoteComparison({ quoteRequest, onBack }: QuoteCompariso
   }, [quoteRequest.id]);
 
   // ── Compute assigned items from the quote request's itemAssignments ──
+  // Falls back to deriving assignments from accepted/partially_accepted responses
+  // when itemAssignments is missing (e.g., orders accepted via the old full-accept flow).
   const assignedItemsMap = useMemo(() => {
     const map = new Map<string, ItemAssignment>();
-    (quoteRequest.itemAssignments || []).forEach((a) => {
+
+    // Primary source: explicit itemAssignments on the quote request
+    const explicit = quoteRequest.itemAssignments || [];
+    explicit.forEach((a) => {
       map.set(a.itemName, a);
     });
+
+    // Fallback: if no explicit assignments exist but there are accepted responses,
+    // derive assignments from accepted response data so the tracker is accurate.
+    if (map.size === 0 && responses.length > 0) {
+      responses.forEach((resp) => {
+        if (resp.status === 'accepted' || resp.status === 'partially_accepted') {
+          // For partially_accepted, only count the explicitly accepted items
+          const assignedNames = resp.acceptedItemNames && resp.acceptedItemNames.length > 0
+            ? resp.acceptedItemNames
+            : resp.quotedItems.map((qi) => qi.name); // full accept = all items
+
+          assignedNames.forEach((itemName) => {
+            if (!map.has(itemName)) {
+              map.set(itemName, {
+                itemName,
+                responseId: resp.id,
+                businessId: resp.businessId,
+                businessName: resp.businessName,
+                assignedAt: resp.createdAt,
+              });
+            }
+          });
+        }
+      });
+    }
+
     return map;
-  }, [quoteRequest.itemAssignments]);
+  }, [quoteRequest.itemAssignments, responses]);
 
   const totalRequestItems = quoteRequest.items.length;
   const assignedCount = assignedItemsMap.size;
