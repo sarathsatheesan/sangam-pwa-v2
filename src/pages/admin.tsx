@@ -96,6 +96,15 @@ interface UserRecord {
   createdAt?: any;
   heritage?: string | string[];
   accountType?: string;
+  businessName?: string;
+  businessType?: string;
+  adminReviewRequired?: boolean;
+  adminApproved?: boolean;
+  phone?: string;
+  tinNumber?: string;
+  tinValidationStatus?: string;
+  verificationDocUrls?: string[];
+  photoIdUrl?: string;
 }
 
 interface Announcement {
@@ -310,7 +319,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [bannedUserIds, setBannedUserIds] = useState<string[]>([]);
   const [disabledUserIds, setDisabledUserIds] = useState<string[]>([]);
-  const [userFilter, setUserFilter] = useState<'all' | 'active' | 'disabled' | 'banned' | 'admin'>('all');
+  const [userFilter, setUserFilter] = useState<'all' | 'active' | 'business' | 'disabled' | 'banned' | 'admin'>('all');
   const [userSearch, setUserSearch] = useState('');
   const [deletingContent, setDeletingContent] = useState<string | null>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
@@ -455,6 +464,7 @@ export default function AdminPage() {
     else if (userFilter === 'disabled') filtered = filtered.filter((u) => disabledUserIds.includes(u.id));
     else if (userFilter === 'active') filtered = filtered.filter((u) => !bannedUserIds.includes(u.id) && !disabledUserIds.includes(u.id));
     else if (userFilter === 'admin') filtered = filtered.filter((u) => isUserAdmin(u));
+    else if (userFilter === 'business') filtered = filtered.filter((u) => u.accountType === 'business');
     return filtered;
   }, [users, userSearch, userFilter, bannedUserIds, disabledUserIds, adminEmails]);
 
@@ -584,17 +594,29 @@ export default function AdminPage() {
     try {
       setLoading(true);
       const querySnapshot = await getDocs(collection(db, 'users'));
-      const usersData: UserRecord[] = querySnapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        name: docSnap.data().name || 'No Name',
-        email: docSnap.data().email,
-        avatar: docSnap.data().avatar,
-        city: docSnap.data().city,
-        isAdmin: docSnap.data().isAdmin || false,
-        createdAt: docSnap.data().createdAt,
-        heritage: docSnap.data().heritage,
-        accountType: docSnap.data().accountType,
-      }));
+      const usersData: UserRecord[] = querySnapshot.docs.map((docSnap) => {
+        const d = docSnap.data();
+        return {
+          id: docSnap.id,
+          name: d.name || 'No Name',
+          email: d.email,
+          avatar: d.avatar,
+          city: d.city,
+          isAdmin: d.isAdmin || false,
+          createdAt: d.createdAt,
+          heritage: d.heritage,
+          accountType: d.accountType,
+          businessName: d.businessName,
+          businessType: d.businessType,
+          adminReviewRequired: d.adminReviewRequired,
+          adminApproved: d.adminApproved,
+          phone: d.phone,
+          tinNumber: d.tinNumber,
+          tinValidationStatus: d.tinValidationStatus,
+          verificationDocUrls: d.verificationDocUrls,
+          photoIdUrl: d.photoIdUrl,
+        };
+      });
       setUsers(usersData);
 
       const bannedSnapshot = await getDocs(collection(db, 'bannedUsers'));
@@ -1606,7 +1628,7 @@ export default function AdminPage() {
                     />
                   </div>
                   <div className="flex gap-2">
-                    {(['all', 'active', 'admin', 'disabled', 'banned'] as const).map((f) => (
+                    {(['all', 'active', 'business', 'admin', 'disabled', 'banned'] as const).map((f) => (
                       <button
                         key={f}
                         onClick={() => setUserFilter(f)}
@@ -1667,8 +1689,21 @@ export default function AdminPage() {
                                         ADMIN
                                       </span>
                                     )}
+                                    {u.accountType === 'business' && (
+                                      <span className="text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-bold tracking-wider flex-shrink-0">
+                                        BUSINESS
+                                      </span>
+                                    )}
+                                    {u.accountType === 'business' && u.adminReviewRequired && u.adminApproved === false && (
+                                      <span className="text-[9px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-bold tracking-wider flex-shrink-0">
+                                        PENDING
+                                      </span>
+                                    )}
                                   </div>
-                                  <p className="text-xs text-[var(--aurora-text-secondary)] truncate">{u.email}</p>
+                                  <p className="text-xs text-[var(--aurora-text-secondary)] truncate">
+                                    {u.email}
+                                    {u.businessName ? ` — ${u.businessName}` : ''}
+                                  </p>
                                 </div>
                                 {/* Heritage */}
                                 <div className="hidden md:block text-xs text-[var(--aurora-text-secondary)] w-24 truncate">
@@ -2033,9 +2068,16 @@ export default function AdminPage() {
                               {biz.category} &middot; {biz.country === 'CA' ? '🇨🇦' : '🇺🇸'} &middot; {biz.ownerName}
                             </p>
                           </div>
-                          <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">
-                            Pending
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {(biz as any)._source === 'signup' && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-600 font-bold">
+                                SIGNUP
+                              </span>
+                            )}
+                            <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">
+                              Pending
+                            </span>
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-xs mb-3">
@@ -2083,9 +2125,14 @@ export default function AdminPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={async () => {
-                              await approveRegistration(biz.id);
-                              setPendingRegistrations((prev) => prev.filter((b) => b.id !== biz.id));
-                              setToastMessage(`${biz.name} approved!`);
+                              try {
+                                await approveRegistration(biz.id, (biz as any)._source);
+                                setPendingRegistrations((prev) => prev.filter((b) => b.id !== biz.id));
+                                setToastMessage(`${biz.name} approved!`);
+                              } catch (err: any) {
+                                console.error('Approve failed:', err);
+                                setToastMessage(`Failed to approve: ${err.message || 'Unknown error'}`);
+                              }
                             }}
                             className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-green-500 hover:bg-green-600 transition-colors"
                           >
@@ -2112,10 +2159,15 @@ export default function AdminPage() {
                             <div className="flex gap-2">
                               <button
                                 onClick={async () => {
-                                  await rejectRegistration(biz.id, rejectReason);
-                                  setPendingRegistrations((prev) => prev.filter((b) => b.id !== biz.id));
-                                  setRejectModalId(null);
-                                  setToastMessage(`${biz.name} rejected.`);
+                                  try {
+                                    await rejectRegistration(biz.id, rejectReason, (biz as any)._source);
+                                    setPendingRegistrations((prev) => prev.filter((b) => b.id !== biz.id));
+                                    setRejectModalId(null);
+                                    setToastMessage(`${biz.name} rejected.`);
+                                  } catch (err: any) {
+                                    console.error('Reject failed:', err);
+                                    setToastMessage(`Failed to reject: ${err.message || 'Unknown error'}`);
+                                  }
                                 }}
                                 disabled={!rejectReason.trim()}
                                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-red-500 disabled:opacity-40"

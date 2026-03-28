@@ -13,6 +13,7 @@ import {
   UserCircle,
   Shield,
   ShoppingBag,
+  ChefHat,
 } from 'lucide-react';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -50,6 +51,12 @@ const modules: Module[] = [
     label: 'Housing',
     icon: <Building2 size={20} />,
     feature: 'modules_housing',
+  },
+  {
+    path: '/catering',
+    label: 'Catering',
+    icon: <ChefHat size={20} />,
+    feature: 'modules_catering',
   },
   {
     path: '/marketplace',

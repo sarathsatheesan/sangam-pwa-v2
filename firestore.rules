@@ -11,15 +11,21 @@ service cloud.firestore {
     }
 
     // ─── App Config (feature settings, admin emails) ──
+    // Read allowed for all (needed for signup page to check KYC feature flags)
+    // Write restricted to authenticated users
     match /appConfig/{docId} {
-      allow read: if request.auth != null;
+      allow read: if true;
       allow write: if request.auth != null;
     }
 
     // ─── Users collection ─────────────────────────────
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      // Users can write their own doc; admins can update any user (for approvals)
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null
+        && (request.auth.uid == userId || isAdminUser());
+      allow delete: if request.auth != null && request.auth.uid == userId;
 
       // Legacy connections subcollection
       match /connections/{connectionId} {
@@ -110,6 +116,21 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if request.auth != null;
+    }
+
+    // ─── Catering Menu Items ──────────────────────
+    match /cateringMenuItems/{itemId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
+    }
+
+    // ─── Catering Orders ──────────────────────────
+    match /cateringOrders/{orderId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if isAdminUser();
     }
 
     // ─── Business Reviews ───────────────────────────

@@ -2,3 +2,5 @@ node_modules
 dist
 .env
 .DS_Store
+serviceAccountKey.json
+**/serviceAccountKey.json

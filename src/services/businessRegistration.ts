@@ -291,34 +291,184 @@ export interface PendingBusiness {
 }
 
 export async function fetchPendingRegistrations(): Promise<PendingBusiness[]> {
-  const q = query(
-    collection(db, 'businesses'),
-    where('registrationStatus', '==', 'submitted'),
-    orderBy('createdAt', 'desc'),
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({
-    id: d.id,
-    ...d.data(),
-  })) as PendingBusiness[];
+  const results: PendingBusiness[] = [];
+
+  // 1. Fetch from 'businesses' collection (wizard-based submissions)
+  try {
+    const bizQuery = query(
+      collection(db, 'businesses'),
+      where('registrationStatus', '==', 'submitted'),
+      orderBy('createdAt', 'desc'),
+    );
+    const bizSnap = await getDocs(bizQuery);
+    bizSnap.docs.forEach((d) => {
+      results.push({ id: d.id, ...d.data(), _source: 'wizard' } as any);
+    });
+  } catch (err) {
+    console.warn('Failed to load wizard registrations:', err);
+  }
+
+  // 2. Fetch from 'users' collection (signup-based business accounts pending review)
+  try {
+    const usersQuery = query(
+      collection(db, 'users'),
+      where('accountType', '==', 'business'),
+      where('adminReviewRequired', '==', true),
+    );
+    const usersSnap = await getDocs(usersQuery);
+    usersSnap.docs.forEach((d) => {
+      const data = d.data();
+      // Skip if already approved
+      if (data.adminApproved === true) return;
+      results.push({
+        id: d.id,
+        name: data.businessName || data.name || 'Unknown',
+        category: data.businessType || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        country: data.businessAddress?.country || '',
+        ownerName: data.name || '',
+        kycStatus: data.adminApproved === false ? 'pending' : 'submitted',
+        registrationStatus: 'submitted',
+        createdAt: data.createdAt,
+        tin: data.tinNumber,
+        verificationDocs: data.verificationDocUrls,
+        _source: 'signup',
+      } as any);
+    });
+  } catch (err) {
+    console.warn('Failed to load signup-based business registrations:', err);
+  }
+
+  // Sort by createdAt descending
+  results.sort((a, b) => {
+    const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+    const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+    return bTime - aTime;
+  });
+
+  return results;
 }
 
-export async function approveRegistration(businessId: string): Promise<void> {
-  const bizRef = doc(db, 'businesses', businessId);
-  await updateDoc(bizRef, {
-    registrationStatus: 'approved',
-    kycStatus: 'approved',
-    verified: true,
-    verifiedAt: serverTimestamp(),
-    verificationMethod: 'admin',
-  });
+export async function approveRegistration(businessId: string, source?: string): Promise<void> {
+  if (source === 'signup') {
+    // 1. Read the user document to get business details
+    const userRef = doc(db, 'users', businessId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) throw new Error('User not found');
+    const userData = userSnap.data();
+
+    // 2. Update the user document
+    await updateDoc(userRef, {
+      adminApproved: true,
+      adminReviewRequired: false,
+      verifiedAt: serverTimestamp(),
+    });
+
+    // 3. Create a business listing in the businesses collection
+    const address = userData.businessAddress || {};
+    const businessListing: Record<string, any> = {
+      // Core fields matching existing Business interface
+      name: userData.businessName || '',
+      category: userData.businessType || '',
+      desc: '',
+      location: address.formattedAddress || [address.street, address.city, address.state, address.zip].filter(Boolean).join(', '),
+      phone: userData.phone || '',
+      website: '',
+      email: userData.email || '',
+      hours: '',
+      menu: '',
+      services: '',
+      priceRange: '',
+      yearEstablished: new Date().getFullYear(),
+      paymentMethods: [],
+      deliveryOptions: [],
+      specialtyTags: [],
+      emoji: '',
+      rating: 0,
+      reviews: 0,
+      promoted: false,
+      bgColor: '#f0f4ff',
+      ownerId: businessId,
+      ownerName: userData.name || '',
+      ownerEmail: userData.email || '',
+      createdAt: serverTimestamp(),
+
+      // Geolocation
+      latitude: address.lat || null,
+      longitude: address.lng || null,
+
+      // Address details
+      country: address.country || 'US',
+      addressComponents: address,
+      stateOfIncorp: userData.stateOfIncorp || null,
+
+      // TIN
+      tin: userData.tinNumber || null,
+      tinVerified: userData.tinValidationStatus === 'valid',
+
+      // Registration & verification status — pre-approved
+      kycStatus: 'approved',
+      registrationStatus: 'approved',
+      verified: true,
+      verifiedAt: serverTimestamp(),
+      verificationMethod: 'admin',
+
+      // Profit status
+      profitStatus: userData.profitStatus || '',
+      isRegistered: userData.isRegistered ?? false,
+
+      // KYC docs
+      verificationDocs: (userData.verificationDocUrls || []).map((url: string, i: number) => ({
+        url,
+        name: `Document ${i + 1}`,
+      })),
+      photoIdUrl: userData.photoIdUrl || null,
+      beneficialOwners: userData.beneficialOwners || [],
+
+      // Photos & analytics
+      photos: [],
+      coverPhotoIndex: 0,
+      viewCount: 0,
+      contactClicks: 0,
+      shareCount: 0,
+      followerCount: 0,
+      followers: [],
+
+      // Link back to signup source
+      _signupUserId: businessId,
+    };
+
+    await addDoc(collection(db, 'businesses'), businessListing);
+  } else {
+    // Approve wizard-based business
+    const bizRef = doc(db, 'businesses', businessId);
+    await updateDoc(bizRef, {
+      registrationStatus: 'approved',
+      kycStatus: 'approved',
+      verified: true,
+      verifiedAt: serverTimestamp(),
+      verificationMethod: 'admin',
+    });
+  }
 }
 
-export async function rejectRegistration(businessId: string, reason: string): Promise<void> {
-  const bizRef = doc(db, 'businesses', businessId);
-  await updateDoc(bizRef, {
-    registrationStatus: 'rejected',
-    kycStatus: 'rejected',
-    kycRejectionReason: reason,
-  });
+export async function rejectRegistration(businessId: string, reason: string, source?: string): Promise<void> {
+  if (source === 'signup') {
+    // Reject user-based business account
+    const userRef = doc(db, 'users', businessId);
+    await updateDoc(userRef, {
+      adminApproved: false,
+      adminReviewRequired: false,
+      adminRejectionReason: reason,
+    });
+  } else {
+    // Reject wizard-based business
+    const bizRef = doc(db, 'businesses', businessId);
+    await updateDoc(bizRef, {
+      registrationStatus: 'rejected',
+      kycStatus: 'rejected',
+      kycRejectionReason: reason,
+    });
+  }
 }

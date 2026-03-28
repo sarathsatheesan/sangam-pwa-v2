@@ -33,6 +33,23 @@ export interface UserProfile {
   messagingPrivacy?: 'everyone' | 'connections' | 'nobody';
 }
 
+export interface BusinessAddress {
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  lat: number;
+  lng: number;
+  formattedAddress: string;
+}
+
+export interface BeneficialOwner {
+  name: string;
+  title: string;
+  ownershipPct: number;
+}
+
 export interface BusinessExtras {
   accountType: 'business';
   phone: string;
@@ -49,6 +66,13 @@ export interface BusinessExtras {
   };
   profitStatus: 'profit' | 'non-profit';
   adminReviewRequired?: boolean;
+  // Address fields
+  businessAddress?: BusinessAddress;
+  stateOfIncorp?: string;
+  // KYC fields
+  beneficialOwners?: BeneficialOwner[];
+  verificationDocUrls?: string[];
+  photoIdUrl?: string;
 }
 
 export interface IndividualExtras {
@@ -147,6 +171,25 @@ export const signUpWithEmail = async (
       userData.profitStatus = biz.profitStatus || '';
       userData.adminReviewRequired = biz.adminReviewRequired || biz.tinValidationStatus === 'invalid' || !biz.isRegistered;
       userData.adminApproved = biz.isRegistered ? undefined : false;
+
+      // Address fields
+      if (biz.businessAddress) {
+        userData.businessAddress = biz.businessAddress;
+      }
+      if (biz.stateOfIncorp) {
+        userData.stateOfIncorp = biz.stateOfIncorp;
+      }
+
+      // KYC fields
+      if (biz.beneficialOwners && biz.beneficialOwners.length > 0) {
+        userData.beneficialOwners = biz.beneficialOwners;
+      }
+      if (biz.verificationDocUrls && biz.verificationDocUrls.length > 0) {
+        userData.verificationDocUrls = biz.verificationDocUrls;
+      }
+      if (biz.photoIdUrl) {
+        userData.photoIdUrl = biz.photoIdUrl;
+      }
     }
 
     await setDoc(userDocRef, userData);

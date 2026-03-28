@@ -33,24 +33,24 @@ async function ensureValidToken(): Promise<boolean> {
 /**
  * Fetch a single feature flag value from Firestore.
  * Returns the flag value, or the provided defaultValue if not found.
+ *
+ * Works both with and without authentication — appConfig allows public reads
+ * so the signup page can check KYC flags before the user logs in.
  */
 export async function getFeatureFlag(
   key: string,
   defaultValue: boolean = true
 ): Promise<boolean> {
   try {
-    // Ensure user is authenticated with a valid token
-    const hasValidToken = await ensureValidToken();
-    if (!hasValidToken) {
-      return cachedFlags?.[key] ?? defaultValue;
-    }
-
     const now = Date.now();
 
     // Use cache if still fresh
     if (cachedFlags && now - cacheTimestamp < CACHE_TTL_MS) {
       return cachedFlags[key] ?? defaultValue;
     }
+
+    // Try to refresh token if user is logged in (avoids stale-token errors)
+    await ensureValidToken();
 
     const docRef = doc(db, FIRESTORE_DOC, FIRESTORE_ID);
     const docSnap = await getDoc(docRef);
@@ -64,7 +64,7 @@ export async function getFeatureFlag(
 
     return defaultValue;
   } catch (error: any) {
-    // Silence permission errors (expected during auth transitions)
+    // Silence permission errors — fall back to cache or default
     if (error?.code === 'permission-denied') {
       return cachedFlags?.[key] ?? defaultValue;
     }
@@ -76,24 +76,21 @@ export async function getFeatureFlag(
 /**
  * Fetch multiple feature flags at once.
  */
+/**
+ * Fetch multiple feature flags at once.
+ * Works both with and without authentication.
+ */
 export async function getFeatureFlags(
   keys: string[],
   defaults: Record<string, boolean> = {}
 ): Promise<Record<string, boolean>> {
   try {
-    // Ensure user is authenticated with a valid token
-    const hasValidToken = await ensureValidToken();
-    if (!hasValidToken) {
-      const result: Record<string, boolean> = {};
-      for (const key of keys) {
-        result[key] = cachedFlags?.[key] ?? defaults[key] ?? true;
-      }
-      return result;
-    }
-
     const now = Date.now();
 
     if (!cachedFlags || now - cacheTimestamp >= CACHE_TTL_MS) {
+      // Try to refresh token if user is logged in
+      await ensureValidToken();
+
       const docRef = doc(db, FIRESTORE_DOC, FIRESTORE_ID);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
@@ -108,18 +105,12 @@ export async function getFeatureFlags(
     }
     return result;
   } catch (error: any) {
-    // Silence permission errors (expected during auth transitions)
-    if (error?.code === 'permission-denied') {
-      const result: Record<string, boolean> = {};
-      for (const key of keys) {
-        result[key] = cachedFlags?.[key] ?? defaults[key] ?? true;
-      }
-      return result;
+    if (error?.code !== 'permission-denied') {
+      console.warn('[FeatureFlags] Error reading flags — using defaults');
     }
-    console.warn('[FeatureFlags] Error reading flags — using defaults');
     const result: Record<string, boolean> = {};
     for (const key of keys) {
-      result[key] = defaults[key] ?? true;
+      result[key] = cachedFlags?.[key] ?? defaults[key] ?? true;
     }
     return result;
   }

@@ -114,18 +114,46 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
 
   // Load the script and import the places library
   useEffect(() => {
-    if (!apiKey) return;
+    if (!apiKey) {
+      setLoadError('No Google Maps API key provided');
+      return;
+    }
+
+    let cancelled = false;
+
+    // Set a timeout — if loading takes > 10s, give up and show manual entry
+    const timeout = setTimeout(() => {
+      if (!cancelled && !isLoaded) {
+        setLoadError('Google Places took too long to load. Please enter address manually.');
+      }
+    }, 10000);
 
     loadGoogleMapsScript(apiKey)
       .then(async () => {
+        if (cancelled) return;
         // Import the places library using the new API
+        if (typeof google === 'undefined' || typeof google.maps?.importLibrary !== 'function') {
+          throw new Error('Google Maps failed to initialize');
+        }
         await google.maps.importLibrary('places');
+        if (cancelled) return;
         sessionToken.current = new google.maps.places.AutocompleteSessionToken();
         setIsLoaded(true);
       })
       .catch((err) => {
-        setLoadError(err.message);
+        if (!cancelled) {
+          console.warn('Google Places load error:', err);
+          setLoadError(err.message || 'Failed to load Google Places');
+        }
+      })
+      .finally(() => {
+        clearTimeout(timeout);
       });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [apiKey]);
 
   // Get autocomplete predictions using Places API (New)

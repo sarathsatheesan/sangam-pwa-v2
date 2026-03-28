@@ -1,10 +1,14 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, limit, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, where, writeBatch, arrayUnion, onSnapshot, orderBy, startAfter, type DocumentSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
 import { HERITAGE_OPTIONS } from '@/constants/config';
+import { useConnections, type ConnectionDetail } from '@/hooks/useConnections';
+import { usePYMK, PYMK_PREVIEW, type PYMKGroups } from '@/hooks/usePYMK';
+import { PersonCard } from '@/components/discover/PersonCard';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import {
   Search, MapPin, Users, UserPlus, UserMinus,
   X, ChevronDown, MessageCircle, Sparkles,
@@ -29,13 +33,6 @@ interface User {
   showPhone?: boolean;
   updatedAt?: any;
   createdAt?: any;
-}
-
-interface ConnectionDetail {
-  status: 'pending' | 'connected';
-  initiatedBy: string;
-  connectedAt?: any;
-  createdAt?: any; // #3.4: When the request was sent
 }
 
 // Constants
@@ -193,12 +190,14 @@ const fuzzyMatch = (text: string, query: string): boolean => {
 };
 
 // #3.1: Enhanced avatar rendering with photo support
+// Cross-browser: Use Emoji_Presentation for reliable emoji detection across Chrome/Safari/Firefox
+const EMOJI_REGEX = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/u;
 const renderAvatar = (avatar: string | undefined, name: string, size: 'sm' | 'md' | 'lg' = 'sm'): React.ReactNode => {
   const isPhoto = avatar && (avatar.startsWith('http') || avatar.startsWith('data:'));
   if (isPhoto) {
     return <img src={avatar} alt={name} className="w-full h-full rounded-full object-cover" loading="lazy" />;
   }
-  if (avatar && /\p{Emoji}/u.test(avatar)) {
+  if (avatar && EMOJI_REGEX.test(avatar)) {
     const emojiSize = size === 'lg' ? 'text-3xl' : size === 'md' ? 'text-xl' : 'text-base';
     return <span className={emojiSize}>{avatar}</span>;
   }
@@ -280,6 +279,75 @@ const SkeletonCard: React.FC = () => (
   </div>
 );
 
+// ── Modal State Reducer ──
+interface ModalState {
+  selectedPerson: User | null;
+  showBlockConfirm: boolean;
+  blockTargetUser: { id: string; name: string } | null;
+  mutualListFor: string | null;
+  openMenuId: string | null;
+}
+
+type ModalAction =
+  | { type: 'OPEN_PROFILE'; payload: User }
+  | { type: 'CLOSE_PROFILE' }
+  | { type: 'OPEN_BLOCK_CONFIRM'; payload: { id: string; name: string } }
+  | { type: 'CLOSE_BLOCK_CONFIRM' }
+  | { type: 'SET_MUTUAL_LIST'; payload: string | null }
+  | { type: 'SET_MENU'; payload: string | null };
+
+const modalReducer = (state: ModalState, action: ModalAction): ModalState => {
+  switch (action.type) {
+    case 'OPEN_PROFILE':
+      return { ...state, selectedPerson: action.payload };
+    case 'CLOSE_PROFILE':
+      return { ...state, selectedPerson: null };
+    case 'OPEN_BLOCK_CONFIRM':
+      return { ...state, blockTargetUser: action.payload, showBlockConfirm: true };
+    case 'CLOSE_BLOCK_CONFIRM':
+      return { ...state, showBlockConfirm: false, blockTargetUser: null };
+    case 'SET_MUTUAL_LIST':
+      return { ...state, mutualListFor: action.payload };
+    case 'SET_MENU':
+      return { ...state, openMenuId: action.payload };
+    default:
+      return state;
+  }
+};
+
+// ── Filter State Reducer ──
+interface FilterState {
+  searchQuery: string;
+  selectedHeritage: string[];
+  sortBy: 'match' | 'name' | 'recent';
+  activeTab: 'discover' | 'network' | 'pending';
+  activeTile: 'connections' | 'pending' | 'members' | null;
+}
+
+type FilterAction =
+  | { type: 'SET_SEARCH'; payload: string }
+  | { type: 'SET_HERITAGE'; payload: string[] }
+  | { type: 'SET_SORT'; payload: 'match' | 'name' | 'recent' }
+  | { type: 'SET_TAB'; payload: 'discover' | 'network' | 'pending' }
+  | { type: 'SET_TILE'; payload: 'connections' | 'pending' | 'members' | null };
+
+const filterReducer = (state: FilterState, action: FilterAction): FilterState => {
+  switch (action.type) {
+    case 'SET_SEARCH':
+      return { ...state, searchQuery: action.payload };
+    case 'SET_HERITAGE':
+      return { ...state, selectedHeritage: action.payload };
+    case 'SET_SORT':
+      return { ...state, sortBy: action.payload };
+    case 'SET_TAB':
+      return { ...state, activeTab: action.payload };
+    case 'SET_TILE':
+      return { ...state, activeTile: action.payload };
+    default:
+      return state;
+  }
+};
+
 // Main Component
 export default function DiscoverPage() {
   const { user, userProfile } = useAuth();
@@ -289,37 +357,87 @@ export default function DiscoverPage() {
   const [people, setPeople] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
-  const heritageDisplayCount = selectedHeritage.length;
-
-  // #3.8: Default heritage filter to "All" — no pre-selection so users discover cross-heritage connections
-
-  const [connections, setConnections] = useState<Map<string, 'pending' | 'connected'>>(new Map());
-  const [connectionDetails, setConnectionDetails] = useState<Map<string, ConnectionDetail>>(new Map());
-  const [connectingId, setConnectingId] = useState<string | null>(null);
-  const [selectedPerson, setSelectedPerson] = useState<User | null>(null);
-  const [sortBy, setSortBy] = useState<'match' | 'name' | 'recent'>('match');
-  const [activeTab, setActiveTab] = useState<'discover' | 'network' | 'pending'>('discover');
-  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
-  const [disconnectPersonId, setDisconnectPersonId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [activeTile, setActiveTile] = useState<'connections' | 'pending' | 'members' | null>(null);
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
-  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
-  const [blockTargetUser, setBlockTargetUser] = useState<{ id: string; name: string } | null>(null);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [mutualListFor, setMutualListFor] = useState<string | null>(null);
   // #2.2: Cursor-based pagination state
   const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const PAGE_SIZE = 30;
-  // #3.5: PYMK "View All" expansion state
-  const [expandedPymk, setExpandedPymk] = useState<Record<string, boolean>>({});
-  const PYMK_PREVIEW = 6; // Show first 6 in carousel, expand for more
-  // #3.9: Accept animation state
-  const [acceptAnimatingId, setAcceptAnimatingId] = useState<string | null>(null);
+
+  // Modal state — consolidated into reducer
+  const [modalState, dispatchModal] = useReducer(modalReducer, {
+    selectedPerson: null,
+    showBlockConfirm: false,
+    blockTargetUser: null,
+    mutualListFor: null,
+    openMenuId: null,
+  });
+
+  // Filter state — consolidated into reducer
+  const [filterState, dispatchFilter] = useReducer(filterReducer, {
+    searchQuery: '',
+    selectedHeritage: [],
+    sortBy: 'match' as const,
+    activeTab: 'discover' as const,
+    activeTile: null,
+  });
+
+  // Destructure for convenient access
+  const { selectedPerson, showBlockConfirm, blockTargetUser, mutualListFor, openMenuId } = modalState;
+  const { searchQuery, selectedHeritage, sortBy, activeTab, activeTile } = filterState;
+  const heritageDisplayCount = selectedHeritage.length;
+
+  // #3.8: Default heritage filter to "All" — no pre-selection so users discover cross-heritage connections
+
+  // Refs for carousel keyboard navigation
+  const carouselRefCity = useRef<HTMLDivElement>(null);
+  const carouselRefHeritage = useRef<HTMLDivElement>(null);
+  const carouselRefInterests = useRef<HTMLDivElement>(null);
+
+  // Carousel keyboard navigation handler
+  const handleCarouselKeyDown = useCallback((e: React.KeyboardEvent, carouselRef: React.RefObject<HTMLDivElement | null>) => {
+    if (!carouselRef.current) return;
+    const cards = carouselRef.current.querySelectorAll('[role="button"]');
+    if (cards.length === 0) return;
+
+    const currentIndex = Array.from(cards).indexOf(document.activeElement as HTMLElement);
+    let nextIndex = currentIndex;
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      nextIndex = currentIndex > 0 ? currentIndex - 1 : cards.length - 1;
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      nextIndex = currentIndex < cards.length - 1 ? currentIndex + 1 : 0;
+    }
+
+    if (nextIndex !== currentIndex) {
+      (cards[nextIndex] as HTMLElement).focus();
+      // Scroll into view for keyboard navigation
+      (cards[nextIndex] as HTMLElement).scrollIntoView({ behavior: 'smooth', inline: 'nearest' });
+    }
+  }, []);
+
+  // Hook calls for connection management and PYMK groups
+  const {
+    connections, connectionDetails, connectingId,
+    showDisconnectConfirm, disconnectPersonId, acceptAnimatingId,
+    handleConnect, confirmDisconnect, handleAcceptConnection, handleDeclineConnection,
+    connectedCount, pendingCount,
+    setShowDisconnectConfirm, setDisconnectPersonId,
+  } = useConnections(user?.uid, setToastMessage);
+
+  const {
+    pymkGroups, expandedPymk, setExpandedPymk,
+  } = usePYMK({
+    people,
+    connections,
+    connectionDetails,
+    userProfile,
+    activeTab,
+    userId: user?.uid,
+  });
 
   // #2.8: Load blocked users from userProfile (already fetched by AuthContext — eliminates extra Firestore read)
   useEffect(() => {
@@ -336,31 +454,29 @@ export default function DiscoverPage() {
       });
       setBlockedUsers((prev) => [...prev, blockTargetUser.id]);
       setToastMessage(`${blockTargetUser.name} has been blocked`);
-      setSelectedPerson(null);
+      dispatchModal({ type: 'CLOSE_PROFILE' });
     } catch (err) {
       console.error('Failed to block user:', err);
       setToastMessage('Failed to block user');
     } finally {
-      setShowBlockConfirm(false);
-      setBlockTargetUser(null);
+      dispatchModal({ type: 'CLOSE_BLOCK_CONFIRM' });
     }
   };
 
   const openBlockConfirm = (personId: string, personName: string) => {
-    setBlockTargetUser({ id: personId, name: personName });
-    setShowBlockConfirm(true);
-    setOpenMenuId(null);
+    dispatchModal({ type: 'OPEN_BLOCK_CONFIRM', payload: { id: personId, name: personName } });
+    dispatchModal({ type: 'SET_MENU', payload: null });
   };
 
   // Handle tile click — switch tab and highlight tile
   const handleTileClick = useCallback((tile: 'connections' | 'pending' | 'members') => {
-    setActiveTile(tile);
+    dispatchFilter({ type: 'SET_TILE', payload: tile });
     if (tile === 'members') {
-      setActiveTab('discover');
+      dispatchFilter({ type: 'SET_TAB', payload: 'discover' });
     } else if (tile === 'pending') {
-      setActiveTab('pending');
+      dispatchFilter({ type: 'SET_TAB', payload: 'pending' });
     } else {
-      setActiveTab('network');
+      dispatchFilter({ type: 'SET_TAB', payload: 'network' });
     }
   }, []);
 
@@ -369,7 +485,7 @@ export default function DiscoverPage() {
   // Close menu on outside click
   useEffect(() => {
     if (!openMenuId) return;
-    const handleClick = () => setOpenMenuId(null);
+    const handleClick = () => dispatchModal({ type: 'SET_MENU', payload: null });
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [openMenuId]);
@@ -381,11 +497,6 @@ export default function DiscoverPage() {
       return () => clearTimeout(t);
     }
   }, [toastMessage]);
-
-  // Helper function
-  const getConnectionId = (uid1: string, uid2: string) => {
-    return [uid1, uid2].sort().join('_');
-  };
 
   // Fetch people data
   const [refreshing, setRefreshing] = useState(false);
@@ -525,7 +636,7 @@ export default function DiscoverPage() {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && selectedPerson) {
-        setSelectedPerson(null);
+        dispatchModal({ type: "CLOSE_PROFILE" });
       }
     };
 
@@ -533,232 +644,7 @@ export default function DiscoverPage() {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [selectedPerson]);
 
-  // #2.7: Real-time connections via onSnapshot (replaces one-time getDocs)
-  // #2.4: Legacy migration runs once per mount, gated by localStorage + ref
-  const migrationAttemptedRef = useRef(false);
-  useEffect(() => {
-    if (!user?.uid) return;
-    migrationAttemptedRef.current = false;
-    const q1 = query(collection(db, 'connections'), where('users', 'array-contains', user.uid));
-
-    const unsubscribe = onSnapshot(q1, async (connSnap) => {
-      const connMap = new Map<string, 'pending' | 'connected'>();
-      const detailsMap = new Map<string, ConnectionDetail>();
-
-      connSnap.forEach((d) => {
-        const data = d.data();
-        const otherUid = (data.users as string[]).find((uid: string) => uid !== user.uid);
-        if (otherUid) {
-          const status = data.status || 'connected';
-          connMap.set(otherUid, status);
-          detailsMap.set(otherUid, {
-            status,
-            initiatedBy: data.initiatedBy || '',
-            connectedAt: data.connectedAt || null,
-            createdAt: data.createdAt || null, // #3.4: track request timestamp
-          });
-        }
-      });
-
-      // Legacy migration: only attempt once per mount + localStorage gate
-      if (!migrationAttemptedRef.current) {
-        migrationAttemptedRef.current = true;
-        const migrationKey = `discover_migrated_${user.uid}`;
-        if (localStorage.getItem(migrationKey) !== 'true') {
-          try {
-            const legacySnap = await getDocs(collection(db, 'users', user.uid, 'connections'));
-            for (const d of legacySnap.docs) {
-              if (!connMap.has(d.id)) {
-                const connId = getConnectionId(user.uid, d.id);
-                try {
-                  await setDoc(doc(db, 'connections', connId), {
-                    users: [user.uid, d.id].sort(),
-                    status: 'connected',
-                    connectedAt: d.data().connectedAt || serverTimestamp(),
-                    migratedAt: serverTimestamp(),
-                  });
-                  connMap.set(d.id, 'connected');
-                  detailsMap.set(d.id, { status: 'connected', initiatedBy: '', connectedAt: d.data().connectedAt });
-                } catch {
-                  connMap.set(d.id, d.data().status || 'connected');
-                  detailsMap.set(d.id, { status: d.data().status || 'connected', initiatedBy: '' });
-                }
-              }
-            }
-          } catch {
-            // Legacy subcollection may not exist
-          }
-          localStorage.setItem(migrationKey, 'true');
-        }
-      }
-
-      setConnections(connMap);
-      setConnectionDetails(detailsMap);
-    }, (err) => {
-      console.error('Error listening to connections:', err);
-    });
-
-    return () => unsubscribe();
-  }, [user?.uid]);
-
-  // Handle connect
-  const handleConnect = async (personId: string) => {
-    if (!user?.uid || connectingId) return;
-
-    const currentStatus = connections.get(personId);
-    if (currentStatus === 'connected') {
-      // Show disconnect confirmation modal instead of window.confirm
-      setDisconnectPersonId(personId);
-      setShowDisconnectConfirm(true);
-      return;
-    }
-
-    setConnectingId(personId);
-    const connId = getConnectionId(user.uid, personId);
-
-    try {
-      if (currentStatus === 'pending') {
-        // Withdraw pending request
-        await deleteDoc(doc(db, 'connections', connId));
-        setConnections((prev) => {
-          const m = new Map(prev);
-          m.delete(personId);
-          return m;
-        });
-        setConnectionDetails((prev) => {
-          const m = new Map(prev);
-          m.delete(personId);
-          return m;
-        });
-      } else {
-        // Send connection request
-        await setDoc(doc(db, 'connections', connId), {
-          users: [user.uid, personId].sort(),
-          status: 'pending',
-          initiatedBy: user.uid,
-          connectedAt: null,
-          createdAt: serverTimestamp(),
-        });
-        setConnections((prev) => new Map(prev).set(personId, 'pending'));
-        setConnectionDetails((prev) =>
-          new Map(prev).set(personId, { status: 'pending', initiatedBy: user.uid })
-        );
-      }
-    } catch (err) {
-      console.error('Error toggling connection:', err);
-      setToastMessage('Connection failed. Please try again.');
-    } finally {
-      setConnectingId(null);
-    }
-  };
-
-  // Confirm disconnect (replaces window.confirm)
-  const confirmDisconnect = async () => {
-    if (!disconnectPersonId || !user?.uid) return;
-    setConnectingId(disconnectPersonId);
-    const connId = getConnectionId(user.uid, disconnectPersonId);
-    try {
-      await deleteDoc(doc(db, 'connections', connId));
-      try {
-        await deleteDoc(doc(db, 'users', user.uid, 'connections', disconnectPersonId));
-      } catch {}
-      try {
-        await deleteDoc(doc(db, 'users', disconnectPersonId, 'connections', user.uid));
-      } catch {}
-      setConnections((prev) => {
-        const m = new Map(prev);
-        m.delete(disconnectPersonId);
-        return m;
-      });
-      setConnectionDetails((prev) => {
-        const m = new Map(prev);
-        m.delete(disconnectPersonId);
-        return m;
-      });
-    } catch (err) {
-      console.error('Error disconnecting:', err);
-      setToastMessage('Failed to disconnect. Please try again.');
-    } finally {
-      setConnectingId(null);
-      setShowDisconnectConfirm(false);
-      setDisconnectPersonId(null);
-    }
-  };
-
-  // Handle accept connection
-  const handleAcceptConnection = async (personId: string) => {
-    if (!user?.uid || connectingId) return;
-    setConnectingId(personId);
-    const connId = getConnectionId(user.uid, personId);
-    try {
-      const connRef = doc(db, 'connections', connId);
-      const connSnap = await getDoc(connRef);
-      if (connSnap.exists()) {
-        // Existing pending request — update status to connected
-        await updateDoc(connRef, {
-          status: 'connected',
-          connectedAt: serverTimestamp(),
-        });
-      } else {
-        // No existing doc (edge case) — create fresh
-        await setDoc(connRef, {
-          users: [user.uid, personId].sort(),
-          status: 'connected',
-          initiatedBy: personId,
-          createdAt: serverTimestamp(),
-          connectedAt: serverTimestamp(),
-        });
-      }
-      setConnections((prev) => new Map(prev).set(personId, 'connected'));
-      setConnectionDetails((prev) =>
-        new Map(prev).set(personId, {
-          status: 'connected',
-          initiatedBy: connectionDetails.get(personId)?.initiatedBy || personId,
-          connectedAt: new Date(),
-        })
-      );
-      // #3.9: Trigger accept animation
-      setAcceptAnimatingId(personId);
-      setTimeout(() => setAcceptAnimatingId(null), 2000);
-      setToastMessage('Connection accepted! 🎉');
-    } catch (err) {
-      console.error('Error accepting connection:', err);
-      setToastMessage('Failed to accept connection. Please try again.');
-    } finally {
-      setConnectingId(null);
-    }
-  };
-
-  // Handle decline connection
-  const handleDeclineConnection = async (personId: string) => {
-    if (!user?.uid || connectingId) return;
-    setConnectingId(personId);
-    const connId = getConnectionId(user.uid, personId);
-    try {
-      await deleteDoc(doc(db, 'connections', connId));
-      setConnections((prev) => {
-        const m = new Map(prev);
-        m.delete(personId);
-        return m;
-      });
-      setConnectionDetails((prev) => {
-        const m = new Map(prev);
-        m.delete(personId);
-        return m;
-      });
-    } catch (err) {
-      console.error('Error declining connection:', err);
-      setToastMessage('Failed to decline connection. Please try again.');
-    } finally {
-      setConnectingId(null);
-    }
-  };
-
   // Computed values
-  const connectedCount = Array.from(connections.values()).filter((s) => s === 'connected').length;
-  const pendingCount = Array.from(connections.entries()).filter(
-    ([pid, s]) => s === 'pending' && connectionDetails.get(pid)?.initiatedBy !== user?.uid
-  ).length;
   const discoverCount = people.filter((p) => {
     const status = connections.get(p.id);
     if (!status) return true;
@@ -767,12 +653,14 @@ export default function DiscoverPage() {
   }).length;
 
   // Helper: render heritage badge(s) for a person, hidden if "Prefer Not to Say"
+  // Cross-browser: use explicit Tailwind classes (not dynamic `text-${size}`) to survive CSS purging
   const renderHeritage = (person: User, size: 'xs' | 'sm' = 'xs') => {
     const raw = Array.isArray(person.heritage) ? person.heritage : [person.heritage];
     const display = raw.filter((h) => h && h !== 'Prefer Not to Say' && h !== 'Other');
     if (display.length === 0) return null;
+    const textSizeClass = size === 'sm' ? 'text-sm' : 'text-xs';
     return (
-      <p className={`text-${size} text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5`}>
+      <p className={`${textSizeClass} text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-0.5`}>
         <Globe className="w-3 h-3 shrink-0" /> <span className="truncate">{display.join(', ')}</span>
       </p>
     );
@@ -927,53 +815,6 @@ export default function DiscoverPage() {
     });
   }, [people, selectedHeritage, searchQuery, matchScoreMap, sortBy, connections, connectionDetails, activeTab, user?.uid, blockedUsers]);
 
-  // #2.9: PYMK Groups — single-pass optimization (was 3 separate filter passes)
-  const pymkGroups = useMemo(() => {
-    if (activeTab !== 'discover' || !userProfile)
-      return { sameCity: [], sameHeritage: [], similarInterests: [] };
-
-    const userCity = (userProfile.city || '').toLowerCase();
-    const userHeritage = (Array.isArray(userProfile.heritage)
-      ? userProfile.heritage
-      : [userProfile.heritage].filter(Boolean)
-    ).map((h: string) => h.toLowerCase());
-    const userInterestsSet = new Set<string>(userProfile.interests || []);
-
-    const sameCity: User[] = [];
-    const sameHeritage: User[] = [];
-    const similarInterests: User[] = [];
-
-    // Single pass: classify each discoverable person into PYMK groups
-    for (const p of people) {
-      const status = connections.get(p.id);
-      // Discoverable: not connected, or pending sent by me
-      if (status === 'connected') continue;
-      if (status === 'pending' && connectionDetails.get(p.id)?.initiatedBy !== user?.uid) continue;
-
-      // City match (#3.5: raised cap from 10 to 30 for View All)
-      if (sameCity.length < 30 && p.city && userCity && p.city.toLowerCase() === userCity) {
-        sameCity.push(p);
-      }
-      // Heritage match
-      if (sameHeritage.length < 30) {
-        const pH = (Array.isArray(p.heritage) ? p.heritage : [p.heritage]).filter(Boolean);
-        if (pH.some((h: string) => userHeritage.includes(h.toLowerCase()))) {
-          sameHeritage.push(p);
-        }
-      }
-      // Shared interests (>= 2)
-      if (similarInterests.length < 30) {
-        let shared = 0;
-        for (const i of (p.interests || [])) {
-          if (userInterestsSet.has(i)) shared++;
-          if (shared >= 2) { similarInterests.push(p); break; }
-        }
-      }
-    }
-
-    return { sameCity, sameHeritage, similarInterests };
-  }, [people, connections, connectionDetails, userProfile, activeTab, user?.uid]);
-
   // Pending/Sent requests
   const incomingRequests = useMemo(() => {
     return people.filter((p) => {
@@ -1010,29 +851,56 @@ export default function DiscoverPage() {
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <button
               onClick={() => handleTileClick('members')}
-              className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
-                activeTile === 'members' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
+              className={`rounded-lg p-2 sm:p-3 cursor-pointer text-left ${
+                activeTile === 'members'
+                  ? 'bg-gradient-to-br from-green-400 to-emerald-600 ring-2 ring-white/70 shadow-lg shadow-green-500/30'
+                  : 'bg-white/20 hover:bg-white/30'
               }`}
+              style={{
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: activeTile === 'members' ? 'scale(1.03)' : 'scale(1)',
+                WebkitBackdropFilter: activeTile === 'members' ? 'none' : 'blur(8px)',
+                backdropFilter: activeTile === 'members' ? 'none' : 'blur(8px)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
             >
-              <div className="text-xs text-blue-100">Discover</div>
+              <div className={`text-xs ${activeTile === 'members' ? 'text-green-100' : 'text-blue-100'}`}>Discover</div>
               <div className="text-xl sm:text-2xl font-bold">{discoverCount}</div>
             </button>
             <button
               onClick={() => handleTileClick('connections')}
-              className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left ${
-                activeTile === 'connections' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
+              className={`rounded-lg p-2 sm:p-3 cursor-pointer text-left ${
+                activeTile === 'connections'
+                  ? 'bg-gradient-to-br from-blue-400 to-cyan-600 ring-2 ring-white/70 shadow-lg shadow-blue-500/30'
+                  : 'bg-white/20 hover:bg-white/30'
               }`}
+              style={{
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: activeTile === 'connections' ? 'scale(1.03)' : 'scale(1)',
+                WebkitBackdropFilter: activeTile === 'connections' ? 'none' : 'blur(8px)',
+                backdropFilter: activeTile === 'connections' ? 'none' : 'blur(8px)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
             >
-              <div className="text-xs text-blue-100">Network</div>
+              <div className={`text-xs ${activeTile === 'connections' ? 'text-cyan-100' : 'text-blue-100'}`}>Network</div>
               <div className="text-xl sm:text-2xl font-bold">{connectedCount}</div>
             </button>
             <button
               onClick={() => handleTileClick('pending')}
-              className={`rounded-lg p-2 sm:p-3 backdrop-blur cursor-pointer hover:bg-white/30 transition-all text-left relative ${
-                activeTile === 'pending' ? 'bg-white/40 ring-2 ring-white/70 shadow-lg' : 'bg-white/20'
-              } ${pendingCount > 0 ? 'ring-2 ring-yellow-400/60' : ''}`}
+              className={`rounded-lg p-2 sm:p-3 cursor-pointer text-left relative ${
+                activeTile === 'pending'
+                  ? 'bg-gradient-to-br from-orange-400 to-amber-600 ring-2 ring-white/70 shadow-lg shadow-orange-500/30'
+                  : 'bg-white/20 hover:bg-white/30'
+              } ${pendingCount > 0 && activeTile !== 'pending' ? 'ring-2 ring-yellow-400/60' : ''}`}
+              style={{
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: activeTile === 'pending' ? 'scale(1.03)' : 'scale(1)',
+                WebkitBackdropFilter: activeTile === 'pending' ? 'none' : 'blur(8px)',
+                backdropFilter: activeTile === 'pending' ? 'none' : 'blur(8px)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
             >
-              <div className="text-xs text-blue-100">Pending</div>
+              <div className={`text-xs ${activeTile === 'pending' ? 'text-amber-100' : 'text-blue-100'}`}>Pending</div>
               <div className="text-xl sm:text-2xl font-bold">{pendingCount}</div>
               {pendingCount > 0 && (
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
@@ -1042,8 +910,8 @@ export default function DiscoverPage() {
         </div>
       </div>
 
-      {/* Sticky Tab Navigation + Search */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm">
+      {/* Sticky Tab Navigation + Search — -webkit-sticky for iOS Safari */}
+      <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm" style={{ position: '-webkit-sticky' as any }}>
         <div className="max-w-6xl mx-auto px-4">
           {/* Search + EthniZity + Tabs row */}
           <div className="flex items-center gap-2 py-3 border-b border-aurora-border">
@@ -1054,11 +922,11 @@ export default function DiscoverPage() {
                 type="text"
                 placeholder="Search by name, city, profession..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => dispatchFilter({ type: "SET_SEARCH", payload: e.target.value })}
                 className="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-300">
+                <button onClick={() => dispatchFilter({ type: "SET_SEARCH", payload: '' })} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-300">
                   <X className="w-4 h-4" />
                 </button>
               )}
@@ -1067,7 +935,7 @@ export default function DiscoverPage() {
             {/* EthniZity Filter Dropdown */}
             <EthnicityFilterDropdown
               selected={selectedHeritage}
-              onChange={setSelectedHeritage}
+              onChange={(h) => dispatchFilter({ type: "SET_HERITAGE", payload: h })}
             />
 
           </div>
@@ -1107,7 +975,7 @@ export default function DiscoverPage() {
             {activeTab === 'discover' && (
               <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
                 <button
-                  onClick={() => setSortBy('match')}
+                  onClick={() => dispatchFilter({ type: "SET_SORT", payload: 'match' })}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     sortBy === 'match'
                       ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm'
@@ -1118,7 +986,7 @@ export default function DiscoverPage() {
                   <Sparkles className="w-3.5 h-3.5 inline mr-1" />Match
                 </button>
                 <button
-                  onClick={() => setSortBy('name')}
+                  onClick={() => dispatchFilter({ type: "SET_SORT", payload: 'name' })}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     sortBy === 'name'
                       ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm'
@@ -1129,7 +997,7 @@ export default function DiscoverPage() {
                   A–Z
                 </button>
                 <button
-                  onClick={() => setSortBy('recent')}
+                  onClick={() => dispatchFilter({ type: "SET_SORT", payload: 'recent' })}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     sortBy === 'recent'
                       ? 'bg-white dark:bg-gray-700 text-purple-600 dark:text-purple-400 shadow-sm'
@@ -1168,8 +1036,8 @@ export default function DiscoverPage() {
                       ? 'border-green-400 dark:border-green-500/60 scale-[1.02]'
                       : 'border-orange-300 dark:border-orange-500/40'
                   }`}
-                  onClick={() => setSelectedPerson(person)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
+                  onClick={() => dispatchModal({ type: "OPEN_PROFILE", payload: person })}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dispatchModal({ type: "OPEN_PROFILE", payload: person }); } }}
                 >
                   {/* #3.9: Accept animation overlay */}
                   {acceptAnimatingId === person.id && (
@@ -1179,7 +1047,7 @@ export default function DiscoverPage() {
                       </div>
                     </div>
                   )}
-                  <div className="bg-gradient-to-r from-orange-400 to-amber-400 px-3 py-2.5">
+                  <div className="bg-gradient-to-r from-orange-600 to-amber-500 px-3 py-2.5">
                     <div className="flex items-center gap-2">
                       <div className="bg-orange-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                         <UserPlus className="w-3 h-3" /> Wants to connect
@@ -1240,8 +1108,8 @@ export default function DiscoverPage() {
               {sentRequests.map((person) => (
                 <div key={person.id} role="button" tabIndex={0} aria-label={`View profile of ${person.name} — sent request`}
                   className="bg-aurora-surface rounded-2xl border border-purple-200 dark:border-purple-500/30 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer"
-                  onClick={() => setSelectedPerson(person)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
+                  onClick={() => dispatchModal({ type: "OPEN_PROFILE", payload: person })}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dispatchModal({ type: "OPEN_PROFILE", payload: person }); } }}
                 >
                   <div className="bg-gradient-to-r from-purple-500 to-blue-400 px-3 py-2.5">
                     <div className="flex items-center gap-2">
@@ -1307,7 +1175,7 @@ export default function DiscoverPage() {
                     </button>
                   )}
                 </div>
-                <div className="overflow-x-auto pb-4 scrollbar-hide">
+                <div ref={carouselRefCity} className="overflow-x-auto pb-4 hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }} onKeyDown={(e) => handleCarouselKeyDown(e, carouselRefCity)}>
                   <div className={expandedPymk.city ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'flex gap-4 w-max'}>
                     {(expandedPymk.city ? pymkGroups.sameCity : pymkGroups.sameCity.slice(0, PYMK_PREVIEW)).map((person) => (
                       <div
@@ -1316,8 +1184,9 @@ export default function DiscoverPage() {
                         tabIndex={0}
                         aria-label={`View profile of ${person.name}`}
                         className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-blue-200 dark:border-blue-500/30 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
-                        onClick={() => setSelectedPerson(person)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                        onClick={() => dispatchModal({ type: "OPEN_PROFILE", payload: person })}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dispatchModal({ type: "OPEN_PROFILE", payload: person }); } else { handleCarouselKeyDown(e, carouselRefCity); } }}
                       >
                         <div className="bg-gradient-to-r from-blue-500 to-blue-400 px-3 py-2">
                           <div className="bg-blue-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
@@ -1391,7 +1260,7 @@ export default function DiscoverPage() {
                     </button>
                   )}
                 </div>
-                <div className="overflow-x-auto pb-4 scrollbar-hide">
+                <div ref={carouselRefHeritage} className="overflow-x-auto pb-4 hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }} onKeyDown={(e) => handleCarouselKeyDown(e, carouselRefHeritage)}>
                   <div className={expandedPymk.heritage ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'flex gap-4 w-max'}>
                     {(expandedPymk.heritage ? pymkGroups.sameHeritage : pymkGroups.sameHeritage.slice(0, PYMK_PREVIEW)).map((person) => (
                       <div
@@ -1400,8 +1269,9 @@ export default function DiscoverPage() {
                         tabIndex={0}
                         aria-label={`View profile of ${person.name}`}
                         className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-orange-200 dark:border-orange-500/30 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
-                        onClick={() => setSelectedPerson(person)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                        onClick={() => dispatchModal({ type: "OPEN_PROFILE", payload: person })}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dispatchModal({ type: "OPEN_PROFILE", payload: person }); } else { handleCarouselKeyDown(e, carouselRefHeritage); } }}
                       >
                         <div className="bg-gradient-to-r from-orange-500 to-amber-400 px-3 py-2">
                           <div className="bg-orange-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
@@ -1475,7 +1345,7 @@ export default function DiscoverPage() {
                     </button>
                   )}
                 </div>
-                <div className="overflow-x-auto pb-4 scrollbar-hide">
+                <div ref={carouselRefInterests} className="overflow-x-auto pb-4 hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }} onKeyDown={(e) => handleCarouselKeyDown(e, carouselRefInterests)}>
                   <div className={expandedPymk.interests ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4' : 'flex gap-4 w-max'}>
                     {(expandedPymk.interests ? pymkGroups.similarInterests : pymkGroups.similarInterests.slice(0, PYMK_PREVIEW)).map((person) => (
                       <div
@@ -1484,8 +1354,9 @@ export default function DiscoverPage() {
                         tabIndex={0}
                         aria-label={`View profile of ${person.name}`}
                         className="w-44 sm:w-52 bg-aurora-surface rounded-2xl border border-purple-200 dark:border-purple-500/30 overflow-hidden hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col cursor-pointer flex-shrink-0"
-                        onClick={() => setSelectedPerson(person)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                        onClick={() => dispatchModal({ type: "OPEN_PROFILE", payload: person })}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dispatchModal({ type: "OPEN_PROFILE", payload: person }); } else { handleCarouselKeyDown(e, carouselRefInterests); } }}
                       >
                         <div className="bg-gradient-to-r from-purple-500 to-violet-400 px-3 py-2">
                           <div className="bg-purple-700 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 w-fit">
@@ -1556,6 +1427,15 @@ export default function DiscoverPage() {
           </>
         )}
 
+        {/* Accessibility: Announce result count changes */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {activeTab === 'discover' && filteredPeople.length > 0 &&
+            `Found ${filteredPeople.length} ${filteredPeople.length === 1 ? 'person' : 'people'} matching your filters`}
+          {activeTab === 'discover' && filteredPeople.length === 0 && 'No people found matching your filters'}
+          {activeTab === 'network' && connectedCount > 0 && `${connectedCount} connected ${connectedCount === 1 ? 'person' : 'people'}`}
+          {activeTab === 'pending' && pendingCount > 0 && `${pendingCount} pending ${pendingCount === 1 ? 'request' : 'requests'}`}
+        </div>
+
         {/* Main Grid/List View */}
         {!loading && filteredPeople.length > 0 && activeTab !== 'pending' && (
           <div className="flex items-center gap-2 mb-4">
@@ -1580,7 +1460,7 @@ export default function DiscoverPage() {
                 <p className="text-gray-500 dark:text-gray-400 mb-4">Try adjusting your filters or search terms</p>
                 {selectedHeritage.length > 0 && (
                   <button
-                    onClick={() => setSelectedHeritage([])}
+                    onClick={() => dispatchFilter({ type: "SET_HERITAGE", payload: [] })}
                     className="text-sm text-purple-600 hover:text-purple-800 dark:text-purple-400 font-medium"
                   >
                     Clear heritage filter
@@ -1603,7 +1483,7 @@ export default function DiscoverPage() {
                 <h3 className="text-xl font-bold text-gray-600 dark:text-gray-300 mb-2">No connections yet</h3>
                 <p className="text-gray-500 dark:text-gray-400 mb-4">Start connecting with people to build your network</p>
                 <button
-                  onClick={() => setActiveTab('discover')}
+                  onClick={() => dispatchFilter({ type: "SET_TAB", payload: 'discover' })}
                   className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                 >
                   Discover People
@@ -1625,12 +1505,12 @@ export default function DiscoverPage() {
                   aria-label={`View profile of ${person.name}${person.profession ? `, ${person.profession}` : ''}${person.city ? `, ${person.city}` : ''}`}
                   className="group bg-aurora-surface rounded-2xl border border-green-200 dark:border-green-500/30 overflow-hidden cursor-pointer hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none transition-all duration-200 flex flex-col"
                   style={{ WebkitTapHighlightColor: 'transparent' }}
-                  onClick={() => setSelectedPerson(person)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedPerson(person); } }}
+                  onClick={() => dispatchModal({ type: "OPEN_PROFILE", payload: person })}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dispatchModal({ type: "OPEN_PROFILE", payload: person }); } }}
                   onTouchStart={() => {}}
                 >
                   {/* Short gradient header */}
-                  <div className={`bg-gradient-to-r ${activeTab === 'pending' ? 'from-orange-400 to-amber-400' : 'from-green-500 to-emerald-400'} px-2 py-1.5 flex items-center justify-between`}>
+                  <div className={`bg-gradient-to-r ${activeTab === 'pending' ? 'from-orange-600 to-amber-500' : 'from-green-500 to-emerald-400'} px-2 py-1.5 flex items-center justify-between`}>
                     {isNewMember(person) && (
                       <span className="bg-green-700 text-white text-[7px] font-bold px-1.5 py-0.5 rounded-full leading-none">NEW</span>
                     )}
@@ -1638,7 +1518,7 @@ export default function DiscoverPage() {
                       <MatchBadge score={score} inline />
                       <div className="relative">
                         <button
-                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === person.id ? null : person.id); }}
+                          onClick={(e) => { e.stopPropagation(); dispatchModal({ type: "SET_MENU", payload: openMenuId === person.id ? null : person.id }); }}
                           className="p-0.5 hover:bg-white/20 rounded-full transition-colors"
                         >
                           <MoreVertical className="w-3.5 h-3.5 text-white/80" />
@@ -1688,7 +1568,7 @@ export default function DiscoverPage() {
                       )}
                       {getMutualConnectionCount(person.id) > 0 && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setMutualListFor(person.id); }}
+                          onClick={(e) => { e.stopPropagation(); dispatchModal({ type: "SET_MUTUAL_LIST", payload: person.id }); }}
                           className="text-[10px] text-blue-600 font-medium hover:text-blue-800 hover:underline cursor-pointer transition-colors text-left"
                         >
                           {getMutualConnectionCount(person.id)} mutual
@@ -1774,13 +1654,15 @@ export default function DiscoverPage() {
       {selectedPerson && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center sm:justify-center"
-          onClick={() => setSelectedPerson(null)}
+          onClick={() => dispatchModal({ type: "CLOSE_PROFILE" })}
           role="dialog"
           aria-modal="true"
           aria-label={`Profile details for ${selectedPerson.name}`}
+          style={{ WebkitTapHighlightColor: 'transparent' }}
         >
           <div
             className="bg-white dark:bg-gray-800 w-full sm:max-w-md sm:rounded-lg rounded-t-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            style={{ maxHeight: 'min(90vh, 90dvh)', WebkitOverflowScrolling: 'touch' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className={`h-40 bg-gradient-to-r ${
@@ -1791,7 +1673,7 @@ export default function DiscoverPage() {
               ] || 'from-gray-300 to-gray-400'
             } relative`}>
               <button
-                onClick={() => setSelectedPerson(null)}
+                onClick={() => dispatchModal({ type: "CLOSE_PROFILE" })}
                 className="absolute top-3 right-3 p-1.5 bg-black/30 hover:bg-black/50 rounded-full transition-colors"
                 aria-label="Close profile"
               >
@@ -1848,7 +1730,7 @@ export default function DiscoverPage() {
 
               {getMutualConnectionCount(selectedPerson.id) > 0 && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setMutualListFor(selectedPerson.id); }}
+                  onClick={(e) => { e.stopPropagation(); dispatchModal({ type: "SET_MUTUAL_LIST", payload: selectedPerson.id }); }}
                   className="block mx-auto text-xs text-blue-600 dark:text-blue-400 font-medium mb-1 hover:text-blue-800 hover:underline cursor-pointer transition-colors">
                   {getMutualConnectionCount(selectedPerson.id)} mutual connections
                 </button>
@@ -1919,7 +1801,7 @@ export default function DiscoverPage() {
                     <button
                       onClick={() => {
                         navigate(`/messages?user=${selectedPerson.id}`);
-                        setSelectedPerson(null);
+                        dispatchModal({ type: "CLOSE_PROFILE" });
                       }}
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-1"
                     >
@@ -1968,12 +1850,13 @@ export default function DiscoverPage() {
       {mutualListFor && (
         <div
           className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[60]"
-          onClick={() => setMutualListFor(null)}
-          onTouchStart={() => setMutualListFor(null)}
+          onClick={() => dispatchModal({ type: "SET_MUTUAL_LIST", payload: null })}
+          onTouchStart={() => dispatchModal({ type: "SET_MUTUAL_LIST", payload: null })}
           style={{ WebkitTapHighlightColor: 'transparent' }}
         >
           <div
             className="bg-white dark:bg-gray-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[70vh] flex flex-col overflow-hidden"
+            style={{ maxHeight: 'min(70vh, 70dvh)' }}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
           >
@@ -1986,7 +1869,7 @@ export default function DiscoverPage() {
                 </p>
               </div>
               <button
-                onClick={() => setMutualListFor(null)}
+                onClick={() => dispatchModal({ type: "SET_MUTUAL_LIST", payload: null })}
                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
               >
                 <X className="w-4 h-4 text-white" />
@@ -2001,7 +1884,7 @@ export default function DiscoverPage() {
                   <div
                     key={mutual.id}
                     className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-                    onClick={() => { setMutualListFor(null); setSelectedPerson(mutual); }}
+                    onClick={() => { dispatchModal({ type: "SET_MUTUAL_LIST", payload: null }); dispatchModal({ type: "OPEN_PROFILE", payload: mutual }); }}
                   >
                     <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-sm">
                       {renderAvatar(mutual.avatar, mutual.name)}
@@ -2020,7 +1903,7 @@ export default function DiscoverPage() {
                       </div>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); setMutualListFor(null); navigate(`/messages?user=${mutual.id}`); }}
+                      onClick={(e) => { e.stopPropagation(); dispatchModal({ type: "SET_MUTUAL_LIST", payload: null }); navigate(`/messages?user=${mutual.id}`); }}
                       className="shrink-0 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 p-2 rounded-full hover:bg-green-200 dark:hover:bg-green-800/40 transition-colors"
                     >
                       <MessageCircle className="w-4 h-4" />
@@ -2035,7 +1918,7 @@ export default function DiscoverPage() {
 
       {/* Block User Confirmation Modal */}
       {showBlockConfirm && blockTargetUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => { dispatchModal({ type: "CLOSE_BLOCK_CONFIRM" }); }} style={{ WebkitTapHighlightColor: 'transparent' }}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-center">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -2047,7 +1930,7 @@ export default function DiscoverPage() {
               </p>
               <div className="flex gap-3">
                 <button
-                  onClick={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}
+                  onClick={() => { dispatchModal({ type: "CLOSE_BLOCK_CONFIRM" }); }}
                   className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 transition-colors"
                 >
                   Cancel
@@ -2066,7 +1949,7 @@ export default function DiscoverPage() {
 
       {/* Disconnect Confirmation Modal */}
       {showDisconnectConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => { setShowDisconnectConfirm(false); setDisconnectPersonId(null); }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => { setShowDisconnectConfirm(false); setDisconnectPersonId(null); }} style={{ WebkitTapHighlightColor: 'transparent' }}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-center">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -2098,8 +1981,15 @@ export default function DiscoverPage() {
       {/* Toast Notification (#1.7: safe-area-aware positioning, cross-browser) */}
       {toastMessage && (
         <div
-          className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[70] text-sm font-medium animate-fade-in max-w-[90vw]"
-          style={{ bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))' }}
+          className="fixed left-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-lg z-[70] text-sm font-medium animate-fade-in max-w-[90vw]"
+          style={{
+            bottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))',
+            transform: 'translateX(-50%)',
+            WebkitTransform: 'translateX(-50%)',
+          }}
+          role="status"
+          aria-live="assertive"
+          aria-atomic="true"
         >
           {toastMessage}
         </div>
