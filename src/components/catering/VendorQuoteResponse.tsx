@@ -241,10 +241,40 @@ export default function VendorQuoteResponse({
 
                   {/* Request details */}
                   {request && (
-                    <div className="flex items-center gap-3 text-xs mb-3" style={{ color: 'var(--aurora-text-secondary)' }}>
-                      <span>{request.cuisineCategory}</span>
-                      <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
-                      <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
+                    <div className="mb-3">
+                      <div className="flex items-center gap-3 text-xs mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        <span>{request.cuisineCategory}</span>
+                        <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
+                        <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} />
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString() : String(request.eventDate || '')}
+                        </span>
+                      </div>
+                      {/* Full item breakdown */}
+                      <div className="space-y-1">
+                        {response.quotedItems?.map((qi, i) => (
+                          <div key={i} className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>{qi.name} x {qi.qty} ({qi.pricingType?.replace(/_/g, ' ') || 'per unit'})</span>
+                            <span>{formatPrice(qi.unitPrice * qi.qty)}</span>
+                          </div>
+                        ))}
+                        {response.serviceFee != null && response.serviceFee > 0 && (
+                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>Service fee</span><span>{formatPrice(response.serviceFee)}</span>
+                          </div>
+                        )}
+                        {response.deliveryFee != null && response.deliveryFee > 0 && (
+                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>Delivery fee</span><span>{formatPrice(response.deliveryFee)}</span>
+                          </div>
+                        )}
+                      </div>
+                      {request.specialInstructions && (
+                        <p className="text-xs mt-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
+                          Customer note: {request.specialInstructions}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -393,30 +423,39 @@ export default function VendorQuoteResponse({
                         <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6366F1' }}>
                           Your Quote
                         </p>
-                        {form.items.map((qi, idx) => (
-                          <div key={idx} className="flex items-center gap-3">
-                            <span className="flex-1 text-sm" style={{ color: 'var(--aurora-text)' }}>
-                              {qi.name} x {qi.qty}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <DollarSign size={14} style={{ color: 'var(--aurora-text-secondary)' }} />
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={qi.unitPrice ? (qi.unitPrice / 100).toFixed(2) : ''}
-                                onChange={(e) => {
-                                  const cents = Math.round(parseFloat(e.target.value || '0') * 100);
-                                  updateQuoteItem(request.id, idx, { unitPrice: cents });
-                                }}
-                                placeholder="0.00"
-                                className="w-24 rounded-lg border px-2 py-1.5 text-sm text-right outline-none focus:ring-2 focus:ring-indigo-500/30"
-                                style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                              />
-                              <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>/unit</span>
+                        {form.items.map((qi, idx) => {
+                          const requestItem = request.items[idx];
+                          const pricingLabel = (requestItem?.pricingType || qi.pricingType || 'per_unit').replace(/_/g, ' ');
+                          return (
+                            <div key={idx} className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>
+                                  {qi.name} x {qi.qty}
+                                </span>
+                                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                                  {pricingLabel}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <DollarSign size={14} style={{ color: 'var(--aurora-text-secondary)' }} />
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={qi.unitPrice ? (qi.unitPrice / 100).toFixed(2) : ''}
+                                  onChange={(e) => {
+                                    const cents = Math.round(parseFloat(e.target.value || '0') * 100);
+                                    updateQuoteItem(request.id, idx, { unitPrice: cents });
+                                  }}
+                                  placeholder="0.00"
+                                  className="w-24 rounded-lg border px-2 py-1.5 text-sm text-right outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                  style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                />
+                                <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>/{pricingLabel.split(' ').pop()}</span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
 
                         {/* Fees */}
                         <div className="grid grid-cols-2 gap-3 pt-2">
@@ -507,26 +546,101 @@ export default function VendorQuoteResponse({
           <div className="space-y-2">
             {pendingResponses.map((response) => {
               const request = requests.find((r) => r.id === response.quoteRequestId);
+              const isExpanded = expandedId === `pending-${response.id}`;
               return (
                 <div
                   key={response.id}
-                  className="flex items-center justify-between p-4 rounded-xl border"
+                  className="rounded-2xl border overflow-hidden"
                   style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
                 >
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
-                      {request?.cuisineCategory || 'Catering'} · {request?.headcount || '?'} guests · {request?.deliveryCity || ''}
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                      Your quote: {formatPrice(response.total)}
-                    </p>
-                  </div>
-                  <span
-                    className="px-2.5 py-1 rounded-full text-xs font-medium"
-                    style={{ backgroundColor: '#EEF2FF', color: '#6366F1' }}
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : `pending-${response.id}`)}
+                    className="w-full flex items-center justify-between p-4 text-left"
                   >
-                    Pending
-                  </span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
+                          {request?.cuisineCategory || 'Catering'} · {request?.headcount || '?'} guests · {request?.deliveryCity || ''}
+                        </span>
+                      </div>
+                      <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        Your quote: {formatPrice(response.total)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-medium"
+                        style={{ backgroundColor: '#EEF2FF', color: '#6366F1' }}
+                      >
+                        Pending
+                      </span>
+                      {isExpanded ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+                    </div>
+                  </button>
+                  {isExpanded && request && (
+                    <div className="px-4 pb-4 border-t space-y-3" style={{ borderColor: 'var(--aurora-border)' }}>
+                      {/* Event details */}
+                      <div className="flex items-center gap-3 text-xs pt-3" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
+                        <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} />
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString() : String(request.eventDate || '')}
+                        </span>
+                      </div>
+                      {/* Requested items */}
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                          Requested Items
+                        </p>
+                        {request.items.map((ri, i) => (
+                          <div key={i} className="flex items-center gap-2 text-sm mb-1.5" style={{ color: 'var(--aurora-text)' }}>
+                            <span>{ri.name} (qty: {ri.qty}, {ri.pricingType.replace(/_/g, ' ')})</span>
+                            {ri.dietaryTags && ri.dietaryTags.length > 0 && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(5,150,105,0.08)', color: '#059669' }}>
+                                {ri.dietaryTags.join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {/* Your submitted quote breakdown */}
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#6366F1' }}>
+                          Your Submitted Quote
+                        </p>
+                        {response.quotedItems.map((qi, i) => (
+                          <div key={i} className="flex justify-between text-sm mb-1" style={{ color: 'var(--aurora-text)' }}>
+                            <span>{qi.name} x {qi.qty} <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>({qi.pricingType?.replace(/_/g, ' ') || 'per unit'})</span></span>
+                            <span>{formatPrice(qi.unitPrice * qi.qty)}</span>
+                          </div>
+                        ))}
+                        {response.serviceFee != null && response.serviceFee > 0 && (
+                          <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>Service fee</span><span>{formatPrice(response.serviceFee)}</span>
+                          </div>
+                        )}
+                        {response.deliveryFee != null && response.deliveryFee > 0 && (
+                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>Delivery fee</span><span>{formatPrice(response.deliveryFee)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}>
+                          <span>Total</span><span style={{ color: '#6366F1' }}>{formatPrice(response.total)}</span>
+                        </div>
+                      </div>
+                      {response.estimatedPrepTime && (
+                        <p className="text-xs flex items-center gap-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+                          <Clock size={12} /> Prep time: {response.estimatedPrepTime}
+                        </p>
+                      )}
+                      {request.specialInstructions && (
+                        <p className="text-xs p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
+                          Customer note: {request.specialInstructions}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -543,26 +657,67 @@ export default function VendorQuoteResponse({
           <div className="space-y-2">
             {declinedResponses.map((response) => {
               const request = requests.find((r) => r.id === response.quoteRequestId);
+              const isExpanded = expandedId === `declined-${response.id}`;
               return (
                 <div
                   key={response.id}
-                  className="flex items-center justify-between p-4 rounded-xl border opacity-60"
+                  className="rounded-2xl border overflow-hidden opacity-60"
                   style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
                 >
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
-                      {request?.cuisineCategory || 'Catering'} · {request?.headcount || '?'} guests · {request?.deliveryCity || ''}
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                      Your quote: {formatPrice(response.total)}
-                    </p>
-                  </div>
-                  <span
-                    className="px-2.5 py-1 rounded-full text-xs font-medium"
-                    style={{ backgroundColor: '#FEE2E2', color: '#EF4444' }}
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : `declined-${response.id}`)}
+                    className="w-full flex items-center justify-between p-4 text-left"
                   >
-                    Declined
-                  </span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
+                          {request?.cuisineCategory || 'Catering'} · {request?.headcount || '?'} guests · {request?.deliveryCity || ''}
+                        </span>
+                      </div>
+                      <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        Your quote: {formatPrice(response.total)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-medium"
+                        style={{ backgroundColor: '#FEE2E2', color: '#EF4444' }}
+                      >
+                        Declined
+                      </span>
+                      {isExpanded ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+                    </div>
+                  </button>
+                  {isExpanded && request && (
+                    <div className="px-4 pb-4 border-t space-y-3" style={{ borderColor: 'var(--aurora-border)' }}>
+                      <div className="flex items-center gap-3 text-xs pt-3" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
+                        <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} />
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString() : String(request.eventDate || '')}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                          Requested Items
+                        </p>
+                        {request.items.map((ri, i) => (
+                          <div key={i} className="flex items-center gap-2 text-sm mb-1.5" style={{ color: 'var(--aurora-text)' }}>
+                            <span>{ri.name} (qty: {ri.qty}, {ri.pricingType.replace(/_/g, ' ')})</span>
+                            {ri.dietaryTags && ri.dietaryTags.length > 0 && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(5,150,105,0.08)', color: '#059669' }}>
+                                {ri.dietaryTags.join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold pt-2 border-t" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}>
+                        <span>Your quote was</span><span style={{ color: '#EF4444' }}>{formatPrice(response.total)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
