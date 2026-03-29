@@ -12,7 +12,7 @@
 import React, { useReducer, useCallback, useEffect, useState, useRef } from 'react';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store,
-  Send, FileText,
+  Send, FileText, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -30,15 +30,27 @@ import {
   subscribeToCustomerQuoteRequests,
 } from '@/services/cateringService';
 
-// ── Components ──
+// ── Components (eager: lightweight, needed on first render) ──
 import CateringCategoryGrid from '@/components/catering/CateringCategoryGrid';
 import CateringItemList from '@/components/catering/CateringItemList';
 import CateringCart from '@/components/catering/CateringCart';
-import CateringCheckout from '@/components/catering/CateringCheckout';
-import VendorCateringDashboard from '@/components/catering/VendorCateringDashboard';
-import VendorQuoteResponse from '@/components/catering/VendorQuoteResponse';
-import RequestForPriceForm from '@/components/catering/RequestForPriceForm';
-import QuoteComparison from '@/components/catering/QuoteComparison';
+
+// ── Components (lazy: heavy, only loaded when navigated to) ──
+const CateringCheckout = React.lazy(() => import('@/components/catering/CateringCheckout'));
+const VendorCateringDashboard = React.lazy(() => import('@/components/catering/VendorCateringDashboard'));
+const VendorQuoteResponse = React.lazy(() => import('@/components/catering/VendorQuoteResponse'));
+const RequestForPriceForm = React.lazy(() => import('@/components/catering/RequestForPriceForm'));
+const QuoteComparison = React.lazy(() => import('@/components/catering/QuoteComparison'));
+const CateringOrderStatus = React.lazy(() => import('@/components/catering/CateringOrderStatus'));
+const VendorAnalytics = React.lazy(() => import('@/components/catering/VendorAnalytics'));
+
+function LazyFallback() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+    </div>
+  );
+}
 
 export default function CateringPage() {
   const { user, userProfile } = useAuth();
@@ -48,7 +60,7 @@ export default function CateringPage() {
   const [allCateringBusinesses, setAllCateringBusinesses] = useState<any[]>([]);
   const [userOwnedBusiness, setUserOwnedBusiness] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes'>('orders');
+  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics'>('orders');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
   const selectedQuoteRequestRef = useRef<CateringQuoteRequest | null>(null);
   // Keep ref in sync with state so real-time subscription callback can access latest value
@@ -235,6 +247,7 @@ export default function CateringPage() {
         customerId: user.uid,
         deliveryCity: rfpForm.deliveryCity,
         cuisineCategory: state.selectedCategory || '',
+        eventType: rfpForm.eventType || undefined,
         eventDate: rfpForm.eventDate,
         headcount: rfpForm.headcount,
         items: rfpForm.items,
@@ -277,6 +290,7 @@ export default function CateringPage() {
       case 'checkout': return 'Checkout';
       case 'rfp': return 'Request for Price';
       case 'quotes': return selectedQuoteRequest ? 'Quote Responses' : 'My Quotes';
+      case 'orders': return 'My Orders';
       case 'vendor': return 'Vendor Dashboard';
       default: return 'Catering';
     }
@@ -290,6 +304,7 @@ export default function CateringPage() {
       setSelectedQuoteRequest(null);
       return;
     }
+    if (state.view === 'orders') return handleBackToCategories();
     return handleBackToCategories();
   };
 
@@ -323,6 +338,27 @@ export default function CateringPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* My Orders pill — always visible when logged in */}
+          {user && (
+            <button
+              onClick={() => {
+                if (state.view === 'orders') {
+                  dispatch({ type: 'SET_VIEW', payload: 'categories' });
+                } else {
+                  dispatch({ type: 'SET_VIEW', payload: 'orders' });
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              style={{
+                backgroundColor: state.view === 'orders' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                color: state.view === 'orders' ? '#fff' : 'var(--aurora-text-secondary)',
+              }}
+            >
+              <ClipboardList size={16} />
+              Orders
+            </button>
+          )}
+
           {/* My Quotes pill — always visible when logged in */}
           {user && (
             <button
@@ -342,7 +378,7 @@ export default function CateringPage() {
               }}
             >
               <FileText size={16} />
-              My Quotes
+              Quotes
             </button>
           )}
 
@@ -368,7 +404,7 @@ export default function CateringPage() {
           )}
 
           {/* Cart button */}
-          {!['checkout', 'vendor', 'rfp', 'quotes'].includes(state.view) && (
+          {!['checkout', 'vendor', 'rfp', 'quotes', 'orders'].includes(state.view) && (
             <button
               onClick={() => dispatch({ type: 'TOGGLE_CART' })}
               className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
@@ -469,18 +505,28 @@ export default function CateringPage() {
 
         {/* Checkout view (Path A) */}
         {state.view === 'checkout' && (
-          <CateringCheckout
-            cart={state.cart}
-            orderForm={state.orderForm}
-            onUpdateForm={(updates) => dispatch({ type: 'UPDATE_ORDER_FORM', payload: updates })}
-            onPlaceOrder={handlePlaceOrder}
-            onBack={handleBackToItems}
-            loading={submitting}
-          />
+          <React.Suspense fallback={<LazyFallback />}>
+            <CateringCheckout
+              cart={state.cart}
+              orderForm={state.orderForm}
+              onUpdateForm={(updates) => dispatch({ type: 'UPDATE_ORDER_FORM', payload: updates })}
+              onPlaceOrder={handlePlaceOrder}
+              onBack={handleBackToItems}
+              loading={submitting}
+            />
+          </React.Suspense>
+        )}
+
+        {/* My Orders view with status timeline */}
+        {state.view === 'orders' && (
+          <React.Suspense fallback={<LazyFallback />}>
+            <CateringOrderStatus onBack={handleBackToCategories} />
+          </React.Suspense>
         )}
 
         {/* RFP form view (Path B) */}
         {state.view === 'rfp' && (
+          <React.Suspense fallback={<LazyFallback />}>
           <RequestForPriceForm
             rfpForm={state.rfpForm}
             businesses={state.businesses}
@@ -493,6 +539,7 @@ export default function CateringPage() {
             onBack={handleBackToItems}
             loading={submitting}
           />
+          </React.Suspense>
         )}
 
         {/* My Quotes view */}
@@ -547,6 +594,7 @@ export default function CateringPage() {
                           </span>
                         </div>
                         <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                          {req.eventType && <span className="capitalize">{req.eventType.replace(/_/g, ' ')} · </span>}
                           {req.headcount} guests · {req.deliveryCity} · {req.items.length} item{req.items.length !== 1 ? 's' : ''}
                         </p>
                         <p className="text-xs mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
@@ -569,10 +617,12 @@ export default function CateringPage() {
 
         {/* Quote comparison view (viewing responses for a specific request) */}
         {state.view === 'quotes' && selectedQuoteRequest && (
-          <QuoteComparison
-            quoteRequest={selectedQuoteRequest}
-            onBack={() => setSelectedQuoteRequest(null)}
-          />
+          <React.Suspense fallback={<LazyFallback />}>
+            <QuoteComparison
+              quoteRequest={selectedQuoteRequest}
+              onBack={() => setSelectedQuoteRequest(null)}
+            />
+          </React.Suspense>
         )}
 
         {/* Vendor dashboard with tabs */}
@@ -600,8 +650,19 @@ export default function CateringPage() {
               >
                 Quote Requests
               </button>
+              <button
+                onClick={() => setVendorTab('analytics')}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: vendorTab === 'analytics' ? '#6366F1' : 'var(--aurora-surface-variant)',
+                  color: vendorTab === 'analytics' ? '#fff' : 'var(--aurora-text-secondary)',
+                }}
+              >
+                Analytics
+              </button>
             </div>
 
+            <React.Suspense fallback={<LazyFallback />}>
             {vendorTab === 'orders' && (
               <VendorCateringDashboard
                 businessId={ownedBusiness.id}
@@ -616,6 +677,13 @@ export default function CateringPage() {
                 businessRating={ownedBusiness.rating}
               />
             )}
+            {vendorTab === 'analytics' && (
+                <VendorAnalytics
+                  businessId={ownedBusiness.id}
+                  businessName={ownedBusiness.name}
+                />
+            )}
+            </React.Suspense>
           </div>
         )}
       </div>

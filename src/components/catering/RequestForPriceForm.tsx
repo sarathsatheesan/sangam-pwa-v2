@@ -8,6 +8,7 @@ import OrderForSelector from './OrderForSelector';
 interface RequestForPriceFormProps {
   rfpForm: {
     deliveryCity: string;
+    eventType: string;
     eventDate: string;
     headcount: number;
     specialInstructions: string;
@@ -25,6 +26,21 @@ interface RequestForPriceFormProps {
   onBack: () => void;
   loading: boolean;
 }
+
+const EVENT_TYPES = [
+  { value: 'corporate_meeting', label: 'Corporate Meeting', emoji: '💼' },
+  { value: 'wedding', label: 'Wedding', emoji: '💍' },
+  { value: 'cultural_festival', label: 'Cultural Festival', emoji: '🎊' },
+  { value: 'religious', label: 'Religious Event', emoji: '🙏' },
+  { value: 'birthday', label: 'Birthday Party', emoji: '🎂' },
+  { value: 'sangeet', label: 'Sangeet / Mehndi', emoji: '💃' },
+  { value: 'pooja', label: 'Pooja / Puja', emoji: '🪔' },
+  { value: 'eid', label: 'Eid Celebration', emoji: '🌙' },
+  { value: 'graduation', label: 'Graduation', emoji: '🎓' },
+  { value: 'baby_shower', label: 'Baby Shower', emoji: '👶' },
+  { value: 'community_gathering', label: 'Community Gathering', emoji: '🤝' },
+  { value: 'other', label: 'Other', emoji: '🍽️' },
+];
 
 const DIETARY_OPTIONS = ['vegetarian', 'vegan', 'halal', 'kosher', 'gluten_free', 'dairy_free', 'nut_free'];
 const PRICING_TYPES: Array<{ value: QuoteRequestItem['pricingType']; label: string }> = [
@@ -169,6 +185,34 @@ export default function RequestForPriceForm({
                 color: 'var(--aurora-text)',
               }}
             />
+          </div>
+
+          {/* Event Type */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Event Type
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {EVENT_TYPES.map((et) => {
+                const isSelected = rfpForm.eventType === et.value;
+                return (
+                  <button
+                    key={et.value}
+                    type="button"
+                    onClick={() => onUpdateForm({ eventType: isSelected ? '' : et.value })}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border"
+                    style={{
+                      backgroundColor: isSelected ? '#6366F1' : 'var(--aurora-bg)',
+                      color: isSelected ? '#fff' : 'var(--aurora-text-secondary)',
+                      borderColor: isSelected ? '#6366F1' : 'var(--aurora-border)',
+                    }}
+                  >
+                    <span>{et.emoji}</span>
+                    {et.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

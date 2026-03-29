@@ -242,8 +242,13 @@ export default function VendorQuoteResponse({
                   {/* Request details */}
                   {request && (
                     <div className="mb-3">
-                      <div className="flex items-center gap-3 text-xs mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      <div className="flex items-center gap-3 flex-wrap text-xs mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                         <span>{request.cuisineCategory}</span>
+                        {request.eventType && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                            {request.eventType.replace(/_/g, ' ')}
+                          </span>
+                        )}
                         <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
                         <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
                         <span className="flex items-center gap-1">

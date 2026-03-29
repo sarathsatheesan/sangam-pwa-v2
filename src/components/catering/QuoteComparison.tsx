@@ -179,6 +179,22 @@ export default function QuoteComparison({ quoteRequest, onBack }: QuoteCompariso
   const submittedResponses = responses.filter((r) => r.status === 'submitted');
   const sortedByPrice = [...submittedResponses].sort((a, b) => a.total - b.total);
 
+  // Heritage match: Check if caterer's heritage aligns with the event type / cuisine
+  const HERITAGE_EVENT_MAP: Record<string, string[]> = {
+    pooja: ['Indian', 'Hindu', 'South Asian'],
+    sangeet: ['Indian', 'South Asian', 'Punjabi'],
+    eid: ['Middle Eastern', 'South Asian', 'Pakistani', 'Bangladeshi'],
+    wedding: [],
+    cultural_festival: [],
+    religious: [],
+  };
+  const getHeritageMatch = (heritage?: string): boolean => {
+    if (!heritage || !quoteRequest.eventType) return false;
+    const matchTerms = HERITAGE_EVENT_MAP[quoteRequest.eventType] || [];
+    if (matchTerms.length === 0) return false;
+    return matchTerms.some((term) => heritage.toLowerCase().includes(term.toLowerCase()));
+  };
+
   // Determine which items from a response are already assigned to another vendor
   const getItemAssignmentStatus = (itemName: string) => {
     return assignedItemsMap.get(itemName) || null;
@@ -196,7 +212,9 @@ export default function QuoteComparison({ quoteRequest, onBack }: QuoteCompariso
             Quote Responses
           </h2>
           <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-            {quoteRequest.cuisineCategory} · {quoteRequest.headcount} guests · {quoteRequest.deliveryCity}
+            {quoteRequest.cuisineCategory}
+            {quoteRequest.eventType && <span className="capitalize"> · {quoteRequest.eventType.replace(/_/g, ' ')}</span>}
+            {' '}· {quoteRequest.headcount} guests · {quoteRequest.deliveryCity}
           </p>
         </div>
       </div>
@@ -378,7 +396,14 @@ export default function QuoteComparison({ quoteRequest, onBack }: QuoteCompariso
                     </span>
                   </div>
                   {response.businessHeritage && (
-                    <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>{response.businessHeritage}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>{response.businessHeritage}</p>
+                      {getHeritageMatch(response.businessHeritage) && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
+                          Heritage Match
+                        </span>
+                      )}
+                    </div>
                   )}
                   {/* Show accepted item count for partially accepted */}
                   {response.acceptedItemNames && response.acceptedItemNames.length > 0 && (

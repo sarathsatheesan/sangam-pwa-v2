@@ -145,7 +145,11 @@ export default function CateringItemList({
               if (!business) return null;
 
               return (
-                <div key={businessId} className="space-y-4">
+                <div
+                  key={businessId}
+                  className="space-y-4"
+                  style={{ contentVisibility: 'auto', containIntrinsicSize: '0 400px' } as React.CSSProperties}
+                >
                   {/* Business header */}
                   <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                     <div className="flex items-center gap-3">

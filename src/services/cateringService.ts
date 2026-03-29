@@ -17,6 +17,8 @@ import {
   orderBy,
   serverTimestamp,
   onSnapshot,
+  arrayUnion,
+  Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -88,9 +90,11 @@ export interface CateringOrder {
   orderForContext?: OrderForContext;
   contactName: string;
   contactPhone: string;
+  eventType?: string;           // corporate_meeting | wedding | cultural_festival | religious | birthday | other
   createdAt?: any;
   confirmedAt?: any;
   declinedReason?: string;
+  statusHistory?: Array<{ status: string; timestamp: any }>;
 }
 
 // ── Menu Items ──
@@ -200,6 +204,28 @@ export async function fetchOrdersByBusiness(businessId: string): Promise<Caterin
   });
 }
 
+export function subscribeToCustomerOrders(
+  customerId: string,
+  callback: (orders: CateringOrder[]) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, ORDERS_COL),
+    where('customerId', '==', customerId),
+  );
+  return onSnapshot(q, (snap) => {
+    const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
+    results.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
+      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+      return bTime - aTime;
+    });
+    callback(results);
+  }, (err) => {
+    console.warn('subscribeToCustomerOrders error:', err);
+    callback([]);
+  });
+}
+
 export function subscribeToBusinessOrders(
   businessId: string,
   callback: (orders: CateringOrder[]) => void,
@@ -231,6 +257,11 @@ export async function updateOrderStatus(
   const ref = doc(db, ORDERS_COL, orderId);
   const updates: Record<string, any> = { status, ...extra };
   if (status === 'confirmed') updates.confirmedAt = serverTimestamp();
+  // Append to statusHistory for timeline tracking
+  updates.statusHistory = arrayUnion({
+    status,
+    timestamp: Timestamp.now(),
+  });
   await updateDoc(ref, updates);
 }
 
@@ -291,6 +322,7 @@ export interface CateringQuoteRequest {
   // Privacy: NO customer name/email/phone stored here
   deliveryCity: string;           // Only city shared with caterers
   cuisineCategory: string;
+  eventType?: string;             // corporate_meeting | wedding | cultural_festival | religious | birthday | other
   eventDate: any;
   headcount: number;
   items: QuoteRequestItem[];      // What they want catered
@@ -371,6 +403,7 @@ export async function createQuoteRequest(request: Omit<CateringQuoteRequest, 'id
     createdAt: serverTimestamp(),
   };
   // Only add optional fields if they have values
+  if (request.eventType) payload.eventType = request.eventType;
   if (request.specialInstructions) payload.specialInstructions = request.specialInstructions;
   if (request.orderForContext) payload.orderForContext = request.orderForContext;
   if (request.targetBusinessIds && request.targetBusinessIds.length > 0) {
