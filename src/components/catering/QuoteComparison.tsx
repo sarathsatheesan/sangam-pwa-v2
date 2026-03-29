@@ -19,9 +19,10 @@ import { useToast } from '@/contexts/ToastContext';
 interface QuoteComparisonProps {
   quoteRequest: CateringQuoteRequest;
   onBack: () => void;
+  onViewOrders?: () => void;
 }
 
-export default function QuoteComparison({ quoteRequest, onBack }: QuoteComparisonProps) {
+export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: QuoteComparisonProps) {
   const { user, userProfile } = useAuth();
   const { addToast } = useToast();
   const [responses, setResponses] = useState<CateringQuoteResponse[]>([]);
@@ -156,7 +157,11 @@ export default function QuoteComparison({ quoteRequest, onBack }: QuoteCompariso
     setFinalizingOrder(true);
     try {
       await finalizeQuoteRequest(quoteRequest.id);
-      addToast('Order finalized! Remaining unselected vendors have been notified.', 'success', 5000);
+      addToast('Order finalized! Track your order below.', 'success', 5000);
+      // Redirect to order tracking after short delay so toast is visible
+      if (onViewOrders) {
+        setTimeout(() => onViewOrders(), 1500);
+      }
     } catch (err: any) {
       addToast(err.message || 'Failed to finalize order', 'error');
     } finally {
@@ -309,13 +314,24 @@ export default function QuoteComparison({ quoteRequest, onBack }: QuoteCompariso
       {/* Status banner for fully accepted */}
       {isFullyAccepted && (
         <div
-          className="flex items-center gap-2 p-3 rounded-xl"
+          className="p-3 rounded-xl space-y-2"
           style={{ backgroundColor: '#D1FAE5' }}
         >
-          <CheckCircle2 size={18} style={{ color: '#059669' }} />
-          <p className="text-sm font-medium" style={{ color: '#059669' }}>
-            Order finalized. Selected caterers will contact you shortly.
-          </p>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={18} style={{ color: '#059669' }} />
+            <p className="text-sm font-medium" style={{ color: '#059669' }}>
+              Order finalized. Selected caterers will contact you shortly.
+            </p>
+          </div>
+          {onViewOrders && (
+            <button
+              onClick={onViewOrders}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+              style={{ backgroundColor: '#059669' }}
+            >
+              Track Your Orders
+            </button>
+          )}
         </div>
       )}
 

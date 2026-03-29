@@ -26,7 +26,8 @@ const STATUS_STEPS = [
   { key: 'confirmed', label: 'Confirmed', icon: CheckCircle2, color: '#6366F1', description: 'Caterer has accepted your order' },
   { key: 'preparing', label: 'Preparing', icon: UtensilsCrossed, color: '#8B5CF6', description: 'Your food is being prepared' },
   { key: 'ready', label: 'Ready', icon: Package, color: '#10B981', description: 'Order is ready for pickup/delivery' },
-  { key: 'delivered', label: 'Delivered', icon: Truck, color: '#059669', description: 'Order has been delivered' },
+  { key: 'out_for_delivery', label: 'Out for Delivery', icon: Truck, color: '#0EA5E9', description: 'Your order is on the way' },
+  { key: 'delivered', label: 'Delivered', icon: CheckCircle2, color: '#059669', description: 'Order has been delivered' },
 ] as const;
 
 const CANCELLED_STEP = { key: 'cancelled', label: 'Cancelled', icon: XCircle, color: '#EF4444', description: 'Order was cancelled' };
@@ -120,7 +121,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                 className="rounded-2xl border overflow-hidden"
                 style={{
                   backgroundColor: 'var(--aurora-surface)',
-                  borderColor: isCancelled ? '#FCA5A5' : currentIdx >= 4 ? '#6EE7B7' : 'var(--aurora-border)',
+                  borderColor: isCancelled ? '#FCA5A5' : currentIdx >= 5 ? '#6EE7B7' : 'var(--aurora-border)',
                 }}
               >
                 {/* Order header */}
@@ -150,6 +151,16 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         {formatPrice(order.total)}
                       </span>
                     </div>
+                    {/* ETA badge — shown for active orders with estimated delivery time */}
+                    {order.estimatedDeliveryTime && !['delivered', 'cancelled'].includes(order.status) && (
+                      <div
+                        className="flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-medium w-fit"
+                        style={{ backgroundColor: 'rgba(14, 165, 233, 0.1)', color: '#0369A1' }}
+                      >
+                        <Clock size={10} />
+                        ETA: {order.estimatedDeliveryTime}
+                      </div>
+                    )}
                   </div>
                   {isExpanded ? <ChevronUp size={18} className="opacity-40" /> : <ChevronDown size={18} className="opacity-40" />}
                 </button>
@@ -281,6 +292,7 @@ function StatusBadge({ status }: { status: string }) {
     confirmed: { label: 'Confirmed', color: '#3730A3', bg: '#EEF2FF' },
     preparing: { label: 'Preparing', color: '#5B21B6', bg: '#F5F3FF' },
     ready: { label: 'Ready', color: '#065F46', bg: '#D1FAE5' },
+    out_for_delivery: { label: 'On the Way', color: '#0369A1', bg: '#E0F2FE' },
     delivered: { label: 'Delivered', color: '#059669', bg: '#A7F3D0' },
     cancelled: { label: 'Cancelled', color: '#991B1B', bg: '#FEE2E2' },
   };

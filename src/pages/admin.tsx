@@ -2372,7 +2372,7 @@ export default function AdminPage() {
                   ) : (() => {
                     const filtered = cateringOrders.filter((o) => {
                       if (cateringFilter === 'pending') return o.status === 'pending';
-                      if (cateringFilter === 'active') return ['confirmed', 'preparing', 'ready'].includes(o.status);
+                      if (cateringFilter === 'active') return ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(o.status);
                       if (cateringFilter === 'completed') return ['delivered', 'cancelled'].includes(o.status);
                       return true;
                     });
@@ -2442,8 +2442,8 @@ export default function AdminPage() {
                                   </button>
                                 </div>
                               )}
-                              {['confirmed', 'preparing', 'ready'].includes(order.status) && (
-                                <div className="flex gap-2 mt-2">
+                              {['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
+                                <div className="flex gap-2 mt-2 flex-wrap">
                                   {order.status === 'confirmed' && (
                                     <button
                                       onClick={() => handleCateringStatusChange(order.id, 'preparing')}
@@ -2463,6 +2463,15 @@ export default function AdminPage() {
                                     </button>
                                   )}
                                   {order.status === 'ready' && (
+                                    <button
+                                      onClick={() => handleCateringStatusChange(order.id, 'out_for_delivery')}
+                                      disabled={isActionLoading}
+                                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-sky-500 hover:bg-sky-600 transition disabled:opacity-50"
+                                    >
+                                      Out for Delivery
+                                    </button>
+                                  )}
+                                  {order.status === 'out_for_delivery' && (
                                     <button
                                       onClick={() => handleCateringStatusChange(order.id, 'delivered')}
                                       disabled={isActionLoading}

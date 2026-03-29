@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Package, Clock, CheckCircle2, XCircle, ChevronDown, ChevronUp,
-  User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle,
+  User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
 import {
@@ -26,6 +26,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
   confirmed: { label: 'Confirmed', color: '#6366F1', bgColor: '#EEF2FF', icon: <CheckCircle2 size={14} /> },
   preparing: { label: 'Preparing', color: '#8B5CF6', bgColor: '#F5F3FF', icon: <Package size={14} /> },
   ready: { label: 'Ready', color: '#10B981', bgColor: '#D1FAE5', icon: <CheckCircle2 size={14} /> },
+  out_for_delivery: { label: 'On the Way', color: '#0EA5E9', bgColor: '#E0F2FE', icon: <Truck size={14} /> },
   delivered: { label: 'Delivered', color: '#059669', bgColor: '#A7F3D0', icon: <CheckCircle2 size={14} /> },
   cancelled: { label: 'Cancelled', color: '#EF4444', bgColor: '#FEE2E2', icon: <XCircle size={14} /> },
 };
@@ -46,11 +47,14 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
     return unsub;
   }, [businessId]);
 
-  const handleStatusChange = async (orderId: string, newStatus: CateringOrder['status']) => {
+  // ETA inputs per order (vendor enters before dispatching for delivery)
+  const [etaInputs, setEtaInputs] = useState<Record<string, string>>({});
+
+  const handleStatusChange = async (orderId: string, newStatus: CateringOrder['status'], extra?: Record<string, any>) => {
     setActionLoading(orderId);
     try {
-      await updateOrderStatus(orderId, newStatus);
-      addToast(`Order ${newStatus}`, 'success');
+      await updateOrderStatus(orderId, newStatus, extra);
+      addToast(`Order ${newStatus.replace(/_/g, ' ')}`, 'success');
     } catch (err: any) {
       addToast(err.message || 'Failed to update order', 'error');
     } finally {
@@ -60,7 +64,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
   const filteredOrders = orders.filter((o) => {
     if (filter === 'pending') return o.status === 'pending';
-    if (filter === 'active') return ['confirmed', 'preparing', 'ready'].includes(o.status);
+    if (filter === 'active') return ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(o.status);
     if (filter === 'completed') return ['delivered', 'cancelled'].includes(o.status);
     return true;
   });
@@ -172,6 +176,12 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                       <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
                         {formatPrice(order.total)}
                       </span>
+                      {order.estimatedDeliveryTime && order.status === 'out_for_delivery' && (
+                        <span className="flex items-center gap-1 font-medium" style={{ color: '#0369A1' }}>
+                          <Truck size={12} />
+                          ETA: {order.estimatedDeliveryTime}
+                        </span>
+                      )}
                     </div>
                   </div>
                   {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -275,15 +285,49 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                       </button>
                     )}
                     {order.status === 'ready' && (
-                      <button
-                        onClick={() => handleStatusChange(order.id, 'delivered')}
-                        disabled={isActionLoading}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                        style={{ backgroundColor: '#059669' }}
-                      >
-                        {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                        Mark as Delivered
-                      </button>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="ETA (e.g. 2:30 PM, 30 min)"
+                            value={etaInputs[order.id] || ''}
+                            onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                            className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
+                            style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            const eta = etaInputs[order.id]?.trim();
+                            handleStatusChange(order.id, 'out_for_delivery', eta ? { estimatedDeliveryTime: eta } : undefined);
+                          }}
+                          disabled={isActionLoading}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                          style={{ backgroundColor: '#0EA5E9' }}
+                        >
+                          {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+                          Dispatch for Delivery
+                        </button>
+                      </div>
+                    )}
+                    {order.status === 'out_for_delivery' && (
+                      <div className="space-y-2">
+                        {order.estimatedDeliveryTime && (
+                          <div className="flex items-center gap-1.5 text-xs p-2 rounded-lg" style={{ backgroundColor: '#E0F2FE', color: '#0369A1' }}>
+                            <Clock size={12} />
+                            <span className="font-medium">ETA: {order.estimatedDeliveryTime}</span>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => handleStatusChange(order.id, 'delivered')}
+                          disabled={isActionLoading}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                          style={{ backgroundColor: '#059669' }}
+                        >
+                          {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                          Mark as Delivered
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}

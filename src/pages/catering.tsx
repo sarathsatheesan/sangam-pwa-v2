@@ -220,9 +220,9 @@ export default function CateringPage() {
         contactPhone: orderForm.contactPhone,
       });
 
-      addToast('Order placed successfully! The caterer will confirm shortly.', 'success', 5000);
+      addToast('Order placed successfully! Track your order below.', 'success', 5000);
       dispatch({ type: 'CLEAR_CART' });
-      dispatch({ type: 'SET_VIEW', payload: 'categories' });
+      dispatch({ type: 'SET_VIEW', payload: 'orders' });
     } catch (err: any) {
       addToast(err.message || 'Failed to place order', 'error');
     } finally {
@@ -622,6 +622,10 @@ export default function CateringPage() {
             <QuoteComparison
               quoteRequest={selectedQuoteRequest}
               onBack={() => setSelectedQuoteRequest(null)}
+              onViewOrders={() => {
+                setSelectedQuoteRequest(null);
+                dispatch({ type: 'SET_VIEW', payload: 'orders' });
+              }}
             />
           </React.Suspense>
         )}

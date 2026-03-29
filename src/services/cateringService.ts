@@ -82,7 +82,7 @@ export interface CateringOrder {
   subtotal: number;           // cents
   tax?: number;               // cents
   total: number;              // cents
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
   eventDate: any;
   deliveryAddress: DeliveryAddress;
   headcount: number;
@@ -91,6 +91,7 @@ export interface CateringOrder {
   contactName: string;
   contactPhone: string;
   eventType?: string;           // corporate_meeting | wedding | cultural_festival | religious | birthday | other
+  estimatedDeliveryTime?: string; // e.g. "2:30 PM" or "30 minutes"
   createdAt?: any;
   confirmedAt?: any;
   declinedReason?: string;
