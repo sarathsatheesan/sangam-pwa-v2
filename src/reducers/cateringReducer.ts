@@ -5,13 +5,13 @@
 // ═════════════════════════════════════════════════════════════════════════════════
 
 import { QueryDocumentSnapshot } from 'firebase/firestore';
-import type { CateringMenuItem, CateringOrder, OrderItem, DeliveryAddress, OrderForContext, CateringQuoteRequest, CateringQuoteResponse, QuoteRequestItem, ItemAssignment } from '@/services/cateringService';
+import type { CateringMenuItem, CateringOrder, OrderItem, DeliveryAddress, OrderForContext, CateringQuoteRequest, CateringQuoteResponse, QuoteRequestItem, ItemAssignment, FavoriteOrder, RecurringOrder, OrderTemplate } from '@/services/cateringService';
 
 // ── State shape ──
 
 export interface CateringState {
   // Navigation
-  view: 'categories' | 'items' | 'checkout' | 'orders' | 'vendor' | 'rfp' | 'quotes';
+  view: 'categories' | 'items' | 'checkout' | 'orders' | 'vendor' | 'rfp' | 'quotes' | 'favorites' | 'recurring' | 'templates';
   selectedCategory: string | null;
 
   // Menu & Catalog
@@ -48,6 +48,11 @@ export interface CateringState {
   // Search & filtering
   searchQuery: string;
   dietaryFilter: string[];
+
+  // Phase 6: Favorites, Recurring, Templates
+  favorites: FavoriteOrder[];
+  recurringOrders: RecurringOrder[];
+  templates: OrderTemplate[];
 
   // Quote requests (Phase 2 - RFP)
   quoteRequests: CateringQuoteRequest[];
@@ -95,6 +100,10 @@ export function createInitialState(): CateringState {
 
     orders: [],
 
+    favorites: [],
+    recurringOrders: [],
+    templates: [],
+
     loading: false,
     error: null,
 
@@ -121,7 +130,7 @@ export function createInitialState(): CateringState {
 
 export type CateringAction =
   // Navigation
-  | { type: 'SET_VIEW'; payload: 'categories' | 'items' | 'checkout' | 'orders' | 'vendor' | 'rfp' | 'quotes' }
+  | { type: 'SET_VIEW'; payload: CateringState['view'] }
   | { type: 'SET_CATEGORY'; payload: string | null }
 
   // Menu & Catalog
@@ -175,6 +184,11 @@ export type CateringAction =
   | { type: 'UPDATE_RFP_ITEM'; payload: { index: number; item: QuoteRequestItem } }
   | { type: 'REMOVE_RFP_ITEM'; payload: number }
   | { type: 'CLEAR_RFP_FORM' }
+
+  // Phase 6: Favorites, Recurring, Templates
+  | { type: 'SET_FAVORITES'; payload: FavoriteOrder[] }
+  | { type: 'SET_RECURRING_ORDERS'; payload: RecurringOrder[] }
+  | { type: 'SET_TEMPLATES'; payload: OrderTemplate[] }
 
   // Reset
   | { type: 'RESET' };
@@ -340,6 +354,16 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
           targetBusinessIds: [],
         },
       };
+
+    // ── Phase 6: Favorites, Recurring, Templates ──
+    case 'SET_FAVORITES':
+      return { ...state, favorites: action.payload };
+
+    case 'SET_RECURRING_ORDERS':
+      return { ...state, recurringOrders: action.payload };
+
+    case 'SET_TEMPLATES':
+      return { ...state, templates: action.payload };
 
     // ── Reset ──
     case 'RESET':

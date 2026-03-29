@@ -920,3 +920,491 @@ export async function addVendorResponse(reviewId: string, responseText: string):
     vendorRespondedAt: Timestamp.now(),
   });
 }
+
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// PHASE 6: RECURRING ORDERS, FAVORITES & ORDER TEMPLATES
+// ═════════════════════════════════════════════════════════════════════════════════
+
+// ── Types ──
+
+export interface FavoriteOrder {
+  id: string;
+  userId: string;
+  businessId: string;
+  businessName: string;
+  label: string;                       // e.g. "Weekly Office Lunch"
+  items: OrderItem[];
+  headcount?: number;
+  specialInstructions?: string;
+  deliveryAddress?: DeliveryAddress;
+  orderForContext?: OrderForContext;
+  lastOrderedAt?: any;
+  useCount: number;
+  createdAt?: any;
+}
+
+export type RecurrenceInterval = 'daily' | 'weekly' | 'biweekly' | 'monthly';
+
+export interface RecurrenceSchedule {
+  // Simple interval mode
+  interval?: RecurrenceInterval;
+  // Calendar-based mode (advanced)
+  daysOfWeek?: number[];               // 0=Sun..6=Sat (e.g. [1,3] = Mon,Wed)
+  dayOfMonth?: number;                 // For monthly on a specific date (1–31)
+  // Shared
+  timeOfDay: string;                   // "11:30" (HH:mm) — delivery target time
+  startDate: string;                   // ISO date "2026-04-01"
+  endDate?: string;                    // ISO date or null for indefinite
+  skipDates?: string[];                // Holidays / vacation dates to skip
+}
+
+export interface RecurringOrder {
+  id: string;
+  userId: string;
+  favoriteId: string;                  // Links to the FavoriteOrder being repeated
+  businessId: string;
+  businessName: string;
+  label: string;
+  items: OrderItem[];
+  headcount?: number;
+  specialInstructions?: string;
+  deliveryAddress: DeliveryAddress;
+  orderForContext?: OrderForContext;
+  contactName: string;
+  contactPhone: string;
+  schedule: RecurrenceSchedule;
+  active: boolean;
+  nextRunDate: string;                 // ISO date of next scheduled order
+  lastRunDate?: string;
+  totalOrdersPlaced: number;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface OrderTemplate {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  businessId: string;
+  businessName: string;
+  title: string;                       // "Q1 Team Lunch Template"
+  description?: string;
+  items: OrderItem[];
+  headcount?: number;
+  specialInstructions?: string;
+  eventType?: string;
+  // Sharing
+  shareCode: string;                   // 8-char unique code for link sharing
+  isPublic: boolean;                   // Anyone with link can use it
+  // Organization scoping
+  organizationId?: string;             // Ties to an org for team library
+  organizationName?: string;
+  // Stats
+  useCount: number;
+  lastUsedAt?: any;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FAVORITES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Save a completed order (or cart) as a favorite for quick reordering.
+ */
+export async function saveFavoriteOrder(fav: Omit<FavoriteOrder, 'id' | 'useCount' | 'createdAt'>): Promise<string> {
+  const docRef = await addDoc(collection(db, 'cateringFavorites'), {
+    ...fav,
+    useCount: 0,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+/**
+ * List all favorites for a user, most-recently-used first.
+ */
+export async function fetchFavoriteOrders(userId: string): Promise<FavoriteOrder[]> {
+  const q = query(
+    collection(db, 'cateringFavorites'),
+    where('userId', '==', userId),
+  );
+  const snap = await getDocs(q);
+  const favorites = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FavoriteOrder));
+  // Sort client-side: most recently used first, then by creation date
+  favorites.sort((a, b) => {
+    const aTime = a.lastOrderedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+    const bTime = b.lastOrderedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+    return bTime - aTime;
+  });
+  return favorites;
+}
+
+/**
+ * Real-time subscription to user's favorites.
+ */
+export function subscribeToFavorites(userId: string, callback: (favs: FavoriteOrder[]) => void): Unsubscribe {
+  const q = query(
+    collection(db, 'cateringFavorites'),
+    where('userId', '==', userId),
+  );
+  return onSnapshot(q, (snap) => {
+    const favorites = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FavoriteOrder));
+    favorites.sort((a, b) => {
+      const aTime = a.lastOrderedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+      const bTime = b.lastOrderedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+      return bTime - aTime;
+    });
+    callback(favorites);
+  });
+}
+
+/**
+ * Update a favorite (rename, update items, etc.).
+ */
+export async function updateFavoriteOrder(favId: string, updates: Partial<FavoriteOrder>): Promise<void> {
+  const { id, ...data } = updates as any;
+  await updateDoc(doc(db, 'cateringFavorites', favId), data);
+}
+
+/**
+ * Delete a favorite.
+ */
+export async function deleteFavoriteOrder(favId: string): Promise<void> {
+  await deleteDoc(doc(db, 'cateringFavorites', favId));
+}
+
+/**
+ * Quick reorder from a favorite — creates a new order using the saved items.
+ * Returns the new order ID.
+ */
+export async function reorderFromFavorite(
+  fav: FavoriteOrder,
+  overrides: {
+    customerId: string;
+    customerName: string;
+    customerEmail: string;
+    contactName: string;
+    contactPhone: string;
+    eventDate: string;
+    deliveryAddress: DeliveryAddress;
+    headcount?: number;
+  },
+): Promise<string> {
+  const total = calculateOrderTotal(fav.items);
+  const orderId = await createOrder({
+    customerId: overrides.customerId,
+    customerName: overrides.customerName,
+    customerEmail: overrides.customerEmail,
+    customerPhone: overrides.contactPhone,
+    businessId: fav.businessId,
+    businessName: fav.businessName,
+    items: fav.items,
+    subtotal: total,
+    total,
+    status: 'pending',
+    eventDate: overrides.eventDate,
+    deliveryAddress: overrides.deliveryAddress,
+    headcount: overrides.headcount || fav.headcount || 1,
+    specialInstructions: fav.specialInstructions,
+    orderForContext: fav.orderForContext,
+    contactName: overrides.contactName,
+    contactPhone: overrides.contactPhone,
+  });
+
+  // Bump favorite usage stats
+  await updateDoc(doc(db, 'cateringFavorites', fav.id), {
+    lastOrderedAt: serverTimestamp(),
+    useCount: (fav.useCount || 0) + 1,
+  });
+
+  return orderId;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RECURRING ORDERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Compute the next run date from a schedule config.
+ */
+export function computeNextRunDate(schedule: RecurrenceSchedule, afterDate?: string): string {
+  const after = afterDate ? new Date(afterDate) : new Date();
+  after.setHours(0, 0, 0, 0);
+  const skipSet = new Set(schedule.skipDates || []);
+
+  // Calendar-based: specific days of week
+  if (schedule.daysOfWeek && schedule.daysOfWeek.length > 0) {
+    const candidate = new Date(after);
+    candidate.setDate(candidate.getDate() + 1); // Start from tomorrow
+    for (let i = 0; i < 365; i++) {
+      const iso = candidate.toISOString().slice(0, 10);
+      if (schedule.daysOfWeek.includes(candidate.getDay()) && !skipSet.has(iso)) {
+        if (!schedule.endDate || iso <= schedule.endDate) return iso;
+      }
+      candidate.setDate(candidate.getDate() + 1);
+    }
+    return ''; // No valid date found within a year
+  }
+
+  // Calendar-based: specific day of month
+  if (schedule.dayOfMonth) {
+    const candidate = new Date(after);
+    candidate.setDate(candidate.getDate() + 1);
+    for (let i = 0; i < 365; i++) {
+      if (candidate.getDate() === schedule.dayOfMonth) {
+        const iso = candidate.toISOString().slice(0, 10);
+        if (!skipSet.has(iso) && (!schedule.endDate || iso <= schedule.endDate)) return iso;
+      }
+      candidate.setDate(candidate.getDate() + 1);
+    }
+    return '';
+  }
+
+  // Simple interval mode
+  const intervalDays: Record<RecurrenceInterval, number> = {
+    daily: 1,
+    weekly: 7,
+    biweekly: 14,
+    monthly: 30,
+  };
+  const days = intervalDays[schedule.interval || 'weekly'];
+  const candidate = new Date(after);
+  candidate.setDate(candidate.getDate() + days);
+  for (let i = 0; i < 365; i++) {
+    const iso = candidate.toISOString().slice(0, 10);
+    if (!skipSet.has(iso) && (!schedule.endDate || iso <= schedule.endDate)) return iso;
+    candidate.setDate(candidate.getDate() + 1);
+  }
+  return '';
+}
+
+/**
+ * Create a recurring order schedule.
+ */
+export async function createRecurringOrder(rec: Omit<RecurringOrder, 'id' | 'totalOrdersPlaced' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  const docRef = await addDoc(collection(db, 'cateringRecurring'), {
+    ...rec,
+    totalOrdersPlaced: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+/**
+ * List recurring orders for a user.
+ */
+export async function fetchRecurringOrders(userId: string): Promise<RecurringOrder[]> {
+  const q = query(
+    collection(db, 'cateringRecurring'),
+    where('userId', '==', userId),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as RecurringOrder));
+}
+
+/**
+ * Real-time subscription to user's recurring orders.
+ */
+export function subscribeToRecurringOrders(userId: string, callback: (recs: RecurringOrder[]) => void): Unsubscribe {
+  const q = query(
+    collection(db, 'cateringRecurring'),
+    where('userId', '==', userId),
+  );
+  return onSnapshot(q, (snap) => {
+    const recs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RecurringOrder));
+    callback(recs);
+  });
+}
+
+/**
+ * Update a recurring order (pause, change schedule, update items, etc.).
+ */
+export async function updateRecurringOrder(recId: string, updates: Partial<RecurringOrder>): Promise<void> {
+  const { id, ...data } = updates as any;
+  await updateDoc(doc(db, 'cateringRecurring', recId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Delete a recurring order.
+ */
+export async function deleteRecurringOrder(recId: string): Promise<void> {
+  await deleteDoc(doc(db, 'cateringRecurring', recId));
+}
+
+/**
+ * Toggle a recurring order active/paused.
+ */
+export async function toggleRecurringOrder(recId: string, active: boolean): Promise<void> {
+  await updateDoc(doc(db, 'cateringRecurring', recId), {
+    active,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ORDER TEMPLATES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Generate a short unique share code.
+ */
+function generateShareCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+/**
+ * Create an order template.
+ */
+export async function createOrderTemplate(tmpl: Omit<OrderTemplate, 'id' | 'shareCode' | 'useCount' | 'createdAt' | 'updatedAt'>): Promise<{ id: string; shareCode: string }> {
+  const shareCode = generateShareCode();
+  const docRef = await addDoc(collection(db, 'cateringTemplates'), {
+    ...tmpl,
+    shareCode,
+    useCount: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return { id: docRef.id, shareCode };
+}
+
+/**
+ * Fetch templates created by a user.
+ */
+export async function fetchMyTemplates(userId: string): Promise<OrderTemplate[]> {
+  const q = query(
+    collection(db, 'cateringTemplates'),
+    where('creatorId', '==', userId),
+  );
+  const snap = await getDocs(q);
+  const templates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
+  templates.sort((a, b) => {
+    const aTime = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+    const bTime = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+    return bTime - aTime;
+  });
+  return templates;
+}
+
+/**
+ * Fetch templates shared within an organization.
+ */
+export async function fetchOrgTemplates(organizationId: string): Promise<OrderTemplate[]> {
+  const q = query(
+    collection(db, 'cateringTemplates'),
+    where('organizationId', '==', organizationId),
+  );
+  const snap = await getDocs(q);
+  const templates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
+  templates.sort((a, b) => (b.useCount || 0) - (a.useCount || 0));
+  return templates;
+}
+
+/**
+ * Look up a template by its share code (for link sharing).
+ */
+export async function fetchTemplateByShareCode(shareCode: string): Promise<OrderTemplate | null> {
+  const q = query(
+    collection(db, 'cateringTemplates'),
+    where('shareCode', '==', shareCode),
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return { id: d.id, ...d.data() } as OrderTemplate;
+}
+
+/**
+ * Update a template.
+ */
+export async function updateOrderTemplate(tmplId: string, updates: Partial<OrderTemplate>): Promise<void> {
+  const { id, ...data } = updates as any;
+  await updateDoc(doc(db, 'cateringTemplates', tmplId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Delete a template.
+ */
+export async function deleteOrderTemplate(tmplId: string): Promise<void> {
+  await deleteDoc(doc(db, 'cateringTemplates', tmplId));
+}
+
+/**
+ * Record a template usage (when someone uses a template to start an order).
+ */
+export async function recordTemplateUsage(tmplId: string): Promise<void> {
+  const tmplRef = doc(db, 'cateringTemplates', tmplId);
+  const snap = await getDoc(tmplRef);
+  if (snap.exists()) {
+    await updateDoc(tmplRef, {
+      useCount: (snap.data().useCount || 0) + 1,
+      lastUsedAt: serverTimestamp(),
+    });
+  }
+}
+
+/**
+ * Subscribe to templates for a user (own + org).
+ */
+export function subscribeToTemplates(
+  userId: string,
+  organizationId: string | null,
+  callback: (templates: OrderTemplate[]) => void,
+): Unsubscribe {
+  // Subscribe to user's own templates
+  const qOwn = query(
+    collection(db, 'cateringTemplates'),
+    where('creatorId', '==', userId),
+  );
+
+  let ownTemplates: OrderTemplate[] = [];
+  let orgTemplates: OrderTemplate[] = [];
+
+  const unsubOwn = onSnapshot(qOwn, (snap) => {
+    ownTemplates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
+    callback(dedupeTemplates([...ownTemplates, ...orgTemplates]));
+  });
+
+  let unsubOrg: Unsubscribe | null = null;
+  if (organizationId) {
+    const qOrg = query(
+      collection(db, 'cateringTemplates'),
+      where('organizationId', '==', organizationId),
+    );
+    unsubOrg = onSnapshot(qOrg, (snap) => {
+      orgTemplates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
+      callback(dedupeTemplates([...ownTemplates, ...orgTemplates]));
+    });
+  }
+
+  return () => {
+    unsubOwn();
+    if (unsubOrg) unsubOrg();
+  };
+}
+
+function dedupeTemplates(templates: OrderTemplate[]): OrderTemplate[] {
+  const seen = new Set<string>();
+  return templates.filter((t) => {
+    if (seen.has(t.id)) return false;
+    seen.add(t.id);
+    return true;
+  });
+}

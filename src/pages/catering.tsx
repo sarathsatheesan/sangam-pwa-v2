@@ -12,14 +12,14 @@
 import React, { useReducer, useCallback, useEffect, useState, useRef } from 'react';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store,
-  Send, FileText, ClipboardList, Star,
+  Send, FileText, ClipboardList, Star, Heart, Repeat, Share2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { cateringReducer, createInitialState } from '@/reducers/cateringReducer';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebase';
-import type { CateringMenuItem, OrderItem, QuoteRequestItem, CateringQuoteRequest } from '@/services/cateringService';
+import type { CateringMenuItem, OrderItem, QuoteRequestItem, CateringQuoteRequest, FavoriteOrder, OrderTemplate } from '@/services/cateringService';
 import {
   fetchCateringBusinesses,
   fetchCateringBusinessesByCategory,
@@ -28,6 +28,7 @@ import {
   calculateOrderTotal,
   createQuoteRequest,
   subscribeToCustomerQuoteRequests,
+  saveFavoriteOrder,
 } from '@/services/cateringService';
 
 // ── Components (eager: lightweight, needed on first render) ──
@@ -44,6 +45,11 @@ const QuoteComparison = React.lazy(() => import('@/components/catering/QuoteComp
 const CateringOrderStatus = React.lazy(() => import('@/components/catering/CateringOrderStatus'));
 const VendorAnalytics = React.lazy(() => import('@/components/catering/VendorAnalytics'));
 const CateringReviews = React.lazy(() => import('@/components/catering/CateringReviews'));
+
+// Phase 6: Favorites, Recurring, Templates
+const FavoriteOrders = React.lazy(() => import('@/components/catering/FavoriteOrders'));
+const RecurringOrderManager = React.lazy(() => import('@/components/catering/RecurringOrderManager'));
+const OrderTemplates = React.lazy(() => import('@/components/catering/OrderTemplates'));
 
 function LazyFallback() {
   return (
@@ -63,6 +69,8 @@ export default function CateringPage() {
   const [submitting, setSubmitting] = useState(false);
   const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews'>('orders');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
+  const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
+  const [selectedFavoriteForTemplate, setSelectedFavoriteForTemplate] = useState<FavoriteOrder | null>(null);
   const selectedQuoteRequestRef = useRef<CateringQuoteRequest | null>(null);
   // Keep ref in sync with state so real-time subscription callback can access latest value
   useEffect(() => {
@@ -220,7 +228,22 @@ export default function CateringPage() {
         contactPhone: orderForm.contactPhone,
       });
 
-      addToast('Order placed successfully! Track your order below.', 'success', 5000);
+      // Auto-save as favorite for quick reorder
+      try {
+        await saveFavoriteOrder({
+          userId: user.uid,
+          businessId: cart.businessId!,
+          businessName: cart.businessName || '',
+          label: `${cart.businessName || 'Order'} — ${new Date().toLocaleDateString()}`,
+          items: cart.items,
+          headcount: orderForm.headcount,
+          specialInstructions: orderForm.specialInstructions || undefined,
+          deliveryAddress: orderForm.deliveryAddress || undefined,
+          orderForContext: orderForm.orderForContext,
+        });
+      } catch { /* non-blocking — don't fail the order */ }
+
+      addToast('Order placed! Saved to Favorites for quick reorder.', 'success', 5000);
       dispatch({ type: 'CLEAR_CART' });
       dispatch({ type: 'SET_VIEW', payload: 'orders' });
     } catch (err: any) {
@@ -293,6 +316,9 @@ export default function CateringPage() {
       case 'quotes': return selectedQuoteRequest ? 'Quote Responses' : 'My Quotes';
       case 'orders': return 'My Orders';
       case 'vendor': return 'Vendor Dashboard';
+      case 'favorites': return 'My Favorites';
+      case 'recurring': return 'Recurring Orders';
+      case 'templates': return 'Order Templates';
       default: return 'Catering';
     }
   };
@@ -306,6 +332,17 @@ export default function CateringPage() {
       return;
     }
     if (state.view === 'orders') return handleBackToCategories();
+    if (state.view === 'recurring') {
+      setSelectedFavoriteForRecurring(null);
+      dispatch({ type: 'SET_VIEW', payload: 'favorites' });
+      return;
+    }
+    if (state.view === 'templates') {
+      setSelectedFavoriteForTemplate(null);
+      dispatch({ type: 'SET_VIEW', payload: 'favorites' });
+      return;
+    }
+    if (state.view === 'favorites') return handleBackToCategories();
     return handleBackToCategories();
   };
 
@@ -381,6 +418,29 @@ export default function CateringPage() {
               <FileText size={16} />
               Quotes
             </button>
+          )}
+
+          {/* Phase 6 pills — Favorites dropdown */}
+          {user && (
+            <div className="relative group">
+              <button
+                onClick={() => {
+                  if (state.view === 'favorites') {
+                    dispatch({ type: 'SET_VIEW', payload: 'categories' });
+                  } else {
+                    dispatch({ type: 'SET_VIEW', payload: 'favorites' });
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: ['favorites', 'recurring', 'templates'].includes(state.view) ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                  color: ['favorites', 'recurring', 'templates'].includes(state.view) ? '#fff' : 'var(--aurora-text-secondary)',
+                }}
+              >
+                <Heart size={16} />
+                Saved
+              </button>
+            </div>
           )}
 
           {/* Vendor pill — always visible when user owns a catering business */}
@@ -709,6 +769,64 @@ export default function CateringPage() {
             )}
             </React.Suspense>
           </div>
+        )}
+        {/* Phase 6: Favorites view */}
+        {state.view === 'favorites' && (
+          <React.Suspense fallback={<LazyFallback />}>
+            <FavoriteOrders
+              onBack={handleBackToCategories}
+              onSetupRecurring={(fav) => {
+                setSelectedFavoriteForRecurring(fav);
+                dispatch({ type: 'SET_VIEW', payload: 'recurring' });
+              }}
+              onCreateTemplate={(fav) => {
+                setSelectedFavoriteForTemplate(fav);
+                dispatch({ type: 'SET_VIEW', payload: 'templates' });
+              }}
+            />
+          </React.Suspense>
+        )}
+
+        {/* Phase 6: Recurring Orders view */}
+        {state.view === 'recurring' && (
+          <React.Suspense fallback={<LazyFallback />}>
+            <RecurringOrderManager
+              onBack={() => {
+                setSelectedFavoriteForRecurring(null);
+                dispatch({ type: 'SET_VIEW', payload: 'favorites' });
+              }}
+              prefillFromFavorite={selectedFavoriteForRecurring}
+            />
+          </React.Suspense>
+        )}
+
+        {/* Phase 6: Order Templates view */}
+        {state.view === 'templates' && (
+          <React.Suspense fallback={<LazyFallback />}>
+            <OrderTemplates
+              onBack={() => {
+                setSelectedFavoriteForTemplate(null);
+                dispatch({ type: 'SET_VIEW', payload: 'favorites' });
+              }}
+              prefillFromFavorite={selectedFavoriteForTemplate}
+              onUseTemplate={(tmpl) => {
+                // Load template items into cart
+                dispatch({ type: 'CLEAR_CART' });
+                tmpl.items.forEach((item) => {
+                  dispatch({
+                    type: 'ADD_TO_CART',
+                    payload: {
+                      item,
+                      businessId: tmpl.businessId,
+                      businessName: tmpl.businessName,
+                    },
+                  });
+                });
+                dispatch({ type: 'SET_VIEW', payload: 'checkout' });
+                addToast('Template loaded into cart! Customize and place your order.', 'success', 4000);
+              }}
+            />
+          </React.Suspense>
         )}
       </div>
 
