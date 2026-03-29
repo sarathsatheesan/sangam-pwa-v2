@@ -355,92 +355,88 @@ export const processRecurringCateringOrders = onSchedule(
 
     console.log(`[recurring-catering] Found ${snap.size} recurring order(s) to process.`);
 
-    const batch = db.batch();
-    const orderPromises: Promise<void>[] = [];
+    // Process each recurring order sequentially to avoid batch race conditions
+    let processed = 0;
+    let failed = 0;
 
-    for (const doc of snap.docs) {
-      const rec = doc.data();
+    for (const recDoc of snap.docs) {
+      const rec = recDoc.data();
 
-      orderPromises.push(
-        (async () => {
-          try {
-            // Calculate total from items
-            const total = (rec.items || []).reduce(
-              (sum: number, item: { unitPrice: number; qty: number }) =>
-                sum + item.unitPrice * item.qty,
-              0
-            );
+      try {
+        // Calculate total from items
+        const total = (rec.items || []).reduce(
+          (sum: number, item: { unitPrice: number; qty: number }) =>
+            sum + item.unitPrice * item.qty,
+          0
+        );
 
-            // Get customer info for the order
-            const userDoc = await db.collection("users").doc(rec.userId).get();
-            const userData = userDoc.exists ? userDoc.data() : {};
+        // Get customer info for the order
+        const userSnap = await db.collection("users").doc(rec.userId).get();
+        const userData = userSnap.exists ? userSnap.data() : {};
 
-            // Create the catering order
-            await db.collection("cateringOrders").add({
-              customerId: rec.userId,
-              customerName: userData?.name || rec.contactName || "",
-              customerEmail: userData?.email || "",
-              customerPhone: rec.contactPhone || "",
-              businessId: rec.businessId,
-              businessName: rec.businessName,
-              items: rec.items,
-              subtotal: total,
-              total: total,
+        // Create the catering order
+        await db.collection("cateringOrders").add({
+          customerId: rec.userId,
+          customerName: userData?.name || rec.contactName || "",
+          customerEmail: userData?.email || "",
+          customerPhone: rec.contactPhone || "",
+          businessId: rec.businessId,
+          businessName: rec.businessName,
+          items: rec.items,
+          subtotal: total,
+          total: total,
+          status: "pending",
+          eventDate: today,
+          deliveryAddress: rec.deliveryAddress,
+          headcount: rec.headcount || 1,
+          specialInstructions: rec.specialInstructions || "",
+          orderForContext: rec.orderForContext || { type: "self" },
+          contactName: rec.contactName,
+          contactPhone: rec.contactPhone,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          statusHistory: [
+            {
               status: "pending",
-              eventDate: today,
-              deliveryAddress: rec.deliveryAddress,
-              headcount: rec.headcount || 1,
-              specialInstructions: rec.specialInstructions || "",
-              orderForContext: rec.orderForContext || { type: "self" },
-              contactName: rec.contactName,
-              contactPhone: rec.contactPhone,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              statusHistory: [
-                {
-                  status: "pending",
-                  timestamp: admin.firestore.FieldValue.serverTimestamp(),
-                },
-              ],
-              isRecurring: true,
-              recurringOrderId: doc.id,
-            });
+              timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            },
+          ],
+          isRecurring: true,
+          recurringOrderId: recDoc.id,
+        });
 
-            // Compute next run date
-            const nextRun = computeNextRunDateServer(rec.schedule, today);
+        // Compute next run date
+        const nextRun = computeNextRunDateServer(rec.schedule, today);
 
-            // Update the recurring order document
-            const updates: Record<string, unknown> = {
-              lastRunDate: today,
-              totalOrdersPlaced: (rec.totalOrdersPlaced || 0) + 1,
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            };
+        // Update the recurring order document
+        const updates: Record<string, unknown> = {
+          lastRunDate: today,
+          totalOrdersPlaced: (rec.totalOrdersPlaced || 0) + 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
 
-            if (nextRun) {
-              updates.nextRunDate = nextRun;
-            } else {
-              // No more valid dates — deactivate
-              updates.active = false;
-              updates.nextRunDate = "";
-            }
+        if (nextRun) {
+          updates.nextRunDate = nextRun;
+        } else {
+          // No more valid dates — deactivate
+          updates.active = false;
+          updates.nextRunDate = "";
+        }
 
-            batch.update(doc.ref, updates);
+        await recDoc.ref.update(updates);
+        processed++;
 
-            console.log(
-              `[recurring-catering] Placed order for ${rec.label} (${rec.businessName}). Next: ${nextRun || "deactivated"}`
-            );
-          } catch (err) {
-            console.error(
-              `[recurring-catering] Error processing ${doc.id}:`,
-              err
-            );
-          }
-        })()
-      );
+        console.log(
+          `[recurring-catering] Placed order for ${rec.label} (${rec.businessName}). Next: ${nextRun || "deactivated"}`
+        );
+      } catch (err) {
+        failed++;
+        console.error(
+          `[recurring-catering] Error processing ${recDoc.id}:`,
+          err
+        );
+      }
     }
 
-    await Promise.all(orderPromises);
-    await batch.commit();
-
-    console.log(`[recurring-catering] Done. Processed ${snap.size} recurring orders.`);
+    console.log(`[recurring-catering] Done. Processed: ${processed}, Failed: ${failed}`);
   }
 );
