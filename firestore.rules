@@ -149,6 +149,36 @@ service cloud.firestore {
       allow delete: if isAdminUser();
     }
 
+    // ─── Catering Favorites (Phase 6) ─────────────────
+    match /cateringFavorites/{favId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+    }
+
+    // ─── Catering Recurring Orders (Phase 6) ────────
+    match /cateringRecurring/{recId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+    }
+
+    // ─── Catering Order Templates (Phase 6) ─────────
+    match /cateringTemplates/{tmplId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.creatorId;
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.creatorId;
+    }
+
     // ─── Business Reviews ───────────────────────────
     match /businessReviews/{reviewId} {
       allow read: if request.auth != null;
