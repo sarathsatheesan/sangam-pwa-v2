@@ -222,7 +222,7 @@ export default function CateringPage() {
         eventDate: orderForm.eventDate,
         deliveryAddress: orderForm.deliveryAddress!,
         headcount: orderForm.headcount,
-        specialInstructions: orderForm.specialInstructions || undefined,
+        ...(orderForm.specialInstructions ? { specialInstructions: orderForm.specialInstructions } : {}),
         orderForContext: orderForm.orderForContext,
         contactName: orderForm.contactName,
         contactPhone: orderForm.contactPhone,
@@ -237,8 +237,8 @@ export default function CateringPage() {
           label: `${cart.businessName || 'Order'} — ${new Date().toLocaleDateString()}`,
           items: cart.items,
           headcount: orderForm.headcount,
-          specialInstructions: orderForm.specialInstructions || undefined,
-          deliveryAddress: orderForm.deliveryAddress || undefined,
+          ...(orderForm.specialInstructions ? { specialInstructions: orderForm.specialInstructions } : {}),
+          ...(orderForm.deliveryAddress ? { deliveryAddress: orderForm.deliveryAddress } : {}),
           orderForContext: orderForm.orderForContext,
         });
       } catch { /* non-blocking — don't fail the order */ }

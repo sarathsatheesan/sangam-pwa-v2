@@ -169,8 +169,12 @@ export async function deleteMenuItem(itemId: string): Promise<void> {
 const ORDERS_COL = 'cateringOrders';
 
 export async function createOrder(order: Omit<CateringOrder, 'id'>): Promise<string> {
+  // Filter out undefined values — Firestore rejects them
+  const cleanOrder = Object.fromEntries(
+    Object.entries(order).filter(([, v]) => v !== undefined),
+  );
   const docRef = await addDoc(collection(db, ORDERS_COL), {
-    ...order,
+    ...cleanOrder,
     status: 'pending',
     createdAt: serverTimestamp(),
   });
@@ -1016,8 +1020,12 @@ export interface OrderTemplate {
  * Save a completed order (or cart) as a favorite for quick reordering.
  */
 export async function saveFavoriteOrder(fav: Omit<FavoriteOrder, 'id' | 'useCount' | 'createdAt'>): Promise<string> {
+  // Filter out undefined values — Firestore rejects them
+  const cleanFav = Object.fromEntries(
+    Object.entries(fav).filter(([, v]) => v !== undefined),
+  );
   const docRef = await addDoc(collection(db, 'cateringFavorites'), {
-    ...fav,
+    ...cleanFav,
     useCount: 0,
     createdAt: serverTimestamp(),
   });
