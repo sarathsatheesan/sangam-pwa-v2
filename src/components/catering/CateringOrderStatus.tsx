@@ -9,11 +9,12 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft, Clock, CheckCircle2, Package, Truck, XCircle, MapPin,
   User, Phone, Calendar, Users, ChevronDown, ChevronUp, Loader2,
-  UtensilsCrossed, FileText,
+  UtensilsCrossed, FileText, Star,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
-import { subscribeToCustomerOrders, formatPrice } from '@/services/cateringService';
+import { subscribeToCustomerOrders, formatPrice, hasReviewedOrder } from '@/services/cateringService';
 import { useAuth } from '@/contexts/AuthContext';
+import CateringReviewForm from './CateringReviewForm';
 
 interface CateringOrderStatusProps {
   onBack: () => void;
@@ -48,6 +49,20 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [reviewingOrder, setReviewingOrder] = useState<CateringOrder | null>(null);
+  const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
+
+  // Check which delivered orders have already been reviewed
+  useEffect(() => {
+    if (!user || orders.length === 0) return;
+    const deliveredIds = orders.filter(o => o.status === 'delivered').map(o => o.id);
+    if (deliveredIds.length === 0) return;
+    Promise.all(deliveredIds.map(id => hasReviewedOrder(user.uid, id).then(reviewed => reviewed ? id : null)))
+      .then(results => {
+        setReviewedOrderIds(new Set(results.filter((id): id is string => id !== null)));
+      })
+      .catch(() => { /* silent */ });
+  }, [user, orders]);
 
   useEffect(() => {
     if (!user) return;
@@ -211,6 +226,30 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                           <span style={{ color: '#DC2626' }}>{order.declinedReason}</span>
                         </div>
                       )}
+
+                      {/* Leave a Review CTA — only for delivered orders */}
+                      {order.status === 'delivered' && (
+                        reviewedOrderIds.has(order.id) ? (
+                          <div
+                            className="flex items-center gap-2 p-3 rounded-xl"
+                            style={{ backgroundColor: 'rgba(245, 158, 11, 0.06)' }}
+                          >
+                            <Star size={14} fill="#F59E0B" stroke="#F59E0B" />
+                            <span className="text-sm font-medium" style={{ color: '#92400E' }}>
+                              You reviewed this order
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setReviewingOrder(order)}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-colors"
+                            style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
+                          >
+                            <Star size={16} />
+                            Leave a Review
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 )}
@@ -218,6 +257,18 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
             );
           })}
         </div>
+      )}
+
+      {/* Review modal */}
+      {reviewingOrder && (
+        <CateringReviewForm
+          order={reviewingOrder}
+          onClose={() => setReviewingOrder(null)}
+          onSubmitted={() => {
+            setReviewedOrderIds(prev => new Set([...prev, reviewingOrder.id]));
+            setReviewingOrder(null);
+          }}
+        />
       )}
     </div>
   );

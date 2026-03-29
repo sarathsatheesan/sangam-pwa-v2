@@ -175,6 +175,11 @@ export default function CateringItemList({
                               <span className="text-xs text-gray-600">
                                 {business.rating?.toFixed(1) ?? 'N/A'}
                               </span>
+                              {business.reviews > 0 && (
+                                <span className="text-xs text-gray-400">
+                                  ({business.reviews})
+                                </span>
+                              )}
                             </div>
                           )}
 

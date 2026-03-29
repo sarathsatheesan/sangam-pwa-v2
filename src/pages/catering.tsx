@@ -12,7 +12,7 @@
 import React, { useReducer, useCallback, useEffect, useState, useRef } from 'react';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store,
-  Send, FileText, ClipboardList,
+  Send, FileText, ClipboardList, Star,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -43,6 +43,7 @@ const RequestForPriceForm = React.lazy(() => import('@/components/catering/Reque
 const QuoteComparison = React.lazy(() => import('@/components/catering/QuoteComparison'));
 const CateringOrderStatus = React.lazy(() => import('@/components/catering/CateringOrderStatus'));
 const VendorAnalytics = React.lazy(() => import('@/components/catering/VendorAnalytics'));
+const CateringReviews = React.lazy(() => import('@/components/catering/CateringReviews'));
 
 function LazyFallback() {
   return (
@@ -60,7 +61,7 @@ export default function CateringPage() {
   const [allCateringBusinesses, setAllCateringBusinesses] = useState<any[]>([]);
   const [userOwnedBusiness, setUserOwnedBusiness] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics'>('orders');
+  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews'>('orders');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
   const selectedQuoteRequestRef = useRef<CateringQuoteRequest | null>(null);
   // Keep ref in sync with state so real-time subscription callback can access latest value
@@ -660,6 +661,17 @@ export default function CateringPage() {
               >
                 Analytics
               </button>
+              <button
+                onClick={() => setVendorTab('reviews')}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: vendorTab === 'reviews' ? '#6366F1' : 'var(--aurora-surface-variant)',
+                  color: vendorTab === 'reviews' ? '#fff' : 'var(--aurora-text-secondary)',
+                }}
+              >
+                <Star size={14} />
+                Reviews
+              </button>
             </div>
 
             <React.Suspense fallback={<LazyFallback />}>
@@ -681,6 +693,14 @@ export default function CateringPage() {
                 <VendorAnalytics
                   businessId={ownedBusiness.id}
                   businessName={ownedBusiness.name}
+                />
+            )}
+            {vendorTab === 'reviews' && (
+                <CateringReviews
+                  businessId={ownedBusiness.id}
+                  businessName={ownedBusiness.name}
+                  isVendor={true}
+                  onBack={() => setVendorTab('orders')}
                 />
             )}
             </React.Suspense>
