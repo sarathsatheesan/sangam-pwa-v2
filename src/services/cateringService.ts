@@ -874,8 +874,12 @@ export async function submitCateringReview(review: {
   itemsOrdered?: string[];
   headcount?: number;
 }): Promise<string> {
+  // Filter out undefined values (Firestore rejects them)
+  const cleanReview = Object.fromEntries(
+    Object.entries(review).filter(([, v]) => v !== undefined),
+  );
   const docRef = await addDoc(collection(db, 'businessReviews'), {
-    ...review,
+    ...cleanReview,
     isCateringReview: true,
     createdAt: Timestamp.now(),
   });
