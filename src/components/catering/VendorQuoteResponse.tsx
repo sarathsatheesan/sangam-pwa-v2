@@ -1,9 +1,65 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Package, Clock, Users, MapPin, Send, Loader2,
   ChevronDown, ChevronUp, ShieldCheck, Plus, Trash2, DollarSign,
   Bell, CheckCircle2, XCircle, Check,
 } from 'lucide-react';
+
+// ── PriceInput: local-state input that avoids cursor-jump on controlled value ──
+// Manages its own string state; only pushes cents to parent on blur/Enter.
+function PriceInput({
+  cents,
+  onCentsChange,
+  placeholder = '0.00',
+  className = '',
+  style,
+}: {
+  cents: number;
+  onCentsChange: (cents: number) => void;
+  placeholder?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [localValue, setLocalValue] = useState(() =>
+    cents > 0 ? (cents / 100).toFixed(2) : '',
+  );
+  const lastPushedCents = useRef(cents);
+
+  // Sync from parent only when the external value changes (e.g. form reset)
+  useEffect(() => {
+    if (cents !== lastPushedCents.current) {
+      setLocalValue(cents > 0 ? (cents / 100).toFixed(2) : '');
+      lastPushedCents.current = cents;
+    }
+  }, [cents]);
+
+  const pushValue = useCallback(
+    (raw: string) => {
+      const parsed = parseFloat(raw || '0');
+      const newCents = Math.round(parsed * 100);
+      lastPushedCents.current = newCents;
+      onCentsChange(newCents);
+    },
+    [onCentsChange],
+  );
+
+  return (
+    <input
+      type="number"
+      min="0"
+      step="0.01"
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={(e) => pushValue(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') pushValue((e.target as HTMLInputElement).value);
+      }}
+      placeholder={placeholder}
+      className={className}
+      style={style}
+    />
+  );
+}
 import type { CateringQuoteRequest, CateringQuoteResponse, QuotedItem } from '@/services/cateringService';
 import {
   fetchQuoteRequestsForBusiness,
@@ -253,7 +309,7 @@ export default function VendorQuoteResponse({
                         <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
                         <span className="flex items-center gap-1">
                           <Clock size={12} />
-                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString() : String(request.eventDate || '')}
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
                         </span>
                       </div>
                       {/* Full item breakdown */}
@@ -380,7 +436,7 @@ export default function VendorQuoteResponse({
                         <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
                         <span className="flex items-center gap-1">
                           <Clock size={12} />
-                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString() : request.eventDate}
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : request.eventDate}
                         </span>
                       </div>
                     </div>
@@ -443,16 +499,9 @@ export default function VendorQuoteResponse({
                               </div>
                               <div className="flex items-center gap-1">
                                 <DollarSign size={14} style={{ color: 'var(--aurora-text-secondary)' }} />
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={qi.unitPrice ? (qi.unitPrice / 100).toFixed(2) : ''}
-                                  onChange={(e) => {
-                                    const cents = Math.round(parseFloat(e.target.value || '0') * 100);
-                                    updateQuoteItem(request.id, idx, { unitPrice: cents });
-                                  }}
-                                  placeholder="0.00"
+                                <PriceInput
+                                  cents={qi.unitPrice}
+                                  onCentsChange={(c) => updateQuoteItem(request.id, idx, { unitPrice: c })}
                                   className="w-24 rounded-lg border px-2 py-1.5 text-sm text-right outline-none focus:ring-2 focus:ring-indigo-500/30"
                                   style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
                                 />
@@ -466,26 +515,18 @@ export default function VendorQuoteResponse({
                         <div className="grid grid-cols-2 gap-3 pt-2">
                           <div>
                             <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Service fee ($)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={form.serviceFee ? (form.serviceFee / 100).toFixed(2) : ''}
-                              onChange={(e) => updateQuoteForm(request.id, { serviceFee: Math.round(parseFloat(e.target.value || '0') * 100) })}
-                              placeholder="0.00"
+                            <PriceInput
+                              cents={form.serviceFee}
+                              onCentsChange={(c) => updateQuoteForm(request.id, { serviceFee: c })}
                               className="w-full rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 mt-1"
                               style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
                             />
                           </div>
                           <div>
                             <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Delivery fee ($)</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={form.deliveryFee ? (form.deliveryFee / 100).toFixed(2) : ''}
-                              onChange={(e) => updateQuoteForm(request.id, { deliveryFee: Math.round(parseFloat(e.target.value || '0') * 100) })}
-                              placeholder="0.00"
+                            <PriceInput
+                              cents={form.deliveryFee}
+                              onCentsChange={(c) => updateQuoteForm(request.id, { deliveryFee: c })}
                               className="w-full rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 mt-1"
                               style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
                             />
@@ -590,7 +631,7 @@ export default function VendorQuoteResponse({
                         <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
                         <span className="flex items-center gap-1">
                           <Clock size={12} />
-                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString() : String(request.eventDate || '')}
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
                         </span>
                       </div>
                       {/* Requested items */}
@@ -700,7 +741,7 @@ export default function VendorQuoteResponse({
                         <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
                         <span className="flex items-center gap-1">
                           <Clock size={12} />
-                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString() : String(request.eventDate || '')}
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
                         </span>
                       </div>
                       <div>

@@ -148,7 +148,7 @@ export default function CateringItemList({
                 <div
                   key={businessId}
                   className="space-y-4"
-                  style={{ contentVisibility: 'auto', containIntrinsicSize: '0 400px' } as React.CSSProperties}
+                  style={{ contentVisibility: 'auto', containIntrinsicBlockSize: 'auto 400px' } as React.CSSProperties}
                 >
                   {/* Business header */}
                   <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -173,7 +173,7 @@ export default function CateringItemList({
                                 />
                               ))}
                               <span className="text-xs text-gray-600">
-                                {business.rating.toFixed(1)}
+                                {business.rating?.toFixed(1) ?? 'N/A'}
                               </span>
                             </div>
                           )}

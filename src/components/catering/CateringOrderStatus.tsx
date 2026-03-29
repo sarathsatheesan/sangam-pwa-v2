@@ -38,7 +38,7 @@ function getStepIndex(status: string): number {
 function formatTimestamp(ts: any): string {
   if (!ts) return '';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleString('en-US', {
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
   });
 }
@@ -124,7 +124,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                       <span className="flex items-center gap-1">
                         <Calendar size={12} />
                         {order.eventDate?.toDate?.()
-                          ? order.eventDate.toDate().toLocaleDateString()
+                          ? order.eventDate.toDate().toLocaleDateString('en-US')
                           : order.eventDate}
                       </span>
                       <span className="flex items-center gap-1">
