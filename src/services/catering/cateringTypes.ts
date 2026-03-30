@@ -276,4 +276,14 @@ export interface OrderTemplate {
   lastUsedAt?: any;
   createdAt?: any;
   updatedAt?: any;
+  // Feature #30: Versioning
+  version?: number;
+  versionHistory?: Array<{
+    version: number;
+    items: OrderItem[];
+    headcount?: number;
+    specialInstructions?: string;
+    updatedAt: any;
+    updatedBy: string;
+  }>;
 }

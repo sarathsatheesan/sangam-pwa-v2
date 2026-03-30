@@ -115,4 +115,6 @@ export {
   deleteOrderTemplate,
   recordTemplateUsage,
   subscribeToTemplates,
+  fetchPublicTemplates,
+  fetchTemplateUsageStats,
 } from './cateringTemplates';

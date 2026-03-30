@@ -15,6 +15,9 @@ import {
   where,
   serverTimestamp,
   Unsubscribe,
+  orderBy,
+  limit,
+  arrayUnion,
 } from 'firebase/firestore';
 
 import { db } from '../firebase';
@@ -119,17 +122,47 @@ export async function fetchTemplateByShareCode(shareCode: string): Promise<Order
 }
 
 /**
- * Update a template.
+ * Update a template with versioning support (Feature #30).
  */
 export async function updateOrderTemplate(
   tmplId: string,
   updates: Partial<OrderTemplate>,
+  userId?: string,
 ): Promise<void> {
   const { id, ...data } = updates as any;
-  await updateDoc(doc(db, 'cateringTemplates', tmplId), {
+  const tmplRef = doc(db, 'cateringTemplates', tmplId);
+  const snap = await getDoc(tmplRef);
+
+  // Feature #30: Create version history entry if items/headcount/specialInstructions changed
+  let updatePayload: any = {
     ...data,
     updatedAt: serverTimestamp(),
-  });
+  };
+
+  if (snap.exists()) {
+    const currentData = snap.data();
+    const isContentChange =
+      (data.items && JSON.stringify(data.items) !== JSON.stringify(currentData.items)) ||
+      (data.headcount !== undefined && data.headcount !== currentData.headcount) ||
+      (data.specialInstructions !== undefined && data.specialInstructions !== currentData.specialInstructions);
+
+    if (isContentChange && snap.data().items) {
+      const newVersion = (currentData.version || 0) + 1;
+      const historyEntry = {
+        version: currentData.version || 1,
+        items: currentData.items,
+        headcount: currentData.headcount,
+        specialInstructions: currentData.specialInstructions,
+        updatedAt: currentData.updatedAt || currentData.createdAt,
+        updatedBy: userId || 'system',
+      };
+
+      updatePayload.version = newVersion;
+      updatePayload.versionHistory = arrayUnion(historyEntry);
+    }
+  }
+
+  await updateDoc(tmplRef, updatePayload);
 }
 
 /**
@@ -141,8 +174,9 @@ export async function deleteOrderTemplate(tmplId: string): Promise<void> {
 
 /**
  * Record a template usage (when someone uses a template to start an order).
+ * Feature #31: Also records to usageLog subcollection.
  */
-export async function recordTemplateUsage(tmplId: string): Promise<void> {
+export async function recordTemplateUsage(tmplId: string, userId?: string): Promise<void> {
   const tmplRef = doc(db, 'cateringTemplates', tmplId);
   const snap = await getDoc(tmplRef);
   if (snap.exists()) {
@@ -150,7 +184,86 @@ export async function recordTemplateUsage(tmplId: string): Promise<void> {
       useCount: (snap.data().useCount || 0) + 1,
       lastUsedAt: serverTimestamp(),
     });
+
+    // Feature #31: Add entry to usageLog subcollection
+    await addDoc(collection(db, 'cateringTemplates', tmplId, 'usageLog'), {
+      userId: userId || 'anonymous',
+      usedAt: serverTimestamp(),
+    });
   }
+}
+
+/**
+ * Fetch public templates for discovery marketplace (Feature #29).
+ */
+export async function fetchPublicTemplates(options?: {
+  cuisineCategory?: string;
+  sortBy?: 'popular' | 'newest';
+  limit?: number;
+}): Promise<OrderTemplate[]> {
+  const sortByField = options?.sortBy === 'newest' ? 'createdAt' : 'useCount';
+  const limitCount = options?.limit ?? 20;
+
+  const q = query(
+    collection(db, 'cateringTemplates'),
+    where('isPublic', '==', true),
+    orderBy(sortByField, 'desc'),
+    limit(limitCount),
+  );
+
+  const snap = await getDocs(q);
+  const templates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
+  return templates;
+}
+
+/**
+ * Fetch template usage stats (Feature #31).
+ */
+export async function fetchTemplateUsageStats(
+  tmplId: string,
+): Promise<{
+  totalUses: number;
+  last7Days: number;
+  last30Days: number;
+  recentUsers: Array<{ userId: string; usedAt: any }>;
+}> {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const usageLogCol = collection(db, 'cateringTemplates', tmplId, 'usageLog');
+  const snap = await getDocs(usageLogCol);
+
+  const allLogs = snap.docs.map((d) => ({
+    userId: d.data().userId,
+    usedAt: d.data().usedAt,
+  }));
+
+  const last7Days = allLogs.filter((log) => {
+    const logTime = log.usedAt?.toDate?.() || new Date(0);
+    return logTime >= sevenDaysAgo;
+  }).length;
+
+  const last30Days = allLogs.filter((log) => {
+    const logTime = log.usedAt?.toDate?.() || new Date(0);
+    return logTime >= thirtyDaysAgo;
+  }).length;
+
+  // Sort by recent and take first 5
+  const recentUsers = allLogs
+    .sort((a, b) => {
+      const aTime = a.usedAt?.toMillis?.() || 0;
+      const bTime = b.usedAt?.toMillis?.() || 0;
+      return bTime - aTime;
+    })
+    .slice(0, 5);
+
+  return {
+    totalUses: allLogs.length,
+    last7Days,
+    last30Days,
+    recentUsers,
+  };
 }
 
 /**

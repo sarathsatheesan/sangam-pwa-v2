@@ -11,7 +11,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   ArrowLeft, Share2, Copy, Link2, Loader2, Plus, Trash2, Edit3,
   ChevronDown, ChevronUp, Users, Building2, Globe, Lock, ShoppingCart,
-  Check, Search, ExternalLink,
+  Check, Search, ExternalLink, Sparkles, TrendingUp, History,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -25,6 +25,8 @@ import {
   recordTemplateUsage,
   formatPrice,
   calculateOrderTotal,
+  fetchPublicTemplates,
+  fetchTemplateUsageStats,
 } from '@/services/cateringService';
 
 interface OrderTemplatesProps {
@@ -47,6 +49,16 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
   const [lookedUpTemplate, setLookedUpTemplate] = useState<OrderTemplate | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
 
+  // ── Feature #29: Discover tab state ──
+  const [activeTab, setActiveTab] = useState<'mine' | 'discover'>('mine');
+  const [publicTemplates, setPublicTemplates] = useState<OrderTemplate[]>([]);
+  const [loadingPublic, setLoadingPublic] = useState(false);
+
+  // ── Feature #30/31: Version history and usage stats ──
+  const [expandedVersionsId, setExpandedVersionsId] = useState<string | null>(null);
+  const [usageStats, setUsageStats] = useState<Record<string, any>>({});
+  const [loadingUsageStats, setLoadingUsageStats] = useState<Set<string>>(new Set());
+
   // ── Create form state ──
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -63,6 +75,20 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
     });
     return unsub;
   }, [user, userProfile]);
+
+  // Feature #29: Load public templates for discover tab
+  useEffect(() => {
+    if (activeTab === 'discover' && publicTemplates.length === 0) {
+      setLoadingPublic(true);
+      fetchPublicTemplates({ sortBy: 'popular', limit: 20 })
+        .then(setPublicTemplates)
+        .catch((err) => {
+          addToast('Failed to load public templates', 'error');
+          console.error(err);
+        })
+        .finally(() => setLoadingPublic(false));
+    }
+  }, [activeTab, publicTemplates.length, addToast]);
 
   // Prefill title from favorite
   useEffect(() => {
@@ -141,14 +167,14 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
 
   const handleUseTemplate = useCallback(async (tmpl: OrderTemplate) => {
     try {
-      await recordTemplateUsage(tmpl.id);
+      await recordTemplateUsage(tmpl.id, user?.uid);
     } catch { /* ignore stats failure */ }
     if (onUseTemplate) {
       onUseTemplate(tmpl);
     } else {
       addToast('Template loaded! Go to the cart to customize and place your order.', 'success', 4000);
     }
-  }, [onUseTemplate, addToast]);
+  }, [onUseTemplate, addToast, user?.uid]);
 
   const handleDelete = useCallback(async (tmplId: string) => {
     try {
@@ -158,6 +184,47 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
       addToast(err.message || 'Failed to delete', 'error');
     }
   }, [addToast]);
+
+  // Feature #31: Load usage stats (lazy on expand)
+  const handleExpandTemplate = useCallback(async (tmplId: string) => {
+    if (expandedId === tmplId) {
+      setExpandedId(null);
+      return;
+    }
+
+    setExpandedId(tmplId);
+
+    if (!usageStats[tmplId]) {
+      const newLoading = new Set(loadingUsageStats);
+      newLoading.add(tmplId);
+      setLoadingUsageStats(newLoading);
+
+      try {
+        const stats = await fetchTemplateUsageStats(tmplId);
+        setUsageStats((prev) => ({ ...prev, [tmplId]: stats }));
+      } catch (err) {
+        console.error('Failed to load usage stats:', err);
+      } finally {
+        newLoading.delete(tmplId);
+        setLoadingUsageStats(newLoading);
+      }
+    }
+  }, [expandedId, usageStats, loadingUsageStats]);
+
+  // Feature #30: Restore a previous version
+  const handleRestoreVersion = useCallback(async (tmpl: OrderTemplate, versionToRestore: any) => {
+    if (!user) return;
+    try {
+      await updateOrderTemplate(tmpl.id, {
+        items: versionToRestore.items,
+        headcount: versionToRestore.headcount,
+        specialInstructions: versionToRestore.specialInstructions,
+      }, user.uid);
+      addToast('Version restored successfully', 'success', 2000);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to restore version', 'error');
+    }
+  }, [user, addToast]);
 
   // ═══════════════════ RENDER ═══════════════════
 
@@ -193,6 +260,33 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
         >
           <Link2 size={12} />
           Use Code
+        </button>
+      </div>
+
+      {/* Feature #29: Tab navigation */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setActiveTab('mine')}
+          className="px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+          style={{
+            backgroundColor: activeTab === 'mine' ? 'rgba(99,102,241,0.1)' : 'transparent',
+            color: activeTab === 'mine' ? '#6366F1' : 'var(--aurora-text-secondary)',
+            borderColor: activeTab === 'mine' ? '#6366F1' : 'var(--aurora-border)',
+          }}
+        >
+          My Templates
+        </button>
+        <button
+          onClick={() => setActiveTab('discover')}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+          style={{
+            backgroundColor: activeTab === 'discover' ? 'rgba(99,102,241,0.1)' : 'transparent',
+            color: activeTab === 'discover' ? '#6366F1' : 'var(--aurora-text-secondary)',
+            borderColor: activeTab === 'discover' ? '#6366F1' : 'var(--aurora-border)',
+          }}
+        >
+          <Sparkles size={14} />
+          Discover
         </button>
       </div>
 
@@ -368,35 +462,37 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
         </div>
       )}
 
-      {/* ── Templates List ── */}
-      {templates.length === 0 && !showCreateForm && !lookupMode && (
-        <div className="text-center py-16">
-          <Share2 size={40} className="mx-auto mb-3 opacity-20" />
-          <p className="text-sm font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>
-            No templates yet
-          </p>
-          <p className="text-xs mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
-            Save a favorite order, then create a shareable template from it.
-          </p>
-        </div>
-      )}
+      {/* ── Templates List (My Templates) ── */}
+      {activeTab === 'mine' && (
+        <>
+          {templates.length === 0 && !showCreateForm && !lookupMode && (
+            <div className="text-center py-16">
+              <Share2 size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>
+                No templates yet
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
+                Save a favorite order, then create a shareable template from it.
+              </p>
+            </div>
+          )}
 
-      <div className="space-y-3">
-        {templates.map((tmpl) => {
-          const isExpanded = expandedId === tmpl.id;
-          const total = calculateOrderTotal(tmpl.items);
-          const isMine = tmpl.creatorId === user?.uid;
+          <div className="space-y-3">
+            {templates.map((tmpl) => {
+              const isExpanded = expandedId === tmpl.id;
+              const total = calculateOrderTotal(tmpl.items);
+              const isMine = tmpl.creatorId === user?.uid;
 
-          return (
-            <div
-              key={tmpl.id}
-              className="rounded-2xl border overflow-hidden transition-shadow hover:shadow-md"
-              style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
-            >
-              <div
-                className="flex items-center justify-between p-4 cursor-pointer"
-                onClick={() => setExpandedId(isExpanded ? null : tmpl.id)}
-              >
+              return (
+                <div
+                  key={tmpl.id}
+                  className="rounded-2xl border overflow-hidden transition-shadow hover:shadow-md"
+                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
+                >
+                  <div
+                    className="flex items-center justify-between p-4 cursor-pointer"
+                    onClick={() => handleExpandTemplate(tmpl.id)}
+                  >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Share2 size={14} style={{ color: '#6366F1' }} />
@@ -441,6 +537,28 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                     </p>
                   )}
 
+                  {/* Feature #31: Usage Stats (for owned templates) */}
+                  {isMine && (
+                    <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(99,102,241,0.05)', borderColor: 'rgba(99,102,241,0.1)' }}>
+                      {loadingUsageStats.has(tmpl.id) ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 size={12} className="animate-spin" style={{ color: '#6366F1' }} />
+                          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>Loading stats...</p>
+                        </div>
+                      ) : usageStats[tmpl.id] ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--aurora-text)' }}>
+                            <TrendingUp size={12} style={{ color: '#6366F1' }} />
+                            <span>Total uses: <strong>{usageStats[tmpl.id].totalUses}</strong></span>
+                          </div>
+                          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            Last 7 days: {usageStats[tmpl.id].last7Days} · Last 30 days: {usageStats[tmpl.id].last30Days}
+                          </p>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
                   {/* Items */}
                   <div className="mt-2 space-y-1">
                     <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--aurora-text-muted)' }}>Items</p>
@@ -455,6 +573,51 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                       <span style={{ color: '#6366F1' }}>{formatPrice(total)}</span>
                     </div>
                   </div>
+
+                  {/* Feature #30: Version History (for owned templates) */}
+                  {isMine && tmpl.versionHistory && tmpl.versionHistory.length > 0 && (
+                    <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--aurora-border)' }}>
+                      <button
+                        onClick={() => setExpandedVersionsId(expandedVersionsId === tmpl.id ? null : tmpl.id)}
+                        className="flex items-center gap-1.5 text-xs font-medium"
+                        style={{ color: '#6366F1' }}
+                      >
+                        <History size={12} />
+                        Version History ({tmpl.versionHistory.length})
+                        {expandedVersionsId === tmpl.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                      {expandedVersionsId === tmpl.id && (
+                        <div className="mt-2 space-y-2">
+                          {tmpl.versionHistory.map((vh, idx) => (
+                            <div
+                              key={idx}
+                              className="p-2 rounded-lg border"
+                              style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                                  Version {vh.version}
+                                </span>
+                                <span className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>
+                                  {vh.updatedAt?.toDate?.()?.toLocaleDateString?.() || 'Unknown'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                {vh.items.length} items · by {vh.updatedBy}
+                              </p>
+                              <button
+                                onClick={() => handleRestoreVersion(tmpl, vh)}
+                                className="text-[10px] font-medium px-2 py-1 rounded text-white"
+                                style={{ backgroundColor: '#6366F1' }}
+                              >
+                                Restore
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2 mt-3">
@@ -487,10 +650,89 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                   </div>
                 </div>
               )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Feature #29: Discover Tab */}
+      {activeTab === 'discover' && (
+        <>
+          {loadingPublic ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
             </div>
-          );
-        })}
-      </div>
+          ) : publicTemplates.length === 0 ? (
+            <div className="text-center py-16">
+              <Sparkles size={40} className="mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>
+                No public templates yet
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
+                Check back later for shared templates from the community.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {publicTemplates.map((tmpl) => {
+                const total = calculateOrderTotal(tmpl.items);
+                return (
+                  <div
+                    key={tmpl.id}
+                    className="rounded-2xl border p-4"
+                    style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
+                  >
+                    <div className="mb-2">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="text-sm font-semibold truncate" style={{ color: 'var(--aurora-text)' }}>
+                          {tmpl.title}
+                        </span>
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[9px] whitespace-nowrap"
+                          style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
+                        >
+                          Public
+                        </span>
+                      </div>
+                      <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        {tmpl.businessName}
+                      </p>
+                      <p className="text-[10px] mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
+                        by {tmpl.creatorName}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs mb-2 p-2 rounded" style={{ backgroundColor: 'rgba(99,102,241,0.05)' }}>
+                      <span style={{ color: 'var(--aurora-text-secondary)' }}>
+                        {tmpl.items.length} items
+                      </span>
+                      <span style={{ color: '#6366F1', fontWeight: 600 }}>
+                        {formatPrice(total)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] mb-3 px-2" style={{ color: 'var(--aurora-text-muted)' }}>
+                      <TrendingUp size={10} />
+                      Used {tmpl.useCount || 0} times
+                    </div>
+
+                    <button
+                      onClick={() => handleUseTemplate(tmpl)}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white"
+                      style={{ backgroundColor: '#059669' }}
+                    >
+                      <ShoppingCart size={12} />
+                      Use Template
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
