@@ -42,6 +42,7 @@ export {
   subscribeToCustomerOrders,
   subscribeToBusinessOrders,
   updateOrderStatus,
+  isValidStatusTransition,
   cancelOrder,
   fetchCateringBusinesses,
   fetchCateringBusinessesByCategory,
@@ -118,3 +119,17 @@ export {
   fetchPublicTemplates,
   fetchTemplateUsageStats,
 } from './cateringTemplates';
+
+// Notifications
+export type { CateringNotification } from './cateringNotifications';
+export {
+  sendCateringNotification,
+  notifyVendorNewOrder,
+  notifyCustomerStatusChange,
+  notifyCustomerOrderModified,
+  fetchCateringNotifications,
+  subscribeToCateringNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  getUnreadNotificationCount,
+} from './cateringNotifications';

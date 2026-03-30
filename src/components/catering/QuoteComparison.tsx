@@ -36,6 +36,13 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   // Item-level selection: Map<responseId, Set<itemName>>
   const [selectedItems, setSelectedItems] = useState<Record<string, Set<string>>>({});
 
+  // Reassignment confirmation dialog
+  const [reassignConfirm, setReassignConfirm] = useState<{
+    responseId: string;
+    itemNames: string[];
+    existingAssignments: Array<{itemName: string; businessName: string}>;
+  } | null>(null);
+
   // ── RFQ Walkthrough (onboarding) ──
   const WALKTHROUGH_KEY = 'ethnicity_rfq_walkthrough_seen';
   const [walkthroughStep, setWalkthroughStep] = useState(() => {
@@ -141,9 +148,33 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       return;
     }
 
+    const selectedItemNames = Array.from(selected);
+
+    // Check for existing assignments to other vendors
+    const existingAssignments = selectedItemNames
+      .map(name => {
+        const existing = quoteRequest.itemAssignments?.find(
+          a => a.itemName === name && a.responseId !== response.id
+        );
+        return existing ? { itemName: name, businessName: existing.businessName } : null;
+      })
+      .filter((x): x is {itemName: string; businessName: string} => x !== null);
+
+    if (existingAssignments.length > 0) {
+      // Show confirmation dialog
+      setReassignConfirm({ responseId: response.id, itemNames: selectedItemNames, existingAssignments });
+      return;
+    }
+
+    // No conflicts, proceed with acceptance
+    await proceedWithAcceptance(response, selectedItemNames);
+  };
+
+  const proceedWithAcceptance = async (response: CateringQuoteResponse, itemNames: string[]) => {
+    if (!user || !userProfile) return;
+
     setAcceptingId(response.id);
     try {
-      const itemNames = Array.from(selected);
       const result = await acceptQuoteResponseItems(
         response.id,
         quoteRequest.id,
@@ -707,6 +738,59 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
           </div>
         );
       })}
+
+      {/* ── Reassignment Confirmation Dialog ── */}
+      {reassignConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Reassign Items?</h3>
+            </div>
+            <p className="text-sm mb-3" style={{ color: 'var(--aurora-text-secondary)' }}>
+              The following items are already assigned to other vendors:
+            </p>
+            <ul className="mb-4 space-y-1">
+              {reassignConfirm.existingAssignments.map((a, i) => (
+                <li key={i} className="text-sm">
+                  <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>{a.itemName}</span>
+                  {' '}— currently with{' '}
+                  <span style={{ color: '#6366F1' }}>{a.businessName}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Proceeding will reassign these items to the new vendor.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setReassignConfirm(null)}
+                className="px-4 py-2 text-sm rounded-lg border font-medium transition-colors"
+                style={{
+                  borderColor: 'var(--aurora-border)',
+                  color: 'var(--aurora-text-secondary)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const { responseId, itemNames } = reassignConfirm;
+                  setReassignConfirm(null);
+                  const response = responses.find(r => r.id === responseId);
+                  if (response) {
+                    await proceedWithAcceptance(response, itemNames);
+                  }
+                }}
+                className="px-4 py-2 text-sm rounded-lg text-white font-medium transition-colors"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                Reassign Items
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,10 @@
 import { QueryDocumentSnapshot } from 'firebase/firestore';
 import type { CateringMenuItem, CateringOrder, OrderItem, DeliveryAddress, OrderForContext, CateringQuoteRequest, CateringQuoteResponse, QuoteRequestItem, ItemAssignment, FavoriteOrder, RecurringOrder, OrderTemplate } from '@/services/cateringService';
 
+// ── Constants ──
+
+const ORDER_FORM_STORAGE_KEY = 'sangam_catering_order_form';
+
 // ── State shape ──
 
 export interface CateringState {
@@ -81,6 +85,13 @@ export interface CateringState {
 // ── Initial state factory ──
 
 export function createInitialState(): CateringState {
+  // Try to restore checkout form from sessionStorage
+  let restoredForm: CateringState['orderForm'] | null = null;
+  try {
+    const stored = sessionStorage.getItem(ORDER_FORM_STORAGE_KEY);
+    if (stored) restoredForm = JSON.parse(stored);
+  } catch {}
+
   return {
     view: 'categories',
     selectedCategory: null,
@@ -97,7 +108,7 @@ export function createInitialState(): CateringState {
     pendingVendorSwitch: null,
 
     checkoutStep: 'details',
-    orderForm: {
+    orderForm: restoredForm || {
       eventDate: '',
       headcount: 0,
       deliveryAddress: null,
@@ -249,9 +260,12 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
       // Add or update item
       const existingIndex = nextCart.items.findIndex((i) => i.menuItemId === item.menuItemId);
       if (existingIndex >= 0) {
+        const existing = nextCart.items[existingIndex];
+        const newQty = existing.qty + item.qty;
+        const maxQty = existing.maxOrderQty || 9999;
         nextCart.items[existingIndex] = {
-          ...nextCart.items[existingIndex],
-          qty: nextCart.items[existingIndex].qty + item.qty,
+          ...existing,
+          qty: Math.min(newQty, maxQty),
         };
       } else {
         nextCart.items.push(item);
@@ -287,9 +301,11 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
       if (qty <= 0) {
         nextCart.items = nextCart.items.filter((i) => i.menuItemId !== itemId);
       } else {
-        nextCart.items = nextCart.items.map((i) =>
-          i.menuItemId === itemId ? { ...i, qty } : i
-        );
+        nextCart.items = nextCart.items.map((i) => {
+          if (i.menuItemId !== itemId) return i;
+          const maxQty = i.maxOrderQty || 9999;
+          return { ...i, qty: Math.min(qty, maxQty) };
+        });
       }
 
       return { ...state, cart: nextCart };
@@ -302,12 +318,23 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
     }
 
     case 'CLEAR_CART':
+      // Clear persisted checkout form
+      try { sessionStorage.removeItem(ORDER_FORM_STORAGE_KEY); } catch {}
       return {
         ...state,
         cart: {
           items: [],
           businessId: null,
           businessName: null,
+        },
+        orderForm: {
+          eventDate: '',
+          headcount: 0,
+          deliveryAddress: null,
+          specialInstructions: '',
+          contactName: '',
+          contactPhone: '',
+          orderForContext: { type: 'self' as const },
         },
       };
 
@@ -318,11 +345,14 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
     case 'SET_CHECKOUT_STEP':
       return { ...state, checkoutStep: action.payload };
 
-    case 'UPDATE_ORDER_FORM':
-      return {
-        ...state,
-        orderForm: { ...state.orderForm, ...action.payload },
-      };
+    case 'UPDATE_ORDER_FORM': {
+      const nextForm = { ...state.orderForm, ...action.payload };
+      // Persist to sessionStorage for navigation resilience
+      try {
+        sessionStorage.setItem(ORDER_FORM_STORAGE_KEY, JSON.stringify(nextForm));
+      } catch {}
+      return { ...state, orderForm: nextForm };
+    }
 
     // ── Orders history ──
     case 'SET_ORDERS':

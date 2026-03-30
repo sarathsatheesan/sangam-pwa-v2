@@ -163,28 +163,48 @@ export async function reorderFromFavorite(
 
 /**
  * Compute the next run date from a schedule config.
+ * Throws if schedule is invalid or no valid date found within 365 days.
  */
 export function computeNextRunDate(schedule: RecurrenceSchedule, afterDate?: string): string {
+  // Input validation
+  if (!schedule) throw new Error('Schedule is required');
+
+  const hasCalendarDays = schedule.daysOfWeek && schedule.daysOfWeek.length > 0;
+  const hasDayOfMonth = !!schedule.dayOfMonth;
+  const hasInterval = !!schedule.interval;
+
+  if (!hasCalendarDays && !hasDayOfMonth && !hasInterval) {
+    throw new Error('Schedule must specify daysOfWeek, dayOfMonth, or interval');
+  }
+
   const after = afterDate ? new Date(afterDate) : new Date();
+  if (isNaN(after.getTime())) throw new Error(`Invalid afterDate: ${afterDate}`);
   after.setHours(0, 0, 0, 0);
   const skipSet = new Set(schedule.skipDates || []);
 
   // Calendar-based: specific days of week
-  if (schedule.daysOfWeek && schedule.daysOfWeek.length > 0) {
+  if (hasCalendarDays) {
+    // Validate day numbers
+    if (schedule.daysOfWeek!.some(d => d < 0 || d > 6)) {
+      throw new Error('daysOfWeek must contain values 0-6 (Sun-Sat)');
+    }
     const candidate = new Date(after);
-    candidate.setDate(candidate.getDate() + 1); // Start from tomorrow
+    candidate.setDate(candidate.getDate() + 1);
     for (let i = 0; i < 365; i++) {
       const iso = candidate.toISOString().slice(0, 10);
-      if (schedule.daysOfWeek.includes(candidate.getDay()) && !skipSet.has(iso)) {
+      if (schedule.daysOfWeek!.includes(candidate.getDay()) && !skipSet.has(iso)) {
         if (!schedule.endDate || iso <= schedule.endDate) return iso;
       }
       candidate.setDate(candidate.getDate() + 1);
     }
-    return ''; // No valid date found within a year
+    throw new Error('No valid run date found within 365 days for daysOfWeek schedule');
   }
 
   // Calendar-based: specific day of month
-  if (schedule.dayOfMonth) {
+  if (hasDayOfMonth) {
+    if (schedule.dayOfMonth! < 1 || schedule.dayOfMonth! > 31) {
+      throw new Error('dayOfMonth must be between 1 and 31');
+    }
     const candidate = new Date(after);
     candidate.setDate(candidate.getDate() + 1);
     for (let i = 0; i < 365; i++) {
@@ -194,7 +214,7 @@ export function computeNextRunDate(schedule: RecurrenceSchedule, afterDate?: str
       }
       candidate.setDate(candidate.getDate() + 1);
     }
-    return '';
+    throw new Error('No valid run date found within 365 days for dayOfMonth schedule');
   }
 
   // Simple interval mode
@@ -204,7 +224,9 @@ export function computeNextRunDate(schedule: RecurrenceSchedule, afterDate?: str
     biweekly: 14,
     monthly: 30,
   };
-  const days = intervalDays[schedule.interval || 'weekly'];
+  const days = intervalDays[schedule.interval!];
+  if (!days) throw new Error(`Unknown interval: ${schedule.interval}`);
+
   const candidate = new Date(after);
   candidate.setDate(candidate.getDate() + days);
   for (let i = 0; i < 365; i++) {
@@ -212,7 +234,7 @@ export function computeNextRunDate(schedule: RecurrenceSchedule, afterDate?: str
     if (!skipSet.has(iso) && (!schedule.endDate || iso <= schedule.endDate)) return iso;
     candidate.setDate(candidate.getDate() + 1);
   }
-  return '';
+  throw new Error('No valid run date found within 365 days for interval schedule');
 }
 
 /**

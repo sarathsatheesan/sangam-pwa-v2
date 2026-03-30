@@ -33,9 +33,11 @@ export default function CateringItemCard({
   }[item.pricingType] || '/ person';
 
   const isUnavailable = item.available === false;
+  const isOutOfStock = item.stockStatus === 'out_of_stock' || (item.stockCount !== undefined && item.stockCount !== null && item.stockCount <= 0);
+  const isDisabled = isUnavailable || isOutOfStock;
 
   return (
-    <div className={`flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-200 ${isUnavailable ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isUnavailable ? ' — currently unavailable' : ''}`}>
+    <div className={`flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-200 ${isDisabled ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isDisabled ? ' — ' : ''}${isOutOfStock ? 'out of stock' : isDisabled ? 'currently unavailable' : ''}`}>
       {/* Photo area */}
       <div className="relative h-40 w-full bg-gray-100">
         {item.photoUrl ? (
@@ -62,11 +64,20 @@ export default function CateringItemCard({
           </span>
         </div>
 
-        {/* Unavailable overlay */}
-        {isUnavailable && (
+        {/* Low Stock badge */}
+        {item.stockStatus === 'low_stock' && !isDisabled && (
+          <div className="absolute left-3 top-3">
+            <span className="inline-block rounded-full bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white">
+              Low Stock
+            </span>
+          </div>
+        )}
+
+        {/* Unavailable / Out of Stock overlay */}
+        {isDisabled && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/60">
             <span className="rounded-full bg-gray-800 px-3 py-1 text-xs font-semibold text-white">
-              Currently Unavailable
+              {isOutOfStock ? 'Out of Stock' : 'Currently Unavailable'}
             </span>
           </div>
         )}
@@ -121,15 +132,16 @@ export default function CateringItemCard({
 
           <button
             onClick={handleAddToCart}
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-white transition-colors duration-200"
+            disabled={isDisabled}
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               backgroundColor: 'var(--aurora-primary, #6366F1)',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.opacity = '0.9';
+              if (!isDisabled) e.currentTarget.style.opacity = '0.9';
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.opacity = '1';
+              if (!isDisabled) e.currentTarget.style.opacity = '1';
             }}
             aria-label={`Add ${item.name} to cart — ${formatPrice(item.price)} ${pricingLabel}`}
           >

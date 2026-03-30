@@ -4,6 +4,7 @@ import { CATEGORIES, CATEGORY_EMOJI_MAP, CATEGORY_COLORS } from '@/components/bu
 interface CateringCategoryGridProps {
   onSelectCategory: (category: string) => void;
   businessCounts?: Record<string, number>;
+  totalBusinessCount?: number;
 }
 
 // Catering-relevant categories
@@ -17,6 +18,7 @@ const CATERING_CATEGORIES = [
 export default function CateringCategoryGrid({
   onSelectCategory,
   businessCounts = {},
+  totalBusinessCount = 0,
 }: CateringCategoryGridProps): ReturnType<FC> {
   const filteredCategories = CATEGORIES.filter(cat =>
     CATERING_CATEGORIES.includes(cat)
@@ -25,6 +27,27 @@ export default function CateringCategoryGrid({
   return (
     <div className="w-full">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {/* All Categories button */}
+        <button
+          onClick={() => onSelectCategory('all')}
+          className="group relative flex flex-col items-center justify-center rounded-xl bg-white p-6 shadow-sm transition-transform duration-200 ease-out hover:scale-[1.02] cursor-pointer border border-gray-100"
+          style={{
+            borderLeft: '4px solid #6366F1',
+            backgroundColor: '#6366F1',
+          }}
+          aria-label={`Browse all categories — ${totalBusinessCount} ${totalBusinessCount === 1 ? 'caterer' : 'caterers'} available`}
+        >
+          <div className="mb-3 text-5xl">🔍</div>
+          <h3 className="text-center text-sm font-semibold text-white line-clamp-2">
+            All Categories
+          </h3>
+          {totalBusinessCount > 0 && (
+            <p className="mt-2 text-xs text-gray-100">
+              {totalBusinessCount} {totalBusinessCount === 1 ? 'caterer' : 'caterers'}
+            </p>
+          )}
+        </button>
+
         {filteredCategories.map(category => {
           const emoji = CATEGORY_EMOJI_MAP[category] || '🍽️';
           const color = CATEGORY_COLORS[category] || '#6366F1';

@@ -129,13 +129,14 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
       schedule.daysOfWeek = daysOfWeek;
     }
 
-    const nextRun = computeNextRunDate(schedule, new Date(startDate) > new Date()
-      ? new Date(new Date(startDate).getTime() - 86400000).toISOString().slice(0, 10)
-      : undefined,
-    );
-
-    if (!nextRun) {
-      addToast('Could not compute a valid next run date. Check your schedule settings.', 'error');
+    let nextRun: string;
+    try {
+      nextRun = computeNextRunDate(schedule, new Date(startDate) > new Date()
+        ? new Date(new Date(startDate).getTime() - 86400000).toISOString().slice(0, 10)
+        : undefined,
+      );
+    } catch (err: any) {
+      addToast(err.message || 'Could not compute a valid next run date. Check your schedule settings.', 'error');
       return;
     }
 

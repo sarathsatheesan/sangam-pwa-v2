@@ -41,7 +41,6 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
   const [templates, setTemplates] = useState<OrderTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(!!prefillFromFavorite);
   const [submitting, setSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [lookupMode, setLookupMode] = useState(false);
@@ -60,10 +59,22 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
   const [loadingUsageStats, setLoadingUsageStats] = useState<Set<string>>(new Set());
 
   // ── Create form state ──
+  const [createMode, setCreateMode] = useState<'from_favorite' | 'from_scratch' | null>(
+    prefillFromFavorite ? 'from_favorite' : null
+  );
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [organizationName, setOrganizationName] = useState('');
+
+  // ── Create from scratch form state ──
+  const [scratchTitle, setScratchTitle] = useState('');
+  const [scratchDescription, setScratchDescription] = useState('');
+  const [scratchBusinessName, setScratchBusinessName] = useState('');
+  const [scratchItems, setScratchItems] = useState<Array<{name: string; qty: number; unitPrice: number; pricingType: string}>>([]);
+  const [scratchIsPublic, setScratchIsPublic] = useState(false);
+  const [scratchOrgName, setScratchOrgName] = useState('');
+  const [creating, setCreating] = useState(false);
 
   // Subscribe to templates
   useEffect(() => {
@@ -99,7 +110,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
 
   // ── Handlers ──
 
-  const handleCreate = useCallback(async () => {
+  const handleCreateFromFavorite = useCallback(async () => {
     if (!user || !userProfile || !prefillFromFavorite) return;
     if (!title.trim()) {
       addToast('Please enter a template title', 'error');
@@ -125,7 +136,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
         } : {}),
       });
       addToast(`Template created! Share code: ${result.shareCode}`, 'success', 5000);
-      setShowCreateForm(false);
+      setCreateMode(null);
       setTitle('');
       setDescription('');
     } catch (err: any) {
@@ -134,6 +145,48 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
       setSubmitting(false);
     }
   }, [user, userProfile, prefillFromFavorite, title, description, isPublic, organizationName, addToast]);
+
+  const handleCreateFromScratch = useCallback(async () => {
+    if (!scratchTitle.trim() || scratchItems.length === 0) {
+      addToast('Title and at least one item required', 'error');
+      return;
+    }
+    setCreating(true);
+    try {
+      const items: OrderItem[] = scratchItems.map((si, idx) => ({
+        menuItemId: `scratch_${idx}_${Date.now()}`,
+        name: si.name,
+        qty: si.qty,
+        unitPrice: si.unitPrice,
+        pricingType: si.pricingType || 'per_person',
+      }));
+      const result = await createOrderTemplate({
+        creatorId: user!.uid,
+        creatorName: userProfile?.name || user!.email || 'Anonymous',
+        businessId: '',
+        businessName: scratchBusinessName || 'Custom',
+        title: scratchTitle,
+        description: scratchDescription,
+        items,
+        isPublic: scratchIsPublic,
+        organizationName: scratchOrgName || undefined,
+        useCount: 0,
+      } as any);
+      addToast(`Template created! Share code: ${result.shareCode}`, 'success', 5000);
+      // Reset form
+      setScratchTitle('');
+      setScratchDescription('');
+      setScratchBusinessName('');
+      setScratchItems([]);
+      setScratchIsPublic(false);
+      setScratchOrgName('');
+      setCreateMode(null);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to create template', 'error');
+    } finally {
+      setCreating(false);
+    }
+  }, [user, userProfile, scratchTitle, scratchDescription, scratchBusinessName, scratchItems, scratchIsPublic, scratchOrgName, addToast]);
 
   const handleCopyLink = useCallback(async (tmpl: OrderTemplate) => {
     const shareUrl = `${window.location.origin}/catering?template=${tmpl.shareCode}`;
@@ -355,125 +408,357 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
       )}
 
       {/* ── Create Form ── */}
-      {showCreateForm && prefillFromFavorite && (
+      {createMode && (
         <div
           className="rounded-2xl border p-4 mb-4"
           style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
         >
-          <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--aurora-text)' }}>
-            Create Template from "{prefillFromFavorite.label}"
-          </h3>
-          <p className="text-xs mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
-            {prefillFromFavorite.businessName} · {prefillFromFavorite.items.length} items · {formatPrice(calculateOrderTotal(prefillFromFavorite.items))}
-          </p>
+          {/* Tab selection */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setCreateMode('from_favorite')}
+              disabled={!prefillFromFavorite}
+              className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: createMode === 'from_favorite' ? 'rgba(99,102,241,0.1)' : 'transparent',
+                color: createMode === 'from_favorite' ? '#6366F1' : 'var(--aurora-text-secondary)',
+                borderColor: createMode === 'from_favorite' ? '#6366F1' : 'var(--aurora-border)',
+              }}
+            >
+              From Favorite
+            </button>
+            <button
+              onClick={() => setCreateMode('from_scratch')}
+              className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
+              style={{
+                backgroundColor: createMode === 'from_scratch' ? 'rgba(99,102,241,0.1)' : 'transparent',
+                color: createMode === 'from_scratch' ? '#6366F1' : 'var(--aurora-text-secondary)',
+                borderColor: createMode === 'from_scratch' ? '#6366F1' : 'var(--aurora-border)',
+              }}
+            >
+              Create from Scratch
+            </button>
+          </div>
 
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>Template Title</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Q1 Team Lunch"
-                className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
-                style={{ borderColor: 'var(--aurora-border)' }}
-              />
-            </div>
+          {/* FROM FAVORITE MODE */}
+          {createMode === 'from_favorite' && prefillFromFavorite && (
+            <>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--aurora-text)' }}>
+                Create Template from "{prefillFromFavorite.label}"
+              </h3>
+              <p className="text-xs mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
+                {prefillFromFavorite.businessName} · {prefillFromFavorite.items.length} items · {formatPrice(calculateOrderTotal(prefillFromFavorite.items))}
+              </p>
 
-            <div>
-              <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
-                Description <span style={{ color: 'var(--aurora-text-muted)' }}>(optional)</span>
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Notes about this template..."
-                rows={2}
-                className="w-full mt-1 px-3 py-2 rounded-lg border text-sm resize-none"
-                style={{ borderColor: 'var(--aurora-border)' }}
-              />
-            </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>Template Title</label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g., Q1 Team Lunch"
+                    className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
+                    style={{ borderColor: 'var(--aurora-border)' }}
+                  />
+                </div>
 
-            {/* Visibility */}
-            <div>
-              <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>Visibility</label>
-              <div className="flex gap-2 mt-1">
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
+                    Description <span style={{ color: 'var(--aurora-text-muted)' }}>(optional)</span>
+                  </label>
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Notes about this template..."
+                    rows={2}
+                    className="w-full mt-1 px-3 py-2 rounded-lg border text-sm resize-none"
+                    style={{ borderColor: 'var(--aurora-border)' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>Visibility</label>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => setIsPublic(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                      style={{
+                        backgroundColor: isPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
+                        color: isPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
+                        borderColor: isPublic ? '#6366F1' : 'var(--aurora-border)',
+                      }}
+                    >
+                      <Globe size={12} />
+                      Anyone with link
+                    </button>
+                    <button
+                      onClick={() => setIsPublic(false)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                      style={{
+                        backgroundColor: !isPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
+                        color: !isPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
+                        borderColor: !isPublic ? '#6366F1' : 'var(--aurora-border)',
+                      }}
+                    >
+                      <Lock size={12} />
+                      Organization only
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
+                    Organization Name <span style={{ color: 'var(--aurora-text-muted)' }}>(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={organizationName}
+                    onChange={(e) => setOrganizationName(e.target.value)}
+                    placeholder="e.g., Acme Corp"
+                    className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
+                    style={{ borderColor: 'var(--aurora-border)' }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-4">
                 <button
-                  onClick={() => setIsPublic(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-                  style={{
-                    backgroundColor: isPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
-                    color: isPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
-                    borderColor: isPublic ? '#6366F1' : 'var(--aurora-border)',
-                  }}
+                  onClick={handleCreateFromFavorite}
+                  disabled={submitting}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50"
+                  style={{ backgroundColor: '#6366F1' }}
                 >
-                  <Globe size={12} />
-                  Anyone with link
+                  {submitting ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                  {submitting ? 'Creating...' : 'Create Template'}
                 </button>
                 <button
-                  onClick={() => setIsPublic(false)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-                  style={{
-                    backgroundColor: !isPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
-                    color: !isPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
-                    borderColor: !isPublic ? '#6366F1' : 'var(--aurora-border)',
-                  }}
+                  onClick={() => setCreateMode(null)}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium"
+                  style={{ color: 'var(--aurora-text-secondary)' }}
                 >
-                  <Lock size={12} />
-                  Organization only
+                  Cancel
                 </button>
               </div>
-            </div>
+            </>
+          )}
 
-            {/* Organization (optional) */}
-            <div>
-              <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
-                Organization Name <span style={{ color: 'var(--aurora-text-muted)' }}>(optional — for team library)</span>
-              </label>
-              <input
-                type="text"
-                value={organizationName}
-                onChange={(e) => setOrganizationName(e.target.value)}
-                placeholder="e.g., Acme Corp"
-                className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
-                style={{ borderColor: 'var(--aurora-border)' }}
-              />
-            </div>
-          </div>
+          {/* FROM SCRATCH MODE */}
+          {createMode === 'from_scratch' && (
+            <>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--aurora-text)' }}>
+                Create Template from Scratch
+              </h3>
+              <p className="text-xs mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Build a custom order template with your own items
+              </p>
 
-          <div className="flex gap-2 mt-4">
-            <button
-              onClick={handleCreate}
-              disabled={submitting}
-              className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50"
-              style={{ backgroundColor: '#6366F1' }}
-            >
-              {submitting ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-              {submitting ? 'Creating...' : 'Create Template'}
-            </button>
-            <button
-              onClick={() => setShowCreateForm(false)}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium"
-              style={{ color: 'var(--aurora-text-secondary)' }}
-            >
-              Cancel
-            </button>
-          </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>Template Title *</label>
+                  <input
+                    type="text"
+                    value={scratchTitle}
+                    onChange={(e) => setScratchTitle(e.target.value)}
+                    placeholder="e.g., Q1 Team Lunch"
+                    className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
+                    style={{ borderColor: 'var(--aurora-border)' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
+                    Description <span style={{ color: 'var(--aurora-text-muted)' }}>(optional)</span>
+                  </label>
+                  <textarea
+                    value={scratchDescription}
+                    onChange={(e) => setScratchDescription(e.target.value)}
+                    placeholder="Notes about this template..."
+                    rows={2}
+                    className="w-full mt-1 px-3 py-2 rounded-lg border text-sm resize-none"
+                    style={{ borderColor: 'var(--aurora-border)' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
+                    Business Name <span style={{ color: 'var(--aurora-text-muted)' }}>(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={scratchBusinessName}
+                    onChange={(e) => setScratchBusinessName(e.target.value)}
+                    placeholder="e.g., Acme Catering"
+                    className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
+                    style={{ borderColor: 'var(--aurora-border)' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>Visibility</label>
+                  <div className="flex gap-2 mt-1">
+                    <button
+                      onClick={() => setScratchIsPublic(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                      style={{
+                        backgroundColor: scratchIsPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
+                        color: scratchIsPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
+                        borderColor: scratchIsPublic ? '#6366F1' : 'var(--aurora-border)',
+                      }}
+                    >
+                      <Globe size={12} />
+                      Anyone with link
+                    </button>
+                    <button
+                      onClick={() => setScratchIsPublic(false)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+                      style={{
+                        backgroundColor: !scratchIsPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
+                        color: !scratchIsPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
+                        borderColor: !scratchIsPublic ? '#6366F1' : 'var(--aurora-border)',
+                      }}
+                    >
+                      <Lock size={12} />
+                      Organization only
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
+                    Organization Name <span style={{ color: 'var(--aurora-text-muted)' }}>(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={scratchOrgName}
+                    onChange={(e) => setScratchOrgName(e.target.value)}
+                    placeholder="e.g., Acme Corp"
+                    className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
+                    style={{ borderColor: 'var(--aurora-border)' }}
+                  />
+                </div>
+
+                {/* Items section */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>Items *</label>
+                    <button
+                      onClick={() => setScratchItems([...scratchItems, {name: '', qty: 1, unitPrice: 0, pricingType: 'per_person'}])}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-white"
+                      style={{ backgroundColor: '#6366F1' }}
+                    >
+                      <Plus size={12} />
+                      Add Item
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {scratchItems.map((item, idx) => (
+                      <div key={idx} className="flex gap-2 items-end">
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => {
+                            const newItems = [...scratchItems];
+                            newItems[idx].name = e.target.value;
+                            setScratchItems(newItems);
+                          }}
+                          placeholder="Item name"
+                          className="flex-1 px-2 py-1.5 rounded-lg border text-xs"
+                          style={{ borderColor: 'var(--aurora-border)' }}
+                        />
+                        <input
+                          type="number"
+                          value={item.qty}
+                          onChange={(e) => {
+                            const newItems = [...scratchItems];
+                            newItems[idx].qty = parseInt(e.target.value) || 1;
+                            setScratchItems(newItems);
+                          }}
+                          placeholder="Qty"
+                          className="w-16 px-2 py-1.5 rounded-lg border text-xs"
+                          style={{ borderColor: 'var(--aurora-border)' }}
+                        />
+                        <input
+                          type="number"
+                          value={item.unitPrice}
+                          onChange={(e) => {
+                            const newItems = [...scratchItems];
+                            newItems[idx].unitPrice = parseFloat(e.target.value) || 0;
+                            setScratchItems(newItems);
+                          }}
+                          placeholder="Price"
+                          className="w-20 px-2 py-1.5 rounded-lg border text-xs"
+                          style={{ borderColor: 'var(--aurora-border)' }}
+                        />
+                        <select
+                          value={item.pricingType}
+                          onChange={(e) => {
+                            const newItems = [...scratchItems];
+                            newItems[idx].pricingType = e.target.value;
+                            setScratchItems(newItems);
+                          }}
+                          className="w-24 px-2 py-1.5 rounded-lg border text-xs"
+                          style={{ borderColor: 'var(--aurora-border)' }}
+                        >
+                          <option value="per_person">Per Person</option>
+                          <option value="fixed">Fixed</option>
+                        </select>
+                        <button
+                          onClick={() => setScratchItems(scratchItems.filter((_, i) => i !== idx))}
+                          className="px-2 py-1.5 rounded-lg text-xs font-medium text-white"
+                          style={{ backgroundColor: '#EF4444' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={handleCreateFromScratch}
+                  disabled={creating}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50"
+                  style={{ backgroundColor: '#6366F1' }}
+                >
+                  {creating ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                  {creating ? 'Creating...' : 'Create Template'}
+                </button>
+                <button
+                  onClick={() => setCreateMode(null)}
+                  className="px-4 py-2.5 rounded-xl text-sm font-medium"
+                  style={{ color: 'var(--aurora-text-secondary)' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* ── Templates List (My Templates) ── */}
       {activeTab === 'mine' && (
         <>
-          {templates.length === 0 && !showCreateForm && !lookupMode && (
+          {templates.length === 0 && !createMode && !lookupMode && (
             <div className="text-center py-16">
               <Share2 size={40} className="mx-auto mb-3 opacity-20" />
               <p className="text-sm font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>
                 No templates yet
               </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
-                Save a favorite order, then create a shareable template from it.
+              <p className="text-xs mt-1 mb-4" style={{ color: 'var(--aurora-text-muted)' }}>
+                Create a template from scratch or save a favorite order first.
               </p>
+              <button
+                onClick={() => setCreateMode('from_scratch')}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                <Plus size={14} />
+                Create from Scratch
+              </button>
             </div>
           )}
 

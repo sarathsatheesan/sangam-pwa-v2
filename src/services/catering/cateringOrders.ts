@@ -15,10 +15,12 @@ import {
   onSnapshot,
   arrayUnion,
   Timestamp,
+  runTransaction,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { CateringOrder, OrderItem } from './cateringTypes';
+import { notifyCustomerStatusChange, notifyCustomerOrderModified } from './cateringNotifications';
 
 const ORDERS_COL = 'cateringOrders';
 
@@ -110,20 +112,50 @@ export function subscribeToBusinessOrders(
   });
 }
 
+// ── Status state machine — valid transitions ──
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['preparing', 'cancelled'],
+  preparing: ['ready', 'cancelled'],
+  ready: ['out_for_delivery', 'cancelled'],
+  out_for_delivery: ['delivered'],
+  delivered: [],      // terminal state
+  cancelled: [],      // terminal state
+};
+
+export function isValidStatusTransition(
+  currentStatus: string,
+  newStatus: string,
+): boolean {
+  return VALID_TRANSITIONS[currentStatus]?.includes(newStatus) ?? false;
+}
+
 export async function updateOrderStatus(
   orderId: string,
   status: CateringOrder['status'],
   extra?: Record<string, any>,
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
+  // Validate transition
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Order not found');
+  const currentStatus = (snap.data() as CateringOrder).status;
+  if (!isValidStatusTransition(currentStatus, status)) {
+    throw new Error(`Invalid status transition: ${currentStatus} → ${status}`);
+  }
   const updates: Record<string, any> = { status, ...extra };
   if (status === 'confirmed') updates.confirmedAt = serverTimestamp();
-  // Append to statusHistory for timeline tracking
   updates.statusHistory = arrayUnion({
     status,
     timestamp: Timestamp.now(),
   });
   await updateDoc(ref, updates);
+
+  // Fire notification (non-blocking)
+  const orderData = snap.data() as CateringOrder;
+  if (status !== 'pending') {
+    notifyCustomerStatusChange(orderData.customerId, orderId, status, orderData.businessName).catch(console.warn);
+  }
 }
 
 export async function cancelOrder(
@@ -188,7 +220,22 @@ export async function batchUpdateOrderStatus(
   let failed = 0;
   for (const id of orderIds) {
     try {
-      await updateOrderStatus(id, newStatus, extra);
+      const ref = doc(db, ORDERS_COL, id);
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(ref);
+        if (!snap.exists()) throw new Error('Order not found');
+        const currentStatus = (snap.data() as CateringOrder).status;
+        if (!isValidStatusTransition(currentStatus, newStatus)) {
+          throw new Error(`Invalid transition: ${currentStatus} → ${newStatus}`);
+        }
+        const updates: Record<string, any> = { status: newStatus, ...extra };
+        if (newStatus === 'confirmed') updates.confirmedAt = serverTimestamp();
+        updates.statusHistory = arrayUnion({
+          status: newStatus,
+          timestamp: Timestamp.now(),
+        });
+        transaction.update(ref, updates);
+      });
       success++;
     } catch {
       failed++;
@@ -229,6 +276,9 @@ export async function vendorModifyOrder(
     vendorModifiedAt: serverTimestamp(),
     vendorModificationNote: updates.note,
   });
+
+  // Notify customer of modification (non-blocking)
+  notifyCustomerOrderModified(data.customerId, orderId, data.businessName, updates.note).catch(console.warn);
 }
 
 // ── Vendor payment info (#13) ──
