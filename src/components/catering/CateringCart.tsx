@@ -1,7 +1,57 @@
+import { useState, useEffect } from 'react';
 import { X, ShoppingCart, Trash2, Minus, Plus } from 'lucide-react';
 import type { OrderItem } from '@/services/cateringService';
 import { calculateOrderTotal, formatPrice } from '@/services/cateringService';
 import { useModalA11y } from '@/hooks/useModalA11y';
+
+/** Editable quantity input — lets users clear the field, type freely, and commits on blur/Enter */
+function QtyInput({
+  value,
+  min,
+  max,
+  onChange,
+  ariaLabel,
+}: {
+  value: number;
+  min: number;
+  max: number | undefined;
+  onChange: (qty: number) => void;
+  ariaLabel: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+
+  // Keep draft in sync when value changes externally (e.g. via +/- buttons)
+  useEffect(() => { setDraft(String(value)); }, [value]);
+
+  const commit = () => {
+    const parsed = parseInt(draft, 10);
+    if (isNaN(parsed) || parsed < min) {
+      onChange(min);
+      setDraft(String(min));
+    } else if (max && parsed > max) {
+      onChange(max);
+      setDraft(String(max));
+    } else {
+      onChange(parsed);
+      setDraft(String(parsed));
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, ''))}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
+      onFocus={(e) => e.target.select()}
+      className="w-12 text-center font-medium text-gray-900 bg-transparent outline-none"
+      aria-label={ariaLabel}
+    />
+  );
+}
 
 interface CateringCartProps {
   items: OrderItem[];
@@ -109,20 +159,12 @@ export default function CateringCart({
                         >
                           <Minus className="w-4 h-4 text-gray-600" />
                         </button>
-                        <input
-                          type="number"
+                        <QtyInput
                           value={item.qty}
                           min={item.minOrderQty || 1}
                           max={item.maxOrderQty || undefined}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            if (isNaN(val) || val < 1) return;
-                            const minQty = item.minOrderQty || 1;
-                            const maxQty = item.maxOrderQty || Infinity;
-                            onUpdateQty(item.menuItemId, Math.min(maxQty, Math.max(minQty, val)));
-                          }}
-                          className="w-12 text-center font-medium text-gray-900 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          aria-label={`Quantity for ${item.name}`}
+                          onChange={(qty) => onUpdateQty(item.menuItemId, qty)}
+                          ariaLabel={`Quantity for ${item.name}`}
                         />
                         <button
                           onClick={() =>
