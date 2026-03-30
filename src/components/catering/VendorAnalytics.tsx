@@ -158,7 +158,7 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
     completed.forEach((o) => {
       const d = o.createdAt?.toDate ? o.createdAt.toDate() : new Date();
       const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const existing = dayMap.get(key) || { date: key, revenue: 0, orders: [] };
+      const existing = dayMap.get(key) || { date: key, revenue: 0, orders: [] as CateringOrder[] };
       existing.revenue += o.total;
       existing.orders.push(o);
       dayMap.set(key, existing);
@@ -458,7 +458,7 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
                 dataKey="revenue"
                 fill="#6366F1"
                 radius={[4, 4, 0, 0]}
-                onClick={(data) => setDrillDownDay(data.day)}
+                onClick={(data) => setDrillDownDay((data as any).day)}
               />
             </BarChart>
           </ResponsiveContainer>

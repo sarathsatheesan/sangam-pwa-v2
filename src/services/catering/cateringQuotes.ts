@@ -2,7 +2,7 @@
 // CATERING QUOTES — RFQ/RFP quote requests and vendor responses
 // ═══════════════════════════════════════════════════════════════════════
 
-import {
+import type {
   CateringQuoteRequest,
   CateringQuoteResponse,
   QuotedItem,
@@ -24,8 +24,8 @@ import {
   orderBy,
   serverTimestamp,
   onSnapshot,
-  Unsubscribe,
 } from 'firebase/firestore';
+import type { Unsubscribe } from 'firebase/firestore';
 
 import { db } from '../firebase';
 

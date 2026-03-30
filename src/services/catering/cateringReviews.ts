@@ -14,7 +14,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { CateringReview } from './cateringTypes';
+import type { CateringReview } from './cateringTypes';
 
 /**
  * Fetch all catering reviews for a business, sorted newest-first (client-side).

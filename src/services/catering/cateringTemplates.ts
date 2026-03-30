@@ -14,14 +14,14 @@ import {
   updateDoc,
   where,
   serverTimestamp,
-  Unsubscribe,
   orderBy,
   limit,
   arrayUnion,
 } from 'firebase/firestore';
+import type { Unsubscribe } from 'firebase/firestore';
 
 import { db } from '../firebase';
-import { OrderTemplate } from './cateringTypes';
+import type { OrderTemplate } from './cateringTypes';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPERS

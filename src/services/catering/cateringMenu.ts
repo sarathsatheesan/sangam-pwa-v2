@@ -14,7 +14,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { CateringMenuItem } from './cateringTypes';
+import type { CateringMenuItem } from './cateringTypes';
 
 const MENU_ITEMS_COL = 'cateringMenuItems';
 

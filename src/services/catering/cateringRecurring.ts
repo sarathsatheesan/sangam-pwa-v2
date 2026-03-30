@@ -15,11 +15,11 @@ import {
   updateDoc,
   where,
   serverTimestamp,
-  Unsubscribe,
 } from 'firebase/firestore';
+import type { Unsubscribe } from 'firebase/firestore';
 
 import { db } from '../firebase';
-import {
+import type {
   FavoriteOrder,
   RecurringOrder,
   RecurrenceSchedule,
