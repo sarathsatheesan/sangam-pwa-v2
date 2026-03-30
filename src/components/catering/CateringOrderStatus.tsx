@@ -10,10 +10,11 @@ import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, Clock, CheckCircle2, Package, Truck, XCircle, MapPin,
   User, Phone, Calendar, Users, ChevronDown, ChevronUp, Loader2,
-  UtensilsCrossed, FileText, Star, Ban,
+  UtensilsCrossed, FileText, Star, Ban, CreditCard, ExternalLink,
+  MessageSquare, AlertTriangle,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
-import { subscribeToCustomerOrders, formatPrice, hasReviewedOrder, cancelOrder } from '@/services/cateringService';
+import { subscribeToCustomerOrders, formatPrice, hasReviewedOrder, cancelOrder, getBusinessPaymentInfo, findOrCreateConversation } from '@/services/cateringService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
@@ -281,6 +282,31 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         </div>
                       )}
 
+                      {/* ── Vendor modification notice (#18) ── */}
+                      {order.vendorModified && (
+                        <div className="flex items-start gap-2 p-3 rounded-xl" style={{ backgroundColor: '#FEF3C7' }}>
+                          <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#D97706' }} />
+                          <div>
+                            <p className="text-xs font-medium" style={{ color: '#92400E' }}>Order modified by vendor</p>
+                            <p className="text-xs" style={{ color: '#92400E' }}>{order.vendorModificationNote}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── Payment info (#13) ── */}
+                      {['confirmed', 'preparing', 'ready'].includes(order.status) && (
+                        <PaymentInfoSection businessId={order.businessId} orderId={order.id} total={order.total} />
+                      )}
+
+                      {/* ── Message Vendor (#14) ── */}
+                      {!['cancelled', 'delivered'].includes(order.status) && (
+                        <MessageVendorButton
+                          businessId={order.businessId}
+                          businessName={order.businessName}
+                          orderId={order.id}
+                        />
+                      )}
+
                       {/* Cancel Order button — for pending/confirmed orders */}
                       {['pending', 'confirmed'].includes(order.status) && (
                         <button
@@ -394,6 +420,91 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
         </div>
       )}
     </div>
+  );
+}
+
+// ── Payment Info Section (#13) ──
+function PaymentInfoSection({ businessId, orderId, total }: { businessId: string; orderId: string; total: number }) {
+  const [info, setInfo] = useState<{ paymentUrl?: string; paymentMethod?: string; paymentNote?: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getBusinessPaymentInfo(businessId)
+      .then(setInfo)
+      .catch(() => setInfo(null))
+      .finally(() => setLoading(false));
+  }, [businessId]);
+
+  if (loading) return null;
+  if (!info || (!info.paymentUrl && !info.paymentMethod && !info.paymentNote)) return null;
+
+  return (
+    <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'rgba(99,102,241,0.03)' }}>
+      <div className="flex items-center gap-2">
+        <CreditCard size={14} style={{ color: '#6366F1' }} />
+        <span className="text-xs font-semibold" style={{ color: '#6366F1' }}>Payment Information</span>
+      </div>
+      {info.paymentMethod && (
+        <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+          <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Method:</span> {info.paymentMethod}
+        </p>
+      )}
+      {info.paymentNote && (
+        <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+          {info.paymentNote}
+        </p>
+      )}
+      {info.paymentUrl && (
+        <a
+          href={info.paymentUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
+          style={{ backgroundColor: '#6366F1' }}
+        >
+          <ExternalLink size={14} />
+          Pay {formatPrice(total)}
+        </a>
+      )}
+    </div>
+  );
+}
+
+// ── Message Vendor Button (#14) ──
+function MessageVendorButton({ businessId, businessName, orderId }: { businessId: string; businessName: string; orderId: string }) {
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  const handleMessage = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const conversationId = await findOrCreateConversation(
+        user.uid,
+        businessId,
+        `Order #${orderId.slice(-6)}`,
+      );
+      addToast(`Chat opened for order with ${businessName}`, 'success');
+      // In a full implementation, this would navigate to a chat view
+      // For now, the conversation is created and can be accessed from a messaging tab
+    } catch {
+      addToast('Failed to start conversation', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleMessage}
+      disabled={loading}
+      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border disabled:opacity-50"
+      style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.04)' }}
+    >
+      {loading ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />}
+      Message {businessName}
+    </button>
   );
 }
 

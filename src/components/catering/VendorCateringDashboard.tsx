@@ -8,13 +8,19 @@ import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   Package, Clock, CheckCircle2, XCircle, ChevronDown, ChevronUp,
   User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck, Ban,
+  Square, CheckSquare, Pencil, CreditCard, ExternalLink, Save, X,
 } from 'lucide-react';
-import type { CateringOrder } from '@/services/cateringService';
+import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import {
   subscribeToBusinessOrders,
   updateOrderStatus,
   cancelOrder,
+  batchUpdateOrderStatus,
+  vendorModifyOrder,
+  updateBusinessPaymentInfo,
+  getBusinessPaymentInfo,
   formatPrice,
+  calculateOrderTotal,
 } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -59,6 +65,96 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
   // ETA inputs per order (vendor enters before dispatching for delivery)
   const [etaInputs, setEtaInputs] = useState<Record<string, string>>({});
+
+  // ── Batch selection state (#17) ──
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
+
+  const toggleOrderSelection = (orderId: string) => {
+    setSelectedOrders(prev => {
+      const next = new Set(prev);
+      next.has(orderId) ? next.delete(orderId) : next.add(orderId);
+      return next;
+    });
+  };
+
+  const handleBatchAction = async (action: 'confirmed' | 'cancelled') => {
+    if (selectedOrders.size === 0) return;
+    setBatchLoading(true);
+    try {
+      const result = await batchUpdateOrderStatus([...selectedOrders], action);
+      addToast(`${result.success} order(s) ${action}${result.failed ? `, ${result.failed} failed` : ''}`, 'success');
+      setSelectedOrders(new Set());
+      setBatchMode(false);
+    } catch (err: any) {
+      addToast(err.message || 'Batch action failed', 'error');
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  // ── Order modification state (#18) ──
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editItems, setEditItems] = useState<OrderItem[]>([]);
+  const [editNote, setEditNote] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  const startEditOrder = (order: CateringOrder) => {
+    setEditingOrderId(order.id);
+    setEditItems([...order.items]);
+    setEditNote('');
+  };
+
+  const handleSaveModification = async (order: CateringOrder) => {
+    if (!editNote.trim()) { addToast('Please add a note explaining the change', 'error'); return; }
+    setEditSaving(true);
+    try {
+      const subtotal = editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0);
+      const tax = Math.round(subtotal * 0.0825);
+      await vendorModifyOrder(order.id, {
+        items: editItems,
+        subtotal,
+        tax,
+        total: subtotal + tax,
+        note: editNote.trim(),
+      });
+      addToast('Order modified. Customer will be notified.', 'success');
+      setEditingOrderId(null);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to modify order', 'error');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // ── Payment settings state (#13) ──
+  const [showPaymentSettings, setShowPaymentSettings] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [paymentSaving, setPaymentSaving] = useState(false);
+
+  useEffect(() => {
+    getBusinessPaymentInfo(businessId).then(info => {
+      setPaymentUrl(info.paymentUrl || '');
+      setPaymentMethod(info.paymentMethod || '');
+      setPaymentNote(info.paymentNote || '');
+    }).catch(() => {});
+  }, [businessId]);
+
+  const handleSavePayment = async () => {
+    setPaymentSaving(true);
+    try {
+      await updateBusinessPaymentInfo(businessId, { paymentUrl, paymentMethod, paymentNote });
+      addToast('Payment info saved', 'success');
+      setShowPaymentSettings(false);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to save', 'error');
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
 
   // Cancel order state
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
@@ -134,16 +230,100 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
             {businessName}
           </p>
         </div>
-        {pendingCount > 0 && (
-          <span
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
-            style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowPaymentSettings(!showPaymentSettings)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+            style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
           >
-            <AlertCircle size={12} />
-            {pendingCount} pending
-          </span>
-        )}
+            <CreditCard size={12} />
+            Payment
+          </button>
+          <button
+            onClick={() => { setBatchMode(!batchMode); setSelectedOrders(new Set()); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+            style={{
+              borderColor: batchMode ? '#6366F1' : 'var(--aurora-border)',
+              color: batchMode ? '#6366F1' : 'var(--aurora-text-secondary)',
+              backgroundColor: batchMode ? 'rgba(99,102,241,0.05)' : 'transparent',
+            }}
+          >
+            <CheckSquare size={12} />
+            {batchMode ? 'Cancel' : 'Batch'}
+          </button>
+          {pendingCount > 0 && (
+            <span
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
+              style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
+            >
+              <AlertCircle size={12} />
+              {pendingCount} pending
+            </span>
+          )}
+        </div>
       </div>
+
+      {/* ── Payment settings panel (#13) ── */}
+      {showPaymentSettings && (
+        <div className="p-4 rounded-xl border space-y-3" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.03)' }}>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>Payment Settings</p>
+            <button onClick={() => setShowPaymentSettings(false)} className="p-1"><X size={14} style={{ color: 'var(--aurora-text-muted)' }} /></button>
+          </div>
+          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+            Customers will see this info so they can pay you directly.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted)' }}>Payment Method</label>
+              <input type="text" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="e.g. Venmo, PayPal, Zelle"
+                className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }} />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted)' }}>Payment URL</label>
+              <input type="url" value={paymentUrl} onChange={(e) => setPaymentUrl(e.target.value)} placeholder="https://venmo.com/your-handle"
+                className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }} />
+            </div>
+          </div>
+          <div>
+            <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted)' }}>Payment Instructions</label>
+            <textarea value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder="e.g. Please include order # in the memo"
+              rows={2} className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none resize-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }} />
+          </div>
+          <button onClick={handleSavePayment} disabled={paymentSaving}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+            style={{ backgroundColor: '#6366F1' }}
+          >
+            {paymentSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Save Payment Info
+          </button>
+        </div>
+      )}
+
+      {/* ── Batch action bar (#17) ── */}
+      {batchMode && selectedOrders.size > 0 && (
+        <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: 'rgba(99,102,241,0.06)' }}>
+          <span className="text-sm font-medium" style={{ color: '#6366F1' }}>
+            {selectedOrders.size} order(s) selected
+          </span>
+          <div className="flex gap-2">
+            <button onClick={() => handleBatchAction('confirmed')} disabled={batchLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50"
+              style={{ backgroundColor: '#10B981' }}
+            >
+              {batchLoading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+              Accept All
+            </button>
+            <button onClick={() => handleBatchAction('cancelled')} disabled={batchLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50"
+              style={{ backgroundColor: '#EF4444' }}
+            >
+              {batchLoading ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
+              Decline All
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="flex gap-2">
@@ -189,8 +369,16 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 {/* Order header */}
                 <button
                   className="w-full flex items-center justify-between p-4 text-left"
-                  onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
+                  onClick={() => batchMode && order.status === 'pending' ? toggleOrderSelection(order.id) : setExpandedOrder(isExpanded ? null : order.id)}
                 >
+                  {/* Batch checkbox */}
+                  {batchMode && order.status === 'pending' && (
+                    <div className="mr-3 flex-shrink-0" onClick={(e) => { e.stopPropagation(); toggleOrderSelection(order.id); }}>
+                      {selectedOrders.has(order.id)
+                        ? <CheckSquare size={18} style={{ color: '#6366F1' }} />
+                        : <Square size={18} style={{ color: 'var(--aurora-text-muted)' }} />}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
@@ -272,6 +460,53 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                         </div>
                       </div>
                     </div>
+
+                    {/* ── Order modification form (#18) ── */}
+                    {editingOrderId === order.id ? (
+                      <div className="p-3 rounded-xl border space-y-2" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.02)' }}>
+                        <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>Modify Order Items</p>
+                        {editItems.map((item, i) => (
+                          <div key={i} className="flex items-center gap-2 text-sm">
+                            <input type="number" min="0" value={editItems[i].qty}
+                              onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, qty: Math.max(0, parseInt(e.target.value) || 0) } : it))}
+                              className="w-14 text-center rounded-lg border px-2 py-1 text-xs" style={{ borderColor: 'var(--aurora-border)' }}
+                            />
+                            <span className="flex-1 truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
+                            <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * editItems[i].qty)}</span>
+                          </div>
+                        ))}
+                        <p className="text-xs font-medium text-right" style={{ color: 'var(--aurora-text)' }}>
+                          New total: {formatPrice(editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0))}
+                        </p>
+                        <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)}
+                          placeholder="Reason for modification (e.g. item out of stock)..." rows={2}
+                          className="w-full rounded-lg border px-3 py-2 text-xs outline-none resize-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => setEditingOrderId(null)} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border" style={{ borderColor: 'var(--aurora-border)' }}>Cancel</button>
+                          <button onClick={() => handleSaveModification(order)} disabled={editSaving}
+                            className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: '#6366F1' }}
+                          >{editSaving ? <Loader2 size={12} className="animate-spin mx-auto" /> : 'Save Changes'}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Vendor modification notice */}
+                        {order.vendorModified && (
+                          <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
+                            <span className="font-medium">Modified: </span>{order.vendorModificationNote || 'Items adjusted by vendor'}
+                          </div>
+                        )}
+                        {/* Edit order button for confirmed/preparing */}
+                        {['confirmed', 'preparing'].includes(order.status) && (
+                          <button onClick={() => startEditOrder(order)}
+                            className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#6366F1' }}
+                          >
+                            <Pencil size={12} /> Modify order items
+                          </button>
+                        )}
+                      </>
+                    )}
 
                     {/* Special instructions */}
                     {order.specialInstructions && (

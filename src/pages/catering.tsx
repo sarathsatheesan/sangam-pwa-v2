@@ -13,7 +13,7 @@ import React, { useReducer, useCallback, useEffect, useState, useRef, useMemo } 
 import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store, Search,
-  Send, FileText, ClipboardList, Star, Heart, Repeat, Share2, Pencil,
+  Send, FileText, ClipboardList, Star, Heart, Repeat, Share2, Pencil, Package,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -57,6 +57,7 @@ const CateringReviews = React.lazy(() => import('@/components/catering/CateringR
 // Phase 6: Favorites, Recurring, Templates
 const FavoriteOrders = React.lazy(() => import('@/components/catering/FavoriteOrders'));
 const RecurringOrderManager = React.lazy(() => import('@/components/catering/RecurringOrderManager'));
+const VendorInventoryManager = React.lazy(() => import('@/components/catering/VendorInventoryManager'));
 const OrderTemplates = React.lazy(() => import('@/components/catering/OrderTemplates'));
 
 function LazyFallback() {
@@ -75,7 +76,7 @@ export default function CateringPage() {
   const [allCateringBusinesses, setAllCateringBusinesses] = useState<any[]>([]);
   const [userOwnedBusiness, setUserOwnedBusiness] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews'>('quotes');
+  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory'>('quotes');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
   const [editingQuoteRequestId, setEditingQuoteRequestId] = useState<string | null>(null);
   const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
@@ -969,6 +970,17 @@ export default function CateringPage() {
                 <Star size={14} />
                 Reviews
               </button>
+              <button
+                onClick={() => setVendorTab('inventory')}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: vendorTab === 'inventory' ? '#6366F1' : 'var(--aurora-surface-variant)',
+                  color: vendorTab === 'inventory' ? '#fff' : 'var(--aurora-text-secondary)',
+                }}
+              >
+                <Package size={14} />
+                Inventory
+              </button>
             </div>
 
             <React.Suspense fallback={<LazyFallback />}>
@@ -997,6 +1009,13 @@ export default function CateringPage() {
                   businessId={ownedBusiness.id}
                   businessName={ownedBusiness.name}
                   isVendor={true}
+                  onBack={() => setVendorTab('orders')}
+                />
+            )}
+            {vendorTab === 'inventory' && (
+                <VendorInventoryManager
+                  businessId={ownedBusiness.id}
+                  businessName={ownedBusiness.name}
                   onBack={() => setVendorTab('orders')}
                 />
             )}

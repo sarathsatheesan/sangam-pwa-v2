@@ -40,6 +40,11 @@ export interface CateringMenuItem {
   available: boolean;
   minOrderQty?: number;
   maxOrderQty?: number;
+  // Inventory management (#19)
+  stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
+  stockCount?: number;        // null = unlimited
+  availableFrom?: string;     // ISO date — seasonal/time-window availability
+  availableUntil?: string;
   createdAt?: any;
 }
 
@@ -95,6 +100,16 @@ export interface CateringOrder {
   contactPhone: string;
   eventType?: string;           // corporate_meeting | wedding | cultural_festival | religious | birthday | other
   estimatedDeliveryTime?: string; // e.g. "2:30 PM" or "30 minutes"
+  // Payment (#13) — vendor's payment info surfaced to customer
+  paymentStatus?: 'pending' | 'paid' | 'refunded';
+  paymentUrl?: string;        // Vendor's external payment link
+  paymentMethod?: string;     // "Venmo", "PayPal", "Square", etc.
+  paymentNote?: string;       // Any vendor-specific payment instructions
+  // Order modification (#18) — vendor adjusts items post-confirmation
+  vendorModified?: boolean;
+  vendorModifiedAt?: any;
+  vendorModificationNote?: string;
+  originalItems?: OrderItem[];  // Snapshot before vendor modification
   createdAt?: any;
   confirmedAt?: any;
   declinedReason?: string;
@@ -972,6 +987,11 @@ export interface CateringReview {
   isCateringReview: boolean;        // distinguishes from general biz reviews
   vendorResponse?: string;          // vendor's reply to this review
   vendorRespondedAt?: any;
+  // Flagging (#22)
+  flagged?: boolean;
+  flaggedBy?: string;               // vendor userId who flagged
+  flaggedAt?: any;
+  flagReason?: string;
   createdAt: any;
 }
 
@@ -1057,6 +1077,159 @@ export async function addVendorResponse(reviewId: string, responseText: string):
     vendorResponse: responseText,
     vendorRespondedAt: Timestamp.now(),
   });
+}
+
+// ── Review flagging (#22) ──
+
+export async function flagReview(reviewId: string, flaggedBy: string, reason: string): Promise<void> {
+  await updateDoc(doc(db, 'businessReviews', reviewId), {
+    flagged: true,
+    flaggedBy,
+    flaggedAt: serverTimestamp(),
+    flagReason: reason,
+  });
+}
+
+// ── Batch order actions (#17) ──
+
+export async function batchUpdateOrderStatus(
+  orderIds: string[],
+  newStatus: CateringOrder['status'],
+  extra?: Record<string, any>,
+): Promise<{ success: number; failed: number }> {
+  let success = 0;
+  let failed = 0;
+  for (const id of orderIds) {
+    try {
+      await updateOrderStatus(id, newStatus, extra);
+      success++;
+    } catch {
+      failed++;
+    }
+  }
+  return { success, failed };
+}
+
+// ── Order modification by vendor (#18) ──
+
+export async function vendorModifyOrder(
+  orderId: string,
+  updates: {
+    items: OrderItem[];
+    total: number;
+    subtotal: number;
+    tax?: number;
+    note: string;
+  },
+): Promise<void> {
+  const ref = doc(db, ORDERS_COL, orderId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Order not found');
+  const data = snap.data() as CateringOrder;
+
+  // Only allow modification for confirmed/preparing
+  if (!['confirmed', 'preparing'].includes(data.status)) {
+    throw new Error('Can only modify confirmed or preparing orders');
+  }
+
+  await updateDoc(ref, {
+    originalItems: data.items, // save snapshot
+    items: updates.items,
+    subtotal: updates.subtotal,
+    total: updates.total,
+    ...(updates.tax !== undefined ? { tax: updates.tax } : {}),
+    vendorModified: true,
+    vendorModifiedAt: serverTimestamp(),
+    vendorModificationNote: updates.note,
+  });
+}
+
+// ── Inventory management (#19) ──
+
+export async function updateMenuItemStock(
+  itemId: string,
+  updates: {
+    stockStatus?: 'in_stock' | 'low_stock' | 'out_of_stock';
+    stockCount?: number;
+    available?: boolean;
+    availableFrom?: string;
+    availableUntil?: string;
+  },
+): Promise<void> {
+  const cleanUpdates: Record<string, any> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined) cleanUpdates[k] = v;
+  }
+  await updateDoc(doc(db, MENU_ITEMS_COL, itemId), cleanUpdates);
+}
+
+// ── Vendor payment info (#13) ──
+
+export async function updateBusinessPaymentInfo(
+  businessId: string,
+  payment: { paymentUrl?: string; paymentMethod?: string; paymentNote?: string },
+): Promise<void> {
+  await updateDoc(doc(db, 'businesses', businessId), {
+    paymentUrl: payment.paymentUrl || '',
+    paymentMethod: payment.paymentMethod || '',
+    paymentNote: payment.paymentNote || '',
+  });
+}
+
+export async function getBusinessPaymentInfo(
+  businessId: string,
+): Promise<{ paymentUrl?: string; paymentMethod?: string; paymentNote?: string }> {
+  const snap = await getDoc(doc(db, 'businesses', businessId));
+  if (!snap.exists()) return {};
+  const data = snap.data();
+  return {
+    paymentUrl: data.paymentUrl,
+    paymentMethod: data.paymentMethod,
+    paymentNote: data.paymentNote,
+  };
+}
+
+// ── Customer-vendor messaging (#14) ──
+
+export async function findOrCreateConversation(
+  customerId: string,
+  vendorOwnerId: string,
+  context?: string,
+): Promise<string> {
+  // Check if a conversation already exists between these two users
+  const q = query(
+    collection(db, 'conversations'),
+    where('participants', 'array-contains', customerId),
+  );
+  const snap = await getDocs(q);
+  const existing = snap.docs.find(d => {
+    const participants = d.data().participants as string[];
+    return participants.includes(vendorOwnerId);
+  });
+
+  if (existing) return existing.id;
+
+  // Create new conversation
+  const convRef = await addDoc(collection(db, 'conversations'), {
+    participants: [customerId, vendorOwnerId],
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastMessage: context || 'New catering inquiry',
+    lastMessageTime: serverTimestamp(),
+    lastMessageSenderId: customerId,
+  });
+
+  // Add initial context message
+  if (context) {
+    await addDoc(collection(db, 'conversations', convRef.id, 'messages'), {
+      text: context,
+      senderId: customerId,
+      createdAt: Timestamp.now(),
+      encrypted: false,
+    });
+  }
+
+  return convRef.id;
 }
 
 

@@ -9,6 +9,9 @@ import React, { useState, useCallback } from 'react';
 import { Star, Send, Loader2, X, UtensilsCrossed, Users } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
 import { submitCateringReview, hasReviewedOrder } from '@/services/cateringService';
+import { notifyVendorNewReview } from '@/services/notificationService';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -67,6 +70,22 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
       });
 
       addToast('Review submitted! Thank you for your feedback.', 'success');
+
+      // Notify vendor about new review (#21)
+      try {
+        const bizDoc = await getDoc(doc(db, 'businesses', order.businessId));
+        const ownerId = bizDoc.data()?.ownerId;
+        if (ownerId) {
+          await notifyVendorNewReview(
+            ownerId,
+            order.businessName,
+            userProfile?.name || 'A customer',
+            rating,
+            text.trim(),
+          );
+        }
+      } catch { /* non-critical — don't block the UX */ }
+
       onSubmitted();
     } catch (err: any) {
       console.error('Failed to submit review:', err);

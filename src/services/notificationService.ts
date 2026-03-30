@@ -39,7 +39,9 @@ export type CateringNotificationType =
   | 'order_confirmed'
   | 'order_status_changed'
   | 'vendor_new_rfq'
-  | 'vendor_rfq_edited';
+  | 'vendor_rfq_edited'
+  | 'vendor_new_review'
+  | 'review_flagged';
 
 export interface NotificationPayload {
   channel: NotificationChannel;
@@ -186,6 +188,36 @@ export async function notifyVendorsNewRFQ(
       headcount,
     });
   }
+}
+
+/** New review posted — notify vendor (#21) */
+export async function notifyVendorNewReview(
+  vendorOwnerId: string,
+  businessName: string,
+  reviewerName: string,
+  rating: number,
+  reviewText: string,
+): Promise<void> {
+  await notifyAllChannels(vendorOwnerId, 'vendor_new_review', {
+    businessName,
+    reviewerName,
+    rating,
+    reviewText: reviewText.slice(0, 200),
+  });
+}
+
+/** Review flagged — notify admin / vendor (#22) */
+export async function notifyReviewFlagged(
+  vendorOwnerId: string,
+  reviewId: string,
+  reason: string,
+  businessName: string,
+): Promise<void> {
+  await notifyAllChannels(vendorOwnerId, 'review_flagged', {
+    reviewId,
+    reason,
+    businessName,
+  });
 }
 
 /** Order confirmed — notify both parties */

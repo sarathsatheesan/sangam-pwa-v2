@@ -5,14 +5,33 @@
 // Phase 5: Reviews & Ratings
 // ═════════════════════════════════════════════════════════════════════════════════
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Star, ArrowLeft, MessageSquare, Send, Loader2, Users,
   ChevronDown, ChevronUp, Store, UtensilsCrossed,
+  ArrowUpDown, Filter, Flag, AlertTriangle,
 } from 'lucide-react';
 import type { CateringReview } from '@/services/cateringService';
-import { fetchCateringReviews, addVendorResponse } from '@/services/cateringService';
+import { fetchCateringReviews, addVendorResponse, flagReview } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
+
+type SortOption = 'newest' | 'oldest' | 'highest' | 'lowest';
+type FilterOption = 'all' | '5' | '4' | '3' | '2' | '1';
+
+const SORT_LABELS: Record<SortOption, string> = {
+  newest: 'Newest First',
+  oldest: 'Oldest First',
+  highest: 'Highest Rated',
+  lowest: 'Lowest Rated',
+};
+
+const FLAG_REASONS = [
+  'Inappropriate language',
+  'Spam or fake review',
+  'Irrelevant content',
+  'Contains personal information',
+  'Other',
+];
 
 interface CateringReviewsProps {
   businessId: string;
@@ -62,18 +81,24 @@ function ReviewCard({
   review,
   isVendor,
   onReply,
+  onFlag,
   replyLoading,
+  flagLoading,
   businessName,
 }: {
   review: CateringReview;
   isVendor: boolean;
   onReply: (reviewId: string, text: string) => void;
+  onFlag: (reviewId: string, reason: string) => void;
   replyLoading: string | null;
+  flagLoading: string | null;
   businessName?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [showReplyForm, setShowReplyForm] = useState(false);
+  const [showFlagForm, setShowFlagForm] = useState(false);
+  const [flagReason, setFlagReason] = useState('');
 
   const createdDate = review.createdAt?.toDate
     ? review.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -231,6 +256,67 @@ function ReviewCard({
           )}
         </>
       )}
+
+      {/* Vendor flag review (#22) */}
+      {isVendor && !review.flagged && (
+        <>
+          {!showFlagForm ? (
+            <button
+              onClick={() => setShowFlagForm(true)}
+              className="flex items-center gap-1.5 mt-2 text-[10px] font-medium transition-colors"
+              style={{ color: '#9CA3AF' }}
+            >
+              <Flag size={10} />
+              Report review
+            </button>
+          ) : (
+            <div className="mt-2 p-3 rounded-xl border space-y-2" style={{ borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' }}>
+              <p className="text-xs font-medium" style={{ color: '#991B1B' }}>Why are you reporting this review?</p>
+              <div className="space-y-1">
+                {FLAG_REASONS.map((reason) => (
+                  <label key={reason} className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`flag-${review.id}`}
+                      value={reason}
+                      checked={flagReason === reason}
+                      onChange={() => setFlagReason(reason)}
+                      className="accent-red-500"
+                    />
+                    <span style={{ color: 'var(--aurora-text)' }}>{reason}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  onClick={() => { setShowFlagForm(false); setFlagReason(''); }}
+                  className="text-[10px]"
+                  style={{ color: 'var(--aurora-text-secondary)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { if (flagReason) { onFlag(review.id, flagReason); setShowFlagForm(false); } }}
+                  disabled={!flagReason || flagLoading === review.id}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-white disabled:opacity-50"
+                  style={{ backgroundColor: '#EF4444' }}
+                >
+                  {flagLoading === review.id ? <Loader2 size={10} className="animate-spin" /> : <Flag size={10} />}
+                  Submit Report
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Flagged badge */}
+      {review.flagged && isVendor && (
+        <div className="flex items-center gap-1.5 mt-2 px-2 py-1 rounded-lg text-[10px] font-medium" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
+          <AlertTriangle size={10} />
+          Reported — under review
+        </div>
+      )}
     </div>
   );
 }
@@ -246,6 +332,10 @@ export default function CateringReviews({
   const [reviews, setReviews] = useState<CateringReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [replyLoading, setReplyLoading] = useState<string | null>(null);
+  const [flagLoading, setFlagLoading] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [filterRating, setFilterRating] = useState<FilterOption>('all');
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
   const loadReviews = useCallback(async () => {
     setLoading(true);
@@ -279,6 +369,21 @@ export default function CateringReviews({
     }
   }, [addToast]);
 
+  const handleFlag = useCallback(async (reviewId: string, reason: string) => {
+    setFlagLoading(reviewId);
+    try {
+      await flagReview(reviewId, businessId, reason);
+      setReviews(prev => prev.map(r =>
+        r.id === reviewId ? { ...r, flagged: true, flagReason: reason } as CateringReview : r,
+      ));
+      addToast('Review reported — our team will review it', 'success');
+    } catch {
+      addToast('Failed to report review', 'error');
+    } finally {
+      setFlagLoading(null);
+    }
+  }, [businessId, addToast]);
+
   // Aggregated stats
   const totalReviews = reviews.length;
   const avgRating = totalReviews > 0
@@ -286,6 +391,37 @@ export default function CateringReviews({
     : 0;
   const ratingCounts = [0, 0, 0, 0, 0]; // index 0 = 1 star
   reviews.forEach(r => { if (r.rating >= 1 && r.rating <= 5) ratingCounts[r.rating - 1]++; });
+
+  // Sort & filter (#20)
+  const sortedFilteredReviews = useMemo(() => {
+    let result = [...reviews];
+    // Filter by rating
+    if (filterRating !== 'all') {
+      const target = parseInt(filterRating, 10);
+      result = result.filter(r => Math.round(r.rating) === target);
+    }
+    // Sort
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest': {
+          const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+          const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+          return aTime - bTime;
+        }
+        case 'highest':
+          return b.rating - a.rating;
+        case 'lowest':
+          return a.rating - b.rating;
+        case 'newest':
+        default: {
+          const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+          const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+          return bTime - aTime;
+        }
+      }
+    });
+    return result;
+  }, [reviews, sortBy, filterRating]);
 
   if (loading) {
     return (
@@ -344,6 +480,63 @@ export default function CateringReviews({
         </div>
       </div>
 
+      {/* Sort & Filter controls (#20) */}
+      {reviews.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Sort dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSortMenu(!showSortMenu)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors"
+              style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+            >
+              <ArrowUpDown size={12} />
+              {SORT_LABELS[sortBy]}
+              <ChevronDown size={10} />
+            </button>
+            {showSortMenu && (
+              <div
+                className="absolute top-full left-0 mt-1 z-20 rounded-xl border shadow-lg overflow-hidden min-w-[150px]"
+                style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
+              >
+                {(Object.keys(SORT_LABELS) as SortOption[]).map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => { setSortBy(opt); setShowSortMenu(false); }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-black/5 transition-colors"
+                    style={{
+                      color: sortBy === opt ? '#6366F1' : 'var(--aurora-text)',
+                      fontWeight: sortBy === opt ? 600 : 400,
+                    }}
+                  >
+                    {SORT_LABELS[opt]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Filter by rating pills */}
+          <div className="flex items-center gap-1">
+            <Filter size={12} style={{ color: 'var(--aurora-text-muted)' }} />
+            {(['all', '5', '4', '3', '2', '1'] as FilterOption[]).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => setFilterRating(opt)}
+                className="px-2 py-1 rounded-full text-[10px] font-medium transition-colors"
+                style={{
+                  backgroundColor: filterRating === opt ? '#6366F1' : 'transparent',
+                  color: filterRating === opt ? '#fff' : 'var(--aurora-text-secondary)',
+                  border: filterRating === opt ? 'none' : '1px solid var(--aurora-border)',
+                }}
+              >
+                {opt === 'all' ? 'All' : `${opt}★`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Reviews list */}
       {reviews.length === 0 ? (
         <div className="text-center py-8">
@@ -355,16 +548,24 @@ export default function CateringReviews({
             Reviews appear here after catering orders are delivered
           </p>
         </div>
+      ) : sortedFilteredReviews.length === 0 ? (
+        <div className="text-center py-6">
+          <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+            No reviews match this filter
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {reviews.map((review) => (
+          {sortedFilteredReviews.map((review) => (
             <ReviewCard
               key={review.id}
               review={review}
               isVendor={isVendor}
               businessName={businessName}
               onReply={handleReply}
+              onFlag={handleFlag}
               replyLoading={replyLoading}
+              flagLoading={flagLoading}
             />
           ))}
         </div>
