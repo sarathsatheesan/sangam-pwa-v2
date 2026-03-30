@@ -55,38 +55,62 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
   // ── Handlers ──
 
   const handleDelete = useCallback(async (favId: string) => {
+    // Optimistic update: remove from local state immediately
+    const previousFavorites = favorites;
+    setFavorites(prev => prev.filter(f => f.id !== favId));
+
     try {
       await deleteFavoriteOrder(favId);
       addToast('Favorite removed', 'success', 2000);
     } catch (err: any) {
+      // Revert on error: restore the deleted favorite
+      setFavorites(previousFavorites);
       addToast(err.message || 'Failed to remove favorite', 'error');
     }
-  }, [addToast]);
+  }, [addToast, favorites]);
 
   const handleRename = useCallback(async (favId: string) => {
     if (!editLabel.trim()) return;
+
+    // Optimistic update: update local state immediately
+    const previousFavorites = favorites;
+    const newLabel = editLabel.trim();
+    setFavorites(prev => prev.map(f => f.id === favId ? { ...f, label: newLabel } : f));
+    setEditingId(null);
+
     try {
-      await updateFavoriteOrder(favId, { label: editLabel.trim() });
-      setEditingId(null);
+      await updateFavoriteOrder(favId, { label: newLabel });
       addToast('Favorite renamed', 'success', 2000);
     } catch (err: any) {
+      // Revert on error: restore previous state and reopen edit UI
+      setFavorites(previousFavorites);
+      setEditingId(favId);
       addToast(err.message || 'Failed to rename', 'error');
     }
-  }, [editLabel, addToast]);
+  }, [editLabel, addToast, favorites]);
 
   const handleSaveAddress = useCallback(async (favId: string) => {
     if (!editAddress.street.trim() || !editAddress.city.trim()) {
       addToast('Please fill in the address', 'error');
       return;
     }
+
+    // Optimistic update: update local state immediately
+    const previousFavorites = favorites;
+    const newAddress = editAddress;
+    setFavorites(prev => prev.map(f => f.id === favId ? { ...f, deliveryAddress: newAddress } : f));
+    setEditingAddressId(null);
+
     try {
-      await updateFavoriteOrder(favId, { deliveryAddress: editAddress });
-      setEditingAddressId(null);
+      await updateFavoriteOrder(favId, { deliveryAddress: newAddress });
       addToast('Address updated', 'success', 2000);
     } catch (err: any) {
+      // Revert on error: restore previous state and reopen edit form
+      setFavorites(previousFavorites);
+      setEditingAddressId(favId);
       addToast(err.message || 'Failed to update address', 'error');
     }
-  }, [editAddress, addToast]);
+  }, [editAddress, addToast, favorites]);
 
   const handleQuickReorder = useCallback(async (fav: FavoriteOrder) => {
     if (!user || !userProfile || !reorderDate) {

@@ -168,22 +168,44 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
   }, [user, prefillFromFavorite, scheduleMode, interval, daysOfWeek, dayOfMonth, timeOfDay, startDate, endDate, skipDates, contactName, contactPhone, addToast]);
 
   const handleToggle = useCallback(async (rec: RecurringOrder) => {
+    // Capture previous state for revert
+    const previousOrders = recurringOrders;
+    const newActive = !rec.active;
+
+    // Optimistically update local state
+    setRecurringOrders((prev) =>
+      prev.map((r) => (r.id === rec.id ? { ...r, active: newActive } : r))
+    );
+
     try {
-      await toggleRecurringOrder(rec.id, !rec.active);
+      await toggleRecurringOrder(rec.id, newActive);
       addToast(rec.active ? 'Schedule paused' : 'Schedule resumed', 'success', 2000);
     } catch (err: any) {
+      // Revert on error
+      setRecurringOrders(previousOrders);
       addToast(err.message || 'Failed to update schedule', 'error');
     }
-  }, [addToast]);
+  }, [recurringOrders, addToast]);
 
   const handleDelete = useCallback(async (recId: string) => {
+    // Capture previous state for revert
+    const previousOrders = recurringOrders;
+    const deletedOrder = previousOrders.find((r) => r.id === recId);
+
+    // Optimistically remove from local state
+    setRecurringOrders((prev) => prev.filter((r) => r.id !== recId));
+
     try {
       await deleteRecurringOrder(recId);
       addToast('Recurring order deleted', 'success', 2000);
     } catch (err: any) {
+      // Revert on error by re-adding the deleted order
+      if (deletedOrder) {
+        setRecurringOrders((prev) => [...prev, deletedOrder]);
+      }
       addToast(err.message || 'Failed to delete', 'error');
     }
-  }, [addToast]);
+  }, [recurringOrders, addToast]);
 
   // ── Per-occurrence handlers ──
   const startEditOccurrence = useCallback((rec: RecurringOrder) => {
@@ -195,17 +217,38 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
   }, []);
 
   const saveOccurrenceOverride = useCallback(async (rec: RecurringOrder) => {
+    // Capture previous state for revert
+    const previousOverride = rec.nextOccurrenceOverride;
+
+    // Optimistically update local state with the new override
+    const optimisticOverride = {
+      forDate: rec.nextRunDate,
+      items: occItems,
+      headcount: occHeadcount || undefined,
+      specialInstructions: occInstructions || undefined,
+    };
+    setRecurringOrders((prev) =>
+      prev.map((r) =>
+        r.id === rec.id ? { ...r, nextOccurrenceOverride: optimisticOverride } : r
+      )
+    );
+
+    // Close edit form immediately
+    setEditingOccurrenceId(null);
+
     setSavingOcc(true);
     try {
-      await setOccurrenceOverride(rec.id, {
-        forDate: rec.nextRunDate,
-        items: occItems,
-        headcount: occHeadcount || undefined,
-        specialInstructions: occInstructions || undefined,
-      });
+      await setOccurrenceOverride(rec.id, optimisticOverride);
       addToast('Next order modified. Changes apply only to this occurrence.', 'success', 4000);
-      setEditingOccurrenceId(null);
     } catch (err: any) {
+      // Revert on error
+      setRecurringOrders((prev) =>
+        prev.map((r) =>
+          r.id === rec.id ? { ...r, nextOccurrenceOverride: previousOverride } : r
+        )
+      );
+      // Re-open edit form on error
+      setEditingOccurrenceId(rec.id);
       addToast(err.message || 'Failed to save changes', 'error');
     } finally {
       setSavingOcc(false);
@@ -213,23 +256,56 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
   }, [occItems, occHeadcount, occInstructions, addToast]);
 
   const skipNextOccurrence = useCallback(async (rec: RecurringOrder) => {
+    // Capture previous state for revert
+    const previousOverride = rec.nextOccurrenceOverride;
+
+    // Optimistically set skip override locally
+    const optimisticOverride = { forDate: rec.nextRunDate, skip: true };
+    setRecurringOrders((prev) =>
+      prev.map((r) =>
+        r.id === rec.id ? { ...r, nextOccurrenceOverride: optimisticOverride } : r
+      )
+    );
+
     try {
-      await setOccurrenceOverride(rec.id, { forDate: rec.nextRunDate, skip: true });
+      await setOccurrenceOverride(rec.id, optimisticOverride);
       addToast(`Next order on ${rec.nextRunDate} will be skipped.`, 'success', 3000);
     } catch (err: any) {
+      // Revert on error
+      setRecurringOrders((prev) =>
+        prev.map((r) =>
+          r.id === rec.id ? { ...r, nextOccurrenceOverride: previousOverride } : r
+        )
+      );
       addToast(err.message || 'Failed to skip', 'error');
     }
-  }, [addToast]);
+  }, [recurringOrders, addToast]);
 
   const revertOverride = useCallback(async (recId: string) => {
+    // Capture previous override for revert
+    const previousOverride = recurringOrders.find((r) => r.id === recId)?.nextOccurrenceOverride;
+
+    // Optimistically clear the override from local state
+    setRecurringOrders((prev) =>
+      prev.map((r) =>
+        r.id === recId ? { ...r, nextOccurrenceOverride: undefined } : r
+      )
+    );
+
     try {
       await clearOccurrenceOverride(recId);
       addToast('Next order reverted to default.', 'success', 2000);
       setEditingOccurrenceId(null);
     } catch (err: any) {
+      // Revert on error
+      setRecurringOrders((prev) =>
+        prev.map((r) =>
+          r.id === recId ? { ...r, nextOccurrenceOverride: previousOverride } : r
+        )
+      );
       addToast(err.message || 'Failed to revert', 'error');
     }
-  }, [addToast]);
+  }, [recurringOrders, addToast]);
 
   const updateOccItemQty = useCallback((idx: number, qty: number) => {
     setOccItems((prev) => prev.map((item, i) => i === idx ? { ...item, qty: Math.max(1, qty) } : item));

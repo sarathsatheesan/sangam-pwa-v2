@@ -82,12 +82,32 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const handleBatchAction = async (action: 'confirmed' | 'cancelled') => {
     if (selectedOrders.size === 0) return;
     setBatchLoading(true);
+
+    // Capture previous statuses for rollback
+    const previousStatuses = new Map<string, CateringOrder['status']>();
+    orders.forEach(order => {
+      if (selectedOrders.has(order.id)) {
+        previousStatuses.set(order.id, order.status);
+      }
+    });
+
+    // Optimistically update local state
+    setOrders(prev => prev.map(o =>
+      selectedOrders.has(o.id) ? { ...o, status: action } : o
+    ));
+
+    // Clear selection immediately
+    setSelectedOrders(new Set());
+
     try {
-      const result = await batchUpdateOrderStatus([...selectedOrders], action);
+      const result = await batchUpdateOrderStatus([...previousStatuses.keys()], action);
       addToast(`${result.success} order(s) ${action}${result.failed ? `, ${result.failed} failed` : ''}`, 'success');
-      setSelectedOrders(new Set());
       setBatchMode(false);
     } catch (err: any) {
+      // Revert to previous statuses
+      setOrders(prev => prev.map(o =>
+        previousStatuses.has(o.id) ? { ...o, status: previousStatuses.get(o.id)! } : o
+      ));
       addToast(err.message || 'Batch action failed', 'error');
     } finally {
       setBatchLoading(false);
@@ -109,19 +129,50 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const handleSaveModification = async (order: CateringOrder) => {
     if (!editNote.trim()) { addToast('Please add a note explaining the change', 'error'); return; }
     setEditSaving(true);
+
+    // Calculate new totals
+    const subtotal = editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0);
+    const tax = Math.round(subtotal * 0.0825);
+    const total = subtotal + tax;
+
+    // Capture previous state for rollback
+    const previousItems = order.items;
+    const previousSubtotal = order.subtotal;
+    const previousTax = order.tax;
+    const previousTotal = order.total;
+
+    // Optimistically update local state
+    setOrders(prev => prev.map(o =>
+      o.id === order.id
+        ? { ...o, items: editItems, subtotal, tax, total }
+        : o
+    ));
+
+    // Close edit form immediately
+    setEditingOrderId(null);
+
     try {
-      const subtotal = editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0);
-      const tax = Math.round(subtotal * 0.0825);
       await vendorModifyOrder(order.id, {
         items: editItems,
         subtotal,
         tax,
-        total: subtotal + tax,
+        total,
         note: editNote.trim(),
       });
       addToast('Order modified. Customer will be notified.', 'success');
-      setEditingOrderId(null);
     } catch (err: any) {
+      // Revert to previous state
+      setOrders(prev => prev.map(o =>
+        o.id === order.id
+          ? {
+              ...o,
+              items: previousItems,
+              subtotal: previousSubtotal,
+              tax: previousTax,
+              total: previousTotal,
+            }
+          : o
+      ));
       addToast(err.message || 'Failed to modify order', 'error');
     } finally {
       setEditSaving(false);
@@ -175,13 +226,31 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
     const reason = cancelReason === 'Other' ? cancelOtherText.trim() || 'Other' : cancelReason;
     if (!reason) { addToast('Please select a reason', 'error'); return; }
     setCancelSubmitting(true);
+
+    // Capture previous status for rollback
+    const orderToCancel = orders.find(o => o.id === cancellingOrderId);
+    const previousStatus = orderToCancel?.status;
+
+    // Optimistically set status to cancelled
+    setOrders(prev => prev.map(o =>
+      o.id === cancellingOrderId ? { ...o, status: 'cancelled' } : o
+    ));
+
+    // Close dialog immediately
+    setCancellingOrderId(null);
+    setCancelReason('');
+    setCancelOtherText('');
+
     try {
       await cancelOrder(cancellingOrderId, reason, 'vendor');
       addToast('Order cancelled', 'success');
-      setCancellingOrderId(null);
-      setCancelReason('');
-      setCancelOtherText('');
     } catch (err: any) {
+      // Revert to previous status
+      if (previousStatus) {
+        setOrders(prev => prev.map(o =>
+          o.id === cancellingOrderId ? { ...o, status: previousStatus } : o
+        ));
+      }
       addToast(err.message || 'Failed to cancel order', 'error');
     } finally {
       setCancelSubmitting(false);
@@ -190,10 +259,26 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
   const handleStatusChange = async (orderId: string, newStatus: CateringOrder['status'], extra?: Record<string, any>) => {
     setActionLoading(orderId);
+
+    // Capture previous status for rollback
+    const orderToUpdate = orders.find(o => o.id === orderId);
+    const prevStatus = orderToUpdate?.status;
+
+    // Optimistically update local state
+    setOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, status: newStatus } : o
+    ));
+
     try {
       await updateOrderStatus(orderId, newStatus, extra);
       addToast(`Order ${newStatus.replace(/_/g, ' ')}`, 'success');
     } catch (err: any) {
+      // Revert to previous status
+      if (prevStatus) {
+        setOrders(prev => prev.map(o =>
+          o.id === orderId ? { ...o, status: prevStatus } : o
+        ));
+      }
       addToast(err.message || 'Failed to update order', 'error');
     } finally {
       setActionLoading(null);

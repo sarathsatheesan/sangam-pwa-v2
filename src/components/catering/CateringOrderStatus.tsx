@@ -82,13 +82,22 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
     const reason = cancelReason === 'Other' ? cancelOtherText.trim() || 'Other' : cancelReason;
     if (!reason) { addToast('Please select a reason', 'error'); return; }
     setCancelSubmitting(true);
+
+    // Optimistic: update local state immediately
+    const prevOrders = orders;
+    setOrders(prev => prev.map(o =>
+      o.id === cancellingOrderId ? { ...o, status: 'cancelled' as const, cancellationReason: reason, cancelledBy: 'customer' as const } : o,
+    ));
+    setCancellingOrderId(null);
+    setCancelReason('');
+    setCancelOtherText('');
+
     try {
       await cancelOrder(cancellingOrderId, reason, 'customer');
       addToast('Order cancelled', 'success');
-      setCancellingOrderId(null);
-      setCancelReason('');
-      setCancelOtherText('');
     } catch (err: any) {
+      // Revert on error
+      setOrders(prevOrders);
       addToast(err.message || 'Failed to cancel order', 'error');
     } finally {
       setCancelSubmitting(false);
