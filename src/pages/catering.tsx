@@ -17,7 +17,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { cateringReducer, createInitialState } from '@/reducers/cateringReducer';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import type { CateringMenuItem, OrderItem, QuoteRequestItem, CateringQuoteRequest, FavoriteOrder, OrderTemplate } from '@/services/cateringService';
 import {
@@ -113,6 +113,52 @@ export default function CateringPage() {
       }
     }).catch(() => {});
   }, [user?.uid, allCateringBusinesses]);
+
+  // ── Cart persistence: hydrate from localStorage on mount ──
+  const CART_STORAGE_KEY = 'ethniCity_catering_cart';
+  const CART_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CART_STORAGE_KEY);
+      if (!raw) return;
+      const stored = JSON.parse(raw);
+      if (
+        stored?.version === 1 &&
+        stored?.cart?.items?.length > 0 &&
+        stored?.updatedAt &&
+        Date.now() - new Date(stored.updatedAt).getTime() < CART_EXPIRY_MS
+      ) {
+        dispatch({ type: 'HYDRATE_CART', payload: stored.cart });
+      } else {
+        localStorage.removeItem(CART_STORAGE_KEY);
+      }
+    } catch {
+      localStorage.removeItem(CART_STORAGE_KEY);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Cart persistence: save to localStorage on every cart change ──
+  useEffect(() => {
+    if (state.cart.items.length === 0) {
+      localStorage.removeItem(CART_STORAGE_KEY);
+      return;
+    }
+    try {
+      localStorage.setItem(
+        CART_STORAGE_KEY,
+        JSON.stringify({
+          version: 1,
+          cart: {
+            items: state.cart.items,
+            businessId: state.cart.businessId,
+            businessName: state.cart.businessName,
+          },
+          updatedAt: new Date().toISOString(),
+        })
+      );
+    } catch { /* quota exceeded — non-blocking */ }
+  }, [state.cart.items, state.cart.businessId, state.cart.businessName]);
 
   // ── Load items when category is selected ──
   useEffect(() => {
@@ -245,6 +291,7 @@ export default function CateringPage() {
 
       addToast('Order placed! Saved to Favorites for quick reorder.', 'success', 5000);
       dispatch({ type: 'CLEAR_CART' });
+      localStorage.removeItem(CART_STORAGE_KEY);
       dispatch({ type: 'SET_VIEW', payload: 'orders' });
     } catch (err: any) {
       addToast(err.message || 'Failed to place order', 'error');
@@ -267,6 +314,9 @@ export default function CateringPage() {
 
     setSubmitting(true);
     try {
+      // Default 7-day expiration
+      const expiresAt = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+
       await createQuoteRequest({
         customerId: user.uid,
         deliveryCity: rfpForm.deliveryCity,
@@ -278,6 +328,7 @@ export default function CateringPage() {
         specialInstructions: rfpForm.specialInstructions || '',
         orderForContext: rfpForm.orderForContext,
         status: 'open',
+        expiresAt,
         ...(rfpForm.targetBusinessIds.length > 0 ? { targetBusinessIds: rfpForm.targetBusinessIds } : {}),
       });
 
@@ -486,8 +537,47 @@ export default function CateringPage() {
 
       {/* Content */}
       <div className="px-4 py-4">
-        {/* Loading */}
-        {state.loading && (
+        {/* Loading — show skeleton loaders instead of plain spinner */}
+        {state.loading && state.view === 'items' && (
+          <div className="space-y-6">
+            {/* Search skeleton */}
+            <div className="shimmer h-10 w-full rounded-lg" />
+            {/* Filter pills skeleton */}
+            <div className="flex gap-2">
+              {[80, 64, 56, 72, 88].map((w, i) => (
+                <div key={i} className="shimmer h-8 rounded-full" style={{ width: w }} />
+              ))}
+            </div>
+            {/* Business group skeletons (2 groups) */}
+            {[0, 1].map((g) => (
+              <div key={g} className="space-y-4">
+                {/* Business header */}
+                <div className="flex items-center gap-3 border-b border-gray-200 pb-3">
+                  <div>
+                    <div className="shimmer h-5 w-36 rounded" />
+                    <div className="shimmer h-3 w-24 rounded mt-2" />
+                  </div>
+                </div>
+                {/* Item cards grid */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {[0, 1, 2].map((c) => (
+                    <div key={c} className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
+                      <div className="shimmer h-32 w-full rounded-lg" />
+                      <div className="shimmer h-4 w-3/4 rounded" />
+                      <div className="shimmer h-3 w-1/2 rounded" />
+                      <div className="flex justify-between items-center">
+                        <div className="shimmer h-5 w-16 rounded" />
+                        <div className="shimmer h-8 w-8 rounded-full" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {state.loading && state.view !== 'items' && (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={28} className="animate-spin" style={{ color: 'var(--aurora-primary)' }} />
             <span className="ml-3 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
@@ -516,10 +606,27 @@ export default function CateringPage() {
             <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
               Browse caterers by cuisine type and place orders for your next event.
             </p>
-            <CateringCategoryGrid
-              onSelectCategory={handleSelectCategory}
-              businessCounts={businessCounts}
-            />
+            {allCateringBusinesses.length === 0 && !state.error ? (
+              /* Category grid skeleton while business counts load */
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col items-center justify-center rounded-xl bg-white p-6 border border-gray-100"
+                    style={{ borderLeft: '4px solid #E5E7EB' }}
+                  >
+                    <div className="shimmer h-12 w-12 rounded-full mb-3" />
+                    <div className="shimmer h-4 w-20 rounded mb-2" />
+                    <div className="shimmer h-3 w-14 rounded" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <CateringCategoryGrid
+                onSelectCategory={handleSelectCategory}
+                businessCounts={businessCounts}
+              />
+            )}
           </div>
         )}
 
@@ -558,8 +665,10 @@ export default function CateringPage() {
               onAddToCart={handleAddToCart}
               searchQuery={state.searchQuery}
               dietaryFilter={state.dietaryFilter}
+              sortOrder={state.sortOrder}
               onSearchChange={(q) => dispatch({ type: 'SET_SEARCH_QUERY', payload: q })}
               onDietaryToggle={(tag) => dispatch({ type: 'TOGGLE_DIETARY_FILTER', payload: tag })}
+              onSortChange={(sort) => dispatch({ type: 'SET_SORT_ORDER', payload: sort })}
             />
           </div>
         )}
@@ -665,6 +774,17 @@ export default function CateringPage() {
                               {' '} · {req.itemAssignments.length}/{req.items.length} items assigned
                             </span>
                           )}
+                          {req.expiresAt && req.status === 'open' && (() => {
+                            const expiryDate = req.expiresAt?.toDate?.() || new Date(req.expiresAt);
+                            const hoursLeft = Math.max(0, Math.floor((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60)));
+                            const daysLeft = Math.floor(hoursLeft / 24);
+                            const isUrgent = hoursLeft < 24;
+                            return (
+                              <span style={{ color: isUrgent ? '#DC2626' : '#D97706' }}>
+                                {' '} · {daysLeft > 0 ? `${daysLeft}d left` : `${hoursLeft}h left`}
+                              </span>
+                            );
+                          })()}
                         </p>
                       </div>
                       <ArrowLeft size={16} className="rotate-180 opacity-30 ml-2" />
@@ -844,6 +964,51 @@ export default function CateringPage() {
           dispatch({ type: 'SET_VIEW', payload: 'checkout' });
         }}
       />
+
+      {/* Vendor switch confirmation dialog */}
+      {state.pendingVendorSwitch && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Switch vendor confirmation"
+        >
+          <div
+            className="mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+            style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}
+          >
+            <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--aurora-text)' }}>
+              Switch Vendor?
+            </h3>
+            <p className="text-sm mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Your cart has {state.cart.items.length} item{state.cart.items.length !== 1 ? 's' : ''} from{' '}
+              <strong>{state.cart.businessName}</strong>.
+            </p>
+            <p className="text-sm mb-5" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Adding from <strong>{state.pendingVendorSwitch.businessName}</strong> will replace your current cart.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => dispatch({ type: 'CANCEL_VENDOR_SWITCH' })}
+                className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors hover:bg-gray-50"
+                style={{ borderColor: 'var(--aurora-border, #E2E5EF)', color: 'var(--aurora-text)' }}
+              >
+                Keep Current Cart
+              </button>
+              <button
+                onClick={() => {
+                  dispatch({ type: 'CONFIRM_VENDOR_SWITCH' });
+                  addToast(`${state.pendingVendorSwitch!.item.name} added to cart`, 'success', 2000);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                Switch Vendor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

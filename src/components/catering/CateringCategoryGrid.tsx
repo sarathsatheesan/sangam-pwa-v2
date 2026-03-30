@@ -38,6 +38,7 @@ export default function CateringCategoryGrid({
               style={{
                 borderLeft: `4px solid ${color}`,
               }}
+              aria-label={`Browse ${category} — ${count} ${count === 1 ? 'caterer' : 'caterers'} available`}
             >
               {/* Left accent border handled via inline style */}
               <div className="mb-3 text-5xl">{emoji}</div>

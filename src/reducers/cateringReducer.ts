@@ -26,6 +26,13 @@ export interface CateringState {
   };
   cartOpen: boolean;
 
+  // Vendor switch confirmation
+  pendingVendorSwitch: {
+    item: OrderItem;
+    businessId: string;
+    businessName: string;
+  } | null;
+
   // Checkout flow
   checkoutStep: 'details' | 'review' | 'confirm';
   orderForm: {
@@ -48,6 +55,7 @@ export interface CateringState {
   // Search & filtering
   searchQuery: string;
   dietaryFilter: string[];
+  sortOrder: 'default' | 'price_asc' | 'price_desc' | 'rating' | 'name_asc';
 
   // Phase 6: Favorites, Recurring, Templates
   favorites: FavoriteOrder[];
@@ -86,6 +94,7 @@ export function createInitialState(): CateringState {
       businessName: null,
     },
     cartOpen: false,
+    pendingVendorSwitch: null,
 
     checkoutStep: 'details',
     orderForm: {
@@ -109,6 +118,7 @@ export function createInitialState(): CateringState {
 
     searchQuery: '',
     dietaryFilter: [],
+    sortOrder: 'default',
 
     quoteRequests: [],
     quoteResponses: [],
@@ -156,6 +166,8 @@ export type CateringAction =
   | { type: 'REMOVE_FROM_CART'; payload: string }
   | { type: 'CLEAR_CART' }
   | { type: 'TOGGLE_CART' }
+  | { type: 'CONFIRM_VENDOR_SWITCH' }
+  | { type: 'CANCEL_VENDOR_SWITCH' }
 
   // Checkout
   | { type: 'SET_CHECKOUT_STEP'; payload: 'details' | 'review' | 'confirm' }
@@ -174,6 +186,7 @@ export type CateringAction =
   // Search & filtering
   | { type: 'SET_SEARCH_QUERY'; payload: string }
   | { type: 'TOGGLE_DIETARY_FILTER'; payload: string }
+  | { type: 'SET_SORT_ORDER'; payload: CateringState['sortOrder'] }
 
   // RFP (Phase 2)
   | { type: 'SET_QUOTE_REQUESTS'; payload: CateringQuoteRequest[] }
@@ -189,6 +202,9 @@ export type CateringAction =
   | { type: 'SET_FAVORITES'; payload: FavoriteOrder[] }
   | { type: 'SET_RECURRING_ORDERS'; payload: RecurringOrder[] }
   | { type: 'SET_TEMPLATES'; payload: OrderTemplate[] }
+
+  // Cart persistence
+  | { type: 'HYDRATE_CART'; payload: { items: OrderItem[]; businessId: string; businessName: string } }
 
   // Reset
   | { type: 'RESET' };
@@ -221,9 +237,12 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
       const { item, businessId, businessName } = action.payload;
       const nextCart = { ...state.cart };
 
-      // If switching businesses, clear the cart first
-      if (nextCart.businessId && nextCart.businessId !== businessId) {
-        nextCart.items = [];
+      // If switching businesses, ask for confirmation instead of silently clearing
+      if (nextCart.businessId && nextCart.businessId !== businessId && nextCart.items.length > 0) {
+        return {
+          ...state,
+          pendingVendorSwitch: { item, businessId, businessName },
+        };
       }
 
       // Add or update item
@@ -240,8 +259,25 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
       nextCart.businessId = businessId;
       nextCart.businessName = businessName;
 
-      return { ...state, cart: nextCart };
+      return { ...state, cart: nextCart, pendingVendorSwitch: null };
     }
+
+    case 'CONFIRM_VENDOR_SWITCH': {
+      if (!state.pendingVendorSwitch) return state;
+      const { item, businessId, businessName } = state.pendingVendorSwitch;
+      return {
+        ...state,
+        cart: {
+          items: [item],
+          businessId,
+          businessName,
+        },
+        pendingVendorSwitch: null,
+      };
+    }
+
+    case 'CANCEL_VENDOR_SWITCH':
+      return { ...state, pendingVendorSwitch: null };
 
     case 'UPDATE_CART_ITEM': {
       const { itemId, qty } = action.payload;
@@ -313,6 +349,9 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
       return { ...state, dietaryFilter: nextFilter };
     }
 
+    case 'SET_SORT_ORDER':
+      return { ...state, sortOrder: action.payload };
+
     // ── RFP (Phase 2) ──
     case 'SET_QUOTE_REQUESTS':
       return { ...state, quoteRequests: action.payload };
@@ -364,6 +403,17 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
 
     case 'SET_TEMPLATES':
       return { ...state, templates: action.payload };
+
+    // ── Cart persistence ──
+    case 'HYDRATE_CART':
+      return {
+        ...state,
+        cart: {
+          items: action.payload.items,
+          businessId: action.payload.businessId,
+          businessName: action.payload.businessName,
+        },
+      };
 
     // ── Reset ──
     case 'RESET':

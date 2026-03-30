@@ -17,14 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** March 28, 2026 (Last updated: Session 22)
+**Date:** March 29, 2026 (Last updated: Session 24)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** `074f201` — feat: Discover Page Phase 3 — UX Polish & Feature Gaps (items 3.1–3.10)
-**Uncommitted:** Session 21 changes + Session 22 changes (Catering Module Phase 1 + Phase 2 RFP + all bug fixes)
+**Latest Commit:** `367aeb0` — Phase 6: Recurring Orders, Favorites & Order Templates (committed in Session 23)
+**Uncommitted:** Session 23 bug fixes (Firestore undefined filtering, Cloud Function cleanup, security rules) + Session 24 changes (UX audit critical fixes — vendor switch dialog, checkout validation, accessibility)
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
-**Live bundle:** Build clean, deploy from macOS terminal needed (Firebase auth not available in VM). Deploy command: `firebase deploy --only firestore:rules,hosting`
+**Live bundle:** Build clean, deploy from macOS terminal needed (Firebase auth not available in VM). Deploy command: `npm run build && firebase deploy --only firestore:rules,hosting,functions`
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note)
 
 ---
 
@@ -204,6 +204,52 @@ Phase 4 highlights: Extracted `PersonCard` component (464 lines, 6 variants: gri
 - **`useReducer` for catering state management** — Single reducer (`cateringReducer.ts`) manages all catering state including view navigation, cart, orders, RFP form, quote requests/responses. View union type: `'categories' | 'items' | 'checkout' | 'orders' | 'vendor' | 'rfp' | 'quotes'`. Consistent with the business module pattern.
 
 - **Catering module feature flag: `modules_catering`** — Added to both `DEFAULT_FEATURES` (default `true`) and `FEATURE_GROUPS` in `FeatureSettingsContext.tsx`. Module visibility in navigation gated by `isFeatureEnabled('modules_catering')`. Admin can toggle it off to hide the entire catering module.
+
+### Sessions 23-24: Catering Phases 3-6 + UX Audit + Critical Fixes
+
+**Session 23 focused on (March 29, 2026):** Catering Module Phases 3-6 — completing the entire catering feature set. This was a long session that ran out of context and was continued via compaction summary.
+
+- **Phase 3 — Vendor Dashboard**: `VendorCateringDashboard.tsx` with status management workflow (pending → confirmed → preparing → ready → out_for_delivery → delivered), filter tabs (all/pending/active/completed), ETA input before dispatch.
+- **Phase 4 — Order Tracking**: `CateringOrderStatus.tsx` with visual 6-step timeline, real-time subscriptions via `subscribeToCustomerOrders`, collapsible order cards, ETA badges.
+- **Phase 5 — Reviews**: `CateringReviewForm.tsx` (modal with star rating + text), `CateringReviews.tsx` (aggregated ratings + individual reviews with vendor reply capability). Firestore collection `businessReviews` with security rules.
+- **Phase 6 — Favorites, Recurring Orders, Templates**:
+  - `FavoriteOrders.tsx`: Auto-save on order placement, inline rename, quick reorder with date picker, "Set Recurring" and "Save as Template" action buttons
+  - `RecurringOrderManager.tsx`: Two-tier scheduling (simple intervals: daily/weekly/biweekly/monthly + calendar-based: specific days of week), skip dates, pause/resume, contact info pre-fill
+  - `OrderTemplates.tsx`: Create from favorites, 8-char share codes, public/private visibility, org name, "Use Code" lookup mode
+  - Cloud Function `processRecurringCateringOrders` (daily 6 AM PT scheduler) in `functions/src/index.ts`
+  - 3 new Firestore collections: `cateringFavorites`, `cateringRecurring`, `cateringTemplates` with security rules
+  - 18+ new service functions in `cateringService.ts`
+
+- **Bug Fixes (Session 23)**:
+  1. `FirebaseError: Unsupported field value: undefined` in `createOrder()`, `saveFavoriteOrder()`, `submitCateringReview()` — Added `Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined))` pattern
+  2. Firestore permission-denied on new collections — Added security rules for `cateringFavorites`, `cateringRecurring`, `cateringTemplates`
+  3. Cloud Function race condition — Replaced `Promise.all` + shared batch with sequential `for...of` + individual `recDoc.ref.update()`
+  4. `specialInstructions: undefined` in checkout form — Changed to conditional spread `...(val ? { key: val } : {})`
+
+- **Testing (Session 23)**: Placed test orders through deployed app, verified auto-save to favorites, tested quick reorder flow, tested Set Recurring and Save as Template buttons. All Phase 6 features verified working end-to-end except recurring order creation (had remaining undefined field error fixed in Session 24).
+
+**Session 24 focused on (March 29, 2026):** Comprehensive UX Audit + Critical Fixes.
+
+- **UX Audit**: Acted as both user and vendor, clicked through every flow on the deployed app. Produced an 8-page .docx report (`ethniCity_Catering_UX_Audit.docx`) covering: executive summary, 15-area scorecard, detailed user/vendor flow analysis, Phase 6 feature review, prioritized 22-issue tracker, and recommended Phase 7 roadmap.
+
+- **Critical Fix 1 — Vendor Switch Confirmation Dialog**: Cart previously cleared silently when adding items from a different vendor. Added `pendingVendorSwitch` state to reducer, `CONFIRM_VENDOR_SWITCH` / `CANCEL_VENDOR_SWITCH` actions, and a modal dialog in `catering.tsx` asking "Your cart has N items from [Vendor A]. Adding from [Vendor B] will replace your current cart."
+
+- **Critical Fix 2 — Remaining Firestore Undefined Errors**: Extended the `Object.fromEntries` filter pattern to `createRecurringOrder()`, `createOrderTemplate()`, and `createMenuItem()`. Fixed component-level sources: `RecurringOrderManager.tsx` (headcount, specialInstructions, orderForContext) and `OrderTemplates.tsx` (description, headcount, specialInstructions) now use conditional spreads.
+
+- **Critical Fix 3 — Checkout Form Validation**: Complete rewrite of `CateringCheckout.tsx` with: inline real-time validation (red borders + error messages on blur), `min` date constraint (tomorrow), phone number format validation, ZIP code format validation, character count on special instructions (500 max), validation summary alert on submit attempt, `aria-required`, `aria-invalid`, `aria-describedby` on all fields.
+
+- **Critical Fix 4 — Accessibility**: Added ARIA labels across 5 components:
+  - `CateringCart.tsx`: `role="dialog"`, `aria-modal`, `aria-label="Shopping cart"`
+  - `CateringItemCard.tsx`: `role="article"`, `aria-label` with item name/price on card and Add button
+  - `CateringCategoryGrid.tsx`: `aria-label` with category name and caterer count on each button
+  - `CateringItemList.tsx`: `role="checkbox"`, `aria-checked` on dietary filter pills, `aria-label` on search input
+  - `CateringCheckout.tsx`: `aria-labelledby` on sections, `htmlFor` on all labels, `aria-required`/`aria-invalid`/`aria-describedby` on all inputs, `role="alert"` on error messages, `role="list"` on order summary
+
+- **Decisions (Session 24)**:
+  - **Confirmation dialog over silent clear** — Users losing cart items without warning was the #1 UX issue. The dialog gives users an explicit choice: "Keep Current Cart" or "Switch Vendor". The `pendingVendorSwitch` state in the reducer holds the pending item until the user decides.
+  - **Touched + submitAttempted validation pattern** — Errors show on blur (per field) OR on submit attempt (all fields). This avoids overwhelming users with errors before they interact, while catching everything on submit.
+  - **500-char limit on special instructions** — Prevents abuse while being generous enough for real catering needs. Enforced both in UI (`maxLength`) and character counter display.
+  - **Conditional spreads at component level AND filter at service level** — Defense in depth: components avoid passing undefined, and service functions filter it out as a safety net.
 
 ### Session 8: Voice-to-Text, Timer Picker, Undo Removal
 
@@ -1233,6 +1279,39 @@ src/
 - Safari video rendering required special handling
 - The TURN servers used (`openrelay.metered.ca`) are free/public and may be unreliable in production
 
+### Catering Module Phases 1-6 — ALL COMPLETE ✅
+- **Phase 1 (Place Order):** ✅ COMPLETE (Session 22)
+- **Phase 2 (RFP/Quotes):** ✅ COMPLETE (Session 22)
+- **Phase 3 (Vendor Dashboard):** ✅ COMPLETE (Session 23)
+- **Phase 4 (Order Tracking):** ✅ COMPLETE (Session 23)
+- **Phase 5 (Reviews):** ✅ COMPLETE (Session 23)
+- **Phase 6 (Favorites, Recurring, Templates):** ✅ COMPLETE (Session 23)
+- **UX Audit + 4 Critical Fixes:** ✅ COMPLETE (Session 24) — vendor switch dialog, checkout validation, accessibility, Firestore undefined cleanup
+- **Uncommitted changes:** Session 23 bug fixes + Session 24 critical fixes need commit + deploy
+
+**New files created in Sessions 23-24:**
+- `src/components/catering/CateringOrderStatus.tsx` — Customer order tracking with visual timeline
+- `src/components/catering/CateringReviewForm.tsx` — Star rating + text review modal
+- `src/components/catering/CateringReviews.tsx` — Aggregated ratings + vendor replies
+- `src/components/catering/FavoriteOrders.tsx` — Saved favorites with quick reorder
+- `src/components/catering/RecurringOrderManager.tsx` — Two-tier recurring order scheduling
+- `src/components/catering/OrderTemplates.tsx` — Shareable order templates with codes
+- `ethniCity_Catering_UX_Audit.docx` — Comprehensive 8-page UX audit report (workspace root)
+
+**Modified files in Sessions 23-24:**
+- `src/services/cateringService.ts` — +300 lines: 18+ new service functions, 3 new interfaces (FavoriteOrder, RecurringOrder, OrderTemplate), undefined filtering on all addDoc calls
+- `src/reducers/cateringReducer.ts` — 3 new views (favorites/recurring/templates), 3 state fields, 5 new actions (SET_FAVORITES, SET_RECURRING_ORDERS, SET_TEMPLATES, CONFIRM_VENDOR_SWITCH, CANCEL_VENDOR_SWITCH), pendingVendorSwitch state
+- `src/pages/catering.tsx` — Phase 6 view rendering, auto-save favorites on order, vendor switch confirmation dialog
+- `src/components/catering/CateringCheckout.tsx` — Complete rewrite with real-time validation + ARIA
+- `src/components/catering/CateringCart.tsx` — role="dialog", aria-modal
+- `src/components/catering/CateringItemCard.tsx` — role="article", aria-label on card and button
+- `src/components/catering/CateringCategoryGrid.tsx` — aria-label on category buttons
+- `src/components/catering/CateringItemList.tsx` — aria-checked on filter pills, aria-label on search
+- `src/components/catering/RecurringOrderManager.tsx` — Conditional spreads for undefined fields
+- `src/components/catering/OrderTemplates.tsx` — Conditional spreads for undefined fields
+- `firestore.rules` — Rules for cateringFavorites, cateringRecurring, cateringTemplates
+- `functions/src/index.ts` — processRecurringCateringOrders Cloud Function + cleanup
+
 ### Housing Page Enhancements (state ready, UI NOT wired up)
 7 enhancements were added to `housing.tsx` at the state/data level:
 1. Listing status management (Active/Pending/Under Contract/Sold/Rented)
@@ -1263,30 +1342,47 @@ src/
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — Build, Deploy & Commit Session 21 Changes
-- **Session 21 changes are uncommitted** — 10 new files + 6 modified files (Business Sign-Up Wizard). Build is clean (8.10s). Deploy and commit from macOS terminal:
+### Immediate — Commit & Deploy Sessions 23-24 Changes
+- **Sessions 23-24 changes are uncommitted** — 7 new component files + 12 modified files (Catering Phases 3-6 + UX critical fixes). Build is clean (8.18s). Commit and deploy from macOS terminal:
   ```bash
   cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
-  npm run build && firebase deploy --only hosting
-  git add .env src/pages/business/register.tsx src/hooks/useGooglePlaces.ts \
-    src/components/business/registration/BusinessRegistrationWizard.tsx \
-    src/components/business/registration/StepIdentity.tsx \
-    src/components/business/registration/StepLocation.tsx \
-    src/components/business/registration/StepVerification.tsx \
-    src/components/business/registration/StepDetails.tsx \
-    src/components/business/registration/StepReview.tsx \
-    src/services/businessRegistration.ts \
-    src/contexts/FeatureSettingsContext.tsx \
-    src/reducers/businessReducer.ts \
-    src/components/business/businessValidation.ts \
-    src/App.tsx src/pages/admin.tsx src/pages/main/admin.tsx
-  git commit -m "feat: Business Sign-Up Wizard — 5-step registration with Google Places, KYC verification, Firestore backend, admin review (Session 21)"
+  npm run build
+  firebase deploy --only firestore:rules,hosting,functions
+  git add src/components/catering/ src/pages/catering.tsx src/reducers/cateringReducer.ts \
+    src/services/cateringService.ts firestore.rules functions/src/index.ts
+  git commit -m "feat: Catering Phases 3-6 (Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring, Templates) + UX audit critical fixes (Sessions 23-24)"
   git push origin main
   ```
+- **After deploy, test on live site:**
+  1. Add item from one vendor, then try adding from a different vendor → should see confirmation dialog
+  2. Go to Checkout → leave fields empty → click Place Order → should see inline validation errors
+  3. Place a successful order → navigate to Saved → My Favorites → verify favorite auto-saved
+  4. Set Recurring and Save as Template → should work without undefined field errors
 - **App is deployed and live** at `https://mithr-1e5f4.web.app`.
-- **Business sign-up is gated** — Feature flag `business_signup_enabled` must be toggled ON in admin panel before the wizard is accessible. All 10 KYC flags default to `false`.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
-- **Cloud Functions already deployed** — `transcribeVoiceMessage` and `sendNewMessageNotification` are live on Cloud Run.
+- **Cloud Functions deployed** — `transcribeVoiceMessage`, `sendNewMessageNotification`, and `processRecurringCateringOrders` (daily 6 AM PT) are on Cloud Run.
+
+### Phase 7 — Catering UX Improvements (from UX Audit)
+Prioritized improvement list from the comprehensive UX audit (`ethniCity_Catering_UX_Audit.docx`):
+
+**Quick Wins (1-2 days each):**
+1. Add skeleton loaders for category grid and item list
+2. Persist cart to localStorage with vendor context
+3. Add character count display on review textareas
+
+**Short-Term (3-5 days each):**
+4. Order cancellation flow with reason capture (customer + vendor)
+5. In-app messaging between customers and vendors
+6. Sort and filter controls on item list (by price, rating, popularity)
+7. RFQ expiration dates with vendor notification
+8. Multi-date picker for recurring order skip dates
+9. Push/email notifications for order status changes
+
+**Long-Term (1-2 weeks each):**
+10. Payment integration (Stripe/Square) with escrow for RFQ orders
+11. Multi-vendor cart support with split checkout
+12. Driver tracking for out-for-delivery orders
+13. Public template marketplace with search and ratings
 
 ### Discover Page Roadmap — ALL COMPLETE ✅
 - **All 38 items across 4 phases are done** (Sessions 19-20). No more Discover roadmap items pending.
@@ -1573,4 +1669,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Updated March 28, 2026 (Session 22) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (Request for Price / RFP) COMPLETE (Session 22). Next: deploy latest from macOS (`firebase deploy --only firestore:rules,hosting`), then Phase 3 — Notifications & Real-Time Updates (push notifications for new quotes, real-time order status, vendor alerts). Long-term roadmap: expand RFP/quote system to other business types (grocery, restaurants, event management).*
+*Updated March 29, 2026 (Session 24) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). UNCOMMITTED: Session 23 bug fixes + Session 24 critical fixes — must commit and deploy. Next: (1) commit all unstaged changes, (2) deploy from macOS: `npm run build && firebase deploy --only firestore:rules,hosting,functions`, (3) test vendor switch dialog and checkout validation on deployed site, (4) Phase 7 improvements from UX audit (loading skeletons, cart persistence, order cancellation, in-app messaging). Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types.*

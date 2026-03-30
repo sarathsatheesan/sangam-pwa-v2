@@ -178,7 +178,13 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
               }}
             />
             <div className="flex justify-end mt-1">
-              <span className="text-[10px]" style={{ color: 'var(--aurora-text-secondary)' }}>
+              <span
+                className="text-xs"
+                style={{
+                  color: text.length >= 980 ? '#EF4444' : text.length >= 900 ? '#D97706' : 'var(--aurora-text-secondary)',
+                  fontWeight: text.length >= 900 ? 500 : 400,
+                }}
+              >
                 {text.length}/1000
               </span>
             </div>

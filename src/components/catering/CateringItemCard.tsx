@@ -33,7 +33,7 @@ export default function CateringItemCard({
   }[item.pricingType] || '/ person';
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-200 hover:shadow-md">
+    <div className="flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-200 hover:shadow-md" role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}`}>
       {/* Photo area */}
       <div className="relative h-40 w-full bg-gray-100">
         {item.photoUrl ? (
@@ -114,8 +114,9 @@ export default function CateringItemCard({
             onMouseLeave={e => {
               e.currentTarget.style.opacity = '1';
             }}
+            aria-label={`Add ${item.name} to cart — ${formatPrice(item.price)} ${pricingLabel}`}
           >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
             <span className="text-sm">Add</span>
           </button>
         </div>

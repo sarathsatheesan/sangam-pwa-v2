@@ -11,6 +11,7 @@ import {
   Plus, ChevronDown, ChevronUp, Repeat, AlertCircle, Check,
   MapPin, Users, ShoppingCart, Settings,
 } from 'lucide-react';
+import MultiDatePicker from '@/components/shared/MultiDatePicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import type { FavoriteOrder, RecurringOrder, RecurrenceSchedule, RecurrenceInterval, DeliveryAddress } from '@/services/cateringService';
@@ -55,7 +56,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
   const [timeOfDay, setTimeOfDay] = useState('11:30');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [skipDates, setSkipDates] = useState('');
+  const [skipDates, setSkipDates] = useState<string[]>([]);
   const [contactName, setContactName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
 
@@ -108,9 +109,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
       timeOfDay,
       startDate,
       ...(endDate ? { endDate } : {}),
-      ...(skipDates.trim()
-        ? { skipDates: skipDates.split(',').map((s) => s.trim()).filter(Boolean) }
-        : {}),
+      ...(skipDates.length > 0 ? { skipDates } : {}),
     };
 
     if (scheduleMode === 'simple') {
@@ -138,10 +137,10 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
         businessName: prefillFromFavorite.businessName,
         label: prefillFromFavorite.label,
         items: prefillFromFavorite.items,
-        headcount: prefillFromFavorite.headcount,
-        specialInstructions: prefillFromFavorite.specialInstructions,
-        deliveryAddress: prefillFromFavorite.deliveryAddress,
-        orderForContext: prefillFromFavorite.orderForContext,
+        ...(prefillFromFavorite.headcount ? { headcount: prefillFromFavorite.headcount } : {}),
+        ...(prefillFromFavorite.specialInstructions ? { specialInstructions: prefillFromFavorite.specialInstructions } : {}),
+        deliveryAddress: prefillFromFavorite.deliveryAddress!,
+        ...(prefillFromFavorite.orderForContext ? { orderForContext: prefillFromFavorite.orderForContext } : {}),
         contactName: contactName.trim(),
         contactPhone: contactPhone.trim(),
         schedule,
@@ -336,18 +335,13 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
             </div>
           </div>
 
-          {/* Skip dates */}
+          {/* Skip dates — multi-date picker */}
           <div className="mb-4">
-            <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
-              Skip Dates <span style={{ color: 'var(--aurora-text-muted)' }}>(comma-separated YYYY-MM-DD)</span>
-            </label>
-            <input
-              type="text"
-              value={skipDates}
-              onChange={(e) => setSkipDates(e.target.value)}
-              placeholder="e.g., 2026-07-04, 2026-12-25"
-              className="w-full mt-1 px-3 py-1.5 rounded-lg border text-xs"
-              style={{ borderColor: 'var(--aurora-border)' }}
+            <MultiDatePicker
+              selectedDates={skipDates}
+              onChange={setSkipDates}
+              disablePast={true}
+              label="Skip Dates (select dates to skip)"
             />
           </div>
 

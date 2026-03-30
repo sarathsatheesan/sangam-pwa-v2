@@ -95,6 +95,9 @@ export interface CateringOrder {
   createdAt?: any;
   confirmedAt?: any;
   declinedReason?: string;
+  cancellationReason?: string;
+  cancelledBy?: string;
+  cancelledAt?: any;
   statusHistory?: Array<{ status: string; timestamp: any }>;
 }
 
@@ -148,8 +151,11 @@ export async function fetchMenuItemsByCategory(cuisineCategory: string): Promise
 }
 
 export async function createMenuItem(item: Omit<CateringMenuItem, 'id'>): Promise<string> {
+  const cleanItem = Object.fromEntries(
+    Object.entries(item).filter(([, v]) => v !== undefined),
+  );
   const docRef = await addDoc(collection(db, MENU_ITEMS_COL), {
-    ...item,
+    ...cleanItem,
     createdAt: serverTimestamp(),
   });
   return docRef.id;
@@ -268,6 +274,24 @@ export async function updateOrderStatus(
     timestamp: Timestamp.now(),
   });
   await updateDoc(ref, updates);
+}
+
+export async function cancelOrder(
+  orderId: string,
+  reason: string,
+  cancelledBy: 'customer' | 'vendor',
+): Promise<void> {
+  const ref = doc(db, ORDERS_COL, orderId);
+  await updateDoc(ref, {
+    status: 'cancelled',
+    cancellationReason: reason,
+    cancelledBy,
+    cancelledAt: serverTimestamp(),
+    statusHistory: arrayUnion({
+      status: 'cancelled',
+      timestamp: Timestamp.now(),
+    }),
+  });
 }
 
 // ── Catering-enabled businesses ──
@@ -1195,8 +1219,11 @@ export function computeNextRunDate(schedule: RecurrenceSchedule, afterDate?: str
  * Create a recurring order schedule.
  */
 export async function createRecurringOrder(rec: Omit<RecurringOrder, 'id' | 'totalOrdersPlaced' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  const cleanRec = Object.fromEntries(
+    Object.entries(rec).filter(([, v]) => v !== undefined),
+  );
   const docRef = await addDoc(collection(db, 'cateringRecurring'), {
-    ...rec,
+    ...cleanRec,
     totalOrdersPlaced: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -1280,8 +1307,11 @@ function generateShareCode(): string {
  */
 export async function createOrderTemplate(tmpl: Omit<OrderTemplate, 'id' | 'shareCode' | 'useCount' | 'createdAt' | 'updatedAt'>): Promise<{ id: string; shareCode: string }> {
   const shareCode = generateShareCode();
+  const cleanTmpl = Object.fromEntries(
+    Object.entries(tmpl).filter(([, v]) => v !== undefined),
+  );
   const docRef = await addDoc(collection(db, 'cateringTemplates'), {
-    ...tmpl,
+    ...cleanTmpl,
     shareCode,
     useCount: 0,
     createdAt: serverTimestamp(),

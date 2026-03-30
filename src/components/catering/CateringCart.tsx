@@ -42,6 +42,9 @@ export default function CateringCart({
         className={`fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
+        role="dialog"
+        aria-modal={isOpen}
+        aria-label="Shopping cart"
       >
         {/* Header */}
         <div className="sticky top-0 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between">

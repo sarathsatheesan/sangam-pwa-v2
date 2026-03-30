@@ -1,8 +1,18 @@
 import type { FC } from 'react';
 import { useMemo, useState } from 'react';
-import { Search, Star, UtensilsCrossed, Badge } from 'lucide-react';
+import { Search, Star, UtensilsCrossed, Badge, ArrowUpDown } from 'lucide-react';
 import type { CateringMenuItem } from '@/services/cateringService';
 import CateringItemCard from './CateringItemCard';
+
+type SortOrder = 'default' | 'price_asc' | 'price_desc' | 'rating' | 'name_asc';
+
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: 'default', label: 'Default' },
+  { value: 'price_asc', label: 'Price: Low to High' },
+  { value: 'price_desc', label: 'Price: High to Low' },
+  { value: 'name_asc', label: 'Name: A to Z' },
+  { value: 'rating', label: 'Highest Rated' },
+];
 
 interface CateringItemListProps {
   items: CateringMenuItem[];
@@ -10,8 +20,10 @@ interface CateringItemListProps {
   onAddToCart: (item: CateringMenuItem) => void;
   searchQuery: string;
   dietaryFilter: string[];
+  sortOrder?: SortOrder;
   onSearchChange: (q: string) => void;
   onDietaryToggle: (tag: string) => void;
+  onSortChange?: (sort: SortOrder) => void;
 }
 
 const DIETARY_OPTIONS = [
@@ -28,8 +40,10 @@ export default function CateringItemList({
   onAddToCart,
   searchQuery,
   dietaryFilter,
+  sortOrder = 'default',
   onSearchChange,
   onDietaryToggle,
+  onSortChange,
 }: CateringItemListProps): ReturnType<FC> {
   // Create a map for quick business lookup
   const businessMap = useMemo(
@@ -65,11 +79,29 @@ export default function CateringItemList({
     });
   }, [items, searchQuery, dietaryFilter]);
 
+  // Sort items within groups
+  const sortedItems = useMemo(() => {
+    if (sortOrder === 'default') return filteredItems;
+    return [...filteredItems].sort((a, b) => {
+      switch (sortOrder) {
+        case 'price_asc': return a.price - b.price;
+        case 'price_desc': return b.price - a.price;
+        case 'name_asc': return a.name.localeCompare(b.name);
+        case 'rating': {
+          const rA = businessMap[a.businessId]?.rating || 0;
+          const rB = businessMap[b.businessId]?.rating || 0;
+          return rB - rA;
+        }
+        default: return 0;
+      }
+    });
+  }, [filteredItems, sortOrder, businessMap]);
+
   // Group items by business
   const groupedByBusiness = useMemo(() => {
     const grouped = new Map<string, CateringMenuItem[]>();
 
-    filteredItems.forEach(item => {
+    sortedItems.forEach(item => {
       if (!grouped.has(item.businessId)) {
         grouped.set(item.businessId, []);
       }
@@ -77,7 +109,7 @@ export default function CateringItemList({
     });
 
     return grouped;
-  }, [filteredItems]);
+  }, [sortedItems]);
 
   const hasResults = groupedByBusiness.size > 0;
 
@@ -93,6 +125,7 @@ export default function CateringItemList({
             placeholder="Search items by name or description..."
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
+            aria-label="Search catering items by name or description"
             className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-500 transition-colors duration-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
             style={{
               borderColor: 'var(--aurora-border, #E5E7EB)',
@@ -102,36 +135,61 @@ export default function CateringItemList({
           />
         </div>
 
-        {/* Dietary filter pills */}
-        <div className="flex flex-wrap gap-2">
-          {DIETARY_OPTIONS.map(tag => {
-            const isSelected = dietaryFilter.includes(tag);
-            const displayLabel = tag
-              .split('_')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ');
+        {/* Dietary filter pills + Sort dropdown row */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {DIETARY_OPTIONS.map(tag => {
+              const isSelected = dietaryFilter.includes(tag);
+              const displayLabel = tag
+                .split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
 
-            return (
-              <button
-                key={tag}
-                onClick={() => onDietaryToggle(tag)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
-                  isSelected
-                    ? 'text-white'
-                    : 'border border-gray-200 text-gray-700 hover:border-gray-300'
-                }`}
-                style={
-                  isSelected
-                    ? {
-                        backgroundColor: 'var(--aurora-secondary, #10B981)',
-                      }
-                    : undefined
-                }
+              return (
+                <button
+                  key={tag}
+                  onClick={() => onDietaryToggle(tag)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
+                    isSelected
+                      ? 'text-white'
+                      : 'border border-gray-200 text-gray-700 hover:border-gray-300'
+                  }`}
+                  style={
+                    isSelected
+                      ? {
+                          backgroundColor: 'var(--aurora-secondary, #10B981)',
+                        }
+                      : undefined
+                  }
+                  role="checkbox"
+                  aria-checked={isSelected}
+                  aria-label={`Filter by ${displayLabel}`}
+                >
+                  {displayLabel}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sort dropdown */}
+          {onSortChange && (
+            <div className="relative flex items-center gap-1.5">
+              <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+              <select
+                value={sortOrder}
+                onChange={(e) => onSortChange(e.target.value as SortOrder)}
+                className="appearance-none bg-transparent text-xs font-medium text-gray-600 pr-5 cursor-pointer outline-none hover:text-gray-900 transition-colors"
+                aria-label="Sort items"
+                style={{ color: 'var(--aurora-text-secondary)' }}
               >
-                {displayLabel}
-              </button>
-            );
-          })}
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

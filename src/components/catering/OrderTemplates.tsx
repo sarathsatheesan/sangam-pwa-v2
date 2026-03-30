@@ -88,10 +88,10 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
         businessId: prefillFromFavorite.businessId,
         businessName: prefillFromFavorite.businessName,
         title: title.trim(),
-        description: description.trim() || undefined,
+        ...(description.trim() ? { description: description.trim() } : {}),
         items: prefillFromFavorite.items,
-        headcount: prefillFromFavorite.headcount,
-        specialInstructions: prefillFromFavorite.specialInstructions,
+        ...(prefillFromFavorite.headcount ? { headcount: prefillFromFavorite.headcount } : {}),
+        ...(prefillFromFavorite.specialInstructions ? { specialInstructions: prefillFromFavorite.specialInstructions } : {}),
         isPublic,
         ...(organizationName.trim() ? {
           organizationId: organizationName.trim().toLowerCase().replace(/\s+/g, '-'),

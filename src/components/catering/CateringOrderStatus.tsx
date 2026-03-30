@@ -9,12 +9,21 @@ import React, { useEffect, useState } from 'react';
 import {
   ArrowLeft, Clock, CheckCircle2, Package, Truck, XCircle, MapPin,
   User, Phone, Calendar, Users, ChevronDown, ChevronUp, Loader2,
-  UtensilsCrossed, FileText, Star,
+  UtensilsCrossed, FileText, Star, Ban,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
-import { subscribeToCustomerOrders, formatPrice, hasReviewedOrder } from '@/services/cateringService';
+import { subscribeToCustomerOrders, formatPrice, hasReviewedOrder, cancelOrder } from '@/services/cateringService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
+
+const CUSTOMER_CANCEL_REASONS = [
+  'Changed plans',
+  'Found another caterer',
+  'Ordered by mistake',
+  'Event postponed',
+  'Other',
+];
 
 interface CateringOrderStatusProps {
   onBack: () => void;
@@ -47,11 +56,34 @@ function formatTimestamp(ts: any): string {
 
 export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps) {
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [reviewingOrder, setReviewingOrder] = useState<CateringOrder | null>(null);
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelOtherText, setCancelOtherText] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+
+  const handleCancelOrder = async () => {
+    if (!cancellingOrderId) return;
+    const reason = cancelReason === 'Other' ? cancelOtherText.trim() || 'Other' : cancelReason;
+    if (!reason) { addToast('Please select a reason', 'error'); return; }
+    setCancelSubmitting(true);
+    try {
+      await cancelOrder(cancellingOrderId, reason, 'customer');
+      addToast('Order cancelled', 'success');
+      setCancellingOrderId(null);
+      setCancelReason('');
+      setCancelOtherText('');
+    } catch (err: any) {
+      addToast(err.message || 'Failed to cancel order', 'error');
+    } finally {
+      setCancelSubmitting(false);
+    }
+  };
 
   // Check which delivered orders have already been reviewed
   useEffect(() => {
@@ -230,12 +262,26 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         </div>
                       )}
 
-                      {/* Declined reason */}
-                      {order.status === 'cancelled' && order.declinedReason && (
+                      {/* Declined / Cancellation reason */}
+                      {order.status === 'cancelled' && (order.cancellationReason || order.declinedReason) && (
                         <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
-                          <span className="font-medium" style={{ color: '#991B1B' }}>Reason: </span>
-                          <span style={{ color: '#DC2626' }}>{order.declinedReason}</span>
+                          <span className="font-medium" style={{ color: '#991B1B' }}>
+                            {order.cancelledBy === 'vendor' ? 'Cancelled by vendor: ' : 'Reason: '}
+                          </span>
+                          <span style={{ color: '#DC2626' }}>{order.cancellationReason || order.declinedReason}</span>
                         </div>
+                      )}
+
+                      {/* Cancel Order button — for pending/confirmed orders */}
+                      {['pending', 'confirmed'].includes(order.status) && (
+                        <button
+                          onClick={() => { setCancellingOrderId(order.id); setCancelReason(''); setCancelOtherText(''); }}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors border"
+                          style={{ borderColor: '#FCA5A5', color: '#DC2626', backgroundColor: '#FEF2F2' }}
+                        >
+                          <Ban size={14} />
+                          Cancel Order
+                        </button>
                       )}
 
                       {/* Leave a Review CTA — only for delivered orders */}
@@ -280,6 +326,63 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
             setReviewingOrder(null);
           }}
         />
+      )}
+
+      {/* Cancel order dialog */}
+      {cancellingOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">
+          <div className="absolute inset-0 bg-black/40" onClick={() => !cancelSubmitting && setCancellingOrderId(null)} />
+          <div className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}>
+            <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--aurora-text)' }}>Cancel Order</h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Please let us know why you're cancelling.
+            </p>
+            <div className="space-y-2 mb-4">
+              {CUSTOMER_CANCEL_REASONS.map((reason) => (
+                <label key={reason} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="cancel-reason"
+                    value={reason}
+                    checked={cancelReason === reason}
+                    onChange={() => setCancelReason(reason)}
+                    className="accent-red-500"
+                  />
+                  <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>{reason}</span>
+                </label>
+              ))}
+              {cancelReason === 'Other' && (
+                <textarea
+                  value={cancelOtherText}
+                  onChange={(e) => setCancelOtherText(e.target.value)}
+                  placeholder="Please describe..."
+                  rows={2}
+                  maxLength={200}
+                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none focus:ring-2 focus:ring-red-300"
+                  style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                />
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCancellingOrderId(null)}
+                disabled={cancelSubmitting}
+                className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+              >
+                Keep Order
+              </button>
+              <button
+                onClick={handleCancelOrder}
+                disabled={cancelSubmitting || !cancelReason}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: '#EF4444' }}
+              >
+                {cancelSubmitting ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Cancel Order'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

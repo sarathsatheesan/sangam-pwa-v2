@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { SpeechClient } from "@google-cloud/speech";
@@ -438,5 +438,189 @@ export const processRecurringCateringOrders = onSchedule(
     }
 
     console.log(`[recurring-catering] Done. Processed: ${processed}, Failed: ${failed}`);
+  }
+);
+
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// PHASE 7: ORDER STATUS CHANGE NOTIFICATIONS
+// Sends FCM push notifications to customers when their order status changes,
+// and to vendors when a new order is placed.
+// ═════════════════════════════════════════════════════════════════════════════════
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Order Placed",
+  confirmed: "Confirmed",
+  preparing: "Being Prepared",
+  ready: "Ready for Pickup/Delivery",
+  out_for_delivery: "Out for Delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+export const onCateringOrderStatusChange = onDocumentUpdated(
+  "cateringOrders/{orderId}",
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!before || !after) return;
+
+    const oldStatus = before.status as string;
+    const newStatus = after.status as string;
+
+    // Only fire if status actually changed
+    if (oldStatus === newStatus) return;
+
+    const orderId = event.params.orderId;
+    const businessName = after.businessName || "Your caterer";
+    const statusLabel = STATUS_LABELS[newStatus] || newStatus;
+
+    console.log(`[order-status-notify] Order ${orderId}: ${oldStatus} → ${newStatus}`);
+
+    // ── Notify the customer ──
+    const customerId = after.customerId as string;
+    if (customerId) {
+      try {
+        const userDoc = await db.collection("users").doc(customerId).get();
+        const fcmTokens: string[] = userDoc.data()?.fcmTokens || [];
+        const fcmToken: string | undefined = userDoc.data()?.fcmToken;
+        const allTokens = [...fcmTokens, ...(fcmToken ? [fcmToken] : [])].filter(Boolean);
+
+        if (allTokens.length > 0) {
+          const notification = {
+            title: `Order ${statusLabel}`,
+            body: newStatus === "cancelled"
+              ? `Your order from ${businessName} has been cancelled.${after.cancellationReason ? ` Reason: ${after.cancellationReason}` : ""}`
+              : `Your order from ${businessName} is now ${statusLabel.toLowerCase()}.`,
+          };
+
+          const message: admin.messaging.MulticastMessage = {
+            tokens: allTokens,
+            notification,
+            data: {
+              type: "catering_order_status",
+              orderId,
+              status: newStatus,
+            },
+          };
+
+          const result = await admin.messaging().sendEachForMulticast(message);
+          console.log(
+            `[order-status-notify] Customer notification: ${result.successCount} sent, ${result.failureCount} failed`
+          );
+        }
+      } catch (err) {
+        console.error(`[order-status-notify] Error notifying customer ${customerId}:`, err);
+      }
+    }
+
+    // ── Notify vendor when a new order is placed (pending) ──
+    if (newStatus === "pending" && oldStatus !== "pending") return; // Only notify on creation
+    if (oldStatus === "" || !before.status) {
+      // This is a newly created order — notify the vendor
+      const businessId = after.businessId as string;
+      if (businessId) {
+        try {
+          const bizDoc = await db.collection("businesses").doc(businessId).get();
+          const ownerId = bizDoc.data()?.ownerId as string;
+          if (ownerId) {
+            const ownerDoc = await db.collection("users").doc(ownerId).get();
+            const ownerTokens: string[] = ownerDoc.data()?.fcmTokens || [];
+            const ownerToken: string | undefined = ownerDoc.data()?.fcmToken;
+            const allOwnerTokens = [...ownerTokens, ...(ownerToken ? [ownerToken] : [])].filter(Boolean);
+
+            if (allOwnerTokens.length > 0) {
+              const customerName = after.customerName || "A customer";
+              await admin.messaging().sendEachForMulticast({
+                tokens: allOwnerTokens,
+                notification: {
+                  title: "New Catering Order!",
+                  body: `${customerName} placed a catering order for ${after.headcount || "?"} guests.`,
+                },
+                data: {
+                  type: "catering_new_order",
+                  orderId,
+                },
+              });
+              console.log(`[order-status-notify] Vendor ${ownerId} notified of new order`);
+            }
+          }
+        } catch (err) {
+          console.error(`[order-status-notify] Error notifying vendor:`, err);
+        }
+      }
+    }
+  }
+);
+
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// PHASE 7: AUTO-EXPIRE STALE QUOTE REQUESTS
+// Runs daily. Finds open quote requests past their expiresAt date and marks
+// them as expired. Notifies the customer via FCM.
+// ═════════════════════════════════════════════════════════════════════════════════
+
+export const expireStaleQuoteRequests = onSchedule(
+  {
+    schedule: "every day 07:00",
+    timeZone: "America/Los_Angeles",
+    retryCount: 1,
+    maxInstances: 1,
+  },
+  async () => {
+    const now = admin.firestore.Timestamp.now();
+    console.log(`[expire-rfq] Checking for expired quote requests at ${now.toDate().toISOString()}`);
+
+    // Find open requests that have passed their expiration
+    const snap = await db
+      .collection("cateringQuoteRequests")
+      .where("status", "==", "open")
+      .where("expiresAt", "<=", now)
+      .get();
+
+    if (snap.empty) {
+      console.log("[expire-rfq] No expired requests found.");
+      return;
+    }
+
+    console.log(`[expire-rfq] Found ${snap.size} expired request(s).`);
+
+    let expired = 0;
+    for (const reqDoc of snap.docs) {
+      try {
+        await reqDoc.ref.update({ status: "expired" });
+
+        // Notify customer
+        const customerId = reqDoc.data().customerId as string;
+        if (customerId) {
+          const userDoc = await db.collection("users").doc(customerId).get();
+          const tokens: string[] = [
+            ...(userDoc.data()?.fcmTokens || []),
+            ...(userDoc.data()?.fcmToken ? [userDoc.data()?.fcmToken] : []),
+          ].filter(Boolean);
+
+          if (tokens.length > 0) {
+            const category = reqDoc.data().cuisineCategory || "Catering";
+            await admin.messaging().sendEachForMulticast({
+              tokens,
+              notification: {
+                title: "Quote Request Expired",
+                body: `Your ${category} quote request has expired. You can create a new one anytime.`,
+              },
+              data: {
+                type: "rfq_expired",
+                requestId: reqDoc.id,
+              },
+            });
+          }
+        }
+
+        expired++;
+      } catch (err) {
+        console.error(`[expire-rfq] Error expiring ${reqDoc.id}:`, err);
+      }
+    }
+
+    console.log(`[expire-rfq] Done. Expired: ${expired}`);
   }
 );

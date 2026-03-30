@@ -33,10 +33,11 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.transcribeVoiceMessage = exports.sendNewMessageNotification = void 0;
+exports.processRecurringCateringOrders = exports.transcribeVoiceMessage = exports.sendNewMessageNotification = void 0;
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
 const speech_1 = require("@google-cloud/speech");
 admin.initializeApp();
 const db = admin.firestore();
@@ -256,5 +257,149 @@ exports.transcribeVoiceMessage = (0, https_1.onCall)({ maxInstances: 10, timeout
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
         throw new https_1.HttpsError("internal", `Transcription failed: ${errorMessage}`);
     }
+});
+// ═════════════════════════════════════════════════════════════════════════════════
+// PHASE 6: RECURRING CATERING ORDERS — SCHEDULED FUNCTION
+// Runs every day at 6:00 AM UTC. Finds recurring orders whose nextRunDate is
+// today, places the order, bumps stats, and computes the next run date.
+// ═════════════════════════════════════════════════════════════════════════════════
+/**
+ * Compute the next run date from a schedule config (server-side mirror of client logic).
+ */
+function computeNextRunDateServer(schedule, afterDate) {
+    const after = afterDate ? new Date(afterDate) : new Date();
+    after.setHours(0, 0, 0, 0);
+    const skipSet = new Set(schedule.skipDates || []);
+    // Calendar-based: specific days of week
+    if (schedule.daysOfWeek && schedule.daysOfWeek.length > 0) {
+        const candidate = new Date(after);
+        candidate.setDate(candidate.getDate() + 1);
+        for (let i = 0; i < 365; i++) {
+            const iso = candidate.toISOString().slice(0, 10);
+            if (schedule.daysOfWeek.includes(candidate.getDay()) && !skipSet.has(iso)) {
+                if (!schedule.endDate || iso <= schedule.endDate)
+                    return iso;
+            }
+            candidate.setDate(candidate.getDate() + 1);
+        }
+        return "";
+    }
+    // Calendar-based: specific day of month
+    if (schedule.dayOfMonth) {
+        const candidate = new Date(after);
+        candidate.setDate(candidate.getDate() + 1);
+        for (let i = 0; i < 365; i++) {
+            if (candidate.getDate() === schedule.dayOfMonth) {
+                const iso = candidate.toISOString().slice(0, 10);
+                if (!skipSet.has(iso) && (!schedule.endDate || iso <= schedule.endDate))
+                    return iso;
+            }
+            candidate.setDate(candidate.getDate() + 1);
+        }
+        return "";
+    }
+    // Simple interval mode
+    const intervalDays = {
+        daily: 1,
+        weekly: 7,
+        biweekly: 14,
+        monthly: 30,
+    };
+    const days = intervalDays[schedule.interval || "weekly"] || 7;
+    const candidate = new Date(after);
+    candidate.setDate(candidate.getDate() + days);
+    for (let i = 0; i < 365; i++) {
+        const iso = candidate.toISOString().slice(0, 10);
+        if (!skipSet.has(iso) && (!schedule.endDate || iso <= schedule.endDate))
+            return iso;
+        candidate.setDate(candidate.getDate() + 1);
+    }
+    return "";
+}
+exports.processRecurringCateringOrders = (0, scheduler_1.onSchedule)({
+    schedule: "every day 06:00",
+    timeZone: "America/Los_Angeles",
+    retryCount: 2,
+    maxInstances: 1,
+}, async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    console.log(`[recurring-catering] Processing orders for ${today}`);
+    // Find all active recurring orders whose nextRunDate is today
+    const snap = await db
+        .collection("cateringRecurring")
+        .where("active", "==", true)
+        .where("nextRunDate", "==", today)
+        .get();
+    if (snap.empty) {
+        console.log("[recurring-catering] No orders to process today.");
+        return;
+    }
+    console.log(`[recurring-catering] Found ${snap.size} recurring order(s) to process.`);
+    // Process each recurring order sequentially to avoid batch race conditions
+    let processed = 0;
+    let failed = 0;
+    for (const recDoc of snap.docs) {
+        const rec = recDoc.data();
+        try {
+            // Calculate total from items
+            const total = (rec.items || []).reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+            // Get customer info for the order
+            const userSnap = await db.collection("users").doc(rec.userId).get();
+            const userData = userSnap.exists ? userSnap.data() : {};
+            // Create the catering order
+            await db.collection("cateringOrders").add({
+                customerId: rec.userId,
+                customerName: (userData === null || userData === void 0 ? void 0 : userData.name) || rec.contactName || "",
+                customerEmail: (userData === null || userData === void 0 ? void 0 : userData.email) || "",
+                customerPhone: rec.contactPhone || "",
+                businessId: rec.businessId,
+                businessName: rec.businessName,
+                items: rec.items,
+                subtotal: total,
+                total: total,
+                status: "pending",
+                eventDate: today,
+                deliveryAddress: rec.deliveryAddress,
+                headcount: rec.headcount || 1,
+                specialInstructions: rec.specialInstructions || "",
+                orderForContext: rec.orderForContext || { type: "self" },
+                contactName: rec.contactName,
+                contactPhone: rec.contactPhone,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                statusHistory: [
+                    {
+                        status: "pending",
+                        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                ],
+                isRecurring: true,
+                recurringOrderId: recDoc.id,
+            });
+            // Compute next run date
+            const nextRun = computeNextRunDateServer(rec.schedule, today);
+            // Update the recurring order document
+            const updates = {
+                lastRunDate: today,
+                totalOrdersPlaced: (rec.totalOrdersPlaced || 0) + 1,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            if (nextRun) {
+                updates.nextRunDate = nextRun;
+            }
+            else {
+                // No more valid dates — deactivate
+                updates.active = false;
+                updates.nextRunDate = "";
+            }
+            await recDoc.ref.update(updates);
+            processed++;
+            console.log(`[recurring-catering] Placed order for ${rec.label} (${rec.businessName}). Next: ${nextRun || "deactivated"}`);
+        }
+        catch (err) {
+            failed++;
+            console.error(`[recurring-catering] Error processing ${recDoc.id}:`, err);
+        }
+    }
+    console.log(`[recurring-catering] Done. Processed: ${processed}, Failed: ${failed}`);
 });
 //# sourceMappingURL=index.js.map

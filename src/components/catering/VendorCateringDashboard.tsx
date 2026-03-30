@@ -6,15 +6,24 @@
 import React, { useEffect, useState } from 'react';
 import {
   Package, Clock, CheckCircle2, XCircle, ChevronDown, ChevronUp,
-  User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck,
+  User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck, Ban,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
 import {
   subscribeToBusinessOrders,
   updateOrderStatus,
+  cancelOrder,
   formatPrice,
 } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
+
+const VENDOR_CANCEL_REASONS = [
+  'Item unavailable',
+  'Cannot fulfill timeline',
+  'Customer no-show',
+  'Kitchen issue',
+  'Other',
+];
 
 interface VendorCateringDashboardProps {
   businessId: string;
@@ -49,6 +58,30 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
   // ETA inputs per order (vendor enters before dispatching for delivery)
   const [etaInputs, setEtaInputs] = useState<Record<string, string>>({});
+
+  // Cancel order state
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelOtherText, setCancelOtherText] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+
+  const handleCancelOrder = async () => {
+    if (!cancellingOrderId) return;
+    const reason = cancelReason === 'Other' ? cancelOtherText.trim() || 'Other' : cancelReason;
+    if (!reason) { addToast('Please select a reason', 'error'); return; }
+    setCancelSubmitting(true);
+    try {
+      await cancelOrder(cancellingOrderId, reason, 'vendor');
+      addToast('Order cancelled', 'success');
+      setCancellingOrderId(null);
+      setCancelReason('');
+      setCancelOtherText('');
+    } catch (err: any) {
+      addToast(err.message || 'Failed to cancel order', 'error');
+    } finally {
+      setCancelSubmitting(false);
+    }
+  };
 
   const handleStatusChange = async (orderId: string, newStatus: CateringOrder['status'], extra?: Record<string, any>) => {
     setActionLoading(orderId);
@@ -329,11 +362,89 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                         </button>
                       </div>
                     )}
+
+                    {/* Cancel button for non-pending active orders */}
+                    {['confirmed', 'preparing', 'ready'].includes(order.status) && (
+                      <button
+                        onClick={() => { setCancellingOrderId(order.id); setCancelReason(''); setCancelOtherText(''); }}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border mt-2"
+                        style={{ borderColor: '#FCA5A5', color: '#DC2626', backgroundColor: '#FEF2F2' }}
+                      >
+                        <Ban size={14} />
+                        Cancel Order
+                      </button>
+                    )}
+
+                    {/* Cancellation reason display */}
+                    {order.status === 'cancelled' && (order.cancellationReason || order.declinedReason) && (
+                      <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
+                        <span className="font-medium" style={{ color: '#991B1B' }}>
+                          {order.cancelledBy === 'customer' ? 'Cancelled by customer: ' : 'Reason: '}
+                        </span>
+                        <span style={{ color: '#DC2626' }}>{order.cancellationReason || order.declinedReason}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+      {/* Cancel order dialog */}
+      {cancellingOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">
+          <div className="absolute inset-0 bg-black/40" onClick={() => !cancelSubmitting && setCancellingOrderId(null)} />
+          <div className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}>
+            <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--aurora-text)' }}>Cancel Order</h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Please select a reason for cancelling this order.
+            </p>
+            <div className="space-y-2 mb-4">
+              {VENDOR_CANCEL_REASONS.map((reason) => (
+                <label key={reason} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                  <input
+                    type="radio"
+                    name="vendor-cancel-reason"
+                    value={reason}
+                    checked={cancelReason === reason}
+                    onChange={() => setCancelReason(reason)}
+                    className="accent-red-500"
+                  />
+                  <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>{reason}</span>
+                </label>
+              ))}
+              {cancelReason === 'Other' && (
+                <textarea
+                  value={cancelOtherText}
+                  onChange={(e) => setCancelOtherText(e.target.value)}
+                  placeholder="Please describe..."
+                  rows={2}
+                  maxLength={200}
+                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none focus:ring-2 focus:ring-red-300"
+                  style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                />
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCancellingOrderId(null)}
+                disabled={cancelSubmitting}
+                className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleCancelOrder}
+                disabled={cancelSubmitting || !cancelReason}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: '#EF4444' }}
+              >
+                {cancelSubmitting ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Cancel Order'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
