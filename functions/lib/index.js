@@ -687,6 +687,14 @@ const NOTIFICATION_TEMPLATES = {
         subject: "Recurring order reminder — tomorrow",
         body: (d) => `Your recurring order "${d.label}" from ${d.businessName} is scheduled for tomorrow (${d.nextRunDate}).${d.hasOverride ? " You have modifications saved for this order." : ""} Open the app to edit, skip, or adjust this order before it goes through.`,
     },
+    vendor_new_review: {
+        subject: "New review for your business",
+        body: (d) => `${d.reviewerName} left a ${d.rating}-star review for ${d.businessName}: "${d.reviewText}"${d.reviewText.length >= 200 ? "..." : ""}. Log in to your dashboard to read and respond.`,
+    },
+    review_flagged: {
+        subject: "A review has been flagged",
+        body: (d) => `A review for ${d.businessName} has been flagged for: ${d.reason}. Our team will review it shortly.`,
+    },
 };
 /**
  * Process queued notifications and dispatch via email, SMS, or push.
