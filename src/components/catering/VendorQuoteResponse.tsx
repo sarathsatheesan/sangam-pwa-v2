@@ -263,136 +263,6 @@ export default function VendorQuoteResponse({
         </p>
       </div>
 
-      {/* ══ Accepted quotes — prominent section ══ */}
-      {acceptedResponses.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: '#059669' }}>
-            <CheckCircle2 size={16} />
-            Accepted ({acceptedResponses.length})
-          </h3>
-          <div className="space-y-3">
-            {acceptedResponses.map((response) => {
-              const request = requests.find((r) => r.id === response.quoteRequestId);
-              const isPartial = response.status === 'partially_accepted';
-
-              return (
-                <div
-                  key={response.id}
-                  className="p-4 rounded-2xl border-2"
-                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: '#059669' }}
-                >
-                  {/* Status badge */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                      style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
-                    >
-                      <CheckCircle2 size={12} />
-                      {isPartial ? 'Partially Accepted' : 'Accepted'}
-                    </span>
-                    <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
-                      {formatPrice(response.total)}
-                    </span>
-                  </div>
-
-                  {/* Request details */}
-                  {request && (
-                    <div className="mb-3">
-                      <div className="flex items-center gap-3 flex-wrap text-xs mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        <span>{request.cuisineCategory}</span>
-                        {request.eventType && (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
-                            {request.eventType.replace(/_/g, ' ')}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
-                        <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} />
-                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
-                        </span>
-                      </div>
-                      {/* Full item breakdown */}
-                      <div className="space-y-1">
-                        {response.quotedItems?.map((qi, i) => (
-                          <div key={i} className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                            <span>{qi.name} x {qi.qty} ({qi.pricingType?.replace(/_/g, ' ') || 'per unit'})</span>
-                            <span>{formatPrice(qi.unitPrice * qi.qty)}</span>
-                          </div>
-                        ))}
-                        {response.serviceFee != null && response.serviceFee > 0 && (
-                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                            <span>Service fee</span><span>{formatPrice(response.serviceFee)}</span>
-                          </div>
-                        )}
-                        {response.deliveryFee != null && response.deliveryFee > 0 && (
-                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                            <span>Delivery fee</span><span>{formatPrice(response.deliveryFee)}</span>
-                          </div>
-                        )}
-                      </div>
-                      {request.specialInstructions && (
-                        <p className="text-xs mt-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
-                          Customer note: {request.specialInstructions}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Accepted items */}
-                  {response.acceptedItemNames && response.acceptedItemNames.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        Accepted Items
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {response.acceptedItemNames.map((name) => (
-                          <span
-                            key={name}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
-                            style={{ backgroundColor: 'rgba(5, 150, 105, 0.1)', color: '#059669' }}
-                          >
-                            <Check size={10} />
-                            {name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Customer contact details — the key info vendors need */}
-                  {response.customerName && (
-                    <div
-                      className="p-3 rounded-xl"
-                      style={{ backgroundColor: '#D1FAE5' }}
-                    >
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#059669' }}>
-                        Customer Contact
-                      </p>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium" style={{ color: '#065F46' }}>
-                          {response.customerName}
-                        </p>
-                        {response.customerPhone && (
-                          <p className="text-xs" style={{ color: '#065F46' }}>
-                            Phone: {response.customerPhone}
-                          </p>
-                        )}
-                        {response.customerEmail && (
-                          <p className="text-xs" style={{ color: '#065F46' }}>
-                            Email: {response.customerEmail}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* ══ Open requests (not yet responded to) ══ */}
       <div>
         <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--aurora-text)' }}>
@@ -488,24 +358,47 @@ export default function VendorQuoteResponse({
                           const requestItem = request.items[idx];
                           const pricingLabel = (requestItem?.pricingType || qi.pricingType || 'per_unit').replace(/_/g, ' ');
                           return (
-                            <div key={idx} className="flex items-center gap-3">
-                              <div className="flex-1">
-                                <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>
-                                  {qi.name} x {qi.qty}
-                                </span>
-                                <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
-                                  {pricingLabel}
-                                </span>
+                            <div key={idx} className="space-y-2 pb-3 border-b last:border-b-0" style={{ borderColor: 'var(--aurora-border)' }}>
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>
+                                    {qi.name} x {qi.qty}
+                                  </span>
+                                  <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                                    {pricingLabel}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <DollarSign size={14} style={{ color: 'var(--aurora-text-secondary)' }} />
+                                  <PriceInput
+                                    cents={qi.unitPrice}
+                                    onCentsChange={(c) => updateQuoteItem(request.id, idx, { unitPrice: c })}
+                                    className="w-24 rounded-lg border px-2 py-1.5 text-sm text-right outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                    style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                  />
+                                  <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>/{pricingLabel.split(' ').pop()}</span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1">
-                                <DollarSign size={14} style={{ color: 'var(--aurora-text-secondary)' }} />
-                                <PriceInput
-                                  cents={qi.unitPrice}
-                                  onCentsChange={(c) => updateQuoteItem(request.id, idx, { unitPrice: c })}
-                                  className="w-24 rounded-lg border px-2 py-1.5 text-sm text-right outline-none focus:ring-2 focus:ring-indigo-500/30"
-                                  style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                                />
-                                <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>/{pricingLabel.split(' ').pop()}</span>
+                              {/* Tray size selector */}
+                              <div className="flex items-center gap-2 ml-1">
+                                <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>Tray size:</span>
+                                {(['small', 'medium', 'large'] as const).map((size) => (
+                                  <button
+                                    key={size}
+                                    type="button"
+                                    onClick={() => updateQuoteItem(request.id, idx, { traySize: qi.traySize === size ? undefined : size })}
+                                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                                      qi.traySize === size ? 'text-white' : 'border hover:opacity-80'
+                                    }`}
+                                    style={
+                                      qi.traySize === size
+                                        ? { backgroundColor: '#6366F1' }
+                                        : { borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }
+                                    }
+                                  >
+                                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                                  </button>
+                                ))}
                               </div>
                             </div>
                           );
@@ -582,6 +475,136 @@ export default function VendorQuoteResponse({
           </div>
         )}
       </div>
+
+      {/* ══ Accepted quotes ══ */}
+      {acceptedResponses.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: '#059669' }}>
+            <CheckCircle2 size={16} />
+            Accepted ({acceptedResponses.length})
+          </h3>
+          <div className="space-y-3">
+            {acceptedResponses.map((response) => {
+              const request = requests.find((r) => r.id === response.quoteRequestId);
+              const isPartial = response.status === 'partially_accepted';
+
+              return (
+                <div
+                  key={response.id}
+                  className="p-4 rounded-2xl border-2"
+                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: '#059669' }}
+                >
+                  {/* Status badge */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
+                    >
+                      <CheckCircle2 size={12} />
+                      {isPartial ? 'Partially Accepted' : 'Accepted'}
+                    </span>
+                    <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
+                      {formatPrice(response.total)}
+                    </span>
+                  </div>
+
+                  {/* Request details */}
+                  {request && (
+                    <div className="mb-3">
+                      <div className="flex items-center gap-3 flex-wrap text-xs mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        <span>{request.cuisineCategory}</span>
+                        {request.eventType && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                            {request.eventType.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
+                        <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} />
+                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
+                        </span>
+                      </div>
+                      {/* Full item breakdown */}
+                      <div className="space-y-1">
+                        {response.quotedItems?.map((qi, i) => (
+                          <div key={i} className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>{qi.name} x {qi.qty} ({qi.pricingType?.replace(/_/g, ' ') || 'per unit'}){qi.traySize ? ` · ${qi.traySize}` : ''}</span>
+                            <span>{formatPrice(qi.unitPrice * qi.qty)}</span>
+                          </div>
+                        ))}
+                        {response.serviceFee != null && response.serviceFee > 0 && (
+                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>Service fee</span><span>{formatPrice(response.serviceFee)}</span>
+                          </div>
+                        )}
+                        {response.deliveryFee != null && response.deliveryFee > 0 && (
+                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>Delivery fee</span><span>{formatPrice(response.deliveryFee)}</span>
+                          </div>
+                        )}
+                      </div>
+                      {request.specialInstructions && (
+                        <p className="text-xs mt-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
+                          Customer note: {request.specialInstructions}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Accepted items */}
+                  {response.acceptedItemNames && response.acceptedItemNames.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        Accepted Items
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {response.acceptedItemNames.map((name) => (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                            style={{ backgroundColor: 'rgba(5, 150, 105, 0.1)', color: '#059669' }}
+                          >
+                            <Check size={10} />
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Customer contact details — the key info vendors need */}
+                  {response.customerName && (
+                    <div
+                      className="p-3 rounded-xl"
+                      style={{ backgroundColor: '#D1FAE5' }}
+                    >
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#059669' }}>
+                        Customer Contact
+                      </p>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium" style={{ color: '#065F46' }}>
+                          {response.customerName}
+                        </p>
+                        {response.customerPhone && (
+                          <p className="text-xs" style={{ color: '#065F46' }}>
+                            Phone: {response.customerPhone}
+                          </p>
+                        )}
+                        {response.customerEmail && (
+                          <p className="text-xs" style={{ color: '#065F46' }}>
+                            Email: {response.customerEmail}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ══ Pending quotes (submitted, awaiting customer decision) ══ */}
       {pendingResponses.length > 0 && (

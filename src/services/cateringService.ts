@@ -399,6 +399,7 @@ export interface QuotedItem {
   qty: number;
   unitPrice: number;              // cents
   pricingType: string;
+  traySize?: 'small' | 'medium' | 'large';  // tray size offered by vendor
   notes?: string;                 // caterer notes per item
 }
 

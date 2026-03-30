@@ -68,7 +68,7 @@ export default function CateringPage() {
   const [allCateringBusinesses, setAllCateringBusinesses] = useState<any[]>([]);
   const [userOwnedBusiness, setUserOwnedBusiness] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews'>('orders');
+  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews'>('quotes');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
   const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
   const [selectedFavoriteForTemplate, setSelectedFavoriteForTemplate] = useState<FavoriteOrder | null>(null);
@@ -855,16 +855,6 @@ export default function CateringPage() {
             {/* Tab toggle */}
             <div className="flex gap-2">
               <button
-                onClick={() => setVendorTab('orders')}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: vendorTab === 'orders' ? '#6366F1' : 'var(--aurora-surface-variant)',
-                  color: vendorTab === 'orders' ? '#fff' : 'var(--aurora-text-secondary)',
-                }}
-              >
-                Direct Orders
-              </button>
-              <button
                 onClick={() => setVendorTab('quotes')}
                 className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
                 style={{
@@ -873,6 +863,16 @@ export default function CateringPage() {
                 }}
               >
                 Quote Requests
+              </button>
+              <button
+                onClick={() => setVendorTab('orders')}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: vendorTab === 'orders' ? '#6366F1' : 'var(--aurora-surface-variant)',
+                  color: vendorTab === 'orders' ? '#fff' : 'var(--aurora-text-secondary)',
+                }}
+              >
+                Direct Orders
               </button>
               <button
                 onClick={() => setVendorTab('analytics')}
