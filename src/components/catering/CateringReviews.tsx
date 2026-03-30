@@ -63,11 +63,13 @@ function ReviewCard({
   isVendor,
   onReply,
   replyLoading,
+  businessName,
 }: {
   review: CateringReview;
   isVendor: boolean;
   onReply: (reviewId: string, text: string) => void;
   replyLoading: string | null;
+  businessName?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -161,7 +163,9 @@ function ReviewCard({
         >
           <div className="flex items-center gap-1.5 mb-1">
             <Store size={12} style={{ color: '#6366F1' }} />
-            <span className="text-[10px] font-semibold" style={{ color: '#6366F1' }}>Owner Response</span>
+            <span className="text-[10px] font-semibold" style={{ color: '#6366F1' }}>
+              {businessName ? `${businessName} (Owner)` : 'Owner Response'}
+            </span>
             {respondedDate && (
               <span className="text-[10px]" style={{ color: 'var(--aurora-text-secondary)' }}>
                 · {respondedDate}
@@ -358,6 +362,7 @@ export default function CateringReviews({
               key={review.id}
               review={review}
               isVendor={isVendor}
+              businessName={businessName}
               onReply={handleReply}
               replyLoading={replyLoading}
             />

@@ -38,6 +38,9 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [reorderDate, setReorderDate] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [editAddress, setEditAddress] = useState<DeliveryAddress>({ street: '', city: '', state: '', zip: '' });
+  const [reorderQtys, setReorderQtys] = useState<Record<string, number>>({});
 
   // Subscribe to favorites
   useEffect(() => {
@@ -71,25 +74,46 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
     }
   }, [editLabel, addToast]);
 
+  const handleSaveAddress = useCallback(async (favId: string) => {
+    if (!editAddress.street.trim() || !editAddress.city.trim()) {
+      addToast('Please fill in the address', 'error');
+      return;
+    }
+    try {
+      await updateFavoriteOrder(favId, { deliveryAddress: editAddress });
+      setEditingAddressId(null);
+      addToast('Address updated', 'success', 2000);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to update address', 'error');
+    }
+  }, [editAddress, addToast]);
+
   const handleQuickReorder = useCallback(async (fav: FavoriteOrder) => {
     if (!user || !userProfile || !reorderDate) {
       addToast('Please select a delivery date', 'error');
       return;
     }
-    if (!fav.deliveryAddress?.street) {
+    const address = editingAddressId === fav.id ? editAddress : fav.deliveryAddress;
+    if (!address?.street) {
       addToast('This favorite has no saved delivery address. Please place a new order instead.', 'error');
       return;
     }
+    // Apply adjusted quantities
+    const adjustedItems = fav.items.map(item => ({
+      ...item,
+      qty: reorderQtys[item.menuItemId] ?? item.qty,
+    }));
+    const adjustedFav = { ...fav, items: adjustedItems };
     setSubmitting(true);
     try {
-      await reorderFromFavorite(fav, {
+      await reorderFromFavorite(adjustedFav, {
         customerId: user.uid,
         customerName: userProfile.name || '',
         customerEmail: userProfile.email || user.email || '',
         contactName: userProfile.name || '',
         contactPhone: userProfile.phone || '',
         eventDate: reorderDate,
-        deliveryAddress: fav.deliveryAddress,
+        deliveryAddress: address,
         headcount: fav.headcount,
       });
       addToast('Order placed! Check My Orders to track it.', 'success', 4000);
@@ -100,7 +124,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
     } finally {
       setSubmitting(false);
     }
-  }, [user, userProfile, reorderDate, addToast]);
+  }, [user, userProfile, reorderDate, reorderQtys, editAddress, editingAddressId, addToast]);
 
   // ═══════════════════ RENDER ═══════════════════
 
@@ -127,6 +151,17 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
           </p>
         </div>
       </div>
+
+      {/* Auto-save explanation */}
+      {favorites.length > 0 && (
+        <div
+          className="flex items-start gap-2 p-3 rounded-xl mb-4 text-xs"
+          style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)', color: 'var(--aurora-text-secondary)' }}
+        >
+          <Heart size={14} className="mt-0.5 flex-shrink-0" style={{ color: '#6366F1' }} />
+          <span>Your orders are automatically saved here after placement. Rename them for easy reference or use quick reorder to place again with a new date.</span>
+        </div>
+      )}
 
       {/* Empty state */}
       {favorites.length === 0 && (
@@ -233,29 +268,84 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
                     </div>
                   </div>
 
-                  {/* Delivery address */}
-                  {fav.deliveryAddress && (
+                  {/* Delivery address (editable) */}
+                  {fav.deliveryAddress && editingAddressId !== fav.id && (
                     <div className="flex items-start gap-1.5 mt-3 text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
                       <MapPin size={12} className="mt-0.5 flex-shrink-0" />
-                      <span>{fav.deliveryAddress.street}, {fav.deliveryAddress.city}, {fav.deliveryAddress.state} {fav.deliveryAddress.zip}</span>
+                      <span className="flex-1">{fav.deliveryAddress.street}, {fav.deliveryAddress.city}, {fav.deliveryAddress.state} {fav.deliveryAddress.zip}</span>
+                      <button
+                        onClick={() => { setEditingAddressId(fav.id); setEditAddress(fav.deliveryAddress!); }}
+                        className="ml-1 text-indigo-500 hover:text-indigo-700 flex-shrink-0"
+                        aria-label="Edit delivery address"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+                    </div>
+                  )}
+                  {editingAddressId === fav.id && (
+                    <div className="mt-3 p-3 rounded-xl space-y-2" style={{ backgroundColor: 'rgba(99, 102, 241, 0.04)' }}>
+                      <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>Edit Address</label>
+                      <input type="text" value={editAddress.street} onChange={(e) => setEditAddress(a => ({ ...a, street: e.target.value }))} placeholder="Street" className="w-full px-3 py-1.5 rounded-lg border text-xs" style={{ borderColor: 'var(--aurora-border)' }} />
+                      <div className="flex gap-2">
+                        <input type="text" value={editAddress.city} onChange={(e) => setEditAddress(a => ({ ...a, city: e.target.value }))} placeholder="City" className="flex-1 px-3 py-1.5 rounded-lg border text-xs" style={{ borderColor: 'var(--aurora-border)' }} />
+                        <input type="text" value={editAddress.state} onChange={(e) => setEditAddress(a => ({ ...a, state: e.target.value }))} placeholder="State" className="w-16 px-3 py-1.5 rounded-lg border text-xs" style={{ borderColor: 'var(--aurora-border)' }} />
+                        <input type="text" value={editAddress.zip} onChange={(e) => setEditAddress(a => ({ ...a, zip: e.target.value }))} placeholder="ZIP" className="w-20 px-3 py-1.5 rounded-lg border text-xs" style={{ borderColor: 'var(--aurora-border)' }} />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveAddress(fav.id)} className="px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ backgroundColor: '#6366F1' }}>Save</button>
+                        <button onClick={() => setEditingAddressId(null)} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Cancel</button>
+                      </div>
                     </div>
                   )}
 
                   {/* Reorder section */}
                   {isReordering && (
-                    <div className="mt-3 p-3 rounded-xl" style={{ backgroundColor: 'rgba(99, 102, 241, 0.04)' }}>
-                      <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
-                        Delivery Date
-                      </label>
-                      <input
-                        type="date"
-                        value={reorderDate}
-                        onChange={(e) => setReorderDate(e.target.value)}
-                        min={new Date().toISOString().slice(0, 10)}
-                        className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
-                        style={{ borderColor: 'var(--aurora-border)' }}
-                      />
-                      <div className="flex gap-2 mt-2">
+                    <div className="mt-3 p-3 rounded-xl space-y-3" style={{ backgroundColor: 'rgba(99, 102, 241, 0.04)' }}>
+                      {/* Adjust quantities */}
+                      <div>
+                        <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
+                          Adjust Quantities
+                        </label>
+                        <div className="space-y-1 mt-1">
+                          {fav.items.map((item) => {
+                            const qty = reorderQtys[item.menuItemId] ?? item.qty;
+                            return (
+                              <div key={item.menuItemId} className="flex items-center justify-between">
+                                <span className="text-xs truncate flex-1" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => setReorderQtys(prev => ({ ...prev, [item.menuItemId]: Math.max(1, qty - 1) }))}
+                                    className="w-6 h-6 flex items-center justify-center rounded border text-xs hover:bg-gray-100"
+                                    style={{ borderColor: 'var(--aurora-border)' }}
+                                  >−</button>
+                                  <span className="w-6 text-center text-xs font-medium">{qty}</span>
+                                  <button
+                                    onClick={() => setReorderQtys(prev => ({ ...prev, [item.menuItemId]: qty + 1 }))}
+                                    className="w-6 h-6 flex items-center justify-center rounded border text-xs hover:bg-gray-100"
+                                    style={{ borderColor: 'var(--aurora-border)' }}
+                                  >+</button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Delivery date */}
+                      <div>
+                        <label className="text-xs font-medium" style={{ color: 'var(--aurora-text)' }}>
+                          Delivery Date
+                        </label>
+                        <input
+                          type="date"
+                          value={reorderDate}
+                          onChange={(e) => setReorderDate(e.target.value)}
+                          min={new Date().toISOString().slice(0, 10)}
+                          className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
+                          style={{ borderColor: 'var(--aurora-border)' }}
+                        />
+                      </div>
+                      <div className="flex gap-2">
                         <button
                           onClick={() => handleQuickReorder(fav)}
                           disabled={submitting || !reorderDate}
@@ -266,7 +356,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
                           {submitting ? 'Placing...' : 'Place Order'}
                         </button>
                         <button
-                          onClick={() => { setReorderingId(null); setReorderDate(''); }}
+                          onClick={() => { setReorderingId(null); setReorderDate(''); setReorderQtys({}); }}
                           className="px-3 py-2 rounded-xl text-sm font-medium transition-colors"
                           style={{ color: 'var(--aurora-text-secondary)' }}
                         >

@@ -12,7 +12,7 @@
 import React, { useReducer, useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useModalA11y } from '@/hooks/useModalA11y';
 import {
-  ArrowLeft, ShoppingCart, ChefHat, Loader2, Store,
+  ArrowLeft, ShoppingCart, ChefHat, Loader2, Store, Search,
   Send, FileText, ClipboardList, Star, Heart, Repeat, Share2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,6 +72,7 @@ export default function CateringPage() {
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
   const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
   const [selectedFavoriteForTemplate, setSelectedFavoriteForTemplate] = useState<FavoriteOrder | null>(null);
+  const [globalSearch, setGlobalSearch] = useState('');
   const selectedQuoteRequestRef = useRef<CateringQuoteRequest | null>(null);
 
   // Vendor-switch dialog a11y (Escape + focus trap)
@@ -221,9 +222,11 @@ export default function CateringPage() {
     const orderItem: OrderItem = {
       menuItemId: item.id,
       name: item.name,
-      qty: 1,
+      qty: item.minOrderQty || 1,
       unitPrice: item.price,
       pricingType: item.pricingType,
+      ...(item.minOrderQty ? { minOrderQty: item.minOrderQty } : {}),
+      ...(item.maxOrderQty ? { maxOrderQty: item.maxOrderQty } : {}),
     };
     dispatch({
       type: 'ADD_TO_CART',
@@ -618,6 +621,27 @@ export default function CateringPage() {
             <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
               Browse caterers by cuisine type and place orders for your next event.
             </p>
+
+            {/* Global cross-category search */}
+            <div className="relative mb-4">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search all menu items across categories..."
+                value={globalSearch}
+                onChange={(e) => {
+                  setGlobalSearch(e.target.value);
+                  if (e.target.value.trim().length >= 2) {
+                    dispatch({ type: 'SET_SEARCH_QUERY', payload: e.target.value.trim() });
+                    // Load all items for cross-category search
+                    handleSelectCategory('all');
+                  }
+                }}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500/30"
+                style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text)' }}
+                aria-label="Search all catering items across categories"
+              />
+            </div>
             {allCateringBusinesses.length === 0 && !state.error ? (
               /* Category grid skeleton while business counts load */
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check } from 'lucide-react';
+import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check, Store } from 'lucide-react';
 import type { QuoteRequestItem, OrderForContext } from '@/services/cateringService';
 import { CUISINE_CATEGORIES, CUISINE_CATEGORY_KEYS } from '@/constants/cateringFoodItems';
 import type { CuisineFoodItem } from '@/constants/cateringFoodItems';
@@ -696,65 +696,18 @@ export default function RequestForPriceForm({
         />
       </section>
 
-      {/* Section 5: Target specific caterers (optional)
-       * COMMENTED OUT — We don't want to reveal caterer names until responses come back.
-       * Keeping the code for potential repurposing later.
-       *
-      {businesses.length > 0 && (
-        <section
-          className="rounded-2xl p-5 border"
-          style={{
-            backgroundColor: 'var(--aurora-surface, #fff)',
-            borderColor: 'var(--aurora-border)',
-          }}
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-base font-bold" style={{ color: 'var(--aurora-text)' }}>
-              Target Caterers
-            </h2>
-            <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>Optional</span>
-          </div>
-          <p className="text-xs mb-3" style={{ color: 'var(--aurora-text-secondary)' }}>
-            Leave empty to broadcast to all {cuisineCategory} caterers, or select specific ones.
-          </p>
-          <div className="space-y-2">
-            {businesses.map((biz: any) => {
-              const selected = rfpForm.targetBusinessIds.includes(biz.id);
-              return (
-                <button
-                  key={biz.id}
-                  onClick={() => {
-                    const next = selected
-                      ? rfpForm.targetBusinessIds.filter((id) => id !== biz.id)
-                      : [...rfpForm.targetBusinessIds, biz.id];
-                    onUpdateForm({ targetBusinessIds: next });
-                  }}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors"
-                  style={{
-                    backgroundColor: selected ? 'rgba(99,102,241,0.06)' : 'var(--aurora-bg)',
-                    borderColor: selected ? '#6366F1' : 'var(--aurora-border)',
-                  }}
-                >
-                  <div
-                    className="w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0"
-                    style={{
-                      borderColor: selected ? '#6366F1' : 'var(--aurora-border)',
-                      backgroundColor: selected ? '#6366F1' : 'transparent',
-                    }}
-                  >
-                    {selected && <span className="text-white text-xs font-bold">✓</span>}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>{biz.name}</p>
-                    {biz.heritage && <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>{biz.heritage}</p>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-      */}
+      {/* Vendor targeting info */}
+      <div
+        className="flex items-start gap-2 p-3 rounded-xl text-xs"
+        style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)', color: 'var(--aurora-text-secondary)' }}
+      >
+        <Store size={14} className="mt-0.5 flex-shrink-0" style={{ color: '#6366F1' }} />
+        <span>
+          Your request will be sent to <strong>all {cuisineCategory || ''} caterers</strong> on the platform.
+          Vendor identities remain private until they respond with quotes.
+          You can then compare and choose the best option.
+        </span>
+      </div>
 
       {/* Footer Actions */}
       <div

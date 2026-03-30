@@ -202,8 +202,11 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
           className="rounded-2xl border p-4 mb-4"
           style={{ backgroundColor: 'rgba(99,102,241,0.04)', borderColor: 'rgba(99,102,241,0.15)' }}
         >
-          <p className="text-xs font-medium mb-2" style={{ color: 'var(--aurora-text)' }}>
+          <p className="text-xs font-medium mb-1" style={{ color: 'var(--aurora-text)' }}>
             Enter a template share code to load it
+          </p>
+          <p className="text-[10px] mb-2" style={{ color: 'var(--aurora-text-muted)' }}>
+            Share codes are permanent and unique to each template. The creator can delete the template to revoke access.
           </p>
           <div className="flex gap-2">
             <input

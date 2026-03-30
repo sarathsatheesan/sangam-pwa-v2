@@ -49,6 +49,8 @@ export interface OrderItem {
   unitPrice: number;          // cents
   pricingType: string;
   specialInstructions?: string;
+  minOrderQty?: number;
+  maxOrderQty?: number;
 }
 
 export interface DeliveryAddress {
@@ -117,12 +119,12 @@ export async function fetchMenuItemsByBusiness(businessId: string): Promise<Cate
 }
 
 export async function fetchMenuItemsByCategory(cuisineCategory: string): Promise<CateringMenuItem[]> {
-  // First get all catering-enabled businesses in this category
-  const bizQ = query(
-    collection(db, 'businesses'),
-    where('category', '==', cuisineCategory),
+  // First get all catering-enabled businesses (optionally filtered by category)
+  const bizConstraints = [
+    ...(cuisineCategory !== 'all' ? [where('category', '==', cuisineCategory)] : []),
     where('isCateringEnabled', '==', true),
-  );
+  ];
+  const bizQ = query(collection(db, 'businesses'), ...bizConstraints);
   const bizSnap = await getDocs(bizQ);
   const bizIds = bizSnap.docs.map(d => d.id);
 
@@ -307,12 +309,12 @@ export async function fetchCateringBusinesses(): Promise<any[]> {
 }
 
 export async function fetchCateringBusinessesByCategory(category: string): Promise<any[]> {
-  const q = query(
-    collection(db, 'businesses'),
-    where('category', '==', category),
+  const constraints = [
+    ...(category !== 'all' ? [where('category', '==', category)] : []),
     where('isCateringEnabled', '==', true),
     where('registrationStatus', '==', 'approved'),
-  );
+  ];
+  const q = query(collection(db, 'businesses'), ...constraints);
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }

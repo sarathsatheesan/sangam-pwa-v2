@@ -99,13 +99,12 @@ export default function CateringCart({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 border border-gray-200 rounded-lg w-fit">
                         <button
-                          onClick={() =>
-                            onUpdateQty(
-                              item.menuItemId,
-                              Math.max(1, item.qty - 1)
-                            )
-                          }
-                          className="p-1.5 hover:bg-gray-100 transition-colors"
+                          onClick={() => {
+                            const minQty = item.minOrderQty || 1;
+                            onUpdateQty(item.menuItemId, Math.max(minQty, item.qty - 1));
+                          }}
+                          disabled={item.qty <= (item.minOrderQty || 1)}
+                          className="p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-30"
                           aria-label="Decrease quantity"
                         >
                           <Minus className="w-4 h-4 text-gray-600" />
@@ -117,12 +116,20 @@ export default function CateringCart({
                           onClick={() =>
                             onUpdateQty(item.menuItemId, item.qty + 1)
                           }
-                          className="p-1.5 hover:bg-gray-100 transition-colors"
+                          disabled={!!item.maxOrderQty && item.qty >= item.maxOrderQty}
+                          className="p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-30"
                           aria-label="Increase quantity"
                         >
                           <Plus className="w-4 h-4 text-gray-600" />
                         </button>
                       </div>
+                      {(item.minOrderQty || item.maxOrderQty) && (
+                        <p className="text-[10px] text-gray-400 mt-1">
+                          {item.minOrderQty ? `Min: ${item.minOrderQty}` : ''}
+                          {item.minOrderQty && item.maxOrderQty ? ' · ' : ''}
+                          {item.maxOrderQty ? `Max: ${item.maxOrderQty}` : ''}
+                        </p>
+                      )}
 
                       <div className="text-right">
                         <p className="text-sm text-gray-600">
@@ -139,11 +146,25 @@ export default function CateringCart({
 
               {/* Footer */}
               <div className="sticky bottom-0 border-t border-gray-200 bg-white px-6 py-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="text-lg font-semibold text-gray-900">
-                    {formatPrice(total)}
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Subtotal</span>
+                    <span className="text-gray-900">{formatPrice(total)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Est. tax (8.25%)</span>
+                    <span className="text-gray-900">{formatPrice(Math.round(total * 0.0825))}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Delivery</span>
+                    <span className="text-green-600 font-medium">Free</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-gray-100">
+                    <span className="font-semibold text-gray-900">Est. Total</span>
+                    <span className="text-lg font-semibold text-gray-900">
+                      {formatPrice(total + Math.round(total * 0.0825))}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex gap-3">

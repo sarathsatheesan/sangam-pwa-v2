@@ -68,10 +68,10 @@ export default function CateringItemList({
         item.name.toLowerCase().includes(searchLower) ||
         (item.description?.toLowerCase().includes(searchLower) ?? false);
 
-      // Dietary filter (all selected tags must be present)
+      // Dietary filter (OR logic — item matches if it has ANY of the selected tags)
       const matchesDietary =
         dietaryFilter.length === 0 ||
-        dietaryFilter.every(tag =>
+        dietaryFilter.some(tag =>
           item.dietaryTags?.includes(tag) ?? false
         );
 

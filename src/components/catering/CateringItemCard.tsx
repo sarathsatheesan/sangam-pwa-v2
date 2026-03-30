@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Plus, Utensils } from 'lucide-react';
+import { Plus, Utensils, Users } from 'lucide-react';
 import type { CateringMenuItem } from '@/services/cateringService';
 import { formatPrice } from '@/services/cateringService';
 
@@ -32,8 +32,10 @@ export default function CateringItemCard({
     flat_rate: 'flat rate',
   }[item.pricingType] || '/ person';
 
+  const isUnavailable = item.available === false;
+
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-200 hover:shadow-md" role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}`}>
+    <div className={`flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-200 ${isUnavailable ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isUnavailable ? ' — currently unavailable' : ''}`}>
       {/* Photo area */}
       <div className="relative h-40 w-full bg-gray-100">
         {item.photoUrl ? (
@@ -59,6 +61,15 @@ export default function CateringItemCard({
             {item.category}
           </span>
         </div>
+
+        {/* Unavailable overlay */}
+        {isUnavailable && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+            <span className="rounded-full bg-gray-800 px-3 py-1 text-xs font-semibold text-white">
+              Currently Unavailable
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Content area */}
@@ -100,6 +111,12 @@ export default function CateringItemCard({
               {formatPrice(item.price)}
             </span>
             <span className="text-xs text-gray-500">{pricingLabel}</span>
+            {item.servesCount && (
+              <span className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                <Users size={10} aria-hidden="true" />
+                Serves {item.servesCount}
+              </span>
+            )}
           </div>
 
           <button
