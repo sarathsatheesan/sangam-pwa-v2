@@ -375,7 +375,7 @@ export default function CateringPage() {
   // View title
   const getTitle = () => {
     switch (state.view) {
-      case 'categories': return 'Catering';
+      case 'categories': return '';
       case 'items': return state.selectedCategory || 'Menu';
       case 'checkout': return 'Checkout';
       case 'rfp': return 'Request for Price';
@@ -433,12 +433,14 @@ export default function CateringPage() {
               <ArrowLeft size={20} style={{ color: 'var(--aurora-text)' }} />
             </button>
           )}
-          <div className="flex items-center gap-2">
-            <ChefHat size={22} style={{ color: 'var(--aurora-primary, #6366F1)' }} />
-            <h1 className="text-lg font-bold" style={{ color: 'var(--aurora-text, #1E2132)' }}>
-              {getTitle()}
-            </h1>
-          </div>
+          {getTitle() && (
+            <div className="flex items-center gap-2">
+              <ChefHat size={22} style={{ color: 'var(--aurora-primary, #6366F1)' }} />
+              <h1 className="text-lg font-bold" style={{ color: 'var(--aurora-text, #1E2132)' }}>
+                {getTitle()}
+              </h1>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -704,6 +706,7 @@ export default function CateringPage() {
               sortOrder={state.sortOrder}
               onSearchChange={(q) => dispatch({ type: 'SET_SEARCH_QUERY', payload: q })}
               onDietaryToggle={(tag) => dispatch({ type: 'TOGGLE_DIETARY_FILTER', payload: tag })}
+              onClearDietaryFilter={() => dispatch({ type: 'CLEAR_DIETARY_FILTER' })}
               onSortChange={(sort) => dispatch({ type: 'SET_SORT_ORDER', payload: sort })}
             />
           </div>
@@ -997,6 +1000,21 @@ export default function CateringPage() {
         onClear={() => dispatch({ type: 'CLEAR_CART' })}
         onCheckout={() => {
           dispatch({ type: 'TOGGLE_CART' });
+          // Auto-populate checkout form from user profile
+          if (userProfile) {
+            const prefill: Record<string, any> = {};
+            if (!state.orderForm.contactName && userProfile.name) prefill.contactName = userProfile.name;
+            if (!state.orderForm.contactPhone && userProfile.phone) prefill.contactPhone = userProfile.phone;
+            if (!state.orderForm.deliveryAddress?.city && userProfile.city) {
+              prefill.deliveryAddress = {
+                ...(state.orderForm.deliveryAddress || { street: '', city: '', state: '', zip: '' }),
+                city: userProfile.city,
+              };
+            }
+            if (Object.keys(prefill).length > 0) {
+              dispatch({ type: 'UPDATE_ORDER_FORM', payload: prefill });
+            }
+          }
           dispatch({ type: 'SET_VIEW', payload: 'checkout' });
         }}
       />

@@ -109,9 +109,21 @@ export default function CateringCart({
                         >
                           <Minus className="w-4 h-4 text-gray-600" />
                         </button>
-                        <span className="w-8 text-center font-medium text-gray-900">
-                          {item.qty}
-                        </span>
+                        <input
+                          type="number"
+                          value={item.qty}
+                          min={item.minOrderQty || 1}
+                          max={item.maxOrderQty || undefined}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (isNaN(val) || val < 1) return;
+                            const minQty = item.minOrderQty || 1;
+                            const maxQty = item.maxOrderQty || Infinity;
+                            onUpdateQty(item.menuItemId, Math.min(maxQty, Math.max(minQty, val)));
+                          }}
+                          className="w-12 text-center font-medium text-gray-900 bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          aria-label={`Quantity for ${item.name}`}
+                        />
                         <button
                           onClick={() =>
                             onUpdateQty(item.menuItemId, item.qty + 1)

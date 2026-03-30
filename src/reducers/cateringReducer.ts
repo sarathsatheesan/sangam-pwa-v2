@@ -186,6 +186,7 @@ export type CateringAction =
   // Search & filtering
   | { type: 'SET_SEARCH_QUERY'; payload: string }
   | { type: 'TOGGLE_DIETARY_FILTER'; payload: string }
+  | { type: 'CLEAR_DIETARY_FILTER' }
   | { type: 'SET_SORT_ORDER'; payload: CateringState['sortOrder'] }
 
   // RFP (Phase 2)
@@ -348,6 +349,9 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
       }
       return { ...state, dietaryFilter: nextFilter };
     }
+
+    case 'CLEAR_DIETARY_FILTER':
+      return { ...state, dietaryFilter: [] };
 
     case 'SET_SORT_ORDER':
       return { ...state, sortOrder: action.payload };

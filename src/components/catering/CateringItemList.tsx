@@ -23,6 +23,7 @@ interface CateringItemListProps {
   sortOrder?: SortOrder;
   onSearchChange: (q: string) => void;
   onDietaryToggle: (tag: string) => void;
+  onClearDietaryFilter?: () => void;
   onSortChange?: (sort: SortOrder) => void;
 }
 
@@ -43,6 +44,7 @@ export default function CateringItemList({
   sortOrder = 'default',
   onSearchChange,
   onDietaryToggle,
+  onClearDietaryFilter,
   onSortChange,
 }: CateringItemListProps): ReturnType<FC> {
   // Create a map for quick business lookup
@@ -169,6 +171,17 @@ export default function CateringItemList({
                 </button>
               );
             })}
+
+            {/* Clear all filters */}
+            {dietaryFilter.length > 0 && onClearDietaryFilter && (
+              <button
+                onClick={onClearDietaryFilter}
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-all duration-200"
+                aria-label="Clear all dietary filters"
+              >
+                Clear
+              </button>
+            )}
           </div>
 
           {/* Sort dropdown */}
