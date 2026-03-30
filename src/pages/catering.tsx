@@ -517,27 +517,47 @@ export default function CateringPage() {
             </button>
           )}
 
-          {/* Phase 6 pills — Favorites dropdown */}
+          {/* Phase 6 pills — Favorites */}
           {user && (
-            <div className="relative group">
-              <button
-                onClick={() => {
-                  if (state.view === 'favorites') {
-                    dispatch({ type: 'SET_VIEW', payload: 'categories' });
-                  } else {
-                    dispatch({ type: 'SET_VIEW', payload: 'favorites' });
-                  }
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: ['favorites', 'recurring', 'templates'].includes(state.view) ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
-                  color: ['favorites', 'recurring', 'templates'].includes(state.view) ? '#fff' : 'var(--aurora-text-secondary)',
-                }}
-              >
-                <Heart size={16} />
-                Saved
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                if (state.view === 'favorites') {
+                  dispatch({ type: 'SET_VIEW', payload: 'categories' });
+                } else {
+                  dispatch({ type: 'SET_VIEW', payload: 'favorites' });
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              style={{
+                backgroundColor: ['favorites', 'recurring'].includes(state.view) ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                color: ['favorites', 'recurring'].includes(state.view) ? '#fff' : 'var(--aurora-text-secondary)',
+              }}
+            >
+              <Heart size={16} />
+              Saved
+            </button>
+          )}
+
+          {/* Phase 6 pills — Templates */}
+          {user && (
+            <button
+              onClick={() => {
+                if (state.view === 'templates') {
+                  dispatch({ type: 'SET_VIEW', payload: 'categories' });
+                } else {
+                  setSelectedFavoriteForTemplate(null);
+                  dispatch({ type: 'SET_VIEW', payload: 'templates' });
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              style={{
+                backgroundColor: state.view === 'templates' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                color: state.view === 'templates' ? '#fff' : 'var(--aurora-text-secondary)',
+              }}
+            >
+              <ClipboardList size={16} />
+              Templates
+            </button>
           )}
 
           {/* Vendor pill — always visible when user owns a catering business */}
