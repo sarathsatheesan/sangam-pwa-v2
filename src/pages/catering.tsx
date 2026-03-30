@@ -9,7 +9,8 @@
 //   - Vendor dashboard (for business owners)
 // ═════════════════════════════════════════════════════════════════════════════════
 
-import React, { useReducer, useCallback, useEffect, useState, useRef } from 'react';
+import React, { useReducer, useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store,
   Send, FileText, ClipboardList, Star, Heart, Repeat, Share2,
@@ -72,6 +73,17 @@ export default function CateringPage() {
   const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
   const [selectedFavoriteForTemplate, setSelectedFavoriteForTemplate] = useState<FavoriteOrder | null>(null);
   const selectedQuoteRequestRef = useRef<CateringQuoteRequest | null>(null);
+
+  // Vendor-switch dialog a11y (Escape + focus trap)
+  const vendorSwitchClose = useCallback(
+    () => dispatch({ type: 'CANCEL_VENDOR_SWITCH' }),
+    [],
+  );
+  const { modalRef: vendorSwitchRef, handleKeyDown: vendorSwitchKeyDown } = useModalA11y(
+    !!state.pendingVendorSwitch,
+    vendorSwitchClose,
+  );
+
   // Keep ref in sync with state so real-time subscription callback can access latest value
   useEffect(() => {
     selectedQuoteRequestRef.current = selectedQuoteRequest;
@@ -968,6 +980,8 @@ export default function CateringPage() {
       {/* Vendor switch confirmation dialog */}
       {state.pendingVendorSwitch && (
         <div
+          ref={vendorSwitchRef}
+          onKeyDown={vendorSwitchKeyDown}
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"

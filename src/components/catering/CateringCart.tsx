@@ -1,6 +1,7 @@
 import { X, ShoppingCart, Trash2, Minus, Plus } from 'lucide-react';
 import type { OrderItem } from '@/services/cateringService';
 import { calculateOrderTotal, formatPrice } from '@/services/cateringService';
+import { useModalA11y } from '@/hooks/useModalA11y';
 
 interface CateringCartProps {
   items: OrderItem[];
@@ -25,6 +26,7 @@ export default function CateringCart({
 }: CateringCartProps) {
   const isEmpty = items.length === 0;
   const total = calculateOrderTotal(items);
+  const { modalRef, handleKeyDown } = useModalA11y(isOpen, onClose);
 
   return (
     <>
@@ -39,6 +41,8 @@ export default function CateringCart({
 
       {/* Slide-out Panel */}
       <div
+        ref={modalRef}
+        onKeyDown={handleKeyDown}
         className={`fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}

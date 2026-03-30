@@ -5,7 +5,8 @@
 // Phase 3: Polish & Admin
 // ═════════════════════════════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, Clock, CheckCircle2, Package, Truck, XCircle, MapPin,
   User, Phone, Calendar, Users, ChevronDown, ChevronUp, Loader2,
@@ -66,6 +67,14 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
   const [cancelReason, setCancelReason] = useState('');
   const [cancelOtherText, setCancelOtherText] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+
+  const cancelDialogClose = useCallback(() => {
+    if (!cancelSubmitting) setCancellingOrderId(null);
+  }, [cancelSubmitting]);
+  const { modalRef: cancelModalRef, handleKeyDown: cancelKeyDown } = useModalA11y(
+    !!cancellingOrderId,
+    cancelDialogClose,
+  );
 
   const handleCancelOrder = async () => {
     if (!cancellingOrderId) return;
@@ -330,7 +339,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
 
       {/* Cancel order dialog */}
       {cancellingOrderId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">
+        <div ref={cancelModalRef} onKeyDown={cancelKeyDown} className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">
           <div className="absolute inset-0 bg-black/40" onClick={() => !cancelSubmitting && setCancellingOrderId(null)} />
           <div className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}>
             <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--aurora-text)' }}>Cancel Order</h3>

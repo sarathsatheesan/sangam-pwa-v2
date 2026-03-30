@@ -3,7 +3,8 @@
 // Business owners view incoming catering orders and manage them.
 // ═════════════════════════════════════════════════════════════════════════════════
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   Package, Clock, CheckCircle2, XCircle, ChevronDown, ChevronUp,
   User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck, Ban,
@@ -64,6 +65,14 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const [cancelReason, setCancelReason] = useState('');
   const [cancelOtherText, setCancelOtherText] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+
+  const cancelDialogClose = useCallback(() => {
+    if (!cancelSubmitting) setCancellingOrderId(null);
+  }, [cancelSubmitting]);
+  const { modalRef: cancelModalRef, handleKeyDown: cancelKeyDown } = useModalA11y(
+    !!cancellingOrderId,
+    cancelDialogClose,
+  );
 
   const handleCancelOrder = async () => {
     if (!cancellingOrderId) return;
@@ -393,7 +402,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
       )}
       {/* Cancel order dialog */}
       {cancellingOrderId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">
+        <div ref={cancelModalRef} onKeyDown={cancelKeyDown} className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">
           <div className="absolute inset-0 bg-black/40" onClick={() => !cancelSubmitting && setCancellingOrderId(null)} />
           <div className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}>
             <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--aurora-text)' }}>Cancel Order</h3>
