@@ -5,22 +5,26 @@
 // Tier 2: Calendar-based (specific days of week, day of month, skip dates)
 // ═════════════════════════════════════════════════════════════════════════════════
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ArrowLeft, Calendar, Clock, Loader2, Pause, Play, Trash2,
   Plus, ChevronDown, ChevronUp, Repeat, AlertCircle, Check,
-  MapPin, Users, ShoppingCart, Settings,
+  MapPin, Users, ShoppingCart, Settings, Pencil, SkipForward,
+  DollarSign, Bell, Undo2,
 } from 'lucide-react';
 import MultiDatePicker from '@/components/shared/MultiDatePicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import type { FavoriteOrder, RecurringOrder, RecurrenceSchedule, RecurrenceInterval, DeliveryAddress } from '@/services/cateringService';
+import type { FavoriteOrder, RecurringOrder, RecurrenceSchedule, RecurrenceInterval, DeliveryAddress, OccurrenceOverride, OrderItem } from '@/services/cateringService';
 import {
   subscribeToRecurringOrders,
   createRecurringOrder,
   updateRecurringOrder,
   deleteRecurringOrder,
   toggleRecurringOrder,
+  setOccurrenceOverride,
+  clearOccurrenceOverride,
+  estimateMonthlyRecurringCost,
   computeNextRunDate,
   formatPrice,
   calculateOrderTotal,
@@ -47,6 +51,13 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(!!prefillFromFavorite);
   const [submitting, setSubmitting] = useState(false);
+
+  // ── Per-occurrence editing state ──
+  const [editingOccurrenceId, setEditingOccurrenceId] = useState<string | null>(null);
+  const [occItems, setOccItems] = useState<OrderItem[]>([]);
+  const [occHeadcount, setOccHeadcount] = useState<number>(0);
+  const [occInstructions, setOccInstructions] = useState('');
+  const [savingOcc, setSavingOcc] = useState(false);
 
   // ── Create form state ──
   const [scheduleMode, setScheduleMode] = useState<'simple' | 'calendar'>('simple');
@@ -173,6 +184,60 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
       addToast(err.message || 'Failed to delete', 'error');
     }
   }, [addToast]);
+
+  // ── Per-occurrence handlers ──
+  const startEditOccurrence = useCallback((rec: RecurringOrder) => {
+    const override = rec.nextOccurrenceOverride;
+    setEditingOccurrenceId(rec.id);
+    setOccItems(override?.items || [...rec.items]);
+    setOccHeadcount(override?.headcount || rec.headcount || 0);
+    setOccInstructions(override?.specialInstructions || rec.specialInstructions || '');
+  }, []);
+
+  const saveOccurrenceOverride = useCallback(async (rec: RecurringOrder) => {
+    setSavingOcc(true);
+    try {
+      await setOccurrenceOverride(rec.id, {
+        forDate: rec.nextRunDate,
+        items: occItems,
+        headcount: occHeadcount || undefined,
+        specialInstructions: occInstructions || undefined,
+      });
+      addToast('Next order modified. Changes apply only to this occurrence.', 'success', 4000);
+      setEditingOccurrenceId(null);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to save changes', 'error');
+    } finally {
+      setSavingOcc(false);
+    }
+  }, [occItems, occHeadcount, occInstructions, addToast]);
+
+  const skipNextOccurrence = useCallback(async (rec: RecurringOrder) => {
+    try {
+      await setOccurrenceOverride(rec.id, { forDate: rec.nextRunDate, skip: true });
+      addToast(`Next order on ${rec.nextRunDate} will be skipped.`, 'success', 3000);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to skip', 'error');
+    }
+  }, [addToast]);
+
+  const revertOverride = useCallback(async (recId: string) => {
+    try {
+      await clearOccurrenceOverride(recId);
+      addToast('Next order reverted to default.', 'success', 2000);
+      setEditingOccurrenceId(null);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to revert', 'error');
+    }
+  }, [addToast]);
+
+  const updateOccItemQty = useCallback((idx: number, qty: number) => {
+    setOccItems((prev) => prev.map((item, i) => i === idx ? { ...item, qty: Math.max(1, qty) } : item));
+  }, []);
+
+  const removeOccItem = useCallback((idx: number) => {
+    setOccItems((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
 
   // ── Describe schedule in human-readable text ──
   const describeSchedule = (sched: RecurrenceSchedule): string => {
@@ -450,16 +515,142 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
 
               {isExpanded && (
                 <div className="px-4 pb-4 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
-                  {/* Items */}
-                  <div className="mt-3 space-y-1">
-                    <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--aurora-text-muted)' }}>Items</p>
-                    {rec.items.map((item, i) => (
-                      <div key={i} className="flex justify-between text-xs py-0.5">
-                        <span style={{ color: 'var(--aurora-text)' }}>{item.qty}x {item.name}</span>
-                        <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * item.qty)}</span>
-                      </div>
-                    ))}
+                  {/* ── Billing projection (#25) ── */}
+                  <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg" style={{ backgroundColor: 'rgba(5,150,105,0.06)' }}>
+                    <DollarSign size={14} style={{ color: '#059669' }} />
+                    <div>
+                      <p className="text-xs font-medium" style={{ color: '#059669' }}>
+                        Est. {formatPrice(estimateMonthlyRecurringCost(rec))}/month
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>
+                        Based on {formatPrice(total)}/order × schedule frequency
+                      </p>
+                    </div>
                   </div>
+
+                  {/* ── Next occurrence override banner ── */}
+                  {rec.nextOccurrenceOverride && (
+                    <div
+                      className="mt-3 flex items-center justify-between p-2.5 rounded-lg"
+                      style={{ backgroundColor: rec.nextOccurrenceOverride.skip ? '#FEF3C7' : 'rgba(99,102,241,0.06)' }}
+                    >
+                      <div className="flex items-center gap-2">
+                        {rec.nextOccurrenceOverride.skip ? (
+                          <>
+                            <SkipForward size={14} style={{ color: '#D97706' }} />
+                            <p className="text-xs font-medium" style={{ color: '#92400E' }}>
+                              Next order ({rec.nextRunDate}) will be skipped
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Pencil size={14} style={{ color: '#6366F1' }} />
+                            <p className="text-xs font-medium" style={{ color: '#6366F1' }}>
+                              Next order ({rec.nextOccurrenceOverride.forDate}) has modifications
+                            </p>
+                          </>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => revertOverride(rec.id)}
+                        className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg font-medium"
+                        style={{ color: 'var(--aurora-text-secondary)' }}
+                      >
+                        <Undo2 size={10} /> Revert
+                      </button>
+                    </div>
+                  )}
+
+                  {/* ── Push notification reminder (#26) ── */}
+                  {rec.active && rec.nextRunDate && (
+                    <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg" style={{ backgroundColor: 'rgba(99,102,241,0.04)' }}>
+                      <Bell size={14} style={{ color: '#6366F1' }} />
+                      <p className="text-[11px]" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        You'll receive a push notification 24 hours before the next order on <strong>{rec.nextRunDate}</strong>
+                      </p>
+                    </div>
+                  )}
+
+                  {/* ── Per-occurrence edit form (#24) ── */}
+                  {editingOccurrenceId === rec.id ? (
+                    <div className="mt-3 space-y-3 p-3 rounded-xl border" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.02)' }}>
+                      <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>
+                        Edit next order ({rec.nextRunDate}) only
+                      </p>
+                      {/* Editable items */}
+                      <div className="space-y-1.5">
+                        {occItems.map((item, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="1"
+                              value={occItems[i].qty}
+                              onChange={(e) => updateOccItemQty(i, parseInt(e.target.value) || 1)}
+                              className="w-14 text-center rounded-lg border px-2 py-1 text-xs"
+                              style={{ borderColor: 'var(--aurora-border)' }}
+                            />
+                            <span className="flex-1 text-xs truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
+                            <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * occItems[i].qty)}</span>
+                            <button onClick={() => removeOccItem(i)} className="p-1 rounded hover:bg-red-50">
+                              <Trash2 size={12} style={{ color: '#EF4444' }} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Headcount */}
+                      <div className="flex items-center gap-2">
+                        <Users size={12} style={{ color: 'var(--aurora-text-muted)' }} />
+                        <label className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>Headcount:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={occHeadcount || ''}
+                          onChange={(e) => setOccHeadcount(parseInt(e.target.value) || 0)}
+                          className="w-16 rounded-lg border px-2 py-1 text-xs"
+                          style={{ borderColor: 'var(--aurora-border)' }}
+                        />
+                      </div>
+                      {/* Special instructions */}
+                      <textarea
+                        value={occInstructions}
+                        onChange={(e) => setOccInstructions(e.target.value)}
+                        placeholder="Special instructions for this order..."
+                        rows={2}
+                        className="w-full rounded-lg border px-3 py-2 text-xs outline-none"
+                        style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingOccurrenceId(null)}
+                          className="flex-1 px-3 py-1.5 rounded-xl text-xs font-medium border"
+                          style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => saveOccurrenceOverride(rec)}
+                          disabled={savingOcc || occItems.length === 0}
+                          className="flex-1 px-3 py-1.5 rounded-xl text-xs font-medium text-white disabled:opacity-50"
+                          style={{ backgroundColor: '#6366F1' }}
+                        >
+                          {savingOcc ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : 'Save for Next Order'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Items */}
+                      <div className="mt-3 space-y-1">
+                        <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--aurora-text-muted)' }}>Items</p>
+                        {rec.items.map((item, i) => (
+                          <div key={i} className="flex justify-between text-xs py-0.5">
+                            <span style={{ color: 'var(--aurora-text)' }}>{item.qty}x {item.name}</span>
+                            <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * item.qty)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
 
                   {/* Schedule details */}
                   <div className="mt-3 p-2 rounded-lg" style={{ backgroundColor: 'rgba(99,102,241,0.04)' }}>
@@ -485,7 +676,27 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
                   )}
 
                   {/* Actions */}
-                  <div className="flex gap-2 mt-3">
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {rec.active && editingOccurrenceId !== rec.id && (
+                      <>
+                        <button
+                          onClick={() => startEditOccurrence(rec)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border"
+                          style={{ color: '#6366F1', borderColor: '#6366F1' }}
+                        >
+                          <Pencil size={12} />
+                          Edit Next
+                        </button>
+                        <button
+                          onClick={() => skipNextOccurrence(rec)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border"
+                          style={{ color: '#D97706', borderColor: '#D97706' }}
+                        >
+                          <SkipForward size={12} />
+                          Skip Next
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => handleToggle(rec)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border"

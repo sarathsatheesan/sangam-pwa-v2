@@ -3,6 +3,7 @@ import {
   Star, Clock, DollarSign, CheckCircle2, XCircle, Check,
   ChevronDown, ChevronUp, ShieldCheck, Loader2, ArrowLeft,
   MessageSquare, Package, Square, CheckSquare, AlertCircle,
+  HelpCircle, X,
 } from 'lucide-react';
 import { notifyQuoteAccepted } from '@/services/notificationService';
 import type { CateringQuoteRequest, CateringQuoteResponse, ItemAssignment } from '@/services/cateringService';
@@ -34,6 +35,22 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
   // Item-level selection: Map<responseId, Set<itemName>>
   const [selectedItems, setSelectedItems] = useState<Record<string, Set<string>>>({});
+
+  // ── RFQ Walkthrough (onboarding) ──
+  const WALKTHROUGH_KEY = 'ethnicity_rfq_walkthrough_seen';
+  const [walkthroughStep, setWalkthroughStep] = useState(() => {
+    try { return localStorage.getItem(WALKTHROUGH_KEY) ? -1 : 0; } catch { return 0; }
+  });
+  const dismissWalkthrough = () => {
+    setWalkthroughStep(-1);
+    try { localStorage.setItem(WALKTHROUGH_KEY, '1'); } catch {}
+  };
+  const walkthroughSteps = [
+    { title: 'Compare Vendor Quotes', desc: 'Multiple caterers will respond with their prices. Expand each card to see quoted items, pricing, and estimated prep time.' },
+    { title: 'Pick & Choose Items', desc: 'You don\'t have to accept everything from one vendor. Select specific items from each caterer using the checkboxes.' },
+    { title: 'Mix & Match Vendors', desc: 'Assign different items to different vendors — e.g., appetizers from one caterer, mains from another. The progress tracker at the top shows your coverage.' },
+    { title: 'Finalize Your Order', desc: 'Once all items are assigned, finalize the order. Your contact details are only shared with the vendors you choose.' },
+  ];
 
   useEffect(() => {
     const unsub = subscribeToQuoteResponses(quoteRequest.id, setResponses);
@@ -249,6 +266,59 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
             : 'Your identity is hidden. Only your delivery city is visible to caterers. Select specific items to accept from each vendor.'}
         </p>
       </div>
+
+      {/* ── RFQ Walkthrough ── */}
+      {walkthroughStep >= 0 && (
+        <div
+          className="relative rounded-2xl border overflow-hidden"
+          style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.04)' }}
+        >
+          <div className="flex items-start gap-3 p-4">
+            <HelpCircle size={20} className="flex-shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+            <div className="flex-1">
+              <p className="text-sm font-semibold mb-1" style={{ color: '#6366F1' }}>
+                {walkthroughSteps[walkthroughStep].title}
+              </p>
+              <p className="text-xs leading-relaxed" style={{ color: 'var(--aurora-text-secondary)' }}>
+                {walkthroughSteps[walkthroughStep].desc}
+              </p>
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex gap-1.5">
+                  {walkthroughSteps.map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-1.5 rounded-full transition-all"
+                      style={{
+                        width: i === walkthroughStep ? 20 : 8,
+                        backgroundColor: i === walkthroughStep ? '#6366F1' : 'rgba(99,102,241,0.25)',
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={dismissWalkthrough}
+                    className="text-[11px] px-2.5 py-1 rounded-lg"
+                    style={{ color: 'var(--aurora-text-muted)' }}
+                  >
+                    Skip
+                  </button>
+                  <button
+                    onClick={() => walkthroughStep < walkthroughSteps.length - 1 ? setWalkthroughStep(walkthroughStep + 1) : dismissWalkthrough()}
+                    className="text-[11px] px-3 py-1 rounded-lg font-medium text-white"
+                    style={{ backgroundColor: '#6366F1' }}
+                  >
+                    {walkthroughStep < walkthroughSteps.length - 1 ? 'Next' : 'Got it'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button onClick={dismissWalkthrough} className="p-1 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0">
+              <X size={14} style={{ color: 'var(--aurora-text-muted)' }} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Item assignment progress tracker */}
       {totalRequestItems > 0 && (

@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check, Store } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check, Store, TrendingUp, Info } from 'lucide-react';
 import type { QuoteRequestItem, OrderForContext } from '@/services/cateringService';
 import { CUISINE_CATEGORIES, CUISINE_CATEGORY_KEYS } from '@/constants/cateringFoodItems';
 import type { CuisineFoodItem } from '@/constants/cateringFoodItems';
@@ -48,6 +48,21 @@ const PRICING_TYPES: Array<{ value: QuoteRequestItem['pricingType']; label: stri
   { value: 'per_tray', label: 'Per Tray' },
   { value: 'flat_rate', label: 'Flat Rate' },
 ];
+
+// ── Market price guidance (approximate ranges for common catering) ──
+const PRICE_GUIDANCE: Record<string, { perPerson: [number, number]; trayServes: string; note: string }> = {
+  indian: { perPerson: [18, 35], trayServes: '8–12', note: 'Includes appetizer, 2 mains, rice, naan, dessert' },
+  chinese: { perPerson: [15, 30], trayServes: '8–10', note: 'Family-style trays with 3–4 dishes + rice' },
+  mexican: { perPerson: [14, 28], trayServes: '10–12', note: 'Taco/burrito bar with proteins, sides, and salsa' },
+  italian: { perPerson: [16, 32], trayServes: '8–10', note: 'Pasta trays, salad, garlic bread, dessert' },
+  thai: { perPerson: [16, 30], trayServes: '8–10', note: 'Curry, stir-fry, rice, appetizers' },
+  japanese: { perPerson: [20, 40], trayServes: '6–8', note: 'Sushi platters, bento boxes, or tempura trays' },
+  korean: { perPerson: [18, 35], trayServes: '8–10', note: 'BBQ platters, banchan, rice, and stew' },
+  middle_eastern: { perPerson: [16, 30], trayServes: '10–12', note: 'Kebab platters, hummus, rice, salads' },
+  ethiopian: { perPerson: [16, 28], trayServes: '8–10', note: 'Injera platters with assorted stews' },
+  caribbean: { perPerson: [15, 28], trayServes: '8–10', note: 'Jerk chicken, rice & peas, plantains' },
+  default: { perPerson: [15, 35], trayServes: '8–12', note: 'Varies by cuisine and menu complexity' },
+};
 
 export default function RequestForPriceForm({
   rfpForm,
@@ -253,6 +268,11 @@ export default function RequestForPriceForm({
           </div>
         </div>
       </section>
+
+      {/* ── Price Guidance Banner ── */}
+      {rfpForm.headcount > 0 && (
+        <PriceGuidanceBanner cuisineCategory={cuisineCategory || selectedCuisine || ''} headcount={rfpForm.headcount} />
+      )}
 
       {/* Section 2: Menu Items Wanted */}
       <section
@@ -737,6 +757,49 @@ export default function RequestForPriceForm({
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send size={16} />}
           Request Quotes
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Price Guidance Banner Component ──
+function PriceGuidanceBanner({ cuisineCategory, headcount }: { cuisineCategory: string; headcount: number }) {
+  const [dismissed, setDismissed] = useState(false);
+  const guidance = PRICE_GUIDANCE[cuisineCategory] || PRICE_GUIDANCE.default;
+  const lowEst = guidance.perPerson[0] * headcount;
+  const highEst = guidance.perPerson[1] * headcount;
+
+  if (dismissed) return null;
+
+  return (
+    <div
+      className="relative rounded-2xl border p-4"
+      style={{ borderColor: 'rgba(99,102,241,0.2)', backgroundColor: 'rgba(99,102,241,0.03)' }}
+    >
+      <button
+        onClick={() => setDismissed(true)}
+        className="absolute top-3 right-3 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+      >
+        <X size={12} style={{ color: 'var(--aurora-text-muted)' }} />
+      </button>
+      <div className="flex items-start gap-3">
+        <TrendingUp size={18} className="flex-shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+        <div>
+          <p className="text-sm font-semibold mb-1" style={{ color: '#6366F1' }}>
+            Price Guidance
+          </p>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--aurora-text-secondary)' }}>
+            For <strong>{headcount} guests</strong>, expect quotes in the
+            {' '}<strong>${lowEst.toLocaleString()} – ${highEst.toLocaleString()}</strong> range
+            {' '}(${guidance.perPerson[0]}–${guidance.perPerson[1]} per person).
+          </p>
+          <p className="text-[11px] mt-1.5" style={{ color: 'var(--aurora-text-muted)' }}>
+            {guidance.note} · Trays typically serve {guidance.trayServes} people
+          </p>
+          <p className="text-[10px] mt-1 italic" style={{ color: 'var(--aurora-text-muted)' }}>
+            Estimates based on market averages — actual quotes may vary by vendor.
+          </p>
+        </div>
       </div>
     </div>
   );

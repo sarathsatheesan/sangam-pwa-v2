@@ -627,6 +627,94 @@ export const expireStaleQuoteRequests = onSchedule(
 
 
 // ═════════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════════
+// PHASE 7B: RECURRING ORDER 24HR REMINDER
+// Runs daily at 8:00 AM. Finds active recurring orders whose nextRunDate is
+// tomorrow, and sends a push/email/SMS reminder so users can modify or skip.
+// ═════════════════════════════════════════════════════════════════════════════════
+
+export const remindRecurringOrders = onSchedule(
+  {
+    schedule: "every day 08:00",
+    timeZone: "America/Los_Angeles",
+    retryCount: 1,
+    maxInstances: 1,
+  },
+  async () => {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+    console.log(`[recurring-remind] Checking for orders due on ${tomorrowStr}`);
+
+    const snap = await db
+      .collection("cateringRecurring")
+      .where("active", "==", true)
+      .where("nextRunDate", "==", tomorrowStr)
+      .get();
+
+    if (snap.empty) {
+      console.log("[recurring-remind] No orders due tomorrow.");
+      return;
+    }
+
+    console.log(`[recurring-remind] Found ${snap.size} order(s) due tomorrow.`);
+
+    let sent = 0;
+    for (const recDoc of snap.docs) {
+      const rec = recDoc.data();
+      const userId = rec.userId as string;
+      if (!userId) continue;
+
+      // Check if already skipped
+      if (rec.nextOccurrenceOverride?.skip) {
+        console.log(`[recurring-remind] Order ${recDoc.id} is marked skip, ignoring.`);
+        continue;
+      }
+
+      try {
+        // Queue notification via the notifications collection
+        await db.collection("notifications").add({
+          channel: "push",
+          recipientId: userId,
+          template: "recurring_order_reminder",
+          data: {
+            orderId: recDoc.id,
+            label: rec.label || "Recurring Order",
+            businessName: rec.businessName || "",
+            nextRunDate: tomorrowStr,
+            hasOverride: !!rec.nextOccurrenceOverride,
+          },
+          status: "queued",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Also queue email
+        await db.collection("notifications").add({
+          channel: "email",
+          recipientId: userId,
+          template: "recurring_order_reminder",
+          data: {
+            orderId: recDoc.id,
+            label: rec.label || "Recurring Order",
+            businessName: rec.businessName || "",
+            nextRunDate: tomorrowStr,
+          },
+          status: "queued",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        sent++;
+      } catch (err) {
+        console.error(`[recurring-remind] Error notifying user ${userId}:`, err);
+      }
+    }
+
+    console.log(`[recurring-remind] Done. Reminded: ${sent} user(s).`);
+  }
+);
+
+
 // PHASE 8: EMAIL & SMS NOTIFICATION DISPATCHER
 // Processes queued notification documents and dispatches via email (SendGrid)
 // and SMS (Twilio). Falls back to logging when API keys aren't configured.
@@ -682,6 +770,13 @@ const NOTIFICATION_TEMPLATES: Record<string, { subject: string; body: (d: any) =
     subject: "A quote request has been updated — please re-quote",
     body: (d) =>
       d.message || "A customer has updated their quote request. Please review the changes and submit an updated quote.",
+  },
+  recurring_order_reminder: {
+    subject: "Recurring order reminder — tomorrow",
+    body: (d) =>
+      `Your recurring order "${d.label}" from ${d.businessName} is scheduled for tomorrow (${d.nextRunDate}).${
+        d.hasOverride ? " You have modifications saved for this order." : ""
+      } Open the app to edit, skip, or adjust this order before it goes through.`,
   },
 };
 

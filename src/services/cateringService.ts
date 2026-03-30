@@ -18,6 +18,7 @@ import {
   serverTimestamp,
   onSnapshot,
   arrayUnion,
+  deleteField,
   Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -1096,6 +1097,15 @@ export interface RecurrenceSchedule {
   skipDates?: string[];                // Holidays / vacation dates to skip
 }
 
+/** Per-occurrence overrides — modifications to the next scheduled run only */
+export interface OccurrenceOverride {
+  forDate: string;                     // The nextRunDate this override applies to
+  items?: OrderItem[];                 // Override items (null = use default)
+  headcount?: number;
+  specialInstructions?: string;
+  skip?: boolean;                      // Skip just this occurrence
+}
+
 export interface RecurringOrder {
   id: string;
   userId: string;
@@ -1115,6 +1125,7 @@ export interface RecurringOrder {
   nextRunDate: string;                 // ISO date of next scheduled order
   lastRunDate?: string;
   totalOrdersPlaced: number;
+  nextOccurrenceOverride?: OccurrenceOverride;  // One-time modification for the next run
   createdAt?: any;
   updatedAt?: any;
 }
@@ -1392,6 +1403,61 @@ export async function toggleRecurringOrder(recId: string, active: boolean): Prom
     active,
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Set a per-occurrence override for the next scheduled run.
+ * This modifies only the next run without changing the recurring template.
+ */
+export async function setOccurrenceOverride(
+  recId: string,
+  override: OccurrenceOverride,
+): Promise<void> {
+  await updateDoc(doc(db, 'cateringRecurring', recId), {
+    nextOccurrenceOverride: override,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Clear the per-occurrence override (revert next run to default template).
+ */
+export async function clearOccurrenceOverride(recId: string): Promise<void> {
+  await updateDoc(doc(db, 'cateringRecurring', recId), {
+    nextOccurrenceOverride: deleteField(),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Compute estimated monthly cost for a recurring order.
+ * Returns cents.
+ */
+export function estimateMonthlyRecurringCost(rec: RecurringOrder): number {
+  const orderTotal = calculateOrderTotal(rec.items);
+  const sched = rec.schedule;
+
+  let runsPerMonth: number;
+  if (sched.daysOfWeek && sched.daysOfWeek.length > 0) {
+    // Calendar mode: runs per week × ~4.33 weeks/month
+    runsPerMonth = sched.daysOfWeek.length * 4.33;
+  } else {
+    switch (sched.interval) {
+      case 'daily': runsPerMonth = 30; break;
+      case 'weekly': runsPerMonth = 4.33; break;
+      case 'biweekly': runsPerMonth = 2.17; break;
+      case 'monthly': runsPerMonth = 1; break;
+      default: runsPerMonth = 4.33;
+    }
+  }
+
+  // Subtract approximate skip dates per month
+  if (sched.skipDates && sched.skipDates.length > 0) {
+    const skipsPerMonth = sched.skipDates.length / 12; // rough average
+    runsPerMonth = Math.max(0, runsPerMonth - skipsPerMonth);
+  }
+
+  return Math.round(orderTotal * runsPerMonth);
 }
 
 
