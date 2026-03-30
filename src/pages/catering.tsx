@@ -13,7 +13,7 @@ import React, { useReducer, useCallback, useEffect, useState, useRef, useMemo } 
 import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store, Search,
-  Send, FileText, ClipboardList, Star, Heart, Repeat, Share2,
+  Send, FileText, ClipboardList, Star, Heart, Repeat, Share2, Pencil,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -28,9 +28,16 @@ import {
   createOrder,
   calculateOrderTotal,
   createQuoteRequest,
+  updateQuoteRequest,
+  isQuoteRequestEditable,
+  quoteEditTimeRemaining,
   subscribeToCustomerQuoteRequests,
   saveFavoriteOrder,
 } from '@/services/cateringService';
+import {
+  notifyQuoteRequestSubmitted,
+  notifyQuoteRequestEdited,
+} from '@/services/notificationService';
 
 // ── Components (eager: lightweight, needed on first render) ──
 import CateringCategoryGrid from '@/components/catering/CateringCategoryGrid';
@@ -70,6 +77,7 @@ export default function CateringPage() {
   const [submitting, setSubmitting] = useState(false);
   const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews'>('quotes');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
+  const [editingQuoteRequestId, setEditingQuoteRequestId] = useState<string | null>(null);
   const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
   const [selectedFavoriteForTemplate, setSelectedFavoriteForTemplate] = useState<FavoriteOrder | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -329,25 +337,45 @@ export default function CateringPage() {
 
     setSubmitting(true);
     try {
-      // Default 7-day expiration
-      const expiresAt = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+      if (editingQuoteRequestId) {
+        // ── Update existing quote request ──
+        await updateQuoteRequest(editingQuoteRequestId, {
+          deliveryCity: rfpForm.deliveryCity,
+          eventType: rfpForm.eventType || undefined,
+          eventDate: rfpForm.eventDate,
+          headcount: rfpForm.headcount,
+          items: rfpForm.items,
+          specialInstructions: rfpForm.specialInstructions || '',
+        });
+        addToast('Quote request updated successfully!', 'success', 5000);
+        // Fire-and-forget notification
+        notifyQuoteRequestEdited(user.uid, editingQuoteRequestId, false, []).catch(() => {});
+        setEditingQuoteRequestId(null);
+      } else {
+        // ── Create new quote request ──
+        const expiresAt = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
-      await createQuoteRequest({
-        customerId: user.uid,
-        deliveryCity: rfpForm.deliveryCity,
-        cuisineCategory: state.selectedCategory || '',
-        eventType: rfpForm.eventType || undefined,
-        eventDate: rfpForm.eventDate,
-        headcount: rfpForm.headcount,
-        items: rfpForm.items,
-        specialInstructions: rfpForm.specialInstructions || '',
-        orderForContext: rfpForm.orderForContext,
-        status: 'open',
-        expiresAt,
-        ...(rfpForm.targetBusinessIds.length > 0 ? { targetBusinessIds: rfpForm.targetBusinessIds } : {}),
-      });
+        await createQuoteRequest({
+          customerId: user.uid,
+          deliveryCity: rfpForm.deliveryCity,
+          cuisineCategory: state.selectedCategory || '',
+          eventType: rfpForm.eventType || undefined,
+          eventDate: rfpForm.eventDate,
+          headcount: rfpForm.headcount,
+          items: rfpForm.items,
+          specialInstructions: rfpForm.specialInstructions || '',
+          orderForContext: rfpForm.orderForContext,
+          status: 'open',
+          expiresAt,
+          ...(rfpForm.targetBusinessIds.length > 0 ? { targetBusinessIds: rfpForm.targetBusinessIds } : {}),
+        });
 
-      addToast('Quote request sent! Caterers will respond with their quotes.', 'success', 5000);
+        addToast('Quote request sent! You can edit it within 24 hours (if the event is more than 2 days away).', 'success', 7000);
+        // Fire-and-forget notification
+        notifyQuoteRequestSubmitted(
+          user.uid, '', state.selectedCategory || '', rfpForm.eventDate, rfpForm.headcount,
+        ).catch(() => {});
+      }
       dispatch({ type: 'CLEAR_RFP_FORM' });
       dispatch({ type: 'SET_VIEW', payload: 'quotes' });
     } catch (err: any) {
@@ -780,54 +808,100 @@ export default function CateringPage() {
                     cancelled: { bg: '#FEE2E2', text: '#EF4444' },
                   };
                   const sc = statusColors[req.status] || statusColors.open;
+                  const editable = isQuoteRequestEditable(req);
+                  const editMs = editable ? quoteEditTimeRemaining(req) : 0;
+                  const editHrsLeft = Math.ceil(editMs / (1000 * 60 * 60));
+
                   return (
-                    <button
+                    <div
                       key={req.id}
-                      onClick={() => setSelectedQuoteRequest(req)}
-                      className="w-full flex items-center justify-between p-4 rounded-2xl border text-left transition-colors hover:shadow-md"
+                      className="rounded-2xl border overflow-hidden transition-colors hover:shadow-md"
                       style={{
                         backgroundColor: 'var(--aurora-surface)',
                         borderColor: 'var(--aurora-border)',
                       }}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                            {req.cuisineCategory} Catering
-                          </span>
-                          <span
-                            className="px-2 py-0.5 rounded-full text-[10px] font-medium capitalize"
-                            style={{ backgroundColor: sc.bg, color: sc.text }}
-                          >
-                            {req.status === 'partially_accepted' ? 'In Progress' : req.status}
-                          </span>
-                        </div>
-                        <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                          {req.eventType && <span className="capitalize">{req.eventType.replace(/_/g, ' ')} · </span>}
-                          {req.headcount} guests · {req.deliveryCity} · {req.items.length} item{req.items.length !== 1 ? 's' : ''}
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
-                          {req.responseCount} response{req.responseCount !== 1 ? 's' : ''}
-                          {req.itemAssignments && req.itemAssignments.length > 0 && (
-                            <span style={{ color: '#059669' }}>
-                              {' '} · {req.itemAssignments.length}/{req.items.length} items assigned
+                      <button
+                        onClick={() => setSelectedQuoteRequest(req)}
+                        className="w-full flex items-center justify-between p-4 text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                              {req.cuisineCategory} Catering
                             </span>
-                          )}
-                          {req.expiresAt && req.status === 'open' && (() => {
-                            const expiryDate = req.expiresAt?.toDate?.() || new Date(req.expiresAt);
-                            const hoursLeft = Math.max(0, Math.floor((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60)));
-                            const daysLeft = Math.floor(hoursLeft / 24);
-                            const isUrgent = hoursLeft < 24;
-                            return (
-                              <span style={{ color: isUrgent ? '#DC2626' : '#D97706' }}>
-                                {' '} · {daysLeft > 0 ? `${daysLeft}d left` : `${hoursLeft}h left`}
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-medium capitalize"
+                              style={{ backgroundColor: sc.bg, color: sc.text }}
+                            >
+                              {req.status === 'partially_accepted' ? 'In Progress' : req.status}
+                            </span>
+                          </div>
+                          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            {req.eventType && <span className="capitalize">{req.eventType.replace(/_/g, ' ')} · </span>}
+                            {req.headcount} guests · {req.deliveryCity} · {req.items.length} item{req.items.length !== 1 ? 's' : ''}
+                          </p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
+                            {req.responseCount} response{req.responseCount !== 1 ? 's' : ''}
+                            {req.itemAssignments && req.itemAssignments.length > 0 && (
+                              <span style={{ color: '#059669' }}>
+                                {' '} · {req.itemAssignments.length}/{req.items.length} items assigned
                               </span>
-                            );
-                          })()}
-                        </p>
-                      </div>
-                      <ArrowLeft size={16} className="rotate-180 opacity-30 ml-2" />
-                    </button>
+                            )}
+                            {req.expiresAt && req.status === 'open' && (() => {
+                              const expiryDate = req.expiresAt?.toDate?.() || new Date(req.expiresAt);
+                              const hoursLeft = Math.max(0, Math.floor((expiryDate.getTime() - Date.now()) / (1000 * 60 * 60)));
+                              const daysLeft = Math.floor(hoursLeft / 24);
+                              const isUrgent = hoursLeft < 24;
+                              return (
+                                <span style={{ color: isUrgent ? '#DC2626' : '#D97706' }}>
+                                  {' '} · {daysLeft > 0 ? `${daysLeft}d left` : `${hoursLeft}h left`}
+                                </span>
+                              );
+                            })()}
+                          </p>
+                        </div>
+                        <ArrowLeft size={16} className="rotate-180 opacity-30 ml-2" />
+                      </button>
+
+                      {/* Edit strip — shown within 24hr window & event >2 days away */}
+                      {editable && (
+                        <div
+                          className="flex items-center justify-between px-4 py-2 border-t"
+                          style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'rgba(99,102,241,0.04)' }}
+                        >
+                          <span className="text-[11px]" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            Editable for {editHrsLeft}h
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingQuoteRequestId(req.id);
+                              dispatch({
+                                type: 'UPDATE_RFP_FORM',
+                                payload: {
+                                  deliveryCity: req.deliveryCity,
+                                  eventType: req.eventType || '',
+                                  eventDate: req.eventDate?.toDate?.()
+                                    ? req.eventDate.toDate().toISOString().slice(0, 10)
+                                    : (req.eventDate || ''),
+                                  headcount: req.headcount,
+                                  items: req.items,
+                                  specialInstructions: req.specialInstructions || '',
+                                },
+                              });
+                              dispatch({ type: 'SET_CATEGORY', payload: req.cuisineCategory });
+                              dispatch({ type: 'SET_VIEW', payload: 'rfp' });
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-colors"
+                            style={{ backgroundColor: '#6366F1' }}
+                          >
+                            <Pencil size={12} />
+                            Edit
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>

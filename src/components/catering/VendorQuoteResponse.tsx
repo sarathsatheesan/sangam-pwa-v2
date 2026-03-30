@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronUp, ShieldCheck, Plus, Trash2, DollarSign,
   Bell, CheckCircle2, XCircle, Check,
 } from 'lucide-react';
+import { notifyVendorQuoteReceived } from '@/services/notificationService';
 
 // ── PriceInput: local-state input that avoids cursor-jump on controlled value ──
 // Manages its own string state; only pushes cents to parent on blur/Enter.
@@ -220,6 +221,8 @@ export default function VendorQuoteResponse({
         status: 'submitted',
       });
       addToast('Quote submitted successfully!', 'success');
+      // Notify customer about the new quote (fire-and-forget)
+      notifyVendorQuoteReceived(request.customerId, request.id, businessName, total).catch(() => {});
       // Reload requests to update the open/responded lists
       fetchQuoteRequestsForBusiness(businessId).then(setRequests).catch(() => {});
     } catch (err: any) {

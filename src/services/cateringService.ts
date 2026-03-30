@@ -447,6 +447,112 @@ export async function createQuoteRequest(request: Omit<CateringQuoteRequest, 'id
   return docRef.id;
 }
 
+/** Edit window: 24 hours from creation */
+const QUOTE_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Minimum lead time: event must be more than 2 days away to allow edits */
+const MIN_EVENT_LEAD_MS = 2 * 24 * 60 * 60 * 1000;
+
+/** Parse eventDate (YYYY-MM-DD string or Firestore timestamp) to epoch ms */
+function parseEventDateMs(eventDate: any): number {
+  if (!eventDate) return 0;
+  if (typeof eventDate === 'string') {
+    const ms = new Date(eventDate + 'T00:00:00').getTime();
+    return isNaN(ms) ? 0 : ms;
+  }
+  if (eventDate?.toMillis) return eventDate.toMillis();
+  if (eventDate?.seconds) return eventDate.seconds * 1000;
+  return 0;
+}
+
+/**
+ * Check whether a quote request is still editable.
+ * Rules:
+ *  - Status must be 'open' (not accepted/cancelled/expired)
+ *  - Within 24 hours of creation
+ *  - Event must be more than 2 days away
+ *  - Allowed even if vendors have responded (customer can edit & request re-quote)
+ */
+export function isQuoteRequestEditable(request: CateringQuoteRequest): boolean {
+  if (request.status !== 'open') return false;
+
+  // Time-since-creation check
+  const createdMs = request.createdAt?.toMillis?.()
+    || (request.createdAt?.seconds ? request.createdAt.seconds * 1000 : 0);
+  if (!createdMs) return false;
+  if (Date.now() - createdMs >= QUOTE_EDIT_WINDOW_MS) return false;
+
+  // Event lead-time check: block edits if event is within 2 days
+  const eventMs = parseEventDateMs(request.eventDate);
+  if (eventMs && eventMs - Date.now() < MIN_EVENT_LEAD_MS) return false;
+
+  return true;
+}
+
+/** Remaining edit time in milliseconds (0 if expired or event too close) */
+export function quoteEditTimeRemaining(request: CateringQuoteRequest): number {
+  const createdMs = request.createdAt?.toMillis?.()
+    || (request.createdAt?.seconds ? request.createdAt.seconds * 1000 : 0);
+  if (!createdMs) return 0;
+
+  const timeLeft = QUOTE_EDIT_WINDOW_MS - (Date.now() - createdMs);
+  if (timeLeft <= 0) return 0;
+
+  // Also check event lead time
+  const eventMs = parseEventDateMs(request.eventDate);
+  if (eventMs && eventMs - Date.now() < MIN_EVENT_LEAD_MS) return 0;
+
+  return timeLeft;
+}
+
+/** Update an existing quote request (only allowed within edit window) */
+export async function updateQuoteRequest(
+  requestId: string,
+  updates: {
+    deliveryCity?: string;
+    eventType?: string;
+    eventDate?: string;
+    headcount?: number;
+    items?: QuoteRequestItem[];
+    specialInstructions?: string;
+  },
+): Promise<void> {
+  const ref = doc(db, QUOTE_REQUESTS_COL, requestId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Quote request not found');
+  const data = snap.data() as CateringQuoteRequest;
+
+  // Guard: status must be open
+  if (data.status !== 'open') throw new Error('Only open requests can be edited');
+
+  // Guard: within 24hr creation window
+  const createdMs = data.createdAt?.toMillis?.()
+    || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+  if (createdMs && Date.now() - createdMs >= QUOTE_EDIT_WINDOW_MS) {
+    throw new Error('Edit window (24 hours) has expired');
+  }
+
+  // Guard: event must be more than 2 days away
+  const eventMs = parseEventDateMs(data.eventDate);
+  if (eventMs && eventMs - Date.now() < MIN_EVENT_LEAD_MS) {
+    throw new Error('Cannot edit — your event is less than 2 days away');
+  }
+
+  // Strip undefined keys
+  const cleanUpdates: Record<string, any> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined) cleanUpdates[k] = v;
+  }
+  cleanUpdates.updatedAt = serverTimestamp();
+  cleanUpdates.lastEditedAt = serverTimestamp();
+
+  // If vendors already responded, flag as re-quote so vendors are notified
+  if (data.responseCount > 0) {
+    cleanUpdates.requiresRequote = true;
+  }
+
+  await updateDoc(ref, cleanUpdates);
+}
+
 export async function fetchQuoteRequestsByCustomer(customerId: string): Promise<CateringQuoteRequest[]> {
   try {
     const q = query(

@@ -4,6 +4,7 @@ import {
   ChevronDown, ChevronUp, ShieldCheck, Loader2, ArrowLeft,
   MessageSquare, Package, Square, CheckSquare, AlertCircle,
 } from 'lucide-react';
+import { notifyQuoteAccepted } from '@/services/notificationService';
 import type { CateringQuoteRequest, CateringQuoteResponse, ItemAssignment } from '@/services/cateringService';
 import {
   subscribeToQuoteResponses,
@@ -142,6 +143,18 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       } else {
         addToast(`${itemNames.length} item${itemNames.length > 1 ? 's' : ''} accepted from ${response.businessName}. Your contact details have been shared.`, 'success', 5000);
       }
+
+      // Notify vendor their quote was accepted (fire-and-forget, look up owner via businessId)
+      import('@/services/firebase').then(({ db: fireDb }) =>
+        import('firebase/firestore').then(({ doc, getDoc }) =>
+          getDoc(doc(fireDb, 'businesses', response.businessId)).then((bizSnap) => {
+            const ownerId = bizSnap.data()?.ownerId;
+            if (ownerId) {
+              notifyQuoteAccepted(ownerId, quoteRequest.id, userProfile?.name || '', response.total);
+            }
+          })
+        )
+      ).catch(() => {});
 
       // Clear selection for this response
       setSelectedItems((prev) => ({ ...prev, [response.id]: new Set() }));

@@ -624,3 +624,246 @@ export const expireStaleQuoteRequests = onSchedule(
     console.log(`[expire-rfq] Done. Expired: ${expired}`);
   }
 );
+
+
+// ═════════════════════════════════════════════════════════════════════════════════
+// PHASE 8: EMAIL & SMS NOTIFICATION DISPATCHER
+// Processes queued notification documents and dispatches via email (SendGrid)
+// and SMS (Twilio). Falls back to logging when API keys aren't configured.
+// ═════════════════════════════════════════════════════════════════════════════════
+
+/** Email/SMS notification templates */
+const NOTIFICATION_TEMPLATES: Record<string, { subject: string; body: (d: any) => string }> = {
+  quote_request_submitted: {
+    subject: "Your catering quote request has been submitted",
+    body: (d) =>
+      `Your ${d.cuisineCategory} catering request for ${d.headcount} guests on ${d.eventDate} has been submitted. Vendors in your area will respond shortly.`,
+  },
+  quote_request_edited: {
+    subject: "Your quote request has been updated",
+    body: (d) =>
+      d.requiresRequote
+        ? "Your quote request has been updated. Vendors who previously responded will be notified to review and re-quote."
+        : "Your quote request has been updated successfully.",
+  },
+  vendor_quote_received: {
+    subject: "New vendor quote received!",
+    body: (d) =>
+      `${d.vendorName} has submitted a quote of $${(d.totalPrice / 100).toFixed(2)} for your catering request. Log in to compare and accept quotes.`,
+  },
+  quote_accepted: {
+    subject: "Your quote has been accepted!",
+    body: (d) =>
+      `Great news! ${d.customerName} has accepted your quote of $${(d.totalPrice / 100).toFixed(2)}. Log in to your vendor dashboard to see the details and prepare the order.`,
+  },
+  quote_expired: {
+    subject: "Your quote request has expired",
+    body: () =>
+      "Your catering quote request has expired. You can create a new one anytime from the Catering section.",
+  },
+  order_confirmed: {
+    subject: "Catering order confirmed",
+    body: (d) =>
+      d.role === "customer"
+        ? `Your order from ${d.businessName} for $${(d.totalPrice / 100).toFixed(2)} has been confirmed!`
+        : `New confirmed order for $${(d.totalPrice / 100).toFixed(2)}. Check your vendor dashboard for details.`,
+  },
+  order_status_changed: {
+    subject: "Order status update",
+    body: (d) =>
+      `Your order from ${d.businessName} is now: ${d.newStatus}.`,
+  },
+  vendor_new_rfq: {
+    subject: "New catering request in your area",
+    body: (d) =>
+      `A customer in ${d.deliveryCity} is looking for ${d.cuisineCategory} catering for ${d.headcount} guests. Log in to submit your quote!`,
+  },
+  vendor_rfq_edited: {
+    subject: "A quote request has been updated — please re-quote",
+    body: (d) =>
+      d.message || "A customer has updated their quote request. Please review the changes and submit an updated quote.",
+  },
+};
+
+/**
+ * Process queued notifications and dispatch via email, SMS, or push.
+ * Triggered when a new doc is added to the `notifications` collection.
+ */
+export const processNotification = onDocumentCreated(
+  "notifications/{notificationId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const data = snap.data();
+    const { channel, recipientId, template, data: templateData } = data;
+    const notifId = event.params.notificationId;
+
+    console.log(`[notify] Processing ${channel} notification ${notifId}: ${template}`);
+
+    const tmpl = NOTIFICATION_TEMPLATES[template];
+    if (!tmpl) {
+      console.error(`[notify] Unknown template: ${template}`);
+      await snap.ref.update({ status: "failed", error: `Unknown template: ${template}` });
+      return;
+    }
+
+    // Resolve recipient info
+    let email = data.recipientEmail;
+    let phone = data.recipientPhone;
+    let userName = "";
+
+    if (recipientId) {
+      try {
+        const userDoc = await db.collection("users").doc(recipientId).get();
+        const userData = userDoc.data();
+        if (userData) {
+          userName = userData.preferredName || userData.name || "";
+          if (!email) email = userData.email;
+          if (!phone) phone = userData.phone;
+        }
+
+        // Also check Firebase Auth for email
+        if (!email) {
+          try {
+            const authUser = await admin.auth().getUser(recipientId);
+            email = authUser.email;
+          } catch { /* user may not exist in auth */ }
+        }
+      } catch (err) {
+        console.error(`[notify] Error resolving recipient ${recipientId}:`, err);
+      }
+    }
+
+    const subject = tmpl.subject;
+    const body = tmpl.body({ ...templateData, userName });
+
+    try {
+      if (channel === "email") {
+        if (!email) {
+          console.warn(`[notify] No email for user ${recipientId}, skipping email notification`);
+          await snap.ref.update({ status: "skipped", reason: "no_email" });
+          return;
+        }
+
+        // ── SendGrid dispatch ──
+        // To enable: set Firebase config:
+        //   firebase functions:config:set sendgrid.api_key="SG.xxx" sendgrid.from_email="noreply@ethnicity.app"
+        const sendgridKey = process.env.SENDGRID_API_KEY || "";
+        const fromEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@ethnicity.app";
+
+        if (sendgridKey) {
+          // Dynamic import to avoid requiring sendgrid if not configured
+          const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${sendgridKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              personalizations: [{ to: [{ email }] }],
+              from: { email: fromEmail, name: "ethniCity Catering" },
+              subject,
+              content: [{ type: "text/plain", value: body }],
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`SendGrid error: ${response.status} ${await response.text()}`);
+          }
+          console.log(`[notify] Email sent to ${email} for ${template}`);
+        } else {
+          console.log(`[notify] SendGrid not configured. Would send email to ${email}: "${subject}" — ${body}`);
+        }
+
+        await snap.ref.update({ status: sendgridKey ? "sent" : "logged", sentAt: admin.firestore.FieldValue.serverTimestamp() });
+
+      } else if (channel === "sms") {
+        if (!phone) {
+          console.warn(`[notify] No phone for user ${recipientId}, skipping SMS notification`);
+          await snap.ref.update({ status: "skipped", reason: "no_phone" });
+          return;
+        }
+
+        // ── Twilio dispatch ──
+        // To enable: set environment variables:
+        //   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
+        const twilioSid = process.env.TWILIO_ACCOUNT_SID || "";
+        const twilioToken = process.env.TWILIO_AUTH_TOKEN || "";
+        const twilioFrom = process.env.TWILIO_FROM_NUMBER || "";
+
+        if (twilioSid && twilioToken && twilioFrom) {
+          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+          const smsBody = `[ethniCity] ${body}`;
+
+          const response = await fetch(twilioUrl, {
+            method: "POST",
+            headers: {
+              Authorization: "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              To: phone,
+              From: twilioFrom,
+              Body: smsBody,
+            }).toString(),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Twilio error: ${response.status} ${await response.text()}`);
+          }
+          console.log(`[notify] SMS sent to ${phone} for ${template}`);
+        } else {
+          console.log(`[notify] Twilio not configured. Would send SMS to ${phone}: ${body}`);
+        }
+
+        await snap.ref.update({ status: twilioSid ? "sent" : "logged", sentAt: admin.firestore.FieldValue.serverTimestamp() });
+
+      } else if (channel === "push") {
+        // Push notifications — use existing FCM infrastructure
+        if (!recipientId) {
+          await snap.ref.update({ status: "skipped", reason: "no_recipient" });
+          return;
+        }
+
+        const userDoc = await db.collection("users").doc(recipientId).get();
+        const fcmTokens: string[] = [
+          ...(userDoc.data()?.fcmTokens || []),
+          ...(userDoc.data()?.fcmToken ? [userDoc.data()?.fcmToken] : []),
+        ].filter(Boolean);
+
+        if (fcmTokens.length === 0) {
+          await snap.ref.update({ status: "skipped", reason: "no_fcm_tokens" });
+          return;
+        }
+
+        const result = await admin.messaging().sendEachForMulticast({
+          tokens: fcmTokens,
+          notification: { title: subject, body },
+          data: { type: template, ...Object.fromEntries(
+            Object.entries(templateData || {}).map(([k, v]) => [k, String(v)])
+          )},
+        });
+
+        // Clean up invalid tokens
+        const invalidTokens: string[] = [];
+        result.responses.forEach((resp, idx) => {
+          if (!resp.success && resp.error?.code === "messaging/registration-token-not-registered") {
+            invalidTokens.push(fcmTokens[idx]);
+          }
+        });
+        if (invalidTokens.length > 0) {
+          await db.collection("users").doc(recipientId).update({
+            fcmTokens: admin.firestore.FieldValue.arrayRemove(...invalidTokens),
+          });
+        }
+
+        console.log(`[notify] Push sent: ${result.successCount} OK, ${result.failureCount} failed`);
+        await snap.ref.update({ status: "sent", sentAt: admin.firestore.FieldValue.serverTimestamp() });
+      }
+    } catch (err: any) {
+      console.error(`[notify] Error dispatching ${channel} for ${notifId}:`, err);
+      await snap.ref.update({ status: "failed", error: err.message || String(err) });
+    }
+  }
+);

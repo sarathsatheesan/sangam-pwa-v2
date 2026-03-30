@@ -1,0 +1,213 @@
+/**
+ * Notification Service
+ *
+ * Queues email and SMS notifications by writing to a Firestore
+ * `notifications` collection. Cloud Functions pick these up and
+ * dispatch via SendGrid (email) / Twilio (SMS).
+ *
+ * Each notification doc:
+ *  - channel: 'email' | 'sms' | 'push'
+ *  - recipientId: user UID
+ *  - recipientEmail / recipientPhone (resolved by Cloud Function if not provided)
+ *  - template: template key for email/SMS body
+ *  - data: template variables
+ *  - status: 'queued' | 'sent' | 'failed'
+ *  - createdAt: server timestamp
+ */
+
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+} from 'firebase/firestore';
+import { db } from './firebase';
+
+const NOTIFICATIONS_COL = 'notifications';
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+export type NotificationChannel = 'email' | 'sms' | 'push';
+
+export type CateringNotificationType =
+  | 'quote_request_submitted'
+  | 'quote_request_edited'
+  | 'vendor_quote_received'
+  | 'quote_accepted'
+  | 'quote_expired'
+  | 'order_confirmed'
+  | 'order_status_changed'
+  | 'vendor_new_rfq'
+  | 'vendor_rfq_edited';
+
+export interface NotificationPayload {
+  channel: NotificationChannel;
+  recipientId: string;
+  recipientEmail?: string;
+  recipientPhone?: string;
+  template: CateringNotificationType;
+  data: Record<string, any>;
+}
+
+// ─── Queue a single notification ─────────────────────────────────────
+
+async function queueNotification(payload: NotificationPayload): Promise<void> {
+  try {
+    await addDoc(collection(db, NOTIFICATIONS_COL), {
+      ...payload,
+      status: 'queued',
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error('[notificationService] Failed to queue notification:', err);
+  }
+}
+
+// ─── Queue email + SMS together ──────────────────────────────────────
+
+async function notifyAllChannels(
+  recipientId: string,
+  template: CateringNotificationType,
+  data: Record<string, any>,
+): Promise<void> {
+  await Promise.all([
+    queueNotification({ channel: 'email', recipientId, template, data }),
+    queueNotification({ channel: 'sms', recipientId, template, data }),
+    queueNotification({ channel: 'push', recipientId, template, data }),
+  ]);
+}
+
+// ─── Catering-specific notification helpers ──────────────────────────
+
+/** Customer submitted a new quote request */
+export async function notifyQuoteRequestSubmitted(
+  customerId: string,
+  requestId: string,
+  cuisineCategory: string,
+  eventDate: string,
+  headcount: number,
+): Promise<void> {
+  await notifyAllChannels(customerId, 'quote_request_submitted', {
+    requestId,
+    cuisineCategory,
+    eventDate,
+    headcount,
+  });
+}
+
+/** Customer edited their quote request (vendors get notified if they had responded) */
+export async function notifyQuoteRequestEdited(
+  customerId: string,
+  requestId: string,
+  requiresRequote: boolean,
+  vendorBusinessIds: string[],
+): Promise<void> {
+  // Notify customer
+  await notifyAllChannels(customerId, 'quote_request_edited', {
+    requestId,
+    requiresRequote,
+  });
+
+  // Notify vendors who had already responded — they need to re-quote
+  if (requiresRequote && vendorBusinessIds.length > 0) {
+    for (const bizId of vendorBusinessIds) {
+      try {
+        const bizDoc = await getDoc(doc(db, 'businesses', bizId));
+        const ownerId = bizDoc.data()?.ownerId;
+        if (ownerId) {
+          await notifyAllChannels(ownerId, 'vendor_rfq_edited', {
+            requestId,
+            message: 'A customer has updated their quote request. Please review and re-quote.',
+          });
+        }
+      } catch (err) {
+        console.error(`[notificationService] Failed to notify vendor ${bizId}:`, err);
+      }
+    }
+  }
+}
+
+/** Vendor submitted a quote — notify the customer */
+export async function notifyVendorQuoteReceived(
+  customerId: string,
+  requestId: string,
+  vendorName: string,
+  totalPrice: number,
+): Promise<void> {
+  await notifyAllChannels(customerId, 'vendor_quote_received', {
+    requestId,
+    vendorName,
+    totalPrice,
+  });
+}
+
+/** Customer accepted a vendor's quote */
+export async function notifyQuoteAccepted(
+  vendorOwnerId: string,
+  requestId: string,
+  customerName: string,
+  totalPrice: number,
+): Promise<void> {
+  await notifyAllChannels(vendorOwnerId, 'quote_accepted', {
+    requestId,
+    customerName,
+    totalPrice,
+  });
+}
+
+/** Order status changed — notify customer */
+export async function notifyOrderStatusChanged(
+  customerId: string,
+  orderId: string,
+  newStatus: string,
+  businessName: string,
+): Promise<void> {
+  await notifyAllChannels(customerId, 'order_status_changed', {
+    orderId,
+    newStatus,
+    businessName,
+  });
+}
+
+/** New RFQ broadcast — notify eligible vendors */
+export async function notifyVendorsNewRFQ(
+  vendorOwnerIds: string[],
+  requestId: string,
+  cuisineCategory: string,
+  deliveryCity: string,
+  headcount: number,
+): Promise<void> {
+  for (const ownerId of vendorOwnerIds) {
+    await notifyAllChannels(ownerId, 'vendor_new_rfq', {
+      requestId,
+      cuisineCategory,
+      deliveryCity,
+      headcount,
+    });
+  }
+}
+
+/** Order confirmed — notify both parties */
+export async function notifyOrderConfirmed(
+  customerId: string,
+  vendorOwnerId: string,
+  orderId: string,
+  totalPrice: number,
+  businessName: string,
+): Promise<void> {
+  await Promise.all([
+    notifyAllChannels(customerId, 'order_confirmed', {
+      orderId,
+      totalPrice,
+      businessName,
+      role: 'customer',
+    }),
+    notifyAllChannels(vendorOwnerId, 'order_confirmed', {
+      orderId,
+      totalPrice,
+      businessName,
+      role: 'vendor',
+    }),
+  ]);
+}
