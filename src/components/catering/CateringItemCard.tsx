@@ -8,14 +8,14 @@ interface CateringItemCardProps {
   onAddToCart: (item: CateringMenuItem) => void;
 }
 
-const DIETARY_TAG_COLORS: Record<string, { bg: string; text: string }> = {
-  vegetarian: { bg: 'bg-green-100', text: 'text-green-700' },
-  vegan: { bg: 'bg-green-100', text: 'text-green-700' },
-  halal: { bg: 'bg-blue-100', text: 'text-blue-700' },
-  kosher: { bg: 'bg-blue-100', text: 'text-blue-700' },
-  gluten_free: { bg: 'bg-amber-100', text: 'text-amber-700' },
-  dairy_free: { bg: 'bg-purple-100', text: 'text-purple-700' },
-  nut_free: { bg: 'bg-pink-100', text: 'text-pink-700' },
+const DIETARY_TAG_INFO: Record<string, { bg: string; text: string; icon: string }> = {
+  vegetarian: { bg: 'bg-green-100', text: 'text-green-700', icon: '🥬' },
+  vegan: { bg: 'bg-green-100', text: 'text-green-700', icon: '🌱' },
+  halal: { bg: 'bg-blue-100', text: 'text-blue-700', icon: '☪️' },
+  kosher: { bg: 'bg-blue-100', text: 'text-blue-700', icon: '✡️' },
+  gluten_free: { bg: 'bg-amber-100', text: 'text-amber-700', icon: '🌾' },
+  dairy_free: { bg: 'bg-purple-100', text: 'text-purple-700', icon: '🥛' },
+  nut_free: { bg: 'bg-pink-100', text: 'text-pink-700', icon: '🥜' },
 };
 
 export default function CateringItemCard({
@@ -99,15 +99,17 @@ export default function CateringItemCard({
         {item.dietaryTags && item.dietaryTags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {item.dietaryTags.map(tag => {
-              const colors = DIETARY_TAG_COLORS[tag] || {
+              const info = DIETARY_TAG_INFO[tag] || {
                 bg: 'bg-gray-100',
                 text: 'text-gray-700',
+                icon: '🏷️',
               };
               return (
                 <span
                   key={tag}
-                  className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${colors.bg} ${colors.text}`}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${info.bg} ${info.text}`}
                 >
+                  <span aria-hidden="true">{info.icon}</span>
                   {tag.replace(/_/g, ' ')}
                 </span>
               );

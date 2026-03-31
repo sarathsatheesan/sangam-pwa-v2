@@ -465,7 +465,11 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
           {drillDownDay && (
             <DrillDownPanel
               day={drillDownDay}
-              orders={revenueByDay.find(d => d.day === drillDownDay)?.orders || []}
+              orders={filteredOrders.filter(o => {
+                const d = o.createdAt?.toDate ? o.createdAt.toDate() : new Date();
+                const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return key === drillDownDay && o.status === 'delivered';
+              })}
               onClose={() => setDrillDownDay(null)}
             />
           )}

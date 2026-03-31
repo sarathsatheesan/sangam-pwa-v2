@@ -52,6 +52,7 @@ export {
   vendorModifyOrder,
   updateBusinessPaymentInfo,
   getBusinessPaymentInfo,
+  updateOrderPaymentStatus,
   findOrCreateConversation,
 } from './cateringOrders';
 
@@ -96,6 +97,7 @@ export {
   reorderFromFavorite,
   computeNextRunDate,
   estimateMonthlyRecurringCost,
+  estimateMonthlyRecurringCostLive,
   createRecurringOrder,
   fetchRecurringOrders,
   subscribeToRecurringOrders,
@@ -104,6 +106,7 @@ export {
   toggleRecurringOrder,
   setOccurrenceOverride,
   clearOccurrenceOverride,
+  fetchRecurringExecutionHistory,
 } from './cateringRecurring';
 
 // Order templates
@@ -118,6 +121,7 @@ export {
   subscribeToTemplates,
   fetchPublicTemplates,
   fetchTemplateUsageStats,
+  fetchArchivedVersions,
 } from './cateringTemplates';
 
 // Notifications

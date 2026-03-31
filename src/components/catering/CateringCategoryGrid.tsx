@@ -24,9 +24,21 @@ export default function CateringCategoryGrid({
     CATERING_CATEGORIES.includes(cat)
   );
 
+  const totalAvailable = Object.values(businessCounts).reduce((sum, c) => sum + c, 0) + totalBusinessCount;
+  const showEmptyState = totalAvailable === 0;
+
   return (
     <div className="w-full">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {showEmptyState ? (
+        <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-gray-50 py-12 mt-4">
+          <div className="text-5xl mb-4">🍽️</div>
+          <h3 className="font-semibold text-gray-900">No caterers available yet</h3>
+          <p className="mt-1 text-sm text-gray-600">
+            Check back soon — new caterers are joining regularly
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {/* All Categories button */}
         <button
           onClick={() => onSelectCategory('all')}
@@ -76,7 +88,8 @@ export default function CateringCategoryGrid({
             </button>
           );
         })}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

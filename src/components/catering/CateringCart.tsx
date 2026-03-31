@@ -189,9 +189,9 @@ export default function CateringCart({
                         <p className="text-sm text-gray-600">
                           {formatPrice(item.unitPrice)} each
                         </p>
-                        <p className="font-semibold text-gray-900">
+                        <span className="text-sm font-semibold text-gray-900">
                           {formatPrice(item.unitPrice * item.qty)}
-                        </p>
+                        </span>
                       </div>
                     </div>
                   </div>

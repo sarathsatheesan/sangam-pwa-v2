@@ -15,7 +15,7 @@ import {
 import MultiDatePicker from '@/components/shared/MultiDatePicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import type { FavoriteOrder, RecurringOrder, RecurrenceSchedule, RecurrenceInterval, DeliveryAddress, OccurrenceOverride, OrderItem } from '@/services/cateringService';
+import type { FavoriteOrder, RecurringOrder, RecurrenceSchedule, RecurrenceInterval, DeliveryAddress, OccurrenceOverride, OrderItem, CateringOrder } from '@/services/cateringService';
 import {
   subscribeToRecurringOrders,
   createRecurringOrder,
@@ -28,6 +28,7 @@ import {
   computeNextRunDate,
   formatPrice,
   calculateOrderTotal,
+  fetchRecurringExecutionHistory,
 } from '@/services/cateringService';
 
 interface RecurringOrderManagerProps {
@@ -58,6 +59,10 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
   const [occHeadcount, setOccHeadcount] = useState<number>(0);
   const [occInstructions, setOccInstructions] = useState('');
   const [savingOcc, setSavingOcc] = useState(false);
+
+  // ── Execution history state ──
+  const [historyMap, setHistoryMap] = useState<Record<string, CateringOrder[]>>({});
+  const [loadingHistory, setLoadingHistory] = useState<string | null>(null);
 
   // ── Create form state ──
   const [scheduleMode, setScheduleMode] = useState<'simple' | 'calendar'>('simple');
@@ -315,6 +320,20 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
   const removeOccItem = useCallback((idx: number) => {
     setOccItems((prev) => prev.filter((_, i) => i !== idx));
   }, []);
+
+  // ── Load execution history ──
+  const handleLoadHistory = useCallback(async (recId: string) => {
+    if (historyMap[recId]) return; // Already loaded
+    setLoadingHistory(recId);
+    try {
+      const history = await fetchRecurringExecutionHistory(recId);
+      setHistoryMap(prev => ({ ...prev, [recId]: history }));
+    } catch {
+      addToast('Failed to load history', 'error');
+    } finally {
+      setLoadingHistory(null);
+    }
+  }, [historyMap, addToast]);
 
   // ── Describe schedule in human-readable text ──
   const describeSchedule = (sched: RecurrenceSchedule): string => {
@@ -638,6 +657,14 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
                     </div>
                   )}
 
+                  {/* ── Last run display ── */}
+                  {rec.lastRunDate && (
+                    <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                      <Clock size={14} />
+                      <span>Last run: {rec.lastRunDate}</span>
+                    </div>
+                  )}
+
                   {/* ── Push notification reminder (#26) ── */}
                   {rec.active && rec.nextRunDate && (
                     <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg" style={{ backgroundColor: 'rgba(99,102,241,0.04)' }}>
@@ -751,6 +778,41 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
                       <span>{rec.deliveryAddress.street}, {rec.deliveryAddress.city}, {rec.deliveryAddress.state} {rec.deliveryAddress.zip}</span>
                     </div>
                   )}
+
+                  {/* Execution history */}
+                  <div className="border-t border-gray-200 pt-3 mt-3">
+                    <button
+                      onClick={() => handleLoadHistory(rec.id)}
+                      className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                    >
+                      {historyMap[rec.id] ? 'Execution History' : loadingHistory === rec.id ? 'Loading...' : 'View Execution History'}
+                    </button>
+                    {historyMap[rec.id] && (
+                      <div className="mt-2 space-y-2">
+                        {historyMap[rec.id].length === 0 ? (
+                          <p className="text-sm text-gray-500">No orders placed yet</p>
+                        ) : (
+                          historyMap[rec.id].map(order => (
+                            <div key={order.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 text-sm">
+                              <div>
+                                <span className="font-medium">#{order.id.slice(0, 8)}</span>
+                                <span className="text-gray-500 ml-2">
+                                  {order.createdAt?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) || ''}
+                                </span>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                order.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                                order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {order.status}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Actions */}
                   <div className="flex flex-wrap gap-2 mt-3">

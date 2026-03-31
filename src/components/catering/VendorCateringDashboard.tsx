@@ -8,7 +8,8 @@ import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   Package, Clock, CheckCircle2, XCircle, ChevronDown, ChevronUp,
   User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck, Ban,
-  Square, CheckSquare, Pencil, CreditCard, ExternalLink, Save, X,
+  Square, CheckSquare, Pencil, CreditCard, ExternalLink, Save, X, Bell,
+  MessageSquare,
 } from 'lucide-react';
 import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import {
@@ -21,8 +22,13 @@ import {
   getBusinessPaymentInfo,
   formatPrice,
   calculateOrderTotal,
+  findOrCreateConversation,
 } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import OrderTimeline from './OrderTimeline';
+import { addDoc, collection, Timestamp } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 
 const VENDOR_CANCEL_REASONS = [
   'Item unavailable',
@@ -48,12 +54,18 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
 };
 
 export default function VendorCateringDashboard({ businessId, businessName }: VendorCateringDashboardProps) {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
   const { addToast } = useToast();
+
+  // ── Vendor messaging state (H-04) ──
+  const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeToBusinessOrders(businessId, (incoming) => {
@@ -119,6 +131,14 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const [editItems, setEditItems] = useState<OrderItem[]>([]);
   const [editNote, setEditNote] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+
+  // ── Pagination state (V-06) ──
+  const ORDERS_PER_PAGE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ── Notification state (V-12) ──
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
 
   const startEditOrder = (order: CateringOrder) => {
     setEditingOrderId(order.id);
@@ -292,6 +312,18 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
     return true;
   });
 
+  // Reset page to 1 when filter changes (V-06)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
+
+  // Compute paginated orders (V-06)
+  const totalPages = Math.ceil(filteredOrders.length / ORDERS_PER_PAGE);
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * ORDERS_PER_PAGE,
+    currentPage * ORDERS_PER_PAGE,
+  );
+
   const pendingCount = orders.filter(o => o.status === 'pending').length;
 
   if (loading) {
@@ -316,6 +348,47 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* V-12: Notification bell */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifPanel(!showNotifPanel)}
+              className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label={`Notifications${notifications.filter(n => !n.read).length > 0 ? ` (${notifications.filter(n => !n.read).length} unread)` : ''}`}
+            >
+              <Bell size={20} className="text-gray-600" />
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {notifications.filter(n => !n.read).length > 9 ? '9+' : notifications.filter(n => !n.read).length}
+                </span>
+              )}
+            </button>
+            {showNotifPanel && (
+              <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg z-50">
+                <div className="p-3 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+                  <span className="text-sm font-semibold text-gray-900">Notifications</span>
+                  {notifications.filter(n => !n.read).length > 0 && (
+                    <button onClick={() => {}} className="text-xs text-indigo-600 hover:text-indigo-800">
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {notifications.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-500">No notifications yet</div>
+                ) : (
+                  notifications.slice(0, 20).map((n, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {}}
+                      className={`p-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!n.read ? 'bg-indigo-50/50' : ''}`}
+                    >
+                      <div className="text-sm font-medium text-gray-900">{n.title}</div>
+                      <div className="text-xs text-gray-600 mt-0.5">{n.body}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setShowPaymentSettings(!showPaymentSettings)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
@@ -437,7 +510,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredOrders.map((order) => {
+          {paginatedOrders.map((order) => {
             const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
             const isExpanded = expandedOrder === order.id;
             const isActionLoading = actionLoading === order.id;
@@ -523,6 +596,11 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                       </div>
                     </div>
 
+                    {/* Order Timeline */}
+                    <div className="pt-2">
+                      <OrderTimeline order={order} perspective="vendor" />
+                    </div>
+
                     {/* Items */}
                     <div>
                       <h4 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--aurora-text-muted)' }}>
@@ -556,10 +634,54 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                               onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, qty: Math.max(0, parseInt(e.target.value) || 0) } : it))}
                               className="w-14 text-center rounded-lg border px-2 py-1 text-xs" style={{ borderColor: 'var(--aurora-border)' }}
                             />
-                            <span className="flex-1 truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
+                            {/* V-07: Make new item names editable */}
+                            {item.menuItemId.startsWith('added_') ? (
+                              <input
+                                type="text"
+                                value={item.name}
+                                onChange={(e) => {
+                                  const updated = [...editItems];
+                                  const idx = updated.findIndex(it => it.menuItemId === item.menuItemId);
+                                  if (idx >= 0) updated[idx] = { ...updated[idx], name: e.target.value };
+                                  setEditItems(updated);
+                                }}
+                                placeholder="Item name"
+                                className="flex-1 text-sm border border-gray-200 rounded px-2 py-1"
+                                style={{ color: 'var(--aurora-text)' }}
+                              />
+                            ) : (
+                              <span className="flex-1 truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
+                            )}
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={editItems[i].unitPrice}
+                              onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, unitPrice: Math.max(0, parseFloat(e.target.value) || 0) } : it))}
+                              placeholder="Price"
+                              className="w-16 text-center text-sm border border-gray-200 rounded px-1 py-1"
+                              style={{ color: 'var(--aurora-text)' }}
+                            />
                             <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * editItems[i].qty)}</span>
                           </div>
                         ))}
+                        {/* V-07: Add new item button */}
+                        <div className="border-t border-gray-200 pt-3 mt-3">
+                          <button
+                            onClick={() => {
+                              setEditItems(prev => [...prev, {
+                                menuItemId: `added_${Date.now()}`,
+                                name: '',
+                                qty: 1,
+                                unitPrice: 0,
+                                pricingType: 'per_person',
+                              }]);
+                            }}
+                            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                          >
+                            + Add Item
+                          </button>
+                        </div>
                         <p className="text-xs font-medium text-right" style={{ color: 'var(--aurora-text)' }}>
                           New total: {formatPrice(editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0))}
                         </p>
@@ -599,6 +721,27 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                         <span className="font-medium">Note: </span>
                         {order.specialInstructions}
                       </div>
+                    )}
+
+                    {/* Message Customer button */}
+                    {!['cancelled', 'delivered'].includes(order.status) && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await findOrCreateConversation(
+                              order.customerId, user!.uid, `Re: Order #${order.id.slice(0, 8)}`
+                            );
+                            setMessagingOrderId(order.id);
+                          } catch (err) {
+                            addToast('Could not start conversation', 'error');
+                          }
+                        }}
+                        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border"
+                        style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.04)' }}
+                      >
+                        <MessageSquare size={14} />
+                        Message Customer
+                      </button>
                     )}
 
                     {/* Action buttons */}
@@ -718,6 +861,30 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
               </div>
             );
           })}
+          {/* V-06: Pagination controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
+              <span className="text-sm text-gray-600">
+                Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* Cancel order dialog */}
@@ -771,6 +938,62 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 style={{ backgroundColor: '#EF4444' }}
               >
                 {cancelSubmitting ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Cancel Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inline messaging modal (H-04) */}
+      {messagingOrderId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold mb-3">Message Customer</h3>
+            <p className="text-sm text-gray-500 mb-3">Order #{messagingOrderId.slice(0, 8)}</p>
+            <textarea
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder="Type your message..."
+              maxLength={500}
+              rows={4}
+              className="w-full rounded-lg border border-gray-200 p-3 text-sm resize-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none"
+            />
+            <div className="text-xs text-gray-400 text-right mt-1">{messageText.length}/500</div>
+            <div className="flex gap-3 mt-4 justify-end">
+              <button
+                onClick={() => { setMessagingOrderId(null); setMessageText(''); }}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!messageText.trim()) return;
+                  setSendingMessage(true);
+                  try {
+                    const order = orders.find(o => o.id === messagingOrderId);
+                    if (!order) throw new Error('Order not found');
+                    const convId = await findOrCreateConversation(order.customerId, user!.uid);
+                    await addDoc(collection(db, 'conversations', convId, 'messages'), {
+                      text: messageText.trim(),
+                      senderId: user!.uid,
+                      createdAt: Timestamp.now(),
+                      encrypted: false,
+                    });
+                    addToast('Message sent!', 'success');
+                    setMessagingOrderId(null);
+                    setMessageText('');
+                  } catch (err) {
+                    addToast('Failed to send message', 'error');
+                  } finally {
+                    setSendingMessage(false);
+                  }
+                }}
+                disabled={sendingMessage || !messageText.trim()}
+                className="px-4 py-2 text-sm rounded-lg text-white disabled:opacity-50"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                {sendingMessage ? 'Sending...' : 'Send'}
               </button>
             </div>
           </div>

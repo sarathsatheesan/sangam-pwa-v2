@@ -18,6 +18,7 @@ import { subscribeToCustomerOrders, formatPrice, hasReviewedOrder, cancelOrder, 
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
+import OrderTimeline from './OrderTimeline';
 
 const CUSTOMER_CANCEL_REASONS = [
   'Changed plans',
@@ -224,9 +225,8 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                     {/* Status Timeline */}
                     <div className="pt-4">
                       <OrderTimeline
-                        status={order.status}
-                        statusHistory={order.statusHistory}
-                        createdAt={order.createdAt}
+                        order={order}
+                        perspective="customer"
                       />
                     </div>
 
@@ -305,6 +305,17 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                       )}
 
                       {/* ── Payment info (#13) ── */}
+                      {order.paymentStatus && (
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                          order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                          order.paymentStatus === 'refunded' ? 'bg-red-100 text-red-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {order.paymentStatus === 'paid' ? '✓ Paid' :
+                           order.paymentStatus === 'refunded' ? '↩ Refunded' :
+                           '⏳ Payment Pending'}
+                        </span>
+                      )}
                       {['confirmed', 'preparing', 'ready'].includes(order.status) && (
                         <PaymentInfoSection businessId={order.businessId} orderId={order.id} total={order.total} />
                       )}
@@ -560,100 +571,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// ── Order Timeline (vertical status stepper) ──
-function OrderTimeline({ status, statusHistory, createdAt }: {
-  status: string;
-  statusHistory?: Array<{ status: string; timestamp: any }>;
-  createdAt?: any;
-}) {
-  const isCancelled = status === 'cancelled';
-  const currentIdx = getStepIndex(status);
-
-  // Build timestamp lookup from statusHistory
-  const historyMap = new Map<string, any>();
-  if (createdAt) historyMap.set('pending', createdAt);
-  (statusHistory || []).forEach((h) => {
-    historyMap.set(h.status, h.timestamp);
-  });
-
-  const steps = isCancelled
-    ? [...STATUS_STEPS.slice(0, Math.max(currentIdx + 1, 1)), CANCELLED_STEP]
-    : STATUS_STEPS;
-
-  return (
-    <div className="relative">
-      {steps.map((step, idx) => {
-        const isCompleted = !isCancelled && currentIdx >= idx;
-        const isCurrent = !isCancelled && currentIdx === idx;
-        const isCancelledStep = step.key === 'cancelled';
-        const isLast = idx === steps.length - 1;
-        const timestamp = historyMap.get(step.key);
-
-        const Icon = step.icon;
-        const dotColor = isCancelledStep ? '#EF4444' : isCompleted ? step.color : 'var(--aurora-border)';
-        const lineColor = !isLast && (isCompleted && !isCurrent) ? step.color : 'var(--aurora-border)';
-
-        return (
-          <div key={step.key} className="flex items-start gap-3 relative" style={{ minHeight: isLast ? 'auto' : 48 }}>
-            {/* Vertical line */}
-            {!isLast && (
-              <div
-                className="absolute left-[15px] top-[30px] w-0.5"
-                style={{
-                  height: 'calc(100% - 16px)',
-                  backgroundColor: lineColor,
-                  opacity: isCompleted && !isCurrent ? 1 : 0.3,
-                }}
-              />
-            )}
-
-            {/* Step dot */}
-            <div
-              className="w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0 z-10 transition-all"
-              style={{
-                backgroundColor: isCompleted || isCancelledStep ? dotColor : 'transparent',
-                border: isCompleted || isCancelledStep ? 'none' : '2px solid var(--aurora-border)',
-                boxShadow: isCurrent ? `0 0 0 4px ${dotColor}20` : undefined,
-              }}
-            >
-              <Icon
-                size={14}
-                style={{
-                  color: isCompleted || isCancelledStep ? '#fff' : 'var(--aurora-text-muted)',
-                }}
-              />
-            </div>
-
-            {/* Step text */}
-            <div className="flex-1 pb-4">
-              <div className="flex items-center gap-2">
-                <p
-                  className="text-sm font-medium"
-                  style={{
-                    color: isCompleted || isCancelledStep
-                      ? 'var(--aurora-text)'
-                      : 'var(--aurora-text-muted)',
-                  }}
-                >
-                  {step.label}
-                </p>
-                {isCurrent && !isCancelled && (
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: step.color }} />
-                    <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: step.color }} />
-                  </span>
-                )}
-              </div>
-              <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
-                {timestamp ? formatTimestamp(timestamp) : step.description}
-              </p>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 // ── Inline Messaging Modal ──
 function InlineMessagingModal({

@@ -307,6 +307,29 @@ export async function getBusinessPaymentInfo(
   };
 }
 
+// ── Payment status tracking (H-05) ──
+
+/**
+ * Update payment status on an order.
+ * Tracks payment events in the order for audit trail.
+ */
+export async function updateOrderPaymentStatus(
+  orderId: string,
+  paymentStatus: 'pending' | 'paid' | 'refunded',
+  extra?: { paymentMethod?: string; paymentNote?: string; transactionId?: string },
+): Promise<void> {
+  const ref = doc(db, ORDERS_COL, orderId);
+  await updateDoc(ref, {
+    paymentStatus,
+    ...(extra || {}),
+    paymentUpdatedAt: serverTimestamp(),
+    statusHistory: arrayUnion({
+      status: `payment_${paymentStatus}`,
+      timestamp: Timestamp.now(),
+    }),
+  });
+}
+
 // ── Customer-vendor messaging (#14) ──
 
 export async function findOrCreateConversation(

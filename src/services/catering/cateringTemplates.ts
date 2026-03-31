@@ -17,6 +17,7 @@ import {
   orderBy,
   limit,
   arrayUnion,
+  QueryConstraint,
 } from 'firebase/firestore';
 import type { Unsubscribe } from 'firebase/firestore';
 
@@ -159,6 +160,21 @@ export async function updateOrderTemplate(
 
       updatePayload.version = newVersion;
       updatePayload.versionHistory = arrayUnion(historyEntry);
+
+      // Size guard: if version history exceeds 50 entries, archive older entries to subcollection
+      if (currentData.versionHistory && currentData.versionHistory.length > 50) {
+        const toArchive = currentData.versionHistory.slice(0, currentData.versionHistory.length - 20); // keep last 20 in doc
+        const keepRecent = currentData.versionHistory.slice(currentData.versionHistory.length - 20);
+
+        // Archive to subcollection
+        const archiveBatch = toArchive.map(entry =>
+          addDoc(collection(db, 'cateringTemplates', tmplId, 'versionArchive'), entry)
+        );
+        await Promise.all(archiveBatch);
+
+        // Replace versionHistory with only recent entries
+        updatePayload.versionHistory = keepRecent;
+      }
     }
   }
 
@@ -264,6 +280,20 @@ export async function fetchTemplateUsageStats(
     last30Days,
     recentUsers,
   };
+}
+
+/**
+ * Fetch archived version history entries (older versions moved to subcollection).
+ */
+export async function fetchArchivedVersions(templateId: string): Promise<any[]> {
+  const q = query(
+    collection(db, 'cateringTemplates', templateId, 'versionArchive'),
+  );
+  const snap = await getDocs(q);
+  const results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // Sort by version number descending
+  results.sort((a: any, b: any) => (b.version || 0) - (a.version || 0));
+  return results;
 }
 
 /**

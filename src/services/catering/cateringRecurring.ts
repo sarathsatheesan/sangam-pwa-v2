@@ -26,6 +26,7 @@ import type {
   RecurrenceInterval,
   OccurrenceOverride,
   DeliveryAddress,
+  CateringOrder,
 } from './cateringTypes';
 import { calculateOrderTotal, createOrder } from './cateringOrders';
 
@@ -380,4 +381,101 @@ export function estimateMonthlyRecurringCost(rec: RecurringOrder): number {
   }
 
   return Math.round(orderTotal * runsPerMonth);
+}
+
+/**
+ * Estimate monthly cost with refreshed prices from current menu.
+ * Falls back to stored prices if menu items can't be fetched.
+ */
+export async function estimateMonthlyRecurringCostLive(rec: RecurringOrder): Promise<{
+  estimatedCost: number;
+  priceChanges: Array<{ name: string; oldPrice: number; newPrice: number }>;
+}> {
+  const priceChanges: Array<{ name: string; oldPrice: number; newPrice: number }> = [];
+  let refreshedItems = [...rec.items];
+
+  try {
+    // Fetch current prices for each item
+    const menuItemIds = rec.items.map(i => i.menuItemId).filter(id => !id.startsWith('scratch_'));
+    if (menuItemIds.length > 0) {
+      const { getDocs, collection: fbCollection, query: fbQuery, where: fbWhere } = await import('firebase/firestore');
+      const { db: firebaseDb } = await import('../firebase');
+
+      // Fetch in batches of 10 (Firestore 'in' limit)
+      for (let i = 0; i < menuItemIds.length; i += 10) {
+        const batch = menuItemIds.slice(i, i + 10);
+        const q = fbQuery(
+          fbCollection(firebaseDb, 'cateringMenuItems'),
+          fbWhere('__name__', 'in', batch),
+        );
+        const snap = await getDocs(q);
+        const priceMap = new Map<string, number>();
+        snap.docs.forEach(d => priceMap.set(d.id, (d.data() as any).price));
+
+        refreshedItems = refreshedItems.map(item => {
+          const currentPrice = priceMap.get(item.menuItemId);
+          if (currentPrice !== undefined && currentPrice !== item.unitPrice) {
+            priceChanges.push({
+              name: item.name,
+              oldPrice: item.unitPrice,
+              newPrice: currentPrice,
+            });
+            return { ...item, unitPrice: currentPrice };
+          }
+          return item;
+        });
+      }
+    }
+  } catch {
+    // Fallback to stored prices silently
+  }
+
+  // Calculate with (possibly refreshed) items
+  const orderTotal = refreshedItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+  const sched = rec.schedule;
+
+  let runsPerMonth: number;
+  if (sched.daysOfWeek && sched.daysOfWeek.length > 0) {
+    runsPerMonth = sched.daysOfWeek.length * 4.33;
+  } else {
+    switch (sched.interval) {
+      case 'daily': runsPerMonth = 30; break;
+      case 'weekly': runsPerMonth = 4.33; break;
+      case 'biweekly': runsPerMonth = 2.17; break;
+      case 'monthly': runsPerMonth = 1; break;
+      default: runsPerMonth = 4.33;
+    }
+  }
+
+  if (sched.skipDates && sched.skipDates.length > 0) {
+    const skipsPerMonth = sched.skipDates.length / 12;
+    runsPerMonth = Math.max(0, runsPerMonth - skipsPerMonth);
+  }
+
+  return {
+    estimatedCost: Math.round(orderTotal * runsPerMonth),
+    priceChanges,
+  };
+}
+
+/**
+ * Fetch execution history for a recurring order.
+ * Returns orders created by this recurring schedule.
+ */
+export async function fetchRecurringExecutionHistory(
+  recurringOrderId: string,
+  limitCount = 10,
+): Promise<CateringOrder[]> {
+  const q = query(
+    collection(db, 'cateringOrders'),
+    where('recurringOrderId', '==', recurringOrderId),
+  );
+  const snap = await getDocs(q);
+  const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
+  results.sort((a, b) => {
+    const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
+    const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+    return bTime - aTime;
+  });
+  return results.slice(0, limitCount);
 }

@@ -33,6 +33,7 @@ import {
   quoteEditTimeRemaining,
   subscribeToCustomerQuoteRequests,
   saveFavoriteOrder,
+  notifyVendorNewOrder,
 } from '@/services/cateringService';
 import {
   notifyQuoteRequestSubmitted,
@@ -278,7 +279,7 @@ export default function CateringPage() {
     setSubmitting(true);
     try {
       const total = calculateOrderTotal(cart.items);
-      await createOrder({
+      const orderId = await createOrder({
         customerId: user.uid,
         customerName: userProfile.name || '',
         customerEmail: userProfile.email || user.email || '',
@@ -297,6 +298,15 @@ export default function CateringPage() {
         contactName: orderForm.contactName,
         contactPhone: orderForm.contactPhone,
       });
+
+      // Notify vendor of new order (Sprint 27 — U-12)
+      notifyVendorNewOrder(
+        cart.businessId!,
+        orderId,
+        userProfile?.displayName || user.email || 'Customer',
+        cart.businessName || 'Business',
+        total,
+      ).catch(console.warn);
 
       // Auto-save as favorite for quick reorder
       try {
