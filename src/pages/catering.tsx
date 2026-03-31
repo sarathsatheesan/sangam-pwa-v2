@@ -303,7 +303,7 @@ export default function CateringPage() {
       notifyVendorNewOrder(
         cart.businessId!,
         orderId,
-        userProfile?.displayName || user.email || 'Customer',
+        userProfile?.name || user.email || 'Customer',
         cart.businessName || 'Business',
         total,
       ).catch(console.warn);

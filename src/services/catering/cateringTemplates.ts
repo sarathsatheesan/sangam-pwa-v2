@@ -167,7 +167,7 @@ export async function updateOrderTemplate(
         const keepRecent = currentData.versionHistory.slice(currentData.versionHistory.length - 20);
 
         // Archive to subcollection
-        const archiveBatch = toArchive.map(entry =>
+        const archiveBatch = toArchive.map((entry: Record<string, any>) =>
           addDoc(collection(db, 'cateringTemplates', tmplId, 'versionArchive'), entry)
         );
         await Promise.all(archiveBatch);
