@@ -255,6 +255,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
         setUsageStats((prev) => ({ ...prev, [tmplId]: stats }));
       } catch (err) {
         console.error('Failed to load usage stats:', err);
+        // Store fallback so the empty container doesn't render
+        setUsageStats((prev) => ({ ...prev, [tmplId]: { totalUses: 0, last7Days: 0, last30Days: 0, recentUsers: [] } }));
       } finally {
         setLoadingUsageStats(prev => { const next = new Set(prev); next.delete(tmplId); return next; });
       }
@@ -820,14 +822,14 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                   )}
 
                   {/* Feature #31: Usage Stats (for owned templates) */}
-                  {isMine && (
+                  {isMine && (loadingUsageStats.has(tmpl.id) || usageStats[tmpl.id]) && (
                     <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(99,102,241,0.05)', borderColor: 'rgba(99,102,241,0.1)' }}>
                       {loadingUsageStats.has(tmpl.id) ? (
                         <div className="flex items-center gap-2">
                           <Loader2 size={12} className="animate-spin" style={{ color: '#6366F1' }} />
                           <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>Loading stats...</p>
                         </div>
-                      ) : usageStats[tmpl.id] ? (
+                      ) : (
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--aurora-text)' }}>
                             <TrendingUp size={12} style={{ color: '#6366F1' }} />
@@ -837,7 +839,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                             Last 7 days: {usageStats[tmpl.id].last7Days} · Last 30 days: {usageStats[tmpl.id].last30Days}
                           </p>
                         </div>
-                      ) : null}
+                      )}
                     </div>
                   )}
 
