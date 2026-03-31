@@ -91,6 +91,33 @@ export async function hasReviewedOrder(userId: string, orderId: string): Promise
 }
 
 /**
+ * Batch check which order IDs have been reviewed by a user (F-11).
+ * Firestore `in` queries support up to 30 items.
+ */
+export async function batchHasReviewedOrders(userId: string, orderIds: string[]): Promise<Set<string>> {
+  if (orderIds.length === 0) return new Set();
+  const reviewed = new Set<string>();
+  // Firestore 'in' supports up to 30 values per query
+  const chunks: string[][] = [];
+  for (let i = 0; i < orderIds.length; i += 30) {
+    chunks.push(orderIds.slice(i, i + 30));
+  }
+  await Promise.all(chunks.map(async (chunk) => {
+    const q = query(
+      collection(db, 'businessReviews'),
+      where('userId', '==', userId),
+      where('orderId', 'in', chunk),
+    );
+    const snap = await getDocs(q);
+    snap.docs.forEach(d => {
+      const oid = d.data().orderId;
+      if (oid) reviewed.add(oid);
+    });
+  }));
+  return reviewed;
+}
+
+/**
  * Add a vendor response to an existing review.
  */
 export async function addVendorResponse(reviewId: string, responseText: string): Promise<void> {

@@ -164,6 +164,15 @@ export async function cancelOrder(
   cancelledBy: 'customer' | 'vendor',
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
+
+  // Validate status transition before cancelling (F-02 fix)
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Order not found');
+  const currentStatus = (snap.data() as CateringOrder).status;
+  if (!isValidStatusTransition(currentStatus, 'cancelled')) {
+    throw new Error(`Cannot cancel an order that is ${currentStatus.replace(/_/g, ' ')}`);
+  }
+
   await updateDoc(ref, {
     status: 'cancelled',
     cancellationReason: reason,

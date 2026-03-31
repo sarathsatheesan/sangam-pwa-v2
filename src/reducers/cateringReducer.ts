@@ -308,12 +308,23 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
         });
       }
 
+      // F-12: Clear business metadata when cart becomes empty
+      if (nextCart.items.length === 0) {
+        nextCart.businessId = null;
+        nextCart.businessName = null;
+      }
+
       return { ...state, cart: nextCart };
     }
 
     case 'REMOVE_FROM_CART': {
       const nextCart = { ...state.cart };
       nextCart.items = nextCart.items.filter((i) => i.menuItemId !== action.payload);
+      // F-12: Clear business metadata when cart becomes empty
+      if (nextCart.items.length === 0) {
+        nextCart.businessId = null;
+        nextCart.businessName = null;
+      }
       return { ...state, cart: nextCart };
     }
 

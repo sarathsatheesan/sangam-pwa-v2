@@ -23,7 +23,11 @@ import {
   formatPrice,
   calculateOrderTotal,
   findOrCreateConversation,
+  subscribeToCateringNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
 } from '@/services/cateringService';
+import type { CateringNotification } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import OrderTimeline from './OrderTimeline';
@@ -136,9 +140,18 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const ORDERS_PER_PAGE = 20;
   const [currentPage, setCurrentPage] = useState(1);
 
-  // ── Notification state (V-12) ──
-  const [notifications, setNotifications] = useState<any[]>([]);
+  // ── Notification state (V-12) — subscribed to real-time feed (F-05 fix) ──
+  const [notifications, setNotifications] = useState<CateringNotification[]>([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+
+  // F-05: Subscribe to vendor notifications
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = subscribeToCateringNotifications(user.uid, (notifs) => {
+      setNotifications(notifs);
+    });
+    return unsub;
+  }, [user?.uid]);
 
   const startEditOrder = (order: CateringOrder) => {
     setEditingOrderId(order.id);
@@ -367,7 +380,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 <div className="p-3 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
                   <span className="text-sm font-semibold text-gray-900">Notifications</span>
                   {notifications.filter(n => !n.read).length > 0 && (
-                    <button onClick={() => {}} className="text-xs text-indigo-600 hover:text-indigo-800">
+                    <button
+                      onClick={() => {
+                        if (!user?.uid) return;
+                        markAllNotificationsRead(user.uid).catch(console.warn);
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-800"
+                    >
                       Mark all read
                     </button>
                   )}
@@ -375,10 +394,20 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 {notifications.length === 0 ? (
                   <div className="p-6 text-center text-sm text-gray-500">No notifications yet</div>
                 ) : (
-                  notifications.slice(0, 20).map((n, idx) => (
+                  notifications.slice(0, 20).map((n) => (
                     <div
-                      key={idx}
-                      onClick={() => {}}
+                      key={n.id}
+                      onClick={() => {
+                        // Mark this notification as read
+                        if (!n.read) {
+                          markNotificationRead(n.id).catch(console.warn);
+                        }
+                        // Expand the related order if it exists
+                        if (n.orderId) {
+                          setExpandedOrder(n.orderId);
+                          setShowNotifPanel(false);
+                        }
+                      }}
                       className={`p-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!n.read ? 'bg-indigo-50/50' : ''}`}
                     >
                       <div className="text-sm font-medium text-gray-900">{n.title}</div>
@@ -698,10 +727,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                       </div>
                     ) : (
                       <>
-                        {/* Vendor modification notice */}
+                        {/* Vendor modification notice + rejection badge (F-06) */}
                         {order.vendorModified && (
-                          <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
-                            <span className="font-medium">Modified: </span>{order.vendorModificationNote || 'Items adjusted by vendor'}
+                          <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: order.modificationRejected ? '#FEE2E2' : '#FEF3C7', color: order.modificationRejected ? '#991B1B' : '#92400E' }}>
+                            <span className="font-medium">
+                              {order.modificationRejected ? '✗ Customer rejected modification: ' : order.modificationAccepted ? '✓ Customer accepted modification: ' : 'Modified: '}
+                            </span>
+                            {order.vendorModificationNote || 'Items adjusted by vendor'}
                           </div>
                         )}
                         {/* Edit order button for confirmed/preparing */}

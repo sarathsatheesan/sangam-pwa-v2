@@ -84,6 +84,12 @@ export default function CateringPage() {
   const [selectedFavoriteForTemplate, setSelectedFavoriteForTemplate] = useState<FavoriteOrder | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
   const selectedQuoteRequestRef = useRef<CateringQuoteRequest | null>(null);
+  const businessesRef = useRef<any[]>([]); // F-10: stable ref to avoid useCallback recreation
+
+  // Keep businesses ref in sync with state
+  useEffect(() => {
+    businessesRef.current = state.businesses;
+  }, [state.businesses]);
 
   // Vendor-switch dialog a11y (Escape + focus trap)
   const vendorSwitchClose = useCallback(
@@ -155,9 +161,12 @@ export default function CateringPage() {
         dispatch({ type: 'HYDRATE_CART', payload: stored.cart });
       } else {
         localStorage.removeItem(CART_STORAGE_KEY);
+        // F-08: Also clear orphaned checkout form if cart expired/empty
+        try { sessionStorage.removeItem('sangam_catering_order_form'); } catch {}
       }
     } catch {
       localStorage.removeItem(CART_STORAGE_KEY);
+      try { sessionStorage.removeItem('sangam_catering_order_form'); } catch {}
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -228,7 +237,7 @@ export default function CateringPage() {
   }, []);
 
   const handleAddToCart = useCallback((item: CateringMenuItem) => {
-    const biz = state.businesses.find((b: any) => b.id === item.businessId);
+    const biz = businessesRef.current.find((b: any) => b.id === item.businessId);
     const orderItem: OrderItem = {
       menuItemId: item.id,
       name: item.name,
@@ -247,7 +256,7 @@ export default function CateringPage() {
       },
     });
     addToast(`${item.name} added to cart`, 'success', 2000);
-  }, [state.businesses, addToast]);
+  }, [addToast]);
 
   const handleUpdateCartQty = useCallback((menuItemId: string, qty: number) => {
     dispatch({ type: 'UPDATE_CART_ITEM', payload: { itemId: menuItemId, qty } });
@@ -300,13 +309,17 @@ export default function CateringPage() {
       });
 
       // Notify vendor of new order (Sprint 27 — U-12)
-      notifyVendorNewOrder(
-        cart.businessId!,
-        orderId,
-        userProfile?.name || user.email || 'Customer',
-        cart.businessName || 'Business',
-        total,
-      ).catch(console.warn);
+      // Resolve ownerId from business doc — notifyVendorNewOrder expects a userId, not businessId (F-01 fix)
+      const vendorBiz = allCateringBusinesses.find((b: any) => b.id === cart.businessId);
+      if (vendorBiz?.ownerId) {
+        notifyVendorNewOrder(
+          vendorBiz.ownerId,
+          orderId,
+          userProfile?.name || user.email || 'Customer',
+          cart.businessName || 'Business',
+          total,
+        ).catch(console.warn);
+      }
 
       // Auto-save as favorite for quick reorder
       try {
@@ -332,7 +345,7 @@ export default function CateringPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [user, userProfile, state, addToast]);
+  }, [user, userProfile, state, addToast, allCateringBusinesses]);
 
   // ── RFP Handlers ──
   const handleSubmitRFP = useCallback(async () => {
@@ -482,7 +495,7 @@ export default function CateringPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide max-w-[60vw] shrink-0">
           {/* My Orders pill — always visible when logged in */}
           {user && (
             <button
@@ -493,7 +506,7 @@ export default function CateringPage() {
                   dispatch({ type: 'SET_VIEW', payload: 'orders' });
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: state.view === 'orders' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'orders' ? '#fff' : 'var(--aurora-text-secondary)',
@@ -516,7 +529,7 @@ export default function CateringPage() {
                   setSelectedQuoteRequest(null);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: state.view === 'quotes' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'quotes' ? '#fff' : 'var(--aurora-text-secondary)',
@@ -537,7 +550,7 @@ export default function CateringPage() {
                   dispatch({ type: 'SET_VIEW', payload: 'favorites' });
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: ['favorites', 'recurring'].includes(state.view) ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: ['favorites', 'recurring'].includes(state.view) ? '#fff' : 'var(--aurora-text-secondary)',
@@ -559,7 +572,7 @@ export default function CateringPage() {
                   dispatch({ type: 'SET_VIEW', payload: 'templates' });
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: state.view === 'templates' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'templates' ? '#fff' : 'var(--aurora-text-secondary)',
@@ -580,7 +593,7 @@ export default function CateringPage() {
                   dispatch({ type: 'SET_VIEW', payload: 'vendor' });
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: state.view === 'vendor' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'vendor' ? '#fff' : 'var(--aurora-text-secondary)',
@@ -663,6 +676,12 @@ export default function CateringPage() {
               <>
                 <span className="text-gray-400">/</span>
                 <span className="font-medium text-gray-900">Compare Quotes</span>
+              </>
+            )}
+            {state.view === 'vendor' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="font-medium text-gray-900">Vendor Dashboard</span>
               </>
             )}
           </nav>

@@ -31,6 +31,7 @@ export interface CateringNotification {
     | 'order_delivered'     // customer: delivered
     | 'order_cancelled'     // both: order cancelled
     | 'order_modified'      // customer: vendor modified order
+    | 'modification_rejected' // vendor: customer rejected modification
     | 'quote_received'      // customer: new vendor quote on RFP
     | 'quote_accepted';     // vendor: customer accepted quote
   title: string;
@@ -142,6 +143,25 @@ export async function notifyCustomerOrderModified(
     type: 'order_modified',
     title: 'Order Modified by Vendor',
     body: `${businessName} updated your order: ${modificationNote}`,
+    orderId,
+    businessName,
+  });
+}
+
+/**
+ * Notify vendor that customer rejected their order modification (F-06).
+ */
+export async function notifyVendorModificationRejected(
+  vendorOwnerId: string,
+  orderId: string,
+  customerName: string,
+  businessName: string,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: vendorOwnerId,
+    type: 'modification_rejected',
+    title: 'Modification Rejected',
+    body: `${customerName} rejected your changes to their order at ${businessName}`,
     orderId,
     businessName,
   });

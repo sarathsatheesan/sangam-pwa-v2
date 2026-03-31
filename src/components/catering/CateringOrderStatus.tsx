@@ -14,12 +14,12 @@ import {
   MessageSquare, AlertTriangle,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
-import { subscribeToCustomerOrders, formatPrice, hasReviewedOrder, cancelOrder, getBusinessPaymentInfo, findOrCreateConversation } from '@/services/cateringService';
+import { subscribeToCustomerOrders, formatPrice, batchHasReviewedOrders, cancelOrder, getBusinessPaymentInfo, findOrCreateConversation, notifyVendorModificationRejected } from '@/services/cateringService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
 import OrderTimeline from './OrderTimeline';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 
 const CUSTOMER_CANCEL_REASONS = [
@@ -110,15 +110,13 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
     }
   };
 
-  // Check which delivered orders have already been reviewed
+  // Check which delivered orders have already been reviewed (F-11: batched query)
   useEffect(() => {
     if (!user || orders.length === 0) return;
     const deliveredIds = orders.filter(o => o.status === 'delivered').map(o => o.id);
     if (deliveredIds.length === 0) return;
-    Promise.all(deliveredIds.map(id => hasReviewedOrder(user.uid, id).then(reviewed => reviewed ? id : null)))
-      .then(results => {
-        setReviewedOrderIds(new Set(results.filter((id): id is string => id !== null)));
-      })
+    batchHasReviewedOrders(user.uid, deliveredIds)
+      .then(setReviewedOrderIds)
       .catch(() => { /* silent */ });
   }, [user, orders]);
 
@@ -349,7 +347,18 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                                       modificationRejected: true,
                                       modificationRespondedAt: serverTimestamp(),
                                     });
-                                    addToast('Modification rejected — vendor will be notified', 'success');
+                                    // F-06: Notify vendor of rejection
+                                    const bizSnap = await getDoc(doc(db, 'businesses', order.businessId));
+                                    const vendorOwnerId = bizSnap.exists() ? bizSnap.data()?.ownerId : null;
+                                    if (vendorOwnerId) {
+                                      notifyVendorModificationRejected(
+                                        vendorOwnerId,
+                                        order.id,
+                                        order.contactName || 'Customer',
+                                        order.businessName,
+                                      ).catch(console.warn);
+                                    }
+                                    addToast('Modification rejected — vendor has been notified', 'success');
                                   } catch { addToast('Failed to respond', 'error'); }
                                   setRespondingToModification(null);
                                 }}
