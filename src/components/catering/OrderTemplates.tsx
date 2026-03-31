@@ -248,9 +248,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
     setExpandedId(tmplId);
 
     if (!usageStats[tmplId]) {
-      const newLoading = new Set(loadingUsageStats);
-      newLoading.add(tmplId);
-      setLoadingUsageStats(newLoading);
+      setLoadingUsageStats(prev => { const next = new Set(prev); next.add(tmplId); return next; });
 
       try {
         const stats = await fetchTemplateUsageStats(tmplId);
@@ -258,11 +256,10 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
       } catch (err) {
         console.error('Failed to load usage stats:', err);
       } finally {
-        newLoading.delete(tmplId);
-        setLoadingUsageStats(newLoading);
+        setLoadingUsageStats(prev => { const next = new Set(prev); next.delete(tmplId); return next; });
       }
     }
-  }, [expandedId, usageStats, loadingUsageStats]);
+  }, [expandedId, usageStats]);
 
   // Feature #30: Restore a previous version
   const handleRestoreVersion = useCallback(async (tmpl: OrderTemplate, versionToRestore: any) => {

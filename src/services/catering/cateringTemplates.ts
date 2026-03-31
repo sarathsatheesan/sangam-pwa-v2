@@ -14,8 +14,6 @@ import {
   updateDoc,
   where,
   serverTimestamp,
-  orderBy,
-  limit,
   arrayUnion,
   QueryConstraint,
 } from 'firebase/firestore';
@@ -217,19 +215,29 @@ export async function fetchPublicTemplates(options?: {
   sortBy?: 'popular' | 'newest';
   limit?: number;
 }): Promise<OrderTemplate[]> {
-  const sortByField = options?.sortBy === 'newest' ? 'createdAt' : 'useCount';
   const limitCount = options?.limit ?? 20;
 
+  // Use single-field where to avoid composite index requirement; sort client-side
   const q = query(
     collection(db, 'cateringTemplates'),
     where('isPublic', '==', true),
-    orderBy(sortByField, 'desc'),
-    limit(limitCount),
   );
 
   const snap = await getDocs(q);
   const templates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
-  return templates;
+
+  // Client-side sort
+  if (options?.sortBy === 'newest') {
+    templates.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
+      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+      return bTime - aTime;
+    });
+  } else {
+    templates.sort((a, b) => (b.useCount || 0) - (a.useCount || 0));
+  }
+
+  return templates.slice(0, limitCount);
 }
 
 /**
