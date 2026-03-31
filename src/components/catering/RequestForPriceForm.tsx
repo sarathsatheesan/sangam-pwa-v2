@@ -93,6 +93,10 @@ export default function RequestForPriceForm({
     dietaryTags: [],
   });
 
+  // Qty validation state for P-09
+  const [showQtyWarning, setShowQtyWarning] = useState(false);
+  const [confirmedDefaultQty, setConfirmedDefaultQty] = useState(false);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -150,6 +154,19 @@ export default function RequestForPriceForm({
     : cuisineItems;
 
   const canSubmit = rfpForm.deliveryCity.trim() && rfpForm.eventDate && rfpForm.headcount > 0 && rfpForm.items.length > 0;
+
+  // Handle submit with qty validation
+  const handleSubmitWithQtyCheck = () => {
+    const itemsWithDefaultQty = rfpForm.items.filter(i => i.qty === 1);
+    if (itemsWithDefaultQty.length > 0 && !confirmedDefaultQty) {
+      setShowQtyWarning(true);
+      return;
+    }
+    // All items have been checked or confirmed
+    setConfirmedDefaultQty(false);
+    setShowQtyWarning(false);
+    onSubmit();
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -524,9 +541,16 @@ export default function RequestForPriceForm({
                 }}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
-                    {item.name}
-                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
+                      {item.name}
+                    </p>
+                    {item.qty === 1 && (
+                      <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                        Qty is 1 — adjust if needed
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
                     {item.pricingType.replace('_', ' ')}
                     {item.dietaryTags && item.dietaryTags.length > 0 && ` · ${item.dietaryTags.join(', ')}`}
@@ -716,6 +740,33 @@ export default function RequestForPriceForm({
         />
       </section>
 
+      {/* Qty warning dialog */}
+      {showQtyWarning && (
+        <div className="mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50">
+          <p className="text-sm text-amber-800 font-medium">
+            {rfpForm.items.filter(i => i.qty === 1).length} item(s) still have quantity set to 1. Are you sure?
+          </p>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => {
+                setConfirmedDefaultQty(true);
+                setShowQtyWarning(false);
+                handleSubmitWithQtyCheck();
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium transition-colors hover:bg-amber-700"
+            >
+              Yes, submit as-is
+            </button>
+            <button
+              onClick={() => setShowQtyWarning(false)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-amber-300 text-amber-700 font-medium transition-colors hover:bg-amber-50"
+            >
+              Go back and adjust
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Vendor targeting info */}
       <div
         className="flex items-start gap-2 p-3 rounded-xl text-xs"
@@ -749,7 +800,7 @@ export default function RequestForPriceForm({
           Back
         </button>
         <button
-          onClick={onSubmit}
+          onClick={handleSubmitWithQtyCheck}
           disabled={loading || !canSubmit}
           className="flex-1 px-6 py-3 text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           style={{ backgroundColor: '#6366F1' }}

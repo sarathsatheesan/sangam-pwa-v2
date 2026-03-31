@@ -399,6 +399,18 @@ export async function acceptQuoteResponse(
   requestId: string,
   customerDetails: { customerName: string; customerEmail: string; customerPhone: string },
 ): Promise<void> {
+  // Check expiry before accepting
+  const responseSnap = await getDoc(doc(db, QUOTE_RESPONSES_COL, responseId));
+  if (responseSnap.exists()) {
+    const responseData = responseSnap.data();
+    if (responseData.validUntil) {
+      const expiryMs = responseData.validUntil.toMillis?.() || responseData.validUntil.seconds * 1000;
+      if (Date.now() > expiryMs) {
+        throw new Error('This quote has expired. Please request a new quote from the vendor.');
+      }
+    }
+  }
+
   // 1. Mark the chosen response as accepted and reveal customer details
   const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
   await updateDoc(responseRef, {
@@ -407,19 +419,19 @@ export async function acceptQuoteResponse(
   });
 
   // 2. Mark the quote request as accepted + write itemAssignments for all quoted items
-  const responseSnap = await getDoc(responseRef);
-  const responseData = responseSnap.data();
-  const quotedItems: { name: string }[] = responseData?.quotedItems || [];
+  const updatedSnap = await getDoc(responseRef);
+  const updatedData = updatedSnap.data();
+  const quotedItems: { name: string }[] = updatedData?.quotedItems || [];
   const requestRef = doc(db, QUOTE_REQUESTS_COL, requestId);
   await updateDoc(requestRef, {
     status: 'accepted',
     selectedResponseId: responseId,
-    selectedBusinessId: responseData?.businessId,
+    selectedBusinessId: updatedData?.businessId,
     itemAssignments: quotedItems.map((qi) => ({
       itemName: qi.name,
       responseId,
-      businessId: responseData?.businessId,
-      businessName: responseData?.businessName,
+      businessId: updatedData?.businessId,
+      businessName: updatedData?.businessName,
       assignedAt: serverTimestamp(),
     })),
   });
@@ -454,11 +466,18 @@ export async function acceptQuoteResponseItems(
   selectedItemNames: string[],
   customerDetails: { customerName: string; customerEmail: string; customerPhone: string },
 ): Promise<{ allItemsAssigned: boolean }> {
-  // 1. Get the response data to know vendor details
+  // Check expiry before accepting
   const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
   const responseSnap = await getDoc(responseRef);
   if (!responseSnap.exists()) throw new Error('Quote response not found');
   const responseData = responseSnap.data();
+
+  if (responseData.validUntil) {
+    const expiryMs = responseData.validUntil.toMillis?.() || responseData.validUntil.seconds * 1000;
+    if (Date.now() > expiryMs) {
+      throw new Error('This quote has expired. Please request a new quote from the vendor.');
+    }
+  }
 
   // 2. Determine if this is a full or partial accept of THIS vendor's quote
   const allQuotedItemNames = (responseData.quotedItems || []).map((qi: any) => qi.name);

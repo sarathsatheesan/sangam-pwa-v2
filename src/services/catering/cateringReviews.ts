@@ -110,3 +110,42 @@ export async function flagReview(reviewId: string, flaggedBy: string, reason: st
     flagReason: reason,
   });
 }
+
+/**
+ * Fetch all flagged reviews for a business (admin moderation queue).
+ */
+export async function fetchFlaggedReviews(businessId: string): Promise<CateringReview[]> {
+  const q = query(
+    collection(db, 'businessReviews'),
+    where('businessId', '==', businessId),
+    where('flagged', '==', true),
+  );
+  const snap = await getDocs(q);
+  const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringReview));
+  results.sort((a, b) => {
+    const aTime = a.flaggedAt?.toMillis?.() || a.flaggedAt?.seconds || 0;
+    const bTime = b.flaggedAt?.toMillis?.() || b.flaggedAt?.seconds || 0;
+    return bTime - aTime;
+  });
+  return results;
+}
+
+/**
+ * Dismiss a flagged review (admin action — unflag it).
+ */
+export async function dismissFlaggedReview(reviewId: string): Promise<void> {
+  await updateDoc(doc(db, 'businessReviews', reviewId), {
+    flagged: false,
+    flagDismissedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Hide a flagged review (admin action — keep flagged but hide from public).
+ */
+export async function hideReview(reviewId: string): Promise<void> {
+  await updateDoc(doc(db, 'businessReviews', reviewId), {
+    hidden: true,
+    hiddenAt: serverTimestamp(),
+  });
+}

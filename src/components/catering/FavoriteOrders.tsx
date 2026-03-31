@@ -4,10 +4,10 @@
 // Supports: save from delivered order, rename, reorder with date override, delete.
 // ═════════════════════════════════════════════════════════════════════════════════
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Heart, ShoppingCart, Trash2, Edit3, ArrowLeft, Repeat, Clock,
-  ChevronDown, ChevronUp, Loader2, Calendar, Users, MapPin, Star,
+  ChevronDown, ChevronUp, Loader2, Calendar, Users, MapPin, Star, Search,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -41,6 +41,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [editAddress, setEditAddress] = useState<DeliveryAddress>({ street: '', city: '', state: '', zip: '' });
   const [reorderQtys, setReorderQtys] = useState<Record<string, number>>({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Subscribe to favorites
   useEffect(() => {
@@ -51,6 +52,17 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
     });
     return unsub;
   }, [user]);
+
+  // Filter favorites based on search query
+  const filteredFavorites = useMemo(() => {
+    if (!searchQuery.trim()) return favorites;
+    const q = searchQuery.toLowerCase();
+    return favorites.filter(fav =>
+      fav.label.toLowerCase().includes(q) ||
+      fav.businessName.toLowerCase().includes(q) ||
+      fav.items.some(item => item.name.toLowerCase().includes(q))
+    );
+  }, [favorites, searchQuery]);
 
   // ── Handlers ──
 
@@ -187,6 +199,20 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
         </div>
       )}
 
+      {/* Search input - shown only when more than 3 favorites */}
+      {favorites.length > 3 && (
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search favorites by name, restaurant, or item..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        </div>
+      )}
+
       {/* Empty state */}
       {favorites.length === 0 && (
         <div className="text-center py-16">
@@ -202,7 +228,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
 
       {/* Favorites list */}
       <div className="space-y-3">
-        {favorites.map((fav) => {
+        {filteredFavorites.map((fav) => {
           const isExpanded = expandedId === fav.id;
           const isEditing = editingId === fav.id;
           const isReordering = reorderingId === fav.id;

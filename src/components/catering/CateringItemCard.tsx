@@ -39,7 +39,7 @@ export default function CateringItemCard({
   return (
     <div className={`flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-200 ${isDisabled ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isDisabled ? ' — ' : ''}${isOutOfStock ? 'out of stock' : isDisabled ? 'currently unavailable' : ''}`}>
       {/* Photo area */}
-      <div className="relative h-40 w-full bg-gray-100">
+      <div className="relative aspect-[5/3] w-full bg-gray-100">
         {item.photoUrl ? (
           <img
             src={item.photoUrl}

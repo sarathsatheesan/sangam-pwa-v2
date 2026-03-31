@@ -85,6 +85,9 @@ export {
   hasReviewedOrder,
   addVendorResponse,
   flagReview,
+  fetchFlaggedReviews,
+  dismissFlaggedReview,
+  hideReview,
 } from './cateringReviews';
 
 // Favorites & recurring orders

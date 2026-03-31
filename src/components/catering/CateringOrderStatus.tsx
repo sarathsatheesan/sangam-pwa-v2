@@ -19,6 +19,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
 import OrderTimeline from './OrderTimeline';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 
 const CUSTOMER_CANCEL_REASONS = [
   'Changed plans',
@@ -71,6 +73,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
   const [cancelOtherText, setCancelOtherText] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
+  const [respondingToModification, setRespondingToModification] = useState<string | null>(null);
 
   const cancelDialogClose = useCallback(() => {
     if (!cancelSubmitting) setCancellingOrderId(null);
@@ -293,14 +296,94 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         </div>
                       )}
 
-                      {/* ── Vendor modification notice (#18) ── */}
-                      {order.vendorModified && (
-                        <div className="flex items-start gap-2 p-3 rounded-xl" style={{ backgroundColor: '#FEF3C7' }}>
-                          <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" style={{ color: '#D97706' }} />
-                          <div>
-                            <p className="text-xs font-medium" style={{ color: '#92400E' }}>Order modified by vendor</p>
-                            <p className="text-xs" style={{ color: '#92400E' }}>{order.vendorModificationNote}</p>
+                      {/* ── Vendor modification re-approval flow (H-06) ── */}
+                      {order.vendorModified && order.vendorModifiedAt && (
+                        <div className="mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50">
+                          <div className="flex items-center gap-2 mb-1">
+                            <AlertTriangle size={14} className="text-amber-600" />
+                            <span className="text-sm font-medium text-amber-800">Order Modified by Vendor</span>
                           </div>
+                          {order.vendorModificationNote && (
+                            <p className="text-xs text-amber-700 mb-2">{order.vendorModificationNote}</p>
+                          )}
+                          {/* Show original vs modified items comparison */}
+                          {order.originalItems && (
+                            <div className="text-xs text-amber-700 mb-2">
+                              <p className="font-medium">Changes:</p>
+                              {order.items.map((item, i) => {
+                                const orig = order.originalItems?.find(o => o.menuItemId === item.menuItemId);
+                                if (!orig) return <p key={i}>+ Added: {item.qty}x {item.name}</p>;
+                                if (orig.qty !== item.qty) return <p key={i}>{item.name}: {orig.qty} → {item.qty}</p>;
+                                return null;
+                              })}
+                              {order.originalItems.filter(o => !order.items.find(i => i.menuItemId === o.menuItemId)).map((item, i) => (
+                                <p key={`removed-${i}`}>- Removed: {item.qty}x {item.name}</p>
+                              ))}
+                            </div>
+                          )}
+                          {/* Accept/Reject buttons (only if not yet responded) */}
+                          {!order.modificationAccepted && !order.modificationRejected && (
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={async () => {
+                                  setRespondingToModification(order.id);
+                                  try {
+                                    await updateDoc(doc(db, 'cateringOrders', order.id), {
+                                      modificationAccepted: true,
+                                      modificationRespondedAt: serverTimestamp(),
+                                    });
+                                    addToast('Modification accepted', 'success');
+                                  } catch { addToast('Failed to respond', 'error'); }
+                                  setRespondingToModification(null);
+                                }}
+                                disabled={respondingToModification === order.id}
+                                className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                              >
+                                Accept Changes
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setRespondingToModification(order.id);
+                                  try {
+                                    await updateDoc(doc(db, 'cateringOrders', order.id), {
+                                      modificationRejected: true,
+                                      modificationRespondedAt: serverTimestamp(),
+                                    });
+                                    addToast('Modification rejected — vendor will be notified', 'success');
+                                  } catch { addToast('Failed to respond', 'error'); }
+                                  setRespondingToModification(null);
+                                }}
+                                disabled={respondingToModification === order.id}
+                                className="text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                Reject Changes
+                              </button>
+                            </div>
+                          )}
+                          {order.modificationAccepted && (
+                            <p className="text-xs text-green-700 mt-1 font-medium">✓ You accepted these changes</p>
+                          )}
+                          {order.modificationRejected && (
+                            <p className="text-xs text-red-700 mt-1 font-medium">✗ You rejected these changes</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── Delivery tracking status display (H-07) ── */}
+                      {order.status === 'out_for_delivery' && (
+                        <div className="mt-3 p-3 rounded-lg border border-blue-200 bg-blue-50">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Truck size={14} className="text-blue-600" />
+                            <span className="text-sm font-medium text-blue-800">Out for Delivery</span>
+                          </div>
+                          {order.estimatedDeliveryTime && (
+                            <p className="text-xs text-blue-700">
+                              Estimated arrival: <strong>{order.estimatedDeliveryTime}</strong>
+                            </p>
+                          )}
+                          <p className="text-xs text-blue-600 mt-1">
+                            Your order is on the way. The vendor will mark it as delivered upon completion.
+                          </p>
                         </div>
                       )}
 
@@ -342,28 +425,37 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         </button>
                       )}
 
-                      {/* Leave a Review CTA — only for delivered orders */}
-                      {order.status === 'delivered' && (
-                        reviewedOrderIds.has(order.id) ? (
-                          <div
-                            className="flex items-center gap-2 p-3 rounded-xl"
-                            style={{ backgroundColor: 'rgba(245, 158, 11, 0.06)' }}
-                          >
-                            <Star size={14} fill="#F59E0B" stroke="#F59E0B" />
-                            <span className="text-sm font-medium" style={{ color: '#92400E' }}>
-                              You reviewed this order
-                            </span>
+                      {/* ── Review prompt after delivery (H-08) ── */}
+                      {order.status === 'delivered' && !reviewedOrderIds.has(order.id) && (
+                        <div className="mt-3 p-3 rounded-lg border border-green-200 bg-green-50">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-green-800">How was your order?</p>
+                              <p className="text-xs text-green-600 mt-0.5">Your feedback helps other customers and the vendor</p>
+                            </div>
+                            <button
+                              onClick={() => setReviewingOrder(order)}
+                              className="px-3 py-1.5 text-xs font-medium rounded-lg text-white"
+                              style={{ backgroundColor: '#6366F1' }}
+                            >
+                              <Star size={12} className="inline mr-1" />
+                              Leave Review
+                            </button>
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => setReviewingOrder(order)}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium transition-colors"
-                            style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
-                          >
-                            <Star size={16} />
-                            Leave a Review
-                          </button>
-                        )
+                        </div>
+                      )}
+
+                      {/* Already reviewed indicator */}
+                      {order.status === 'delivered' && reviewedOrderIds.has(order.id) && (
+                        <div
+                          className="flex items-center gap-2 p-3 rounded-xl"
+                          style={{ backgroundColor: 'rgba(245, 158, 11, 0.06)' }}
+                        >
+                          <Star size={14} fill="#F59E0B" stroke="#F59E0B" />
+                          <span className="text-sm font-medium" style={{ color: '#92400E' }}>
+                            You reviewed this order
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>

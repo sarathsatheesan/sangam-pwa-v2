@@ -56,6 +56,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
   // ── Feature #30/31: Version history and usage stats ──
   const [expandedVersionsId, setExpandedVersionsId] = useState<string | null>(null);
   const [usageStats, setUsageStats] = useState<Record<string, any>>({});
+  const [statsFetchedAt, setStatsFetchedAt] = useState<Record<string, number>>({});
   const [loadingUsageStats, setLoadingUsageStats] = useState<Set<string>>(new Set());
 
   // ── Create form state ──
@@ -238,7 +239,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
     }
   }, [addToast]);
 
-  // Feature #31: Load usage stats (lazy on expand)
+  // Feature #31: Load usage stats (lazy on expand) with 5-minute TTL caching
   const handleExpandTemplate = useCallback(async (tmplId: string) => {
     if (expandedId === tmplId) {
       setExpandedId(null);
@@ -247,21 +248,25 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
 
     setExpandedId(tmplId);
 
-    if (!usageStats[tmplId]) {
+    // Check if cache is stale (older than 5 minutes)
+    const isCacheStale = statsFetchedAt[tmplId] && (Date.now() - statsFetchedAt[tmplId] > 5 * 60 * 1000);
+    if (!usageStats[tmplId] || isCacheStale) {
       setLoadingUsageStats(prev => { const next = new Set(prev); next.add(tmplId); return next; });
 
       try {
         const stats = await fetchTemplateUsageStats(tmplId);
         setUsageStats((prev) => ({ ...prev, [tmplId]: stats }));
+        setStatsFetchedAt(prev => ({ ...prev, [tmplId]: Date.now() }));
       } catch (err) {
         console.error('Failed to load usage stats:', err);
         // Store fallback so the empty container doesn't render
         setUsageStats((prev) => ({ ...prev, [tmplId]: { totalUses: 0, last7Days: 0, last30Days: 0, recentUsers: [] } }));
+        setStatsFetchedAt(prev => ({ ...prev, [tmplId]: Date.now() }));
       } finally {
         setLoadingUsageStats(prev => { const next = new Set(prev); next.delete(tmplId); return next; });
       }
     }
-  }, [expandedId, usageStats]);
+  }, [expandedId, usageStats, statsFetchedAt]);
 
   // Feature #30: Restore a previous version
   const handleRestoreVersion = useCallback(async (tmpl: OrderTemplate, versionToRestore: any) => {

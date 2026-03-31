@@ -613,6 +613,61 @@ export default function CateringPage() {
 
       {/* Content */}
       <div className="px-4 py-4">
+        {/* Breadcrumb navigation */}
+        {state.view !== 'categories' && (
+          <nav className="flex items-center gap-1.5 text-sm mb-4" aria-label="Breadcrumb">
+            <button
+              onClick={() => dispatch({ type: 'SET_VIEW', payload: 'categories' })}
+              className="text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Categories
+            </button>
+            {['items', 'checkout', 'orders'].includes(state.view) && state.selectedCategory && (
+              <>
+                <span className="text-gray-400">/</span>
+                <button
+                  onClick={() => dispatch({ type: 'SET_VIEW', payload: 'items' })}
+                  className={`font-medium ${state.view === 'items' ? 'text-gray-900' : 'text-indigo-600 hover:text-indigo-800'}`}
+                >
+                  {state.selectedCategory === 'all' ? 'All Items' : state.selectedCategory}
+                </button>
+              </>
+            )}
+            {state.view === 'checkout' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="font-medium text-gray-900">Checkout</span>
+              </>
+            )}
+            {state.view === 'orders' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="font-medium text-gray-900">My Orders</span>
+              </>
+            )}
+            {['favorites', 'recurring', 'templates'].includes(state.view) && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="font-medium text-gray-900">
+                  {state.view === 'favorites' ? 'Saved' : state.view === 'recurring' ? 'Recurring' : 'Templates'}
+                </span>
+              </>
+            )}
+            {state.view === 'rfp' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="font-medium text-gray-900">Request for Quotes</span>
+              </>
+            )}
+            {state.view === 'quotes' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="font-medium text-gray-900">Compare Quotes</span>
+              </>
+            )}
+          </nav>
+        )}
+
         {/* Loading — show skeleton loaders instead of plain spinner */}
         {state.loading && state.view === 'items' && (
           <div className="space-y-6">

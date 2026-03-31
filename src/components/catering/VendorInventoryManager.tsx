@@ -36,6 +36,11 @@ export default function VendorInventoryManager({ businessId, businessName, onBac
   const [editCount, setEditCount] = useState<string>('');
   const [editAvailFrom, setEditAvailFrom] = useState('');
   const [editAvailUntil, setEditAvailUntil] = useState('');
+  const [undoAction, setUndoAction] = useState<{
+    itemId: string;
+    previousStock: { stockStatus?: string; stockCount?: number };
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | StockStatus>('all');
 
   const loadItems = useCallback(async () => {
@@ -63,6 +68,9 @@ export default function VendorInventoryManager({ businessId, businessName, onBac
   const handleSave = async (item: CateringMenuItem) => {
     setSavingId(item.id);
     try {
+      // Store previous stock state for undo
+      const prevStock = { stockStatus: item.stockStatus, stockCount: item.stockCount };
+
       const updates: Parameters<typeof updateMenuItemStock>[1] = {
         stockStatus: editStock,
         available: editStock !== 'out_of_stock',
@@ -79,7 +87,11 @@ export default function VendorInventoryManager({ businessId, businessName, onBac
           : i,
       ));
       setEditingId(null);
-      addToast('Stock updated', 'success');
+
+      // Set up undo action
+      const timer = setTimeout(() => setUndoAction(null), 8000);
+      setUndoAction({ itemId: item.id, previousStock: prevStock, timer });
+      addToast('Stock updated — Undo available for 8s', 'success');
     } catch {
       addToast('Failed to update stock', 'error');
     } finally {
@@ -326,6 +338,29 @@ export default function VendorInventoryManager({ businessId, businessName, onBac
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Undo toast */}
+      {undoAction && (
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-lg bg-gray-900 px-4 py-3 text-white shadow-lg">
+          <span className="text-sm">Stock updated</span>
+          <button
+            onClick={async () => {
+              clearTimeout(undoAction.timer);
+              try {
+                await updateMenuItemStock(undoAction.itemId, undoAction.previousStock);
+                setItems(prev => prev.map(i => i.id === undoAction.itemId ? { ...i, ...undoAction.previousStock } : i));
+                addToast('Change reverted', 'success');
+              } catch {
+                addToast('Failed to undo', 'error');
+              }
+              setUndoAction(null);
+            }}
+            className="rounded px-3 py-1 text-sm font-medium bg-white text-gray-900 hover:bg-gray-100"
+          >
+            Undo
+          </button>
         </div>
       )}
     </div>

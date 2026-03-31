@@ -21,24 +21,28 @@ interface CateringReviewFormProps {
   onSubmitted: () => void;
 }
 
-const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
+const RATING_LABELS: Record<number, string> = {
+  1: 'Poor',
+  2: 'Fair',
+  3: 'Good',
+  4: 'Very Good',
+  5: 'Excellent',
+};
 
 export default function CateringReviewForm({ order, onClose, onSubmitted }: CateringReviewFormProps) {
   const { user, userProfile } = useAuth();
   const { addToast } = useToast();
-  const [rating, setRating] = useState(0);
+  const [activeRating, setActiveRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
-
-  const activeRating = hoverRating || rating;
 
   const handleSubmit = useCallback(async () => {
     if (!user) {
       addToast('Please log in to leave a review', 'error');
       return;
     }
-    if (rating === 0) {
+    if (activeRating === 0) {
       addToast('Please select a star rating', 'error');
       return;
     }
@@ -61,7 +65,7 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
         businessId: order.businessId,
         userId: user.uid,
         userName: userProfile?.name || 'Anonymous',
-        rating,
+        rating: activeRating,
         text: text.trim(),
         orderId: order.id,
         eventType: order.eventType,
@@ -80,7 +84,7 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
             ownerId,
             order.businessName,
             userProfile?.name || 'A customer',
-            rating,
+            activeRating,
             text.trim(),
           );
         }
@@ -93,7 +97,7 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
     } finally {
       setSubmitting(false);
     }
-  }, [user, userProfile, rating, text, order, addToast, onClose, onSubmitted]);
+  }, [user, userProfile, activeRating, text, order, addToast, onClose, onSubmitted]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -151,32 +155,55 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
             )}
           </div>
 
-          {/* Star rating */}
+          {/* Star rating with half-star support */}
           <div className="text-center">
-            <div className="flex items-center justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setRating(star)}
-                  onMouseEnter={() => setHoverRating(star)}
-                  onMouseLeave={() => setHoverRating(0)}
-                  className="p-1 transition-transform hover:scale-110"
-                >
-                  <Star
-                    size={32}
-                    fill={star <= activeRating ? '#F59E0B' : 'none'}
-                    stroke={star <= activeRating ? '#F59E0B' : 'var(--aurora-text-secondary)'}
-                    strokeWidth={1.5}
-                  />
-                </button>
-              ))}
+            <div className="flex items-center justify-center gap-1" role="radiogroup" aria-label="Rating">
+              {[1, 2, 3, 4, 5].map((star) => {
+                const displayRating = hoverRating || activeRating;
+                const fillAmount = Math.min(1, Math.max(0, displayRating - (star - 1)));
+                // fillAmount: 0 = empty, 0.5 = half, 1 = full
+
+                return (
+                  <button
+                    key={star}
+                    type="button"
+                    className="relative p-0.5 cursor-pointer"
+                    onMouseMove={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const isLeftHalf = e.clientX - rect.left < rect.width / 2;
+                      setHoverRating(isLeftHalf ? star - 0.5 : star);
+                    }}
+                    onMouseLeave={() => setHoverRating(0)}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const isLeftHalf = e.clientX - rect.left < rect.width / 2;
+                      setActiveRating(isLeftHalf ? star - 0.5 : star);
+                    }}
+                    aria-label={`${star} star${star > 1 ? 's' : ''}`}
+                  >
+                    <div className="relative">
+                      {/* Empty star background */}
+                      <Star size={28} className="text-gray-300" strokeWidth={1.5} />
+                      {/* Filled overlay */}
+                      {fillAmount > 0 && (
+                        <div
+                          className="absolute inset-0 overflow-hidden"
+                          style={{ width: `${fillAmount * 100}%` }}
+                        >
+                          <Star size={28} className="fill-amber-400 text-amber-400" strokeWidth={1.5} />
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            {activeRating > 0 && (
+            {(hoverRating || activeRating) > 0 && (
               <p
                 className="text-sm font-medium mt-1 transition-opacity"
                 style={{ color: '#F59E0B' }}
               >
-                {RATING_LABELS[activeRating]}
+                {RATING_LABELS[Math.ceil(hoverRating || activeRating)] || ''}
               </p>
             )}
           </div>
@@ -212,7 +239,7 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
           {/* Submit */}
           <button
             onClick={handleSubmit}
-            disabled={submitting || rating === 0 || !text.trim()}
+            disabled={submitting || activeRating === 0 || !text.trim()}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
             style={{ backgroundColor: '#6366F1' }}
           >

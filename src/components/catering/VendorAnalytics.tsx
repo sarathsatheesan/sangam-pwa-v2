@@ -7,7 +7,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   TrendingUp, TrendingDown, DollarSign, Package, Users, Star,
-  BarChart3, Loader2, Calendar, Clock, Repeat, ChevronRight, X, ArrowUp, ArrowDown,
+  BarChart3, Loader2, Calendar, Clock, Repeat, ChevronRight, X, ArrowUp, ArrowDown, Download,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -178,21 +178,19 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
     return Object.entries(counts).map(([name, { count, status }]) => ({ name, value: count, status }));
   }, [filteredOrders]);
 
-  // Feature #33: Popular Items (Best Sellers)
-  const popularItems = useMemo(() => {
-    const itemMap = new Map<string, { name: string; qty: number; revenue: number }>();
-    const completed = filteredOrders.filter(o => o.status === 'delivered');
-    completed.forEach((order) => {
-      (order.items || []).forEach((item) => {
-        const key = item.menuItemId;
-        const existing = itemMap.get(key) || { name: item.name, qty: 0, revenue: 0 };
-        existing.qty += item.qty || 1;
-        existing.revenue += (item.unitPrice || 0) * (item.qty || 1);
-        itemMap.set(key, existing);
+  // Feature #33: Popular Items (Best Sellers) - V-11: Changed to sort by revenue
+  const bestSellers = useMemo(() => {
+    const revenueMap = new Map<string, { name: string; revenue: number; count: number }>();
+    filteredOrders.forEach(order => {
+      order.items?.forEach(item => {
+        const existing = revenueMap.get(item.name) || { name: item.name, revenue: 0, count: 0 };
+        existing.revenue += item.unitPrice * item.qty;
+        existing.count += item.qty;
+        revenueMap.set(item.name, existing);
       });
     });
-    return Array.from(itemMap.values())
-      .sort((a, b) => b.qty - a.qty)
+    return Array.from(revenueMap.values())
+      .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
   }, [filteredOrders]);
 
@@ -214,9 +212,18 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
       dayMap.set(hour, (dayMap.get(hour) || 0) + 1);
     });
 
+    // V-14: Format hours to 12-hour format
+    const formatHour12 = (hour: number): string => {
+      if (hour === 0) return '12 AM';
+      if (hour < 12) return `${hour} AM`;
+      if (hour === 12) return '12 PM';
+      return `${hour - 12} PM`;
+    };
+
     const hourlyChart = Array.from(hourCounts.entries())
-      .map(([hour, count]) => ({ hour: `${hour}:00`, count }))
-      .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
+      .map(([hour, count]) => ({ hour: formatHour12(hour), count, sortKey: hour }))
+      .sort((a, b) => a.sortKey - b.sortKey)
+      .map(({ hour, count }) => ({ hour, count }));
 
     return { hourlyChart, dayHourCounts };
   }, [filteredOrders]);
@@ -253,6 +260,14 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
     };
   }, [filteredOrders]);
 
+  // V-14: Format hour to 12-hour format
+  const formatHour = (hour: number): string => {
+    if (hour === 0) return '12 AM';
+    if (hour < 12) return `${hour} AM`;
+    if (hour === 12) return '12 PM';
+    return `${hour - 12} PM`;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -264,26 +279,54 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
 
   return (
     <div className="space-y-5">
-      {/* Header + time range selector */}
+      {/* Header + time range selector + V-13: Export CSV button */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BarChart3 size={20} style={{ color: '#6366F1' }} />
           <h3 className="text-base font-semibold" style={{ color: 'var(--aurora-text)' }}>Analytics</h3>
         </div>
-        <div className="flex gap-1">
-          {(['7d', '30d', '90d', 'all'] as TimeRange[]).map((range) => (
-            <button
-              key={range}
-              onClick={() => setTimeRange(range)}
-              className="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
-              style={{
-                backgroundColor: timeRange === range ? '#6366F1' : 'transparent',
-                color: timeRange === range ? '#fff' : 'var(--aurora-text-secondary)',
-              }}
-            >
-              {range === 'all' ? 'All' : range}
-            </button>
-          ))}
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const headers = ['Order ID', 'Date', 'Customer', 'Status', 'Items', 'Total'];
+              const rows = filteredOrders.map(o => [
+                o.id,
+                o.createdAt?.toDate?.()?.toISOString?.() || '',
+                o.contactName || '',
+                o.status,
+                o.items?.map(i => `${i.qty}x ${i.name}`).join('; ') || '',
+                (o.total / 100).toFixed(2),
+              ]);
+              const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `catering-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+              addToast('Analytics exported as CSV', 'success');
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
+          <div className="flex gap-1">
+            {(['7d', '30d', '90d', 'all'] as TimeRange[]).map((range) => (
+              <button
+                key={range}
+                onClick={() => setTimeRange(range)}
+                className="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+                style={{
+                  backgroundColor: timeRange === range ? '#6366F1' : 'transparent',
+                  color: timeRange === range ? '#fff' : 'var(--aurora-text-secondary)',
+                }}
+              >
+                {range === 'all' ? 'All' : range}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -543,8 +586,8 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
         </div>
       )}
 
-      {/* Feature #33: Popular Items (Best Sellers) */}
-      {popularItems.length > 0 && (
+      {/* Feature #33: Popular Items (Best Sellers) - V-11: Now shows revenue */}
+      {bestSellers.length > 0 && (
         <div
           className="rounded-2xl border p-4"
           style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
@@ -554,21 +597,21 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
             Best Sellers
           </h4>
           <div className="space-y-2.5">
-            {popularItems.map((item, idx) => (
+            {bestSellers.map((item, idx) => (
               <div key={item.name} className="text-xs">
                 <div className="flex items-center justify-between mb-1">
                   <span style={{ color: 'var(--aurora-text-secondary)' }}>
                     <span className="font-bold" style={{ color: 'var(--aurora-text)' }}>{idx + 1}.</span> {item.name}
                   </span>
                   <span style={{ color: 'var(--aurora-text)' }}>
-                    {item.qty} sold • {formatPrice(item.revenue)}
+                    {item.count} sold • {formatPrice(item.revenue)}
                   </span>
                 </div>
                 <div
                   className="h-1.5 rounded-full"
                   style={{
                     backgroundColor: 'var(--aurora-border)',
-                    backgroundImage: `linear-gradient(to right, #6366F1 0%, #6366F1 ${(item.qty / popularItems[0].qty * 100)}%, var(--aurora-border) ${(item.qty / popularItems[0].qty * 100)}%, var(--aurora-border) 100%)`,
+                    backgroundImage: `linear-gradient(to right, #6366F1 0%, #6366F1 ${(item.revenue / bestSellers[0].revenue * 100)}%, var(--aurora-border) ${(item.revenue / bestSellers[0].revenue * 100)}%, var(--aurora-border) 100%)`,
                   }}
                 />
               </div>
