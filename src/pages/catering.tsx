@@ -523,7 +523,7 @@ export default function CateringPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide max-w-[60vw] shrink-0">
+        <div className="flex items-center gap-2">
           {/* My Orders pill — always visible when logged in */}
           {user && (
             <button
