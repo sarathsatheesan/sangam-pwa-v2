@@ -1354,6 +1354,7 @@ export default function CateringPage() {
           ref={vendorSwitchRef}
           onKeyDown={vendorSwitchKeyDown}
           className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
           role="dialog"
           aria-modal="true"
           aria-label="Switch vendor confirmation"

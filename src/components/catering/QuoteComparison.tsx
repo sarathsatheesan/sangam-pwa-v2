@@ -756,7 +756,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
       {/* ── Reassignment Confirmation Dialog ── */}
       {reassignConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <div className="flex items-center gap-2 mb-3">
               <AlertCircle className="h-5 w-5 text-amber-500" />

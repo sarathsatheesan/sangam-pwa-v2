@@ -86,7 +86,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const [sendingMessage, setSendingMessage] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeToBusinessOrders(businessId, (incoming) => {
+    const unsub = subscribeToBusinessOrders(businessId, async (incoming) => {
       // SB-14: Detect genuinely new orders after initial load
       if (isFirstLoadRef.current) {
         prevOrderIdsRef.current = new Set(incoming.map(o => o.id));
@@ -98,8 +98,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
           const newest = newPendingOrders[0];
           setNewOrderBanner({ orderId: newest.id, customerName: newest.customerName || 'Customer', total: newest.total });
           // Play audio chime (Web Audio API — no external dependency)
+          // Cross-browser: resume() required for iOS Safari & Chrome autoplay policy
           try {
             const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            // iOS Safari / Chrome require explicit resume after user gesture
+            if (audioCtx.state === 'suspended') {
+              await audioCtx.resume();
+            }
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
@@ -112,6 +117,8 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
             osc.start(audioCtx.currentTime);
             osc.stop(audioCtx.currentTime + 0.5);
+            // Clean up audio context after playback to free resources (Safari memory)
+            setTimeout(() => { audioCtx.close().catch(() => {}); }, 1000);
           } catch { /* audio not available — silent fallback */ }
           // Auto-dismiss banner after 15 seconds
           setTimeout(() => setNewOrderBanner(null), 15000);
@@ -428,10 +435,11 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
             </button>
             <button
               onClick={() => setNewOrderBanner(null)}
-              className="p-1 rounded hover:bg-amber-200 transition-colors"
+              className="p-2.5 rounded hover:bg-amber-200 transition-colors"
+              style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               aria-label="Dismiss"
             >
-              <X size={14} style={{ color: '#92400E' }} />
+              <X size={16} style={{ color: '#92400E' }} />
             </button>
           </div>
         </div>
@@ -1121,7 +1129,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
       {/* Cancel order dialog */}
       {cancellingOrderId && (
         <div ref={cancelModalRef} onKeyDown={cancelKeyDown} className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">
-          <div className="absolute inset-0 bg-black/40" onClick={() => !cancelSubmitting && setCancellingOrderId(null)} />
+          <div className="absolute inset-0 bg-black/40" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => !cancelSubmitting && setCancellingOrderId(null)} />
           <div className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}>
             <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--aurora-text)' }}>Cancel Order</h3>
             <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
@@ -1177,7 +1185,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
       {/* Inline messaging modal (H-04) */}
       {messagingOrderId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-semibold mb-3">Message Customer</h3>
             <p className="text-sm text-gray-500 mb-3">Order #{messagingOrderId.slice(0, 8)}</p>

@@ -54,10 +54,33 @@ export default function SharedModal({
   }, [isOpen]);
 
   // Lock body scroll when open
+  // Cross-browser: iOS Safari ignores overflow:hidden on body — use position:fixed pattern
   useEffect(() => {
     if (isOpen) {
+      const scrollY = window.scrollY;
+      const originalStyles = {
+        overflow: document.body.style.overflow,
+        position: document.body.style.position,
+        top: document.body.style.top,
+        left: document.body.style.left,
+        right: document.body.style.right,
+        width: document.body.style.width,
+      };
       document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      return () => {
+        document.body.style.overflow = originalStyles.overflow;
+        document.body.style.position = originalStyles.position;
+        document.body.style.top = originalStyles.top;
+        document.body.style.left = originalStyles.left;
+        document.body.style.right = originalStyles.right;
+        document.body.style.width = originalStyles.width;
+        window.scrollTo(0, scrollY);
+      };
     }
   }, [isOpen]);
 
@@ -68,13 +91,14 @@ export default function SharedModal({
       <>
         <div
           className="fixed inset-0 bg-black/40 z-40 transition-opacity duration-300"
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
           onClick={disableClose ? undefined : onClose}
           role="presentation"
         />
         <div
           ref={modalRef}
           className="fixed right-0 top-0 h-full w-full bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out translate-x-0"
-          style={{ maxWidth }}
+          style={{ maxWidth, willChange: 'transform', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
           role="dialog"
           aria-modal={true}
           aria-label={title || 'Dialog'}
@@ -105,6 +129,7 @@ export default function SharedModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-black/40"
+        style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
         onClick={disableClose ? undefined : onClose}
         role="presentation"
       />
@@ -122,7 +147,8 @@ export default function SharedModal({
             {showClose && (
               <button
                 onClick={disableClose ? undefined : onClose}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 aria-label="Close"
                 disabled={disableClose}
               >

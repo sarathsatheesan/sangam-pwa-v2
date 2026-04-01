@@ -84,6 +84,7 @@ export default function CateringCart({
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-40 transition-opacity duration-300"
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
           onClick={onClose}
           role="presentation"
         />
@@ -96,6 +97,7 @@ export default function CateringCart({
         className={`fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
+        style={{ willChange: 'transform', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         role="dialog"
         aria-modal={isOpen}
         aria-label="Shopping cart"
@@ -139,7 +141,8 @@ export default function CateringCart({
                       <h3 className="font-medium text-gray-900">{item.name}</h3>
                       <button
                         onClick={() => onRemove(item.menuItemId)}
-                        className="p-1 hover:bg-red-50 rounded transition-colors"
+                        className="p-2 hover:bg-red-50 rounded transition-colors"
+                        style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         aria-label="Remove item"
                       >
                         <Trash2 className="w-4 h-4 text-red-500" />
@@ -154,7 +157,8 @@ export default function CateringCart({
                             onUpdateQty(item.menuItemId, Math.max(minQty, item.qty - 1));
                           }}
                           disabled={item.qty <= (item.minOrderQty || 1)}
-                          className="p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-30"
+                          className="p-2.5 hover:bg-gray-100 transition-colors disabled:opacity-30"
+                          style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           aria-label="Decrease quantity"
                         >
                           <Minus className="w-4 h-4 text-gray-600" />
@@ -171,7 +175,8 @@ export default function CateringCart({
                             onUpdateQty(item.menuItemId, item.qty + 1)
                           }
                           disabled={!!item.maxOrderQty && item.qty >= item.maxOrderQty}
-                          className="p-1.5 hover:bg-gray-100 transition-colors disabled:opacity-30"
+                          className="p-2.5 hover:bg-gray-100 transition-colors disabled:opacity-30"
+                          style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           aria-label="Increase quantity"
                         >
                           <Plus className="w-4 h-4 text-gray-600" />
