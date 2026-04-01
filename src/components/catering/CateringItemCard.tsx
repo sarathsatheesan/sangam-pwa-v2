@@ -16,6 +16,7 @@ const DIETARY_TAG_INFO: Record<string, { bg: string; text: string; icon: string 
   gluten_free: { bg: 'bg-amber-100', text: 'text-amber-700', icon: '🌾' },
   dairy_free: { bg: 'bg-purple-100', text: 'text-purple-700', icon: '🥛' },
   nut_free: { bg: 'bg-pink-100', text: 'text-pink-700', icon: '🥜' },
+  __default: { bg: 'var(--aurora-surface-variant)', text: 'var(--aurora-text-secondary)', icon: '🏷️' },
 };
 
 export default function CateringItemCard({
@@ -37,9 +38,9 @@ export default function CateringItemCard({
   const isDisabled = isUnavailable || isOutOfStock;
 
   return (
-    <div className={`flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-shadow duration-200 ${isDisabled ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isDisabled ? ' — ' : ''}${isOutOfStock ? 'out of stock' : isDisabled ? 'currently unavailable' : ''}`}>
+    <div className={`flex flex-col overflow-hidden rounded-xl border shadow-sm transition-shadow duration-200 ${isDisabled ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isDisabled ? ' — ' : ''}${isOutOfStock ? 'out of stock' : isDisabled ? 'currently unavailable' : ''}`}>
       {/* Photo area */}
-      <div className="relative aspect-[5/3] w-full bg-gray-100">
+      <div className="relative aspect-[5/3] w-full" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
         {item.photoUrl ? (
           <img
             src={item.photoUrl}
@@ -49,8 +50,8 @@ export default function CateringItemCard({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-            <Utensils className="h-8 w-8 text-gray-400" strokeWidth={1.5} />
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br" style={{ backgroundImage: 'linear-gradient(to bottom right, var(--aurora-surface-variant), var(--aurora-surface-variant))' }}>
+            <Utensils className="h-8 w-8" strokeWidth={1.5} style={{ color: 'var(--aurora-text-muted)' }} />
           </div>
         )}
 
@@ -76,7 +77,7 @@ export default function CateringItemCard({
         {/* Unavailable / Out of Stock overlay */}
         {isDisabled && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/60">
-            <span className="rounded-full bg-gray-800 px-3 py-1 text-xs font-semibold text-white">
+            <span className="rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: '#1f2937' }}>
               {isOutOfStock ? 'Out of Stock' : 'Currently Unavailable'}
             </span>
           </div>
@@ -86,11 +87,11 @@ export default function CateringItemCard({
       {/* Content area */}
       <div className="flex flex-1 flex-col p-4">
         {/* Name */}
-        <h3 className="font-semibold text-gray-900">{item.name}</h3>
+        <h3 className="font-semibold" style={{ color: 'var(--aurora-text)' }}>{item.name}</h3>
 
         {/* Description */}
         {item.description && (
-          <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+          <p className="mt-1 line-clamp-2 text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
             {item.description}
           </p>
         )}
@@ -99,15 +100,13 @@ export default function CateringItemCard({
         {item.dietaryTags && item.dietaryTags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {item.dietaryTags.map(tag => {
-              const info = DIETARY_TAG_INFO[tag] || {
-                bg: 'bg-gray-100',
-                text: 'text-gray-700',
-                icon: '🏷️',
-              };
+              const info = DIETARY_TAG_INFO[tag] || DIETARY_TAG_INFO.__default;
+              const isDefault = !DIETARY_TAG_INFO[tag];
               return (
                 <span
                   key={tag}
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${info.bg} ${info.text}`}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${isDefault ? '' : `${info.bg} ${info.text}`}`}
+                  style={isDefault ? { backgroundColor: info.bg, color: info.text } : {}}
                 >
                   <span aria-hidden="true">{info.icon}</span>
                   {tag.replace(/_/g, ' ')}
@@ -120,12 +119,12 @@ export default function CateringItemCard({
         {/* Price and button area */}
         <div className="mt-auto flex items-center justify-between pt-4">
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-gray-900">
+            <span className="text-lg font-bold" style={{ color: 'var(--aurora-text)' }}>
               {formatPrice(item.price)}
             </span>
-            <span className="text-xs text-gray-500">{pricingLabel}</span>
+            <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>{pricingLabel}</span>
             {item.servesCount && (
-              <span className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+              <span className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
                 <Users size={10} aria-hidden="true" />
                 Serves {item.servesCount}
               </span>

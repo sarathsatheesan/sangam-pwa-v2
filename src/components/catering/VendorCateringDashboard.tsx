@@ -463,7 +463,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
               className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
               aria-label={`Notifications${notifications.filter(n => !n.read).length > 0 ? ` (${notifications.filter(n => !n.read).length} unread)` : ''}`}
             >
-              <Bell size={20} className="text-gray-600" />
+              <Bell size={20} style={{ color: 'var(--aurora-text-secondary)' }} />
               {notifications.filter(n => !n.read).length > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
                   {notifications.filter(n => !n.read).length > 9 ? '9+' : notifications.filter(n => !n.read).length}
@@ -471,9 +471,9 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
               )}
             </button>
             {showNotifPanel && (
-              <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg z-50">
-                <div className="p-3 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
-                  <span className="text-sm font-semibold text-gray-900">Notifications</span>
+              <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border shadow-lg z-50" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+                <div className="p-3 border-b flex items-center justify-between sticky top-0" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Notifications</span>
                   {notifications.filter(n => !n.read).length > 0 && (
                     <button
                       onClick={() => {
@@ -487,7 +487,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                   )}
                 </div>
                 {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-gray-500">No notifications yet</div>
+                  <div className="p-6 text-center text-sm" style={{ color: 'var(--aurora-text-muted)' }}>No notifications yet</div>
                 ) : (
                   notifications.slice(0, 20).map((n) => (
                     <div
@@ -505,8 +505,8 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                       }}
                       className={`p-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!n.read ? 'bg-indigo-50/50' : ''}`}
                     >
-                      <div className="text-sm font-medium text-gray-900">{n.title}</div>
-                      <div className="text-xs text-gray-600 mt-0.5">{n.body}</div>
+                      <div className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>{n.title}</div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--aurora-text-secondary)' }}>{n.body}</div>
                     </div>
                   ))
                 )}
@@ -816,14 +816,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                                   setEditItems(updated);
                                 }}
                                 placeholder="Item name"
-                                className="flex-1 text-sm border border-gray-200 rounded px-2 py-1"
-                                style={{ color: 'var(--aurora-text)' }}
+                                className="flex-1 text-sm border rounded px-2 py-1" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
                               />
                             ) : (
                               <span className="flex-1 truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
                             )}
                             {/* SB-03: Display price in dollars, store in cents */}
-                            <span className="text-xs text-gray-400 mr-0.5">$</span>
+                            <span className="text-xs mr-0.5" style={{ color: 'var(--aurora-text-muted)' }}>$</span>
                             <input
                               type="number"
                               step="0.01"
@@ -831,14 +830,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                               value={(editItems[i].unitPrice / 100).toFixed(2)}
                               onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, unitPrice: Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100)) } : it))}
                               placeholder="0.00"
-                              className="w-20 text-center text-sm border border-gray-200 rounded px-1 py-1"
-                              style={{ color: 'var(--aurora-text)' }}
+                              className="w-20 text-center text-sm border rounded px-1 py-1" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
                             />
                             <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * editItems[i].qty)}</span>
                           </div>
                         ))}
                         {/* V-07: Add new item button */}
-                        <div className="border-t border-gray-200 pt-3 mt-3">
+                        <div className="border-t pt-3 mt-3" style={{ borderColor: 'var(--aurora-border)' }}>
                           <button
                             onClick={() => {
                               setEditItems(prev => [...prev, {
@@ -1102,22 +1100,22 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
           })}
           {/* V-06: Pagination controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
-              <span className="text-sm text-gray-600">
+            <div className="flex items-center justify-between border-t pt-4 mt-4" style={{ borderColor: 'var(--aurora-border)' }}>
+              <span className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                 Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length}
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                  className="px-3 py-1.5 text-sm rounded-lg border disabled:opacity-40 hover:bg-gray-50" style={{ borderColor: 'var(--aurora-border)' }}
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50"
+                  className="px-3 py-1.5 text-sm rounded-lg border disabled:opacity-40 hover:bg-gray-50" style={{ borderColor: 'var(--aurora-border)' }}
                 >
                   Next
                 </button>
@@ -1186,22 +1184,22 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
       {/* Inline messaging modal (H-04) */}
       {messagingOrderId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
             <h3 className="text-lg font-semibold mb-3">Message Customer</h3>
-            <p className="text-sm text-gray-500 mb-3">Order #{messagingOrderId.slice(0, 8)}</p>
+            <p className="text-sm mb-3" style={{ color: 'var(--aurora-text-muted)' }}>Order #{messagingOrderId.slice(0, 8)}</p>
             <textarea
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
               placeholder="Type your message..."
               maxLength={500}
               rows={4}
-              className="w-full rounded-lg border border-gray-200 p-3 text-sm resize-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none"
+              className="w-full rounded-lg border p-3 text-sm resize-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none" style={{ borderColor: 'var(--aurora-border)' }}
             />
-            <div className="text-xs text-gray-400 text-right mt-1">{messageText.length}/500</div>
+            <div className="text-xs text-right mt-1" style={{ color: 'var(--aurora-text-muted)' }}>{messageText.length}/500</div>
             <div className="flex gap-3 mt-4 justify-end">
               <button
                 onClick={() => { setMessagingOrderId(null); setMessageText(''); }}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
               >
                 Cancel
               </button>

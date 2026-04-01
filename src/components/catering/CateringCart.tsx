@@ -47,7 +47,8 @@ function QtyInput({
       onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); } }}
       onFocus={(e) => e.target.select()}
-      className="w-12 text-center font-medium text-gray-900 bg-transparent outline-none"
+      className="w-12 text-center font-medium bg-transparent outline-none"
+      style={{ color: 'var(--aurora-text)' }}
       aria-label={ariaLabel}
     />
   );
@@ -94,20 +95,20 @@ export default function CateringCart({
       <div
         ref={modalRef}
         onKeyDown={handleKeyDown}
-        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 h-full w-full max-w-md shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
-        style={{ willChange: 'transform', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+        style={{ backgroundColor: 'var(--aurora-surface)', willChange: 'transform', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
         role="dialog"
         aria-modal={isOpen}
         aria-label="Shopping cart"
       >
         {/* Header */}
-        <div className="sticky top-0 border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Your Cart</h2>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Your Cart</h2>
             {businessName && (
-              <p className="text-sm text-gray-600 mt-1">{businessName}</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--aurora-text-secondary)' }}>{businessName}</p>
             )}
           </div>
           <button
@@ -115,7 +116,7 @@ export default function CateringCart({
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label="Close cart"
           >
-            <X className="w-5 h-5 text-gray-600" />
+            <X className="w-5 h-5" style={{ color: 'var(--aurora-text-secondary)' }} />
           </button>
         </div>
 
@@ -123,8 +124,8 @@ export default function CateringCart({
         <div className="flex flex-col h-full">
           {isEmpty ? (
             <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-              <ShoppingCart className="w-12 h-12 text-gray-300 mb-4" />
-              <p className="text-gray-600 text-center">
+              <ShoppingCart className="w-12 h-12 mb-4" style={{ color: 'var(--aurora-text-muted)' }} />
+              <p className="text-center" style={{ color: 'var(--aurora-text-secondary)' }}>
                 Your cart is empty. Add items to get started!
               </p>
             </div>
@@ -135,10 +136,11 @@ export default function CateringCart({
                 {items.map((item) => (
                   <div
                     key={item.menuItemId}
-                    className="border border-gray-200 rounded-lg p-4"
+                    className="border rounded-lg p-4"
+                    style={{ borderColor: 'var(--aurora-border)' }}
                   >
                     <div className="flex justify-between items-start mb-3">
-                      <h3 className="font-medium text-gray-900">{item.name}</h3>
+                      <h3 className="font-medium" style={{ color: 'var(--aurora-text)' }}>{item.name}</h3>
                       <button
                         onClick={() => onRemove(item.menuItemId)}
                         className="p-2 hover:bg-red-50 rounded transition-colors"
@@ -150,7 +152,7 @@ export default function CateringCart({
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 border border-gray-200 rounded-lg w-fit">
+                      <div className="flex items-center gap-2 border rounded-lg w-fit" style={{ borderColor: 'var(--aurora-border)' }}>
                         <button
                           onClick={() => {
                             const minQty = item.minOrderQty || 1;
@@ -161,7 +163,7 @@ export default function CateringCart({
                           style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           aria-label="Decrease quantity"
                         >
-                          <Minus className="w-4 h-4 text-gray-600" />
+                          <Minus className="w-4 h-4" style={{ color: 'var(--aurora-text-secondary)' }} />
                         </button>
                         <QtyInput
                           value={item.qty}
@@ -179,11 +181,11 @@ export default function CateringCart({
                           style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           aria-label="Increase quantity"
                         >
-                          <Plus className="w-4 h-4 text-gray-600" />
+                          <Plus className="w-4 h-4" style={{ color: 'var(--aurora-text-secondary)' }} />
                         </button>
                       </div>
                       {(item.minOrderQty || item.maxOrderQty) && (
-                        <p className="text-[10px] text-gray-400 mt-1">
+                        <p className="text-[10px] mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
                           {item.minOrderQty ? `Min: ${item.minOrderQty}` : ''}
                           {item.minOrderQty && item.maxOrderQty ? ' · ' : ''}
                           {item.maxOrderQty ? `Max: ${item.maxOrderQty}` : ''}
@@ -191,10 +193,10 @@ export default function CateringCart({
                       )}
 
                       <div className="text-right">
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                           {formatPrice(item.unitPrice)} each
                         </p>
-                        <span className="text-sm font-semibold text-gray-900">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
                           {formatPrice(item.unitPrice * item.qty)}
                         </span>
                       </div>
@@ -204,27 +206,27 @@ export default function CateringCart({
               </div>
 
               {/* Footer */}
-              <div className="sticky bottom-0 border-t border-gray-200 bg-white px-6 py-4 space-y-3">
+              <div className="sticky bottom-0 border-t px-6 py-4 space-y-3" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Subtotal</span>
-                    <span className="text-gray-900">{formatPrice(total)}</span>
+                    <span style={{ color: 'var(--aurora-text-muted)' }}>Subtotal</span>
+                    <span style={{ color: 'var(--aurora-text)' }}>{formatPrice(total)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Est. tax (8.25%)</span>
-                    <span className="text-gray-900">{formatPrice(Math.round(total * 0.0825))}</span>
+                    <span style={{ color: 'var(--aurora-text-muted)' }}>Est. tax (8.25%)</span>
+                    <span style={{ color: 'var(--aurora-text)' }}>{formatPrice(Math.round(total * 0.0825))}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Delivery</span>
+                    <span style={{ color: 'var(--aurora-text-muted)' }}>Delivery</span>
                     <span className="text-green-600 font-medium">Free</span>
                   </div>
-                  <div className="flex justify-between items-center pt-1 border-t border-gray-100">
-                    <span className="font-semibold text-gray-900">Est. Total</span>
-                    <span className="text-lg font-semibold text-gray-900">
+                  <div className="flex justify-between items-center pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                    <span className="font-semibold" style={{ color: 'var(--aurora-text)' }}>Est. Total</span>
+                    <span className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>
                       {formatPrice(total + Math.round(total * 0.0825))}
                     </span>
                   </div>
-                  <p className="text-[10px] text-gray-400 italic mt-1">
+                  <p className="text-[10px] italic mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
                     Tax is estimated. Final total may vary based on vendor confirmation.
                   </p>
                 </div>

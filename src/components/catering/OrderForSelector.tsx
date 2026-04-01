@@ -60,7 +60,7 @@ export default function OrderForSelector({
                 : 'border-gray-300'
             }`}
           />
-          <span className="font-medium text-gray-900">For Myself</span>
+          <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>For Myself</span>
         </div>
       </button>
 
@@ -82,7 +82,7 @@ export default function OrderForSelector({
                   : 'border-gray-300'
               }`}
             />
-            <span className="font-medium text-gray-900">
+            <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
               On Behalf of Someone
             </span>
           </div>
@@ -100,7 +100,8 @@ export default function OrderForSelector({
                   recipientName: e.target.value,
                 })
               }
-              className="w-full rounded-lg border border-gray-200 px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+              style={{ borderColor: 'var(--aurora-border)' }}
             />
 
             <input
@@ -113,7 +114,8 @@ export default function OrderForSelector({
                   recipientContact: e.target.value,
                 })
               }
-              className="w-full rounded-lg border border-gray-200 px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+              style={{ borderColor: 'var(--aurora-border)' }}
             />
 
             <div className="relative">
@@ -125,7 +127,8 @@ export default function OrderForSelector({
                     relationship: e.target.value,
                   })
                 }
-                className="w-full rounded-lg border border-gray-200 px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none transition-colors bg-white pr-10"
+                className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none transition-colors bg-white pr-10"
+                style={{ borderColor: 'var(--aurora-border)' }}
               >
                 {relationships.map((rel) => (
                   <option key={rel} value={rel}>
@@ -133,7 +136,7 @@ export default function OrderForSelector({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: 'var(--aurora-text-secondary)' }} />
             </div>
           </div>
         )}
@@ -157,7 +160,7 @@ export default function OrderForSelector({
                   : 'border-gray-300'
               }`}
             />
-            <span className="font-medium text-gray-900">
+            <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
               For a Team/Department
             </span>
           </div>
@@ -175,7 +178,8 @@ export default function OrderForSelector({
                   organizationName: e.target.value,
                 })
               }
-              className="w-full rounded-lg border border-gray-200 px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+              style={{ borderColor: 'var(--aurora-border)' }}
             />
 
             <input
@@ -188,7 +192,8 @@ export default function OrderForSelector({
                   department: e.target.value,
                 })
               }
-              className="w-full rounded-lg border border-gray-200 px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+              style={{ borderColor: 'var(--aurora-border)' }}
             />
           </div>
         )}
@@ -211,7 +216,7 @@ export default function OrderForSelector({
                 : 'border-gray-300'
             }`}
           />
-          <span className="font-medium text-gray-900">Prefer Not to Say</span>
+          <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Prefer Not to Say</span>
         </div>
       </button>
     </div>

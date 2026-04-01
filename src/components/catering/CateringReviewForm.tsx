@@ -183,7 +183,7 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
                   >
                     <div className="relative">
                       {/* Empty star background */}
-                      <Star size={28} className="text-gray-300" strokeWidth={1.5} />
+                      <Star size={28} strokeWidth={1.5} style={{ color: 'var(--aurora-text-muted)' }} />
                       {/* Filled overlay */}
                       {fillAmount > 0 && (
                         <div

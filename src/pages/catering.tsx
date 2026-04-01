@@ -509,8 +509,8 @@ export default function CateringPage() {
             {state.view !== 'categories' && (
               <button
                 onClick={handleBack}
-                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
-                style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                className="p-1.5 rounded-lg transition-colors shrink-0"
+                style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--aurora-bg)' }}
               >
                 <ArrowLeft size={20} style={{ color: 'var(--aurora-text)' }} />
               </button>
@@ -582,8 +582,8 @@ export default function CateringPage() {
                         setSelectedQuoteRequest(null);
                         setShowMoreMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors"
-                      style={{ color: state.view === 'quotes' ? '#6366F1' : 'var(--aurora-text)' }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
+                      style={{ color: state.view === 'quotes' ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
                     >
                       <FileText size={15} />
                       My Quotes
@@ -593,8 +593,8 @@ export default function CateringPage() {
                         dispatch({ type: 'SET_VIEW', payload: 'favorites' });
                         setShowMoreMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors"
-                      style={{ color: ['favorites', 'recurring'].includes(state.view) ? '#6366F1' : 'var(--aurora-text)' }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
+                      style={{ color: ['favorites', 'recurring'].includes(state.view) ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
                     >
                       <Heart size={15} />
                       Saved Orders
@@ -605,8 +605,8 @@ export default function CateringPage() {
                         dispatch({ type: 'SET_VIEW', payload: 'templates' });
                         setShowMoreMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors"
-                      style={{ color: state.view === 'templates' ? '#6366F1' : 'var(--aurora-text)' }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
+                      style={{ color: state.view === 'templates' ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
                     >
                       <ClipboardList size={15} />
                       Templates
@@ -643,7 +643,8 @@ export default function CateringPage() {
           {!['checkout', 'vendor', 'rfp', 'quotes', 'orders'].includes(state.view) && (
             <button
               onClick={() => dispatch({ type: 'TOGGLE_CART' })}
-              className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="relative p-2 rounded-lg transition-colors"
+              style={{ backgroundColor: 'var(--aurora-bg)' }}
             >
               <ShoppingCart size={22} style={{ color: 'var(--aurora-text)' }} />
               {cartItemCount > 0 && (
@@ -673,10 +674,11 @@ export default function CateringPage() {
             </button>
             {['items', 'checkout', 'orders'].includes(state.view) && state.selectedCategory && (
               <>
-                <span className="text-gray-400">/</span>
+                <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
                 <button
                   onClick={() => dispatch({ type: 'SET_VIEW', payload: 'items' })}
-                  className={`font-medium ${state.view === 'items' ? 'text-gray-900' : 'text-indigo-600 hover:text-indigo-800'}`}
+                  className={`font-medium ${state.view === 'items' ? '' : 'text-indigo-600 hover:text-indigo-800'}`}
+                  style={{ color: state.view === 'items' ? 'var(--aurora-text)' : undefined }}
                 >
                   {state.selectedCategory === 'all' ? 'All Items' : state.selectedCategory}
                 </button>
@@ -684,46 +686,46 @@ export default function CateringPage() {
             )}
             {state.view === 'checkout' && (
               <>
-                <span className="text-gray-400">/</span>
-                <span className="font-medium text-gray-900">Checkout</span>
+                <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
+                <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Checkout</span>
               </>
             )}
             {state.view === 'orders' && (
               <>
-                <span className="text-gray-400">/</span>
-                <span className="font-medium text-gray-900">My Orders</span>
+                <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
+                <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>My Orders</span>
               </>
             )}
             {state.view === 'order_confirmation' && (
               <>
-                <span className="text-gray-400">/</span>
-                <span className="font-medium text-gray-900">Order Confirmed</span>
+                <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
+                <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Order Confirmed</span>
               </>
             )}
             {['favorites', 'recurring', 'templates'].includes(state.view) && (
               <>
-                <span className="text-gray-400">/</span>
-                <span className="font-medium text-gray-900">
+                <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
+                <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
                   {state.view === 'favorites' ? 'Saved' : state.view === 'recurring' ? 'Recurring' : 'Templates'}
                 </span>
               </>
             )}
             {state.view === 'rfp' && (
               <>
-                <span className="text-gray-400">/</span>
-                <span className="font-medium text-gray-900">Request for Quotes</span>
+                <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
+                <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Request for Quotes</span>
               </>
             )}
             {state.view === 'quotes' && (
               <>
-                <span className="text-gray-400">/</span>
-                <span className="font-medium text-gray-900">Compare Quotes</span>
+                <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
+                <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Compare Quotes</span>
               </>
             )}
             {state.view === 'vendor' && (
               <>
-                <span className="text-gray-400">/</span>
-                <span className="font-medium text-gray-900">Vendor Dashboard</span>
+                <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
+                <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Vendor Dashboard</span>
               </>
             )}
           </nav>
@@ -744,7 +746,7 @@ export default function CateringPage() {
             {[0, 1].map((g) => (
               <div key={g} className="space-y-4">
                 {/* Business header */}
-                <div className="flex items-center gap-3 border-b border-gray-200 pb-3">
+                <div className="flex items-center gap-3 border-b pb-3" style={{ borderColor: 'var(--aurora-border)' }}>
                   <div>
                     <div className="shimmer h-5 w-36 rounded" />
                     <div className="shimmer h-3 w-24 rounded mt-2" />
@@ -753,7 +755,7 @@ export default function CateringPage() {
                 {/* Item cards grid */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {[0, 1, 2].map((c) => (
-                    <div key={c} className="rounded-xl border border-gray-100 bg-white p-4 space-y-3">
+                    <div key={c} className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
                       <div className="shimmer h-32 w-full rounded-lg" />
                       <div className="shimmer h-4 w-3/4 rounded" />
                       <div className="shimmer h-3 w-1/2 rounded" />
@@ -801,7 +803,7 @@ export default function CateringPage() {
 
             {/* Global cross-category search */}
             <div className="relative mb-4">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--aurora-text-muted)' }} />
               <input
                 type="text"
                 placeholder="Search all menu items across categories..."
@@ -825,8 +827,8 @@ export default function CateringPage() {
                 {[0, 1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="flex flex-col items-center justify-center rounded-xl bg-white p-6 border border-gray-100"
-                    style={{ borderLeft: '4px solid #E5E7EB' }}
+                    className="flex flex-col items-center justify-center rounded-xl p-6 border"
+                    style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)', borderLeft: '4px solid var(--aurora-border)' }}
                   >
                     <div className="shimmer h-12 w-12 rounded-full mb-3" />
                     <div className="shimmer h-4 w-20 rounded mb-2" />
@@ -1384,8 +1386,8 @@ export default function CateringPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => dispatch({ type: 'CANCEL_VENDOR_SWITCH' })}
-                className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors hover:bg-gray-50"
-                style={{ borderColor: 'var(--aurora-border, #E2E5EF)', color: 'var(--aurora-text)' }}
+                className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors"
+                style={{ borderColor: 'var(--aurora-border, #E2E5EF)', color: 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
               >
                 Keep Current Cart
               </button>

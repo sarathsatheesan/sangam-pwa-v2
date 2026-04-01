@@ -97,8 +97,8 @@ export default function SharedModal({
         />
         <div
           ref={modalRef}
-          className="fixed right-0 top-0 h-full w-full bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out translate-x-0"
-          style={{ maxWidth, willChange: 'transform', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+          className="fixed right-0 top-0 h-full w-full shadow-lg z-50 transform transition-transform duration-300 ease-in-out translate-x-0"
+          style={{ maxWidth, willChange: 'transform', WebkitOverflowScrolling: 'touch', backgroundColor: 'var(--aurora-surface)' } as React.CSSProperties}
           role="dialog"
           aria-modal={true}
           aria-label={title || 'Dialog'}

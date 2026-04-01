@@ -357,7 +357,8 @@ export default function VendorInventoryManager({ businessId, businessName, onBac
               }
               setUndoAction(null);
             }}
-            className="rounded px-3 py-1 text-sm font-medium bg-white text-gray-900 hover:bg-gray-100"
+            className="rounded px-3 py-1 text-sm font-medium hover:bg-gray-100"
+            style={{ backgroundColor: 'var(--aurora-surface)', color: 'var(--aurora-text)' }}
           >
             Undo
           </button>

@@ -175,7 +175,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-4">
-        <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+        <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-opacity-50 transition-colors">
           <ArrowLeft size={20} style={{ color: 'var(--aurora-text)' }} />
         </button>
         <div>
@@ -202,13 +202,14 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
       {/* Search input - shown only when more than 3 favorites */}
       {favorites.length > 3 && (
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--aurora-text-muted)' }} />
           <input
             type="text"
             placeholder="Search favorites by name, restaurant, or item..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-4 text-sm text-gray-900 placeholder-gray-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-full rounded-lg py-2 pl-9 pr-4 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)', color: 'var(--aurora-text)' }}
           />
         </div>
       )}
@@ -365,13 +366,13 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
                                 <div className="flex items-center gap-1 ml-2">
                                   <button
                                     onClick={() => setReorderQtys(prev => ({ ...prev, [item.menuItemId]: Math.max(1, qty - 1) }))}
-                                    className="w-6 h-6 flex items-center justify-center rounded border text-xs hover:bg-gray-100"
+                                    className="w-6 h-6 flex items-center justify-center rounded border text-xs hover:bg-opacity-50"
                                     style={{ borderColor: 'var(--aurora-border)' }}
                                   >−</button>
                                   <span className="w-6 text-center text-xs font-medium">{qty}</span>
                                   <button
                                     onClick={() => setReorderQtys(prev => ({ ...prev, [item.menuItemId]: qty + 1 }))}
-                                    className="w-6 h-6 flex items-center justify-center rounded border text-xs hover:bg-gray-100"
+                                    className="w-6 h-6 flex items-center justify-center rounded border text-xs hover:bg-opacity-50"
                                     style={{ borderColor: 'var(--aurora-border)' }}
                                   >+</button>
                                 </div>

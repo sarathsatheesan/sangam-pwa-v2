@@ -38,15 +38,21 @@ const DIETARY_OPTIONS = [
 
 function ItemCardSkeleton() {
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm animate-pulse">
-      <div className="h-40 w-full bg-gray-200" />
+    <div
+      className="flex flex-col overflow-hidden rounded-xl border shadow-sm animate-pulse"
+      style={{
+        borderColor: 'var(--aurora-border)',
+        backgroundColor: 'var(--aurora-surface)',
+      }}
+    >
+      <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-40 w-full" />
       <div className="flex flex-1 flex-col p-4 space-y-3">
-        <div className="h-4 w-3/4 rounded bg-gray-200" />
-        <div className="h-3 w-full rounded bg-gray-200" />
-        <div className="h-3 w-1/2 rounded bg-gray-200" />
+        <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-4 w-3/4 rounded" />
+        <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-3 w-full rounded" />
+        <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-3 w-1/2 rounded" />
         <div className="mt-auto flex items-center justify-between pt-4">
-          <div className="h-5 w-16 rounded bg-gray-200" />
-          <div className="h-9 w-20 rounded-lg bg-gray-200" />
+          <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-5 w-16 rounded" />
+          <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-9 w-20 rounded-lg" />
         </div>
       </div>
     </div>
@@ -140,18 +146,21 @@ export default function CateringItemList({
       <div className="space-y-4">
         {/* Search bar */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          <Search
+            className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2"
+            style={{ color: 'var(--aurora-text-muted)' }}
+          />
           <input
             type="text"
             placeholder="Search items by name or description..."
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             aria-label="Search catering items by name or description"
-            className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-500 transition-colors duration-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-full rounded-lg border py-2.5 pl-10 pr-4 text-sm placeholder-gray-500 transition-colors duration-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
             style={{
-              borderColor: 'var(--aurora-border, #E5E7EB)',
-              backgroundColor: 'var(--aurora-surface, #FFFFFF)',
-              color: 'var(--aurora-text, #111827)',
+              borderColor: 'var(--aurora-border)',
+              backgroundColor: 'var(--aurora-surface)',
+              color: 'var(--aurora-text)',
             }}
           />
         </div>
@@ -173,14 +182,17 @@ export default function CateringItemList({
                   className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                     isSelected
                       ? 'text-white'
-                      : 'border border-gray-200 text-gray-700 hover:border-gray-300'
+                      : 'border hover:border-gray-300'
                   }`}
                   style={
                     isSelected
                       ? {
                           backgroundColor: 'var(--aurora-secondary, #10B981)',
                         }
-                      : undefined
+                      : {
+                          borderColor: 'var(--aurora-border)',
+                          color: 'var(--aurora-text-secondary)',
+                        }
                   }
                   role="checkbox"
                   aria-checked={isSelected}
@@ -206,11 +218,14 @@ export default function CateringItemList({
           {/* Sort dropdown */}
           {onSortChange && (
             <div className="relative flex items-center gap-1.5">
-              <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+              <ArrowUpDown
+                className="h-3.5 w-3.5"
+                style={{ color: 'var(--aurora-text-muted)' }}
+              />
               <select
                 value={sortOrder}
                 onChange={(e) => onSortChange(e.target.value as SortOrder)}
-                className="appearance-none bg-transparent text-xs font-medium text-gray-600 pr-5 cursor-pointer outline-none hover:text-gray-900 transition-colors"
+                className="appearance-none bg-transparent text-xs font-medium pr-5 cursor-pointer outline-none transition-colors hover:text-gray-900"
                 aria-label="Sort items"
                 style={{ color: 'var(--aurora-text-secondary)' }}
               >
@@ -247,10 +262,13 @@ export default function CateringItemList({
                   style={{ contentVisibility: 'auto', containIntrinsicBlockSize: 'auto 400px' } as React.CSSProperties}
                 >
                   {/* Business header */}
-                  <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                  <div
+                    className="flex items-center justify-between border-b pb-3"
+                    style={{ borderColor: 'var(--aurora-border)' }}
+                  >
                     <div className="flex items-center gap-3">
                       <div>
-                        <h2 className="font-semibold text-gray-900">
+                        <h2 className="font-semibold" style={{ color: 'var(--aurora-text)' }}>
                           {business.name}
                         </h2>
                         <div className="mt-1 flex items-center gap-3">
@@ -263,16 +281,21 @@ export default function CateringItemList({
                                   className={`h-3.5 w-3.5 ${
                                     i < Math.floor(business.rating)
                                       ? 'fill-amber-400 text-amber-400'
-                                      : 'text-gray-300'
+                                      : ''
                                   }`}
                                   strokeWidth={2}
+                                  style={
+                                    i < Math.floor(business.rating)
+                                      ? undefined
+                                      : { color: 'var(--aurora-text-muted)' }
+                                  }
                                 />
                               ))}
-                              <span className="text-xs text-gray-600">
+                              <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
                                 {business.rating?.toFixed(1) ?? 'N/A'}
                               </span>
                               {business.reviews > 0 && (
-                                <span className="text-xs text-gray-400">
+                                <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
                                   ({business.reviews})
                                 </span>
                               )}
@@ -317,10 +340,22 @@ export default function CateringItemList({
         </div>
       ) : (
         /* Empty state */
-        <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-gray-50 py-12">
-          <UtensilsCrossed className="h-12 w-12 text-gray-400" strokeWidth={1.5} />
-          <h3 className="mt-4 font-semibold text-gray-900">No items found</h3>
-          <p className="mt-1 text-sm text-gray-600">
+        <div
+          className="flex flex-col items-center justify-center rounded-lg border py-12"
+          style={{
+            borderColor: 'var(--aurora-border)',
+            backgroundColor: 'var(--aurora-bg)',
+          }}
+        >
+          <UtensilsCrossed
+            className="h-12 w-12"
+            strokeWidth={1.5}
+            style={{ color: 'var(--aurora-text-muted)' }}
+          />
+          <h3 className="mt-4 font-semibold" style={{ color: 'var(--aurora-text)' }}>
+            No items found
+          </h3>
+          <p className="mt-1 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
             Try adjusting your search or filters
           </p>
         </div>

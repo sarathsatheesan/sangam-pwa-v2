@@ -259,8 +259,93 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                 {/* Expanded: Timeline + Details */}
                 {isExpanded && (
                   <div className="px-4 pb-4 space-y-4 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
-                    {/* Status Timeline */}
-                    <div className="pt-4">
+
+                    {/* ── Order Progress Stepper — shows full pipeline with current step highlighted ── */}
+                    {!isCancelled && (
+                      <div className="pt-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--aurora-text-muted)' }}>
+                          Order Progress
+                        </h4>
+                        <div className="flex items-start justify-between relative">
+                          {/* Connecting line behind the dots */}
+                          <div
+                            className="absolute top-4 left-0 right-0 h-0.5"
+                            style={{ backgroundColor: 'var(--aurora-border)', marginLeft: '1rem', marginRight: '1rem' }}
+                          />
+                          {/* Filled progress line */}
+                          <div
+                            className="absolute top-4 left-0 h-0.5 transition-all duration-500"
+                            style={{
+                              backgroundColor: STATUS_STEPS[Math.min(currentIdx, STATUS_STEPS.length - 1)]?.color || '#6366F1',
+                              marginLeft: '1rem',
+                              width: currentIdx >= 0 ? `calc(${(currentIdx / (STATUS_STEPS.length - 1)) * 100}% - 2rem)` : '0',
+                            }}
+                          />
+                          {STATUS_STEPS.map((step, idx) => {
+                            const StepIcon = step.icon;
+                            const isCompleted = idx < currentIdx;
+                            const isCurrent = idx === currentIdx;
+                            const isFuture = idx > currentIdx;
+                            return (
+                              <div key={step.key} className="flex flex-col items-center relative z-10" style={{ flex: '1 1 0', minWidth: 0 }}>
+                                <div
+                                  className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300"
+                                  style={{
+                                    backgroundColor: isCurrent ? step.color : isCompleted ? step.color : 'var(--aurora-bg)',
+                                    boxShadow: isCurrent ? `0 0 0 4px ${step.color}22` : 'none',
+                                  }}
+                                >
+                                  {isCompleted ? (
+                                    <CheckCircle2 size={14} className="text-white" strokeWidth={2.5} />
+                                  ) : (
+                                    <StepIcon
+                                      size={14}
+                                      strokeWidth={2}
+                                      style={{ color: isCurrent ? '#fff' : isFuture ? 'var(--aurora-text-muted)' : '#fff' }}
+                                    />
+                                  )}
+                                </div>
+                                <span
+                                  className="text-[10px] sm:text-[11px] mt-1.5 text-center leading-tight font-medium px-0.5"
+                                  style={{
+                                    color: isCurrent ? step.color : isCompleted ? 'var(--aurora-text)' : 'var(--aurora-text-muted)',
+                                  }}
+                                >
+                                  {step.label}
+                                </span>
+                                {isCurrent && (
+                                  <span
+                                    className="text-[9px] mt-0.5 text-center leading-tight"
+                                    style={{ color: step.color }}
+                                  >
+                                    Current
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Cancelled banner */}
+                    {isCancelled && (
+                      <div className="pt-4 flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: '#FEF2F2' }}>
+                        <XCircle size={16} style={{ color: '#EF4444' }} />
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: '#991B1B' }}>Order Cancelled</p>
+                          {order.cancellationReason && (
+                            <p className="text-xs mt-0.5" style={{ color: '#B91C1C' }}>
+                              Reason: {order.cancellationReason}
+                              {order.cancelledBy ? ` (by ${order.cancelledBy})` : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status Timeline — detailed event log */}
+                    <div className="pt-2">
                       <OrderTimeline
                         order={order}
                         perspective="customer"
@@ -476,7 +561,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                           <button
                             disabled
                             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border opacity-40 cursor-not-allowed"
-                            style={{ borderColor: '#E5E7EB', color: '#9CA3AF', backgroundColor: '#F9FAFB' }}
+                            style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-muted)', backgroundColor: 'var(--aurora-bg)' }}
                           >
                             <Ban size={14} />
                             Cancel Order

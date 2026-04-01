@@ -50,7 +50,7 @@ function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
           key={star}
           size={size}
           fill={star <= Math.round(rating) ? '#F59E0B' : 'none'}
-          stroke={star <= Math.round(rating) ? '#F59E0B' : '#D1D5DB'}
+          stroke={star <= Math.round(rating) ? '#F59E0B' : 'var(--aurora-text-muted)'}
           strokeWidth={1.5}
         />
       ))}

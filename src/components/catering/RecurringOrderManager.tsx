@@ -659,7 +659,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
 
                   {/* ── Last run display ── */}
                   {rec.lastRunDate && (
-                    <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+                    <div className="mt-3 flex items-center gap-2 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                       <Clock size={14} />
                       <span>Last run: {rec.lastRunDate}</span>
                     </div>
@@ -780,7 +780,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
                   )}
 
                   {/* Execution history */}
-                  <div className="border-t border-gray-200 pt-3 mt-3">
+                  <div className="border-t pt-3 mt-3" style={{ borderColor: 'var(--aurora-border)' }}>
                     <button
                       onClick={() => handleLoadHistory(rec.id)}
                       className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
@@ -790,21 +790,23 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
                     {historyMap[rec.id] && (
                       <div className="mt-2 space-y-2">
                         {historyMap[rec.id].length === 0 ? (
-                          <p className="text-sm text-gray-500">No orders placed yet</p>
+                          <p className="text-sm" style={{ color: 'var(--aurora-text-muted)' }}>No orders placed yet</p>
                         ) : (
                           historyMap[rec.id].map(order => (
-                            <div key={order.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 text-sm">
+                            <div key={order.id} className="flex items-center justify-between p-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--aurora-bg)' }}>
                               <div>
                                 <span className="font-medium">#{order.id.slice(0, 8)}</span>
-                                <span className="text-gray-500 ml-2">
+                                <span className="ml-2" style={{ color: 'var(--aurora-text-muted)' }}>
                                   {order.createdAt?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) || ''}
                                 </span>
                               </div>
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                 order.status === 'delivered' ? 'bg-green-100 text-green-700' :
                                 order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                                'bg-gray-100 text-gray-700'
-                              }`}>
+                                ''
+                              }`} style={{
+                                ...(order.status !== 'delivered' && order.status !== 'cancelled' ? { backgroundColor: 'var(--aurora-surface-variant)', color: 'var(--aurora-text-secondary)' } : {})
+                              }}>
                                 {order.status}
                               </span>
                             </div>

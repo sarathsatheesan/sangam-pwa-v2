@@ -307,7 +307,8 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
               URL.revokeObjectURL(url);
               addToast('Analytics exported as CSV', 'success');
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border hover:bg-gray-50"
+            style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
           >
             <Download size={14} />
             Export CSV

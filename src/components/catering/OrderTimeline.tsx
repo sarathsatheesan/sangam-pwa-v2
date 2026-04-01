@@ -77,12 +77,12 @@ export default function OrderTimeline({ order, perspective }: OrderTimelineProps
 
   return (
     <div className="space-y-0">
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--aurora-text-muted)' }}>
         Order Timeline
       </h4>
       <div className="relative">
         {/* Vertical line */}
-        <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-gray-200" />
+        <div className="absolute left-3 top-2 bottom-2 w-0.5" style={{ backgroundColor: 'var(--aurora-border)' }} />
 
         {events.map((event, idx) => {
           const isModified = event.status === 'modified';
@@ -99,18 +99,18 @@ export default function OrderTimeline({ order, perspective }: OrderTimelineProps
                 className="relative z-10 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full"
                 style={{ backgroundColor: isLast ? config.color : '#E5E7EB' }}
               >
-                <Icon size={12} className={isLast ? 'text-white' : 'text-gray-500'} strokeWidth={2.5} />
+                <Icon size={12} className={isLast ? 'text-white' : ''} strokeWidth={2.5} style={{ color: isLast ? 'inherit' : 'var(--aurora-text-muted)' }} />
               </div>
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm font-medium ${isLast ? 'text-gray-900' : 'text-gray-600'}`}>
+                  <span className="text-sm font-medium" style={{ color: isLast ? 'var(--aurora-text)' : 'var(--aurora-text-secondary)' }}>
                     {config.label}
                   </span>
                 </div>
-                <span className="text-xs text-gray-500">{formatTimelineDate(event.timestamp)}</span>
+                <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>{formatTimelineDate(event.timestamp)}</span>
                 {event.note && (
-                  <p className="text-xs text-gray-500 mt-0.5 italic">{event.note}</p>
+                  <p className="text-xs mt-0.5 italic" style={{ color: 'var(--aurora-text-muted)' }}>{event.note}</p>
                 )}
               </div>
             </div>

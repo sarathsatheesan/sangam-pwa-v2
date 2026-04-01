@@ -164,7 +164,7 @@ export default function CateringCheckout({
     }`;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--aurora-bg)' }}>
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 flex items-center gap-3">
@@ -173,20 +173,20 @@ export default function CateringCheckout({
             className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
             aria-label="Go back to menu"
           >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
+            <ArrowLeft className="w-5 h-5" style={{ color: 'var(--aurora-text-secondary)' }} />
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">Checkout</h1>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--aurora-text)' }}>Checkout</h1>
         </div>
 
         <div className="space-y-6">
           {/* Section 1: Event Details */}
-          <section className="bg-white rounded-lg p-6 border-t-4 border-indigo-500" aria-labelledby="event-details-heading">
-            <h2 id="event-details-heading" className="text-lg font-semibold text-gray-900 mb-4">
+          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="event-details-heading">
+            <h2 id="event-details-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
               Event Details
             </h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="event-date" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="event-date" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                   Event Date <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <input
@@ -209,7 +209,7 @@ export default function CateringCheckout({
               </div>
 
               <div>
-                <label htmlFor="headcount" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="headcount" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                   Headcount <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <input
@@ -233,7 +233,7 @@ export default function CateringCheckout({
               </div>
 
               <div>
-                <label htmlFor="contact-name" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="contact-name" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                   Contact Name <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <input
@@ -256,7 +256,7 @@ export default function CateringCheckout({
               </div>
 
               <div>
-                <label htmlFor="contact-phone" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="contact-phone" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                   Contact Phone <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <input
@@ -281,13 +281,13 @@ export default function CateringCheckout({
           </section>
 
           {/* Section 2: Delivery Address */}
-          <section className="bg-white rounded-lg p-6 border-t-4 border-indigo-500" aria-labelledby="delivery-heading">
-            <h2 id="delivery-heading" className="text-lg font-semibold text-gray-900 mb-4">
+          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="delivery-heading">
+            <h2 id="delivery-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
               Delivery Address
             </h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="street" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="street" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                   Street Address <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <AddressAutocomplete
@@ -311,7 +311,7 @@ export default function CateringCheckout({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="city" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                     City <span className="text-red-500" aria-hidden="true">*</span>
                   </label>
                   <input
@@ -333,7 +333,7 @@ export default function CateringCheckout({
                 </div>
 
                 <div>
-                  <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="state" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                     State <span className="text-red-500" aria-hidden="true">*</span>
                   </label>
                   <input
@@ -356,7 +356,7 @@ export default function CateringCheckout({
               </div>
 
               <div>
-                <label htmlFor="zip" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="zip" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                   ZIP Code <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <input
@@ -381,8 +381,8 @@ export default function CateringCheckout({
           </section>
 
           {/* Section 3: Order For Context */}
-          <section className="bg-white rounded-lg p-6 border-t-4 border-indigo-500" aria-labelledby="orderfor-heading">
-            <h2 id="orderfor-heading" className="text-lg font-semibold text-gray-900 mb-4">
+          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="orderfor-heading">
+            <h2 id="orderfor-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
               Who is this order for?
             </h2>
             <OrderForSelector
@@ -392,8 +392,8 @@ export default function CateringCheckout({
           </section>
 
           {/* Section 4: Special Instructions */}
-          <section className="bg-white rounded-lg p-6 border-t-4 border-indigo-500" aria-labelledby="instructions-heading">
-            <h2 id="instructions-heading" className="text-lg font-semibold text-gray-900 mb-4">
+          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="instructions-heading">
+            <h2 id="instructions-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
               Special Instructions
             </h2>
             <textarea
@@ -407,30 +407,32 @@ export default function CateringCheckout({
               placeholder="Add any special requests or dietary restrictions..."
               rows={4}
               maxLength={SPECIAL_INSTRUCTIONS_MAX}
-              className="w-full rounded-lg border border-gray-200 px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none"
+              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none"
+              style={{ borderColor: 'var(--aurora-border)' }}
               aria-label="Special instructions"
               aria-describedby="instructions-count"
             />
-            <p id="instructions-count" className="text-xs text-gray-400 text-right mt-1">
+            <p id="instructions-count" className="text-xs text-right mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
               {orderForm.specialInstructions.length}/{SPECIAL_INSTRUCTIONS_MAX}
             </p>
           </section>
 
           {/* Section 5: Order Summary */}
-          <section className="bg-white rounded-lg p-6 border-t-4 border-indigo-500" aria-labelledby="summary-heading">
-            <h2 id="summary-heading" className="text-lg font-semibold text-gray-900 mb-4">
+          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="summary-heading">
+            <h2 id="summary-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
               Order Summary
             </h2>
 
             {cart.businessName && (
-              <p className="text-sm text-gray-600 mb-4">From: {cart.businessName}</p>
+              <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>From: {cart.businessName}</p>
             )}
 
             <div className="space-y-3 mb-4" role="list" aria-label="Order items">
               {cart.items.map((item) => (
                 <div
                   key={item.menuItemId}
-                  className="flex justify-between items-center text-gray-900"
+                  className="flex justify-between items-center"
+                  style={{ color: 'var(--aurora-text)' }}
                   role="listitem"
                 >
                   <span>
@@ -443,17 +445,17 @@ export default function CateringCheckout({
               ))}
             </div>
 
-            <div className="pt-4 border-t border-gray-200 space-y-2">
-              <div className="flex justify-between items-center text-sm text-gray-600">
+            <div className="pt-4 space-y-2" style={{ borderTop: `1px solid var(--aurora-border)` }}>
+              <div className="flex justify-between items-center text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                 <span>Subtotal</span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
-              <div className="flex justify-between items-center text-sm text-gray-600">
+              <div className="flex justify-between items-center text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                 <span>Estimated Tax (8.25%)</span>
                 <span>{formatPrice(estimatedTax)}</span>
               </div>
               {DELIVERY_FEE > 0 ? (
-                <div className="flex justify-between items-center text-sm text-gray-600">
+                <div className="flex justify-between items-center text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                   <span>Delivery Fee</span>
                   <span>{formatPrice(DELIVERY_FEE)}</span>
                 </div>
@@ -463,15 +465,15 @@ export default function CateringCheckout({
                   <span>Free</span>
                 </div>
               )}
-              <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-                <span className="text-lg font-semibold text-gray-900">
+              <div className="flex justify-between items-center pt-2" style={{ borderTop: `1px solid var(--aurora-border)` }}>
+                <span className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>
                   Estimated Total
                 </span>
                 <span className="text-lg font-bold text-indigo-600">
                   {formatPrice(total)}
                 </span>
               </div>
-              <p className="text-[11px] text-gray-400 italic">
+              <p className="text-[11px] italic" style={{ color: 'var(--aurora-text-muted)' }}>
                 Final amount may vary based on vendor confirmation.
               </p>
             </div>
@@ -480,7 +482,8 @@ export default function CateringCheckout({
           {/* Validation summary on submit */}
           {submitAttempted && hasErrors && (
             <div
-              className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3"
+              className="border border-red-200 rounded-lg p-4 flex items-start gap-3"
+              style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)' }}
               role="alert"
               aria-live="polite"
             >
@@ -497,11 +500,12 @@ export default function CateringCheckout({
           )}
 
           {/* Footer Actions */}
-          <div className="flex gap-3 sticky bottom-0 bg-gray-50 py-4 -mx-4 px-4 border-t border-gray-200">
+          <div className="flex gap-3 sticky bottom-0 py-4 -mx-4 px-4" style={{ backgroundColor: 'var(--aurora-bg)', borderTop: `1px solid var(--aurora-border)` }}>
             <button
               onClick={onBack}
               disabled={loading}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-6 py-3 border font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ borderColor: 'var(--aurora-border-glass)', color: 'var(--aurora-text-secondary)' }}
               aria-label="Go back to menu"
             >
               Back
