@@ -496,34 +496,37 @@ export default function CateringPage() {
 
   return (
     <div className="min-h-screen pb-24" style={{ backgroundColor: 'var(--aurora-bg, #F5F6FA)' }}>
-      {/* Header */}
+      {/* Header — responsive: stacks title + pills vertically on mobile */}
       <div
-        className="sticky top-0 z-30 px-4 py-3 flex items-center justify-between border-b"
+        className="sticky top-0 z-30 px-4 py-3 border-b"
         style={{
           backgroundColor: 'var(--aurora-surface, #fff)',
           borderColor: 'var(--aurora-border, #E2E5EF)',
         }}
       >
-        <div className="flex items-center gap-3">
-          {state.view !== 'categories' && (
-            <button
-              onClick={handleBack}
-              className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <ArrowLeft size={20} style={{ color: 'var(--aurora-text)' }} />
-            </button>
-          )}
-          {getTitle() && (
-            <div className="flex items-center gap-2">
-              <ChefHat size={22} style={{ color: 'var(--aurora-primary, #6366F1)' }} />
-              <h1 className="text-lg font-bold" style={{ color: 'var(--aurora-text, #1E2132)' }}>
-                {getTitle()}
-              </h1>
-            </div>
-          )}
-        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            {state.view !== 'categories' && (
+              <button
+                onClick={handleBack}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors shrink-0"
+                style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <ArrowLeft size={20} style={{ color: 'var(--aurora-text)' }} />
+              </button>
+            )}
+            {getTitle() && (
+              <div className="flex items-center gap-2 min-w-0">
+                <ChefHat size={22} className="shrink-0" style={{ color: 'var(--aurora-primary, #6366F1)' }} />
+                <h1 className="text-lg font-bold truncate" style={{ color: 'var(--aurora-text, #1E2132)' }}>
+                  {getTitle()}
+                </h1>
+              </div>
+            )}
+          </div>
 
-        <div className="flex items-center gap-2">
+          {/* Pills row — scrollable on mobile, flex-wrap on larger screens */}
+          <div className="flex items-center gap-2 shrink-0 ml-2">
           {/* My Orders pill — always visible when logged in */}
           {user && (
             <button
@@ -534,13 +537,14 @@ export default function CateringPage() {
                   dispatch({ type: 'SET_VIEW', payload: 'orders' });
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
+              className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: state.view === 'orders' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'orders' ? '#fff' : 'var(--aurora-text-secondary)',
+                minHeight: '36px',
               }}
             >
-              <ClipboardList size={16} />
+              <ClipboardList size={15} className="shrink-0" />
               Orders
             </button>
           )}
@@ -550,15 +554,16 @@ export default function CateringPage() {
             <div className="relative">
               <button
                 onClick={() => setShowMoreMenu(!showMoreMenu)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
+                className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
                 style={{
                   backgroundColor: ['quotes', 'favorites', 'recurring', 'templates'].includes(state.view) ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                   color: ['quotes', 'favorites', 'recurring', 'templates'].includes(state.view) ? '#fff' : 'var(--aurora-text-secondary)',
+                  minHeight: '36px',
                 }}
                 aria-expanded={showMoreMenu}
                 aria-haspopup="true"
               >
-                <MoreHorizontal size={16} />
+                <MoreHorizontal size={15} className="shrink-0" />
                 {['quotes', 'favorites', 'recurring', 'templates'].includes(state.view)
                   ? state.view === 'quotes' ? 'Quotes' : state.view === 'templates' ? 'Templates' : 'Saved'
                   : 'More'
@@ -622,13 +627,14 @@ export default function CateringPage() {
                   dispatch({ type: 'SET_VIEW', payload: 'vendor' });
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
+              className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: state.view === 'vendor' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'vendor' ? '#fff' : 'var(--aurora-text-secondary)',
+                minHeight: '36px',
               }}
             >
-              <Store size={16} />
+              <Store size={15} className="shrink-0" />
               Vendor
             </button>
           )}
@@ -650,6 +656,7 @@ export default function CateringPage() {
               )}
             </button>
           )}
+        </div>
         </div>
       </div>
 
@@ -1194,7 +1201,7 @@ export default function CateringPage() {
             {/* SB-08: Simplified vendor tab bar — primary tabs + bottom border indicator */}
             <div
               className="flex gap-1 overflow-x-auto scrollbar-hide border-b pb-0"
-              style={{ borderColor: 'var(--aurora-border)' }}
+              style={{ borderColor: 'var(--aurora-border)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
             >
               {([
                 { key: 'orders' as const, label: 'Orders' },
@@ -1206,11 +1213,12 @@ export default function CateringPage() {
                 <button
                   key={tab.key}
                   onClick={() => setVendorTab(tab.key)}
-                  className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors shrink-0 whitespace-nowrap border-b-2"
+                  className="flex items-center gap-1.5 px-3 py-2.5 sm:px-4 text-sm font-medium transition-colors shrink-0 whitespace-nowrap border-b-2"
                   style={{
                     borderColor: vendorTab === tab.key ? '#6366F1' : 'transparent',
                     color: vendorTab === tab.key ? '#6366F1' : 'var(--aurora-text-secondary)',
                     marginBottom: '-1px',
+                    minHeight: '44px',
                   }}
                 >
                   {tab.icon}
