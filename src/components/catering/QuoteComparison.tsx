@@ -535,6 +535,21 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                       )}
                     </div>
                   )}
+                  {/* SB-05: Quote expiry countdown */}
+                  {response.validUntil && response.status === 'submitted' && (() => {
+                    const expiryDate = response.validUntil?.toDate?.() || new Date(response.validUntil);
+                    const msLeft = expiryDate.getTime() - Date.now();
+                    if (msLeft <= 0) return <p className="text-[10px] mt-0.5 font-medium" style={{ color: '#DC2626' }}>Quote expired</p>;
+                    const hoursLeft = Math.floor(msLeft / (1000 * 60 * 60));
+                    const daysLeft = Math.floor(hoursLeft / 24);
+                    const isUrgent = hoursLeft < 24;
+                    return (
+                      <p className="text-[10px] mt-0.5 flex items-center gap-1" style={{ color: isUrgent ? '#DC2626' : '#D97706' }}>
+                        <Clock size={10} />
+                        Expires in {daysLeft > 0 ? `${daysLeft}d ${hoursLeft % 24}h` : `${hoursLeft}h`}
+                      </p>
+                    );
+                  })()}
                   {/* Show accepted item count for partially accepted */}
                   {response.acceptedItemNames && response.acceptedItemNames.length > 0 && (
                     <p className="text-[10px] mt-0.5" style={{ color: '#059669' }}>

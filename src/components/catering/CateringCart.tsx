@@ -219,18 +219,23 @@ export default function CateringCart({
                       {formatPrice(total + Math.round(total * 0.0825))}
                     </span>
                   </div>
+                  <p className="text-[10px] text-gray-400 italic mt-1">
+                    Tax is estimated. Final total may vary based on vendor confirmation.
+                  </p>
                 </div>
 
                 <div className="flex gap-3">
                   <button
                     onClick={onClear}
-                    className="flex-1 text-indigo-600 hover:text-indigo-700 font-medium text-sm transition-colors"
+                    className="flex-1 font-medium text-sm transition-colors hover:opacity-80"
+                    style={{ color: 'var(--color-aurora-indigo, #6366F1)' }}
                   >
                     Clear Cart
                   </button>
                   <button
                     onClick={onCheckout}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg py-2.5 transition-colors"
+                    className="flex-1 text-white font-medium rounded-lg py-2.5 transition-colors hover:opacity-90"
+                    style={{ backgroundColor: 'var(--color-aurora-indigo, #6366F1)' }}
                   >
                     Proceed to Checkout
                   </button>

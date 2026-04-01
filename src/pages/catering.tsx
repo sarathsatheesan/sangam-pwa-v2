@@ -13,7 +13,8 @@ import React, { useReducer, useCallback, useEffect, useState, useRef, useMemo } 
 import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store, Search,
-  Send, FileText, ClipboardList, Star, Heart, Repeat, Share2, Pencil, Package,
+  Send, FileText, ClipboardList, Star, Heart, Repeat, Share2, Pencil, Package, CheckCircle,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -27,6 +28,7 @@ import {
   fetchMenuItemsByCategory,
   createOrder,
   calculateOrderTotal,
+  formatPrice,
   createQuoteRequest,
   updateQuoteRequest,
   isQuoteRequestEditable,
@@ -83,6 +85,7 @@ export default function CateringPage() {
   const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
   const [selectedFavoriteForTemplate, setSelectedFavoriteForTemplate] = useState<FavoriteOrder | null>(null);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [showMoreMenu, setShowMoreMenu] = useState(false); // SB-06: "More" dropdown for secondary pills
   const selectedQuoteRequestRef = useRef<CateringQuoteRequest | null>(null);
   const businessesRef = useRef<any[]>([]); // F-10: stable ref to avoid useCallback recreation
 
@@ -287,7 +290,11 @@ export default function CateringPage() {
 
     setSubmitting(true);
     try {
-      const total = calculateOrderTotal(cart.items);
+      const subtotal = calculateOrderTotal(cart.items);
+      // SB-02: Include estimated tax in the order total so cart and order match
+      const ESTIMATED_TAX_RATE = 0.0825;
+      const estimatedTax = Math.round(subtotal * ESTIMATED_TAX_RATE);
+      const total = subtotal + estimatedTax;
       const orderId = await createOrder({
         customerId: user.uid,
         customerName: userProfile.name || '',
@@ -296,7 +303,8 @@ export default function CateringPage() {
         businessId: cart.businessId!,
         businessName: cart.businessName || '',
         items: cart.items,
-        subtotal: total,
+        subtotal,
+        tax: estimatedTax,
         total,
         status: 'pending',
         eventDate: orderForm.eventDate,
@@ -336,10 +344,24 @@ export default function CateringPage() {
         });
       } catch { /* non-blocking — don't fail the order */ }
 
-      addToast('Order placed! Saved to Favorites for quick reorder.', 'success', 5000);
+      // SB-01: Show order confirmation screen instead of jumping to orders list
+      dispatch({
+        type: 'SET_ORDER_CONFIRMATION',
+        payload: {
+          orderId,
+          businessName: cart.businessName || '',
+          total,
+          tax: estimatedTax,
+          subtotal,
+          itemCount: cart.items.length,
+          eventDate: orderForm.eventDate,
+          contactName: orderForm.contactName,
+        },
+      });
       dispatch({ type: 'CLEAR_CART' });
       localStorage.removeItem(CART_STORAGE_KEY);
-      dispatch({ type: 'SET_VIEW', payload: 'orders' });
+      dispatch({ type: 'SET_VIEW', payload: 'order_confirmation' });
+      addToast('Order placed successfully!', 'success', 3000);
     } catch (err: any) {
       addToast(err.message || 'Failed to place order', 'error');
     } finally {
@@ -433,6 +455,7 @@ export default function CateringPage() {
       case 'rfp': return 'Request for Price';
       case 'quotes': return selectedQuoteRequest ? 'Quote Responses' : 'My Quotes';
       case 'orders': return 'My Orders';
+      case 'order_confirmation': return 'Order Confirmed';
       case 'vendor': return 'Vendor Dashboard';
       case 'favorites': return 'My Favorites';
       case 'recurring': return 'Recurring Orders';
@@ -447,6 +470,11 @@ export default function CateringPage() {
     if (state.view === 'rfp') return handleBackToItems();
     if (state.view === 'quotes' && selectedQuoteRequest) {
       setSelectedQuoteRequest(null);
+      return;
+    }
+    if (state.view === 'order_confirmation') {
+      dispatch({ type: 'SET_VIEW', payload: 'orders' });
+      dispatch({ type: 'SET_ORDER_CONFIRMATION', payload: null });
       return;
     }
     if (state.view === 'orders') return handleBackToCategories();
@@ -517,70 +545,71 @@ export default function CateringPage() {
             </button>
           )}
 
-          {/* My Quotes pill — always visible when logged in */}
+          {/* SB-06: "More" dropdown — groups secondary pills (Quotes, Saved, Templates) */}
           {user && (
-            <button
-              onClick={() => {
-                if (state.view === 'quotes') {
-                  dispatch({ type: 'SET_VIEW', payload: 'categories' });
-                  setSelectedQuoteRequest(null);
-                } else {
-                  dispatch({ type: 'SET_VIEW', payload: 'quotes' });
-                  setSelectedQuoteRequest(null);
+            <div className="relative">
+              <button
+                onClick={() => setShowMoreMenu(!showMoreMenu)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
+                style={{
+                  backgroundColor: ['quotes', 'favorites', 'recurring', 'templates'].includes(state.view) ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                  color: ['quotes', 'favorites', 'recurring', 'templates'].includes(state.view) ? '#fff' : 'var(--aurora-text-secondary)',
+                }}
+                aria-expanded={showMoreMenu}
+                aria-haspopup="true"
+              >
+                <MoreHorizontal size={16} />
+                {['quotes', 'favorites', 'recurring', 'templates'].includes(state.view)
+                  ? state.view === 'quotes' ? 'Quotes' : state.view === 'templates' ? 'Templates' : 'Saved'
+                  : 'More'
                 }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
-              style={{
-                backgroundColor: state.view === 'quotes' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
-                color: state.view === 'quotes' ? '#fff' : 'var(--aurora-text-secondary)',
-              }}
-            >
-              <FileText size={16} />
-              Quotes
-            </button>
-          )}
-
-          {/* Phase 6 pills — Favorites */}
-          {user && (
-            <button
-              onClick={() => {
-                if (state.view === 'favorites') {
-                  dispatch({ type: 'SET_VIEW', payload: 'categories' });
-                } else {
-                  dispatch({ type: 'SET_VIEW', payload: 'favorites' });
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
-              style={{
-                backgroundColor: ['favorites', 'recurring'].includes(state.view) ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
-                color: ['favorites', 'recurring'].includes(state.view) ? '#fff' : 'var(--aurora-text-secondary)',
-              }}
-            >
-              <Heart size={16} />
-              Saved
-            </button>
-          )}
-
-          {/* Phase 6 pills — Templates */}
-          {user && (
-            <button
-              onClick={() => {
-                if (state.view === 'templates') {
-                  dispatch({ type: 'SET_VIEW', payload: 'categories' });
-                } else {
-                  setSelectedFavoriteForTemplate(null);
-                  dispatch({ type: 'SET_VIEW', payload: 'templates' });
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
-              style={{
-                backgroundColor: state.view === 'templates' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
-                color: state.view === 'templates' ? '#fff' : 'var(--aurora-text-secondary)',
-              }}
-            >
-              <ClipboardList size={16} />
-              Templates
-            </button>
+              </button>
+              {showMoreMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMoreMenu(false)} />
+                  <div
+                    className="absolute right-0 top-full mt-1 w-44 rounded-xl border shadow-lg z-50 py-1"
+                    style={{ backgroundColor: 'var(--aurora-surface, #fff)', borderColor: 'var(--aurora-border)' }}
+                  >
+                    <button
+                      onClick={() => {
+                        dispatch({ type: 'SET_VIEW', payload: 'quotes' });
+                        setSelectedQuoteRequest(null);
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors"
+                      style={{ color: state.view === 'quotes' ? '#6366F1' : 'var(--aurora-text)' }}
+                    >
+                      <FileText size={15} />
+                      My Quotes
+                    </button>
+                    <button
+                      onClick={() => {
+                        dispatch({ type: 'SET_VIEW', payload: 'favorites' });
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors"
+                      style={{ color: ['favorites', 'recurring'].includes(state.view) ? '#6366F1' : 'var(--aurora-text)' }}
+                    >
+                      <Heart size={15} />
+                      Saved Orders
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedFavoriteForTemplate(null);
+                        dispatch({ type: 'SET_VIEW', payload: 'templates' });
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors"
+                      style={{ color: state.view === 'templates' ? '#6366F1' : 'var(--aurora-text)' }}
+                    >
+                      <ClipboardList size={15} />
+                      Templates
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {/* Vendor pill — always visible when user owns a catering business */}
@@ -656,6 +685,12 @@ export default function CateringPage() {
               <>
                 <span className="text-gray-400">/</span>
                 <span className="font-medium text-gray-900">My Orders</span>
+              </>
+            )}
+            {state.view === 'order_confirmation' && (
+              <>
+                <span className="text-gray-400">/</span>
+                <span className="font-medium text-gray-900">Order Confirmed</span>
               </>
             )}
             {['favorites', 'recurring', 'templates'].includes(state.view) && (
@@ -804,29 +839,32 @@ export default function CateringPage() {
         {/* Items view — with RFP call-to-action */}
         {state.view === 'items' && !state.loading && !state.error && (
           <div>
-            {/* RFP banner */}
-            <div
-              className="flex items-center justify-between p-4 rounded-2xl border mb-4"
-              style={{
-                backgroundColor: 'rgba(99, 102, 241, 0.04)',
-                borderColor: 'rgba(99, 102, 241, 0.15)',
-              }}
-            >
-              <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                  Not sure what to order?
-                </p>
-                <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                  Request quotes from multiple caterers. Your details stay private until you choose.
+            {/* SB-07: Dual ordering path choice card */}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div
+                className="p-3 rounded-xl border-2 cursor-default"
+                style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99, 102, 241, 0.04)' }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <ShoppingCart size={16} style={{ color: '#6366F1' }} />
+                  <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>Order Directly</p>
+                </div>
+                <p className="text-[11px]" style={{ color: 'var(--aurora-text-secondary)' }}>
+                  Browse items with fixed prices and add to your cart.
                 </p>
               </div>
               <button
                 onClick={() => dispatch({ type: 'SET_VIEW', payload: 'rfp' })}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white ml-3 flex-shrink-0"
-                style={{ backgroundColor: '#6366F1' }}
+                className="p-3 rounded-xl border-2 text-left hover:shadow-md transition-shadow"
+                style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface, #fff)' }}
               >
-                <Send size={14} />
-                Get Quotes
+                <div className="flex items-center gap-2 mb-1">
+                  <Send size={16} style={{ color: 'var(--aurora-text-secondary)' }} />
+                  <p className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Request Quotes</p>
+                </div>
+                <p className="text-[11px]" style={{ color: 'var(--aurora-text-secondary)' }}>
+                  Compare prices from multiple caterers for custom events.
+                </p>
               </button>
             </div>
 
@@ -857,6 +895,128 @@ export default function CateringPage() {
               loading={submitting}
             />
           </React.Suspense>
+        )}
+
+        {/* SB-01: Order Confirmation Screen */}
+        {state.view === 'order_confirmation' && state.lastOrderConfirmation && (
+          <div className="max-w-lg mx-auto py-8">
+            <div
+              className="rounded-2xl border p-8 text-center"
+              style={{ backgroundColor: 'var(--aurora-surface, #fff)', borderColor: 'var(--aurora-border, #E2E5EF)' }}
+            >
+              {/* Success icon */}
+              <div className="flex justify-center mb-4">
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: '#D1FAE5' }}
+                >
+                  <CheckCircle size={32} style={{ color: '#059669' }} />
+                </div>
+              </div>
+
+              <h2 className="text-xl font-bold mb-1" style={{ color: 'var(--aurora-text, #1E2132)' }}>
+                Order Confirmed!
+              </h2>
+              <p className="text-sm mb-6" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Your order has been submitted to {state.lastOrderConfirmation.businessName}
+              </p>
+
+              {/* Order details card */}
+              <div
+                className="rounded-xl border p-4 text-left mb-6 space-y-3"
+                style={{ borderColor: 'var(--aurora-border, #E2E5EF)', backgroundColor: 'var(--aurora-bg, #F5F6FA)' }}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--aurora-text-muted)' }}>
+                    Order ID
+                  </span>
+                  <span className="text-sm font-mono font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                    #{state.lastOrderConfirmation.orderId.slice(-8).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--aurora-text-muted)' }}>
+                    Event Date
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
+                    {new Date(state.lastOrderConfirmation.eventDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--aurora-text-muted)' }}>
+                    Items
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
+                    {state.lastOrderConfirmation.itemCount} item{state.lastOrderConfirmation.itemCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="border-t pt-2" style={{ borderColor: 'var(--aurora-border)' }}>
+                  <div className="flex justify-between items-center text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                    <span>Subtotal</span>
+                    <span>{formatPrice(state.lastOrderConfirmation.subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mt-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+                    <span>Est. Tax</span>
+                    <span>{formatPrice(state.lastOrderConfirmation.tax)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Total</span>
+                    <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
+                      {formatPrice(state.lastOrderConfirmation.total)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* What happens next */}
+              <div
+                className="rounded-xl border p-4 text-left mb-6"
+                style={{ borderColor: 'rgba(99, 102, 241, 0.2)', backgroundColor: 'rgba(99, 102, 241, 0.04)' }}
+              >
+                <h3 className="text-sm font-semibold mb-2" style={{ color: 'var(--aurora-text)' }}>
+                  What happens next?
+                </h3>
+                <div className="space-y-2 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                  <div className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: '#6366F1' }}>1</span>
+                    <span>The vendor will review and confirm your order (usually within 1–2 hours).</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: '#6366F1' }}>2</span>
+                    <span>You&apos;ll get a notification when the status changes. Track progress in My Orders.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: '#6366F1' }}>3</span>
+                    <span>If the vendor modifies items or pricing, you&apos;ll be asked to accept or reject.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    dispatch({ type: 'SET_VIEW', payload: 'orders' });
+                    dispatch({ type: 'SET_ORDER_CONFIRMATION', payload: null });
+                  }}
+                  className="flex-1 px-5 py-3 rounded-xl font-medium text-white transition-colors"
+                  style={{ backgroundColor: '#6366F1' }}
+                >
+                  Track This Order
+                </button>
+                <button
+                  onClick={() => {
+                    dispatch({ type: 'SET_VIEW', payload: 'categories' });
+                    dispatch({ type: 'SET_ORDER_CONFIRMATION', payload: null });
+                  }}
+                  className="flex-1 px-5 py-3 rounded-xl font-medium border transition-colors"
+                  style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                >
+                  Continue Browsing
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* My Orders view with status timeline */}
@@ -1031,60 +1191,32 @@ export default function CateringPage() {
         {/* Vendor dashboard with tabs */}
         {state.view === 'vendor' && ownedBusiness && (
           <div className="space-y-4">
-            {/* Tab toggle */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setVendorTab('quotes')}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: vendorTab === 'quotes' ? '#6366F1' : 'var(--aurora-surface-variant)',
-                  color: vendorTab === 'quotes' ? '#fff' : 'var(--aurora-text-secondary)',
-                }}
-              >
-                Quote Requests
-              </button>
-              <button
-                onClick={() => setVendorTab('orders')}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: vendorTab === 'orders' ? '#6366F1' : 'var(--aurora-surface-variant)',
-                  color: vendorTab === 'orders' ? '#fff' : 'var(--aurora-text-secondary)',
-                }}
-              >
-                Direct Orders
-              </button>
-              <button
-                onClick={() => setVendorTab('analytics')}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: vendorTab === 'analytics' ? '#6366F1' : 'var(--aurora-surface-variant)',
-                  color: vendorTab === 'analytics' ? '#fff' : 'var(--aurora-text-secondary)',
-                }}
-              >
-                Analytics
-              </button>
-              <button
-                onClick={() => setVendorTab('reviews')}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: vendorTab === 'reviews' ? '#6366F1' : 'var(--aurora-surface-variant)',
-                  color: vendorTab === 'reviews' ? '#fff' : 'var(--aurora-text-secondary)',
-                }}
-              >
-                <Star size={14} />
-                Reviews
-              </button>
-              <button
-                onClick={() => setVendorTab('inventory')}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                style={{
-                  backgroundColor: vendorTab === 'inventory' ? '#6366F1' : 'var(--aurora-surface-variant)',
-                  color: vendorTab === 'inventory' ? '#fff' : 'var(--aurora-text-secondary)',
-                }}
-              >
-                <Package size={14} />
-                Inventory
-              </button>
+            {/* SB-08: Simplified vendor tab bar — primary tabs + bottom border indicator */}
+            <div
+              className="flex gap-1 overflow-x-auto scrollbar-hide border-b pb-0"
+              style={{ borderColor: 'var(--aurora-border)' }}
+            >
+              {([
+                { key: 'orders' as const, label: 'Orders' },
+                { key: 'quotes' as const, label: 'Quotes' },
+                { key: 'analytics' as const, label: 'Analytics' },
+                { key: 'reviews' as const, label: 'Reviews', icon: <Star size={13} /> },
+                { key: 'inventory' as const, label: 'Inventory', icon: <Package size={13} /> },
+              ]).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setVendorTab(tab.key)}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors shrink-0 whitespace-nowrap border-b-2"
+                  style={{
+                    borderColor: vendorTab === tab.key ? '#6366F1' : 'transparent',
+                    color: vendorTab === tab.key ? '#6366F1' : 'var(--aurora-text-secondary)',
+                    marginBottom: '-1px',
+                  }}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
             <React.Suspense fallback={<LazyFallback />}>

@@ -21,6 +21,7 @@ import CateringReviewForm from './CateringReviewForm';
 import OrderTimeline from './OrderTimeline';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { STATUS_THEME, CUSTOMER_STATUS_LABELS } from '@/constants/cateringStatusTheme';
 
 const CUSTOMER_CANCEL_REASONS = [
   'Changed plans',
@@ -34,17 +35,26 @@ interface CateringOrderStatusProps {
   onBack: () => void;
 }
 
-// ── Status timeline configuration ──
+// ── Status timeline configuration — SB-10: colors from shared STATUS_THEME ──
+const STATUS_STEP_ICONS: Record<string, any> = {
+  pending: FileText,
+  confirmed: CheckCircle2,
+  preparing: UtensilsCrossed,
+  ready: Package,
+  out_for_delivery: Truck,
+  delivered: CheckCircle2,
+};
+
 const STATUS_STEPS = [
-  { key: 'pending', label: 'Order Placed', icon: FileText, color: '#F59E0B', description: 'Waiting for caterer to confirm' },
-  { key: 'confirmed', label: 'Confirmed', icon: CheckCircle2, color: '#6366F1', description: 'Caterer has accepted your order' },
-  { key: 'preparing', label: 'Preparing', icon: UtensilsCrossed, color: '#8B5CF6', description: 'Your food is being prepared' },
-  { key: 'ready', label: 'Ready', icon: Package, color: '#10B981', description: 'Order is ready for pickup/delivery' },
-  { key: 'out_for_delivery', label: 'Out for Delivery', icon: Truck, color: '#0EA5E9', description: 'Your order is on the way' },
-  { key: 'delivered', label: 'Delivered', icon: CheckCircle2, color: '#059669', description: 'Order has been delivered' },
+  { key: 'pending', label: CUSTOMER_STATUS_LABELS.pending, icon: STATUS_STEP_ICONS.pending, color: STATUS_THEME.pending.color, description: STATUS_THEME.pending.description },
+  { key: 'confirmed', label: CUSTOMER_STATUS_LABELS.confirmed, icon: STATUS_STEP_ICONS.confirmed, color: STATUS_THEME.confirmed.color, description: STATUS_THEME.confirmed.description },
+  { key: 'preparing', label: CUSTOMER_STATUS_LABELS.preparing, icon: STATUS_STEP_ICONS.preparing, color: STATUS_THEME.preparing.color, description: STATUS_THEME.preparing.description },
+  { key: 'ready', label: CUSTOMER_STATUS_LABELS.ready, icon: STATUS_STEP_ICONS.ready, color: STATUS_THEME.ready.color, description: STATUS_THEME.ready.description },
+  { key: 'out_for_delivery', label: CUSTOMER_STATUS_LABELS.out_for_delivery, icon: STATUS_STEP_ICONS.out_for_delivery, color: STATUS_THEME.out_for_delivery.color, description: STATUS_THEME.out_for_delivery.description },
+  { key: 'delivered', label: CUSTOMER_STATUS_LABELS.delivered, icon: STATUS_STEP_ICONS.delivered, color: STATUS_THEME.delivered.color, description: STATUS_THEME.delivered.description },
 ] as const;
 
-const CANCELLED_STEP = { key: 'cancelled', label: 'Cancelled', icon: XCircle, color: '#EF4444', description: 'Order was cancelled' };
+const CANCELLED_STEP = { key: 'cancelled', label: CUSTOMER_STATUS_LABELS.cancelled, icon: XCircle, color: STATUS_THEME.cancelled.color, description: STATUS_THEME.cancelled.description };
 
 function getStepIndex(status: string): number {
   const idx = STATUS_STEPS.findIndex(s => s.key === status);
@@ -214,6 +224,32 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                       >
                         <Clock size={10} />
                         ETA: {order.estimatedDeliveryTime}
+                      </div>
+                    )}
+
+                    {/* SB-17: Pulsing badge for "preparing" status */}
+                    {order.status === 'preparing' && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: '#8B5CF6' }} />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: '#8B5CF6' }} />
+                        </span>
+                        <span className="text-[11px] font-medium" style={{ color: '#6D28D9' }}>
+                          Your chef is working on it{order.estimatedDeliveryTime ? ` — ready by ${order.estimatedDeliveryTime}` : ''}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* SB-16: Delivery celebration */}
+                    {order.status === 'delivered' && (
+                      <div
+                        className="flex items-center gap-2 mt-1.5 px-3 py-1.5 rounded-lg"
+                        style={{ backgroundColor: '#D1FAE5' }}
+                      >
+                        <span className="text-base">&#127881;</span>
+                        <span className="text-xs font-semibold" style={{ color: '#065F46' }}>
+                          Your food is here! Enjoy your meal.
+                        </span>
                       </div>
                     )}
                   </div>
@@ -432,6 +468,26 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                           <Ban size={14} />
                           Cancel Order
                         </button>
+                      )}
+
+                      {/* SB-04: Disabled cancel with explanation for preparing/ready orders */}
+                      {['preparing', 'ready'].includes(order.status) && (
+                        <div className="group relative">
+                          <button
+                            disabled
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border opacity-40 cursor-not-allowed"
+                            style={{ borderColor: '#E5E7EB', color: '#9CA3AF', backgroundColor: '#F9FAFB' }}
+                          >
+                            <Ban size={14} />
+                            Cancel Order
+                          </button>
+                          <div className="mt-1.5 flex items-start gap-1.5 px-1">
+                            <AlertTriangle size={12} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-[11px] text-amber-700">
+                              This order is already being {order.status === 'preparing' ? 'prepared' : 'readied'}. To request cancellation, please message the vendor directly.
+                            </p>
+                          </div>
+                        </div>
                       )}
 
                       {/* ── Review prompt after delivery (H-08) ── */}

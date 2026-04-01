@@ -15,8 +15,20 @@ const ORDER_FORM_STORAGE_KEY = 'sangam_catering_order_form';
 
 export interface CateringState {
   // Navigation
-  view: 'categories' | 'items' | 'checkout' | 'orders' | 'vendor' | 'rfp' | 'quotes' | 'favorites' | 'recurring' | 'templates';
+  view: 'categories' | 'items' | 'checkout' | 'orders' | 'order_confirmation' | 'vendor' | 'rfp' | 'quotes' | 'favorites' | 'recurring' | 'templates';
   selectedCategory: string | null;
+
+  // SB-01: Last placed order summary for confirmation screen
+  lastOrderConfirmation: {
+    orderId: string;
+    businessName: string;
+    total: number;
+    tax: number;
+    subtotal: number;
+    itemCount: number;
+    eventDate: string;
+    contactName: string;
+  } | null;
 
   // Menu & Catalog
   menuItems: CateringMenuItem[];
@@ -99,6 +111,8 @@ export function createInitialState(): CateringState {
     menuItems: [],
     businesses: [],
 
+    lastOrderConfirmation: null,
+
     cart: {
       items: [],
       businessId: null,
@@ -152,6 +166,7 @@ export function createInitialState(): CateringState {
 export type CateringAction =
   // Navigation
   | { type: 'SET_VIEW'; payload: CateringState['view'] }
+  | { type: 'SET_ORDER_CONFIRMATION'; payload: CateringState['lastOrderConfirmation'] }
   | { type: 'SET_CATEGORY'; payload: string | null }
 
   // Menu & Catalog
@@ -228,6 +243,9 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
     // ── Navigation ──
     case 'SET_VIEW':
       return { ...state, view: action.payload };
+
+    case 'SET_ORDER_CONFIRMATION':
+      return { ...state, lastOrderConfirmation: action.payload };
 
     case 'SET_CATEGORY':
       return {

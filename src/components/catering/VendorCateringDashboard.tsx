@@ -33,6 +33,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import OrderTimeline from './OrderTimeline';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { STATUS_THEME } from '@/constants/cateringStatusTheme';
 
 const VENDOR_CANCEL_REASONS = [
   'Item unavailable',
@@ -47,15 +48,23 @@ interface VendorCateringDashboardProps {
   businessName: string;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-  pending: { label: 'Pending', color: '#F59E0B', bgColor: '#FEF3C7', icon: <Clock size={14} /> },
-  confirmed: { label: 'Confirmed', color: '#6366F1', bgColor: '#EEF2FF', icon: <CheckCircle2 size={14} /> },
-  preparing: { label: 'Preparing', color: '#8B5CF6', bgColor: '#F5F3FF', icon: <Package size={14} /> },
-  ready: { label: 'Ready', color: '#10B981', bgColor: '#D1FAE5', icon: <CheckCircle2 size={14} /> },
-  out_for_delivery: { label: 'On the Way', color: '#0EA5E9', bgColor: '#E0F2FE', icon: <Truck size={14} /> },
-  delivered: { label: 'Delivered', color: '#059669', bgColor: '#A7F3D0', icon: <CheckCircle2 size={14} /> },
-  cancelled: { label: 'Cancelled', color: '#EF4444', bgColor: '#FEE2E2', icon: <XCircle size={14} /> },
+// SB-10: Derive vendor STATUS_CONFIG from shared STATUS_THEME + add icons
+const STATUS_ICONS: Record<string, React.ReactNode> = {
+  pending: <Clock size={14} />,
+  confirmed: <CheckCircle2 size={14} />,
+  preparing: <Package size={14} />,
+  ready: <CheckCircle2 size={14} />,
+  out_for_delivery: <Truck size={14} />,
+  delivered: <CheckCircle2 size={14} />,
+  cancelled: <XCircle size={14} />,
 };
+const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> =
+  Object.fromEntries(
+    Object.entries(STATUS_THEME).map(([key, theme]) => [
+      key,
+      { ...theme, icon: STATUS_ICONS[key] || <Clock size={14} /> },
+    ]),
+  );
 
 export default function VendorCateringDashboard({ businessId, businessName }: VendorCateringDashboardProps) {
   const { user } = useAuth();
@@ -66,6 +75,11 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
   const { addToast } = useToast();
 
+  // ── SB-14: New order alert state ──
+  const [newOrderBanner, setNewOrderBanner] = useState<{ orderId: string; customerName: string; total: number } | null>(null);
+  const prevOrderIdsRef = React.useRef<Set<string>>(new Set());
+  const isFirstLoadRef = React.useRef(true);
+
   // ── Vendor messaging state (H-04) ──
   const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
   const [messageText, setMessageText] = useState('');
@@ -73,6 +87,37 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
   useEffect(() => {
     const unsub = subscribeToBusinessOrders(businessId, (incoming) => {
+      // SB-14: Detect genuinely new orders after initial load
+      if (isFirstLoadRef.current) {
+        prevOrderIdsRef.current = new Set(incoming.map(o => o.id));
+        isFirstLoadRef.current = false;
+      } else {
+        const prevIds = prevOrderIdsRef.current;
+        const newPendingOrders = incoming.filter(o => !prevIds.has(o.id) && o.status === 'pending');
+        if (newPendingOrders.length > 0) {
+          const newest = newPendingOrders[0];
+          setNewOrderBanner({ orderId: newest.id, customerName: newest.customerName || 'Customer', total: newest.total });
+          // Play audio chime (Web Audio API — no external dependency)
+          try {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(1100, audioCtx.currentTime + 0.1);
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.5);
+          } catch { /* audio not available — silent fallback */ }
+          // Auto-dismiss banner after 15 seconds
+          setTimeout(() => setNewOrderBanner(null), 15000);
+        }
+        prevOrderIdsRef.current = new Set(incoming.map(o => o.id));
+      }
       setOrders(incoming);
       setLoading(false);
     });
@@ -350,6 +395,48 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
   return (
     <div className="space-y-4">
+      {/* SB-14: New order persistent banner */}
+      {newOrderBanner && (
+        <div
+          className="flex items-center justify-between p-3 rounded-xl border animate-pulse"
+          style={{ backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F59E0B' }}>
+              <Bell size={16} className="text-white" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: '#92400E' }}>
+                New order from {newOrderBanner.customerName}
+              </p>
+              <p className="text-xs" style={{ color: '#A16207' }}>
+                {formatPrice(newOrderBanner.total)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setExpandedOrder(newOrderBanner.orderId);
+                setFilter('pending');
+                setNewOrderBanner(null);
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white"
+              style={{ backgroundColor: '#F59E0B' }}
+            >
+              View Order
+            </button>
+            <button
+              onClick={() => setNewOrderBanner(null)}
+              className="p-1 rounded hover:bg-amber-200 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X size={14} style={{ color: '#92400E' }} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -532,10 +619,56 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
       {/* Orders list */}
       {filteredOrders.length === 0 ? (
         <div className="text-center py-12">
-          <Package size={40} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
-            No {filter === 'all' ? '' : filter} orders yet
-          </p>
+          {/* SB-09: Onboarding empty state for new vendors */}
+          {filter === 'all' && orders.length === 0 ? (
+            <div className="max-w-sm mx-auto">
+              <Package size={40} className="mx-auto mb-4 opacity-30" />
+              <h3 className="text-base font-semibold mb-2" style={{ color: 'var(--aurora-text)' }}>
+                Welcome to Your Dashboard!
+              </h3>
+              <p className="text-sm mb-5" style={{ color: 'var(--aurora-text-secondary)' }}>
+                You&apos;re all set to receive catering orders. Here&apos;s how to get started:
+              </p>
+              <div className="text-left space-y-3 mb-5">
+                <div className="flex items-start gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>1</span>
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Set up payment info</p>
+                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>Add your payment link so customers can pay you</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>2</span>
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Add menu items</p>
+                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>Create your catering menu so customers can browse</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>3</span>
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Your first order will appear here</p>
+                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>You&apos;ll get an alert with a chime when a new order comes in</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPaymentSettings(true)}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                <CreditCard size={14} className="inline mr-1.5 -mt-0.5" />
+                Set Up Payment Info
+              </button>
+            </div>
+          ) : (
+            <>
+              <Package size={40} className="mx-auto mb-3 opacity-30" />
+              <p className="text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
+                No {filter === 'all' ? '' : filter} orders yet
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -681,14 +814,16 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                             ) : (
                               <span className="flex-1 truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
                             )}
+                            {/* SB-03: Display price in dollars, store in cents */}
+                            <span className="text-xs text-gray-400 mr-0.5">$</span>
                             <input
                               type="number"
                               step="0.01"
                               min="0"
-                              value={editItems[i].unitPrice}
-                              onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, unitPrice: Math.max(0, parseFloat(e.target.value) || 0) } : it))}
-                              placeholder="Price"
-                              className="w-16 text-center text-sm border border-gray-200 rounded px-1 py-1"
+                              value={(editItems[i].unitPrice / 100).toFixed(2)}
+                              onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, unitPrice: Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100)) } : it))}
+                              placeholder="0.00"
+                              className="w-20 text-center text-sm border border-gray-200 rounded px-1 py-1"
                               style={{ color: 'var(--aurora-text)' }}
                             />
                             <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * editItems[i].qty)}</span>
@@ -727,13 +862,49 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                       </div>
                     ) : (
                       <>
-                        {/* Vendor modification notice + rejection badge (F-06) */}
+                        {/* Vendor modification notice + rejection badge (F-06) + SB-15 recovery */}
                         {order.vendorModified && (
-                          <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: order.modificationRejected ? '#FEE2E2' : '#FEF3C7', color: order.modificationRejected ? '#991B1B' : '#92400E' }}>
-                            <span className="font-medium">
-                              {order.modificationRejected ? '✗ Customer rejected modification: ' : order.modificationAccepted ? '✓ Customer accepted modification: ' : 'Modified: '}
-                            </span>
-                            {order.vendorModificationNote || 'Items adjusted by vendor'}
+                          <div>
+                            <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: (order as any).modificationRejected ? '#FEE2E2' : '#FEF3C7', color: (order as any).modificationRejected ? '#991B1B' : '#92400E' }}>
+                              <span className="font-medium">
+                                {(order as any).modificationRejected ? '✗ Customer rejected modification: ' : (order as any).modificationAccepted ? '✓ Customer accepted modification: ' : 'Modified: '}
+                              </span>
+                              {order.vendorModificationNote || 'Items adjusted by vendor'}
+                            </div>
+                            {/* SB-15: Rejection recovery — Revert + Counter-Proposal */}
+                            {(order as any).modificationRejected && order.originalItems && ['confirmed', 'preparing'].includes(order.status) && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const origSubtotal = calculateOrderTotal(order.originalItems!);
+                                      const origTax = Math.round(origSubtotal * 0.0825);
+                                      await vendorModifyOrder(order.id, {
+                                        items: order.originalItems!,
+                                        subtotal: origSubtotal,
+                                        tax: origTax,
+                                        total: origSubtotal + origTax,
+                                        note: 'Reverted to original order items per customer request',
+                                      });
+                                      addToast('Order reverted to original items', 'success');
+                                    } catch (err: any) {
+                                      addToast(err.message || 'Failed to revert order', 'error');
+                                    }
+                                  }}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
+                                  style={{ borderColor: '#10B981', color: '#059669', backgroundColor: '#ECFDF5' }}
+                                >
+                                  Revert to Original
+                                </button>
+                                <button
+                                  onClick={() => startEditOrder(order)}
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
+                                  style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: '#EEF2FF' }}
+                                >
+                                  <Pencil size={10} /> Send Counter-Proposal
+                                </button>
+                              </div>
+                            )}
                           </div>
                         )}
                         {/* Edit order button for confirmed/preparing */}
@@ -811,15 +982,43 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                       </button>
                     )}
                     {order.status === 'preparing' && (
-                      <button
-                        onClick={() => handleStatusChange(order.id, 'ready')}
-                        disabled={isActionLoading}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                        style={{ backgroundColor: '#10B981' }}
-                      >
-                        {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                        Mark as Ready
-                      </button>
+                      <div className="space-y-2">
+                        {/* SB-17: Prep time estimate input */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Est. ready by (e.g. 2:30 PM)"
+                            value={etaInputs[`prep_${order.id}`] || ''}
+                            onChange={(e) => setEtaInputs(prev => ({ ...prev, [`prep_${order.id}`]: e.target.value }))}
+                            className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500/30"
+                            style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                          />
+                          {etaInputs[`prep_${order.id}`]?.trim() && (
+                            <button
+                              onClick={() => {
+                                const eta = etaInputs[`prep_${order.id}`]?.trim();
+                                if (eta) {
+                                  handleStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: eta }).catch(() => {});
+                                  addToast('Prep time estimate shared with customer', 'success');
+                                }
+                              }}
+                              className="px-3 py-2 rounded-lg text-xs font-medium text-white"
+                              style={{ backgroundColor: '#8B5CF6' }}
+                            >
+                              Share
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleStatusChange(order.id, 'ready')}
+                          disabled={isActionLoading}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                          style={{ backgroundColor: '#10B981' }}
+                        >
+                          {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                          Mark as Ready
+                        </button>
+                      </div>
                     )}
                     {order.status === 'ready' && (
                       <div className="space-y-2">
