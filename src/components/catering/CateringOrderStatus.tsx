@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
 import OrderTimeline from './OrderTimeline';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, collection, addDoc, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { STATUS_THEME, CUSTOMER_STATUS_LABELS } from '@/constants/cateringStatusTheme';
 
@@ -200,6 +200,12 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         {order.businessName}
                       </span>
                       <StatusBadge status={order.status} />
+                      {order.vendorModified && !order.modificationAccepted && !order.modificationRejected && (
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
                       <span className="flex items-center gap-1">
@@ -216,6 +222,15 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         {formatPrice(order.total)}
                       </span>
                     </div>
+                    {/* SB-35: Notification for pending vendor modifications */}
+                    {order.vendorModified && !order.modificationAccepted && !order.modificationRejected && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <AlertTriangle size={12} className="text-amber-500" />
+                        <span className="text-[11px] font-medium text-amber-700">
+                          Vendor modified this order — review needed
+                        </span>
+                      </div>
+                    )}
                     {/* ETA badge — shown for active orders with estimated delivery time */}
                     {order.estimatedDeliveryTime && !['delivered', 'cancelled'].includes(order.status) && (
                       <div
@@ -468,6 +483,14 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                                       modificationRejected: true,
                                       modificationRespondedAt: serverTimestamp(),
                                     });
+                                    // SB-36: Revert to original items on rejection
+                                    if (order.originalItems) {
+                                      await updateDoc(doc(db, 'cateringOrders', order.id), {
+                                        items: order.originalItems,
+                                        total: order.originalItems.reduce((sum: number, i: any) => sum + i.unitPrice * i.qty, 0),
+                                        vendorModified: false,
+                                      });
+                                    }
                                     // F-06: Notify vendor of rejection
                                     const bizSnap = await getDoc(doc(db, 'businesses', order.businessId));
                                     const vendorOwnerId = bizSnap.exists() ? bizSnap.data()?.ownerId : null;
@@ -494,7 +517,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                             <p className="text-xs text-green-700 mt-1 font-medium">✓ You accepted these changes</p>
                           )}
                           {order.modificationRejected && (
-                            <p className="text-xs text-red-700 mt-1 font-medium">✗ You rejected these changes</p>
+                            <p className="text-xs text-red-700 mt-1 font-medium">✗ Changes rejected — order reverted to original items. Vendor has been notified.</p>
                           )}
                         </div>
                       )}
@@ -953,38 +976,88 @@ function InlineMessagingModal({
   const { addToast } = useToast();
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [messages, setMessages] = useState<Array<{
+    id: string;
+    text: string;
+    senderName: string;
+    senderRole: string;
+    timestamp: any;
+  }>>([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   const order = orders.find(o => o.id === orderId);
   if (!order) return null;
 
+  // Load existing messages when modal opens
+  useEffect(() => {
+    if (!user || !order) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const convId = await findOrCreateConversation(
+          user.uid,
+          order.businessId,
+          `Order #${orderId.slice(-6)}`,
+        );
+        if (cancelled) return;
+        setConversationId(convId);
+
+        // Load messages from Firestore
+        const messagesRef = collection(db, 'conversations', convId, 'messages');
+        const q = query(messagesRef, orderBy('timestamp', 'asc'));
+        const snapshot = await getDocs(q);
+
+        if (!cancelled) {
+          setMessages(
+            snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+            } as any))
+          );
+          setLoadingMessages(false);
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+        if (!cancelled) {
+          setLoadingMessages(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, order, orderId]);
+
   const handleSendMessage = async () => {
-    if (!user || !message.trim()) return;
+    if (!user || !message.trim() || !conversationId) return;
     setSending(true);
     try {
-      const conversationId = await findOrCreateConversation(
-        user.uid,
-        order.businessId,
-        `Order #${orderId.slice(-6)}`,
-      );
-
-      // Write message to Firestore conversation subcollection
-      const messageDoc = {
+      // SB-44: Write message to Firestore
+      const messagesRef = collection(db, 'conversations', conversationId, 'messages');
+      await addDoc(messagesRef, {
         senderId: user.uid,
         senderName: user.displayName || 'Customer',
-        senderRole: 'customer' as const,
+        senderRole: 'customer',
         text: message.trim(),
-        timestamp: new Date(),
+        timestamp: serverTimestamp(),
         read: false,
-      };
+      });
 
-      // Since we don't have direct Firestore access here, we rely on the backend service
-      // In a production implementation, you'd have a function like:
-      // await sendConversationMessage(conversationId, messageDoc);
-      // For now, we'll just clear the input and show a success toast
+      // Update conversation's lastMessage metadata for preview
+      await updateDoc(doc(db, 'conversations', conversationId), {
+        lastMessage: message.trim().slice(0, 100),
+        lastMessageAt: serverTimestamp(),
+        lastMessageBy: user.uid,
+      });
+
       setMessage('');
-      addToast('Message sent', 'success');
+      addToast('Message sent!', 'success');
       onClose();
-    } catch {
+    } catch (error) {
+      console.error('Failed to send message:', error);
       addToast('Failed to send message', 'error');
     } finally {
       setSending(false);
@@ -994,7 +1067,7 @@ function InlineMessagingModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-black/40" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
-      <div className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}>
+      <div className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl flex flex-col max-h-[80vh]" style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-bold" style={{ color: 'var(--aurora-text)' }}>
@@ -1011,6 +1084,40 @@ function InlineMessagingModal({
           >
             <span className="text-lg">×</span>
           </button>
+        </div>
+
+        {/* Message History */}
+        <div className="flex-1 overflow-y-auto mb-4 p-3 rounded-lg" style={{ backgroundColor: 'var(--aurora-background, #f9fafb)' }}>
+          {loadingMessages ? (
+            <div className="flex items-center justify-center h-24" style={{ color: 'var(--aurora-text-secondary)' }}>
+              <Loader2 size={16} className="animate-spin mr-2" />
+              Loading messages...
+            </div>
+          ) : messages.length === 0 ? (
+            <p className="text-xs text-center py-6" style={{ color: 'var(--aurora-text-secondary)' }}>
+              No messages yet. Start the conversation!
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`p-3 rounded-lg text-sm ${
+                    msg.senderRole === 'customer' ? 'ml-4' : 'mr-4'
+                  }`}
+                  style={{
+                    backgroundColor: msg.senderRole === 'customer' ? '#E0E7FF' : '#F3F4F6',
+                    color: 'var(--aurora-text)',
+                  }}
+                >
+                  <p className="font-medium text-xs mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+                    {msg.senderName}
+                  </p>
+                  <p className="text-xs break-words">{msg.text}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mb-4">

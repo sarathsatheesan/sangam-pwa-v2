@@ -53,6 +53,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     existingAssignments: Array<{itemName: string; businessName: string}>;
   } | null>(null);
 
+  // SB-38: Quote expiry warning state
+  const [expiredQuoteId, setExpiredQuoteId] = useState<string | null>(null);
+
   // ── RFQ Walkthrough (onboarding) ──
   const WALKTHROUGH_KEY = 'ethnicity_rfq_walkthrough_seen';
   const [walkthroughStep, setWalkthroughStep] = useState(() => {
@@ -156,6 +159,17 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     if (!selected || selected.size === 0) {
       addToast('Please select at least one item to accept', 'error');
       return;
+    }
+
+    // SB-38: Check quote expiry
+    if (response.validUntil) {
+      const expiryMs = response.validUntil?.toMillis?.()
+        || (response.validUntil?.seconds ? response.validUntil.seconds * 1000 : 0)
+        || (typeof response.validUntil === 'string' ? new Date(response.validUntil).getTime() : 0);
+      if (expiryMs && expiryMs < Date.now()) {
+        setExpiredQuoteId(response.id);
+        return;
+      }
     }
 
     const selectedItemNames = Array.from(selected);
@@ -549,6 +563,21 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                       )}
                     </div>
                   )}
+                  {/* SB-38: Quote expiry status indicator */}
+                  {response.validUntil && (() => {
+                    const expiryMs = response.validUntil?.toMillis?.() || (response.validUntil?.seconds ? response.validUntil.seconds * 1000 : 0) || 0;
+                    const isExpired = expiryMs > 0 && expiryMs < Date.now();
+                    const expiryDate = expiryMs > 0 ? new Date(expiryMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+                    return isExpired ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
+                        Expired {expiryDate}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" style={{ backgroundColor: '#ECFDF5', color: '#059669' }}>
+                        Valid until {expiryDate}
+                      </span>
+                    );
+                  })()}
                   {/* SB-05: Quote expiry countdown */}
                   {response.validUntil && response.status === 'submitted' && (() => {
                     const expiryDate = response.validUntil?.toDate?.() || new Date(response.validUntil);
@@ -936,6 +965,46 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
               >
                 {finalizingOrder && <Loader2 size={14} className="animate-spin" />}
                 Finalize Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SB-38: Quote Expired Warning Modal */}
+      {expiredQuoteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <div className="w-full max-w-sm rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FEF3C7' }}>
+                <AlertCircle size={20} style={{ color: '#D97706' }} />
+              </div>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Quote Expired</h3>
+            </div>
+            <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
+              This vendor's quote has expired. The pricing may no longer be valid. You can still accept it, but we recommend contacting the vendor first to confirm availability and pricing.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setExpiredQuoteId(null)}
+                className="flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={() => {
+                  const response = responses.find(r => r.id === expiredQuoteId);
+                  if (response) {
+                    const selectedItemNames = Array.from(selectedItems[response.id] || []);
+                    proceedWithAcceptance(response, selectedItemNames);
+                  }
+                  setExpiredQuoteId(null);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-white"
+                style={{ backgroundColor: '#D97706' }}
+              >
+                Accept Anyway
               </button>
             </div>
           </div>

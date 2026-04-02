@@ -76,6 +76,8 @@ export {
   acceptQuoteResponseItems,
   finalizeQuoteRequest,
   subscribeToBusinessQuoteResponses,
+  updateQuoteResponse,
+  isQuoteResponseEditable,
 } from './cateringQuotes';
 
 // Reviews

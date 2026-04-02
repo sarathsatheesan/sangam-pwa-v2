@@ -1,5 +1,6 @@
 import type { FC } from 'react';
-import { Plus, Utensils, Users } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, Minus, Utensils, Users } from 'lucide-react';
 import type { CateringMenuItem } from '@/services/cateringService';
 import { formatPrice } from '@/services/cateringService';
 
@@ -23,8 +24,31 @@ export default function CateringItemCard({
   item,
   onAddToCart,
 }: CateringItemCardProps): ReturnType<FC> {
+  const [qty, setQty] = useState(0);
+
+  const minQty = item.minOrderQty || 1;
+  const maxQty = item.maxOrderQty;
+
   const handleAddToCart = () => {
+    setQty(minQty);
     onAddToCart(item);
+  };
+
+  const handleIncrement = () => {
+    if (!maxQty || qty < maxQty) {
+      const newQty = qty + 1;
+      setQty(newQty);
+      onAddToCart(item);
+    }
+  };
+
+  const handleDecrement = () => {
+    const newQty = qty - 1;
+    if (newQty <= 0) {
+      setQty(0);
+    } else {
+      setQty(newQty);
+    }
   };
 
   const pricingLabel = {
@@ -131,24 +155,56 @@ export default function CateringItemCard({
             )}
           </div>
 
-          <button
-            onClick={handleAddToCart}
-            disabled={isDisabled}
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              backgroundColor: 'var(--aurora-primary, #6366F1)',
-            }}
-            onMouseEnter={e => {
-              if (!isDisabled) e.currentTarget.style.opacity = '0.9';
-            }}
-            onMouseLeave={e => {
-              if (!isDisabled) e.currentTarget.style.opacity = '1';
-            }}
-            aria-label={`Add ${item.name} to cart — ${formatPrice(item.price)} ${pricingLabel}`}
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
-            <span className="text-sm">Add</span>
-          </button>
+          {qty === 0 ? (
+            <button
+              onClick={handleAddToCart}
+              disabled={isDisabled}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: 'var(--aurora-primary, #6366F1)',
+              }}
+              onMouseEnter={e => {
+                if (!isDisabled) e.currentTarget.style.opacity = '0.9';
+              }}
+              onMouseLeave={e => {
+                if (!isDisabled) e.currentTarget.style.opacity = '1';
+              }}
+              aria-label={`Add ${item.name} to cart — ${formatPrice(item.price)} ${pricingLabel}`}
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+              <span className="text-sm">Add</span>
+            </button>
+          ) : (
+            <div className="inline-flex items-center gap-2 rounded-lg px-2 py-2 border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+              <button
+                onClick={handleDecrement}
+                disabled={isDisabled}
+                className="inline-flex items-center justify-center h-7 w-7 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-opacity-80"
+                style={{
+                  backgroundColor: qty > minQty ? 'var(--aurora-primary, #6366F1)' : 'var(--aurora-surface-variant)',
+                  color: qty > minQty ? 'white' : 'var(--aurora-text-secondary)',
+                }}
+                aria-label={`Decrease quantity of ${item.name}`}
+              >
+                <Minus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+              </button>
+              <span className="text-sm font-semibold min-w-8 text-center" style={{ color: 'var(--aurora-text)' }}>
+                {qty}
+              </span>
+              <button
+                onClick={handleIncrement}
+                disabled={isDisabled || (maxQty !== undefined && qty >= maxQty)}
+                className="inline-flex items-center justify-center h-7 w-7 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-opacity-80"
+                style={{
+                  backgroundColor: 'var(--aurora-primary, #6366F1)',
+                  color: 'white',
+                }}
+                aria-label={`Increase quantity of ${item.name}`}
+              >
+                <Plus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

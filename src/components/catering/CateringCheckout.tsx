@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import type {
   OrderItem,
   DeliveryAddress,
@@ -115,6 +115,9 @@ function validateForm(form: CateringCheckoutProps['orderForm']): FieldError {
 const ESTIMATED_TAX_RATE = 0.0825; // 8.25% default
 const DELIVERY_FEE = 0; // $0 placeholder — vendor-specific in future
 
+// SB-20: Persist checkout form to sessionStorage
+const CHECKOUT_FORM_KEY = 'ethnicity_checkout_form';
+
 export default function CateringCheckout({
   cart,
   orderForm,
@@ -129,9 +132,51 @@ export default function CateringCheckout({
   const tomorrow = useMemo(() => getTomorrow(), []);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [openSections, setOpenSections] = useState<Set<number>>(new Set([1, 2, 3]));
 
   const errors = useMemo(() => validateForm(orderForm), [orderForm]);
   const hasErrors = Object.keys(errors).length > 0;
+
+  // SB-19: Helper to check if a section is valid
+  const isSectionValid = useMemo(() => ({
+    1: !errors.eventDate && !errors.headcount,
+    2: !errors.contactName && !errors.contactPhone && !errors.street && !errors.city && !errors.state && !errors.zip,
+    3: true, // Order Preferences section is always valid (mostly optional)
+  }), [errors]);
+
+  const toggleSection = (sectionNum: number) => {
+    setOpenSections((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionNum)) {
+        newSet.delete(sectionNum);
+      } else {
+        newSet.add(sectionNum);
+      }
+      return newSet;
+    });
+  };
+
+  // SB-20: Restore saved checkout form on mount
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(CHECKOUT_FORM_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Only restore if it looks like a valid form object
+        if (parsed && typeof parsed === 'object' && parsed.eventDate !== undefined) {
+          onUpdateForm(parsed);
+        }
+      }
+    } catch { /* ignore parse errors */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // SB-20: Persist checkout form to sessionStorage on change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CHECKOUT_FORM_KEY, JSON.stringify(orderForm));
+    } catch { /* quota exceeded or private browsing */ }
+  }, [orderForm]);
 
   const showError = (field: keyof FieldError) =>
     (touched[field] || submitAttempted) && errors[field];
@@ -170,6 +215,8 @@ export default function CateringCheckout({
   const handleSubmit = () => {
     setSubmitAttempted(true);
     if (hasErrors) return;
+    // SB-20: Clear sessionStorage when order is successfully placed
+    sessionStorage.removeItem(CHECKOUT_FORM_KEY);
     onPlaceOrder();
   };
 
@@ -196,248 +243,322 @@ export default function CateringCheckout({
         </div>
 
         <div className="space-y-6">
-          {/* Section 1: Event Details */}
-          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="event-details-heading">
-            <h2 id="event-details-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
-              Event Details
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="event-date" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                  Event Date <span className="text-red-500" aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="event-date"
-                  type="date"
-                  min={tomorrow}
-                  value={orderForm.eventDate}
-                  onChange={(e) => onUpdateForm({ eventDate: e.target.value })}
-                  onBlur={() => handleBlur('eventDate')}
-                  className={inputClass('eventDate')}
-                  aria-required={true}
-                  aria-invalid={!!showError('eventDate')}
-                  aria-describedby={showError('eventDate') ? 'event-date-error' : undefined}
-                />
-                {showError('eventDate') && (
-                  <p id="event-date-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
-                    <AlertCircle size={12} /> {errors.eventDate}
-                  </p>
-                )}
+          {/* SB-19: Section 1: Event Details (Collapsible) */}
+          <section className="rounded-lg border" style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }} aria-labelledby="section-1-heading">
+            <button
+              onClick={() => toggleSection(1)}
+              className="w-full px-6 py-4 flex items-center gap-3 hover:opacity-80 transition-opacity"
+              aria-expanded={openSections.has(1)}
+              aria-controls="section-1-content"
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white" style={{ backgroundColor: 'var(--aurora-primary, #6366f1)' }}>
+                1
               </div>
+              <h2 id="section-1-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
+                Event Details
+              </h2>
+              {isSectionValid[1] && (
+                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" />
+              )}
+              {openSections.has(1) ? (
+                <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
+              ) : (
+                <ChevronDown size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
+              )}
+            </button>
+            {openSections.has(1) && (
+              <>
+                <div className="border-t" style={{ borderColor: 'var(--aurora-border)' }} />
+                <div id="section-1-content" className="px-6 py-4 space-y-4">
+                  <div>
+                    <label htmlFor="event-date" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Event Date <span className="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <input
+                      id="event-date"
+                      type="date"
+                      min={tomorrow}
+                      value={orderForm.eventDate}
+                      onChange={(e) => onUpdateForm({ eventDate: e.target.value })}
+                      onBlur={() => handleBlur('eventDate')}
+                      className={inputClass('eventDate')}
+                      aria-required={true}
+                      aria-invalid={!!showError('eventDate')}
+                      aria-describedby={showError('eventDate') ? 'event-date-error' : undefined}
+                    />
+                    {showError('eventDate') && (
+                      <p id="event-date-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                        <AlertCircle size={12} /> {errors.eventDate}
+                      </p>
+                    )}
+                  </div>
 
-              <div>
-                <label htmlFor="headcount" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                  Headcount <span className="text-red-500" aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="headcount"
-                  type="number"
-                  min="1"
-                  value={orderForm.headcount || ''}
-                  onChange={(e) => onUpdateForm({ headcount: parseInt(e.target.value) || 0 })}
-                  onBlur={() => handleBlur('headcount')}
-                  placeholder="Number of guests"
-                  className={inputClass('headcount')}
-                  aria-required={true}
-                  aria-invalid={!!showError('headcount')}
-                  aria-describedby={showError('headcount') ? 'headcount-error' : undefined}
-                />
-                {showError('headcount') && (
-                  <p id="headcount-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
-                    <AlertCircle size={12} /> {errors.headcount}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="contact-name" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                  Contact Name <span className="text-red-500" aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="contact-name"
-                  type="text"
-                  value={orderForm.contactName}
-                  onChange={(e) => onUpdateForm({ contactName: e.target.value })}
-                  onBlur={() => handleBlur('contactName')}
-                  placeholder="Full name"
-                  className={inputClass('contactName')}
-                  aria-required={true}
-                  aria-invalid={!!showError('contactName')}
-                  aria-describedby={showError('contactName') ? 'contact-name-error' : undefined}
-                />
-                {showError('contactName') && (
-                  <p id="contact-name-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
-                    <AlertCircle size={12} /> {errors.contactName}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="contact-phone" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                  Contact Phone <span className="text-red-500" aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="contact-phone"
-                  type="tel"
-                  value={orderForm.contactPhone}
-                  onChange={(e) => onUpdateForm({ contactPhone: e.target.value })}
-                  onBlur={() => handleBlur('contactPhone')}
-                  placeholder="(555) 123-4567"
-                  className={inputClass('contactPhone')}
-                  aria-required={true}
-                  aria-invalid={!!showError('contactPhone')}
-                  aria-describedby={showError('contactPhone') ? 'contact-phone-error' : undefined}
-                />
-                {showError('contactPhone') && (
-                  <p id="contact-phone-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
-                    <AlertCircle size={12} /> {errors.contactPhone}
-                  </p>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* Section 2: Delivery Address */}
-          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="delivery-heading">
-            <h2 id="delivery-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
-              Delivery Address
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="street" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                  Street Address <span className="text-red-500" aria-hidden="true">*</span>
-                </label>
-                <AddressAutocomplete
-                  id="street"
-                  value={orderForm.deliveryAddress?.street || ''}
-                  onChange={(val) => handleAddressChange('street', val)}
-                  onSelect={handleAddressAutocomplete}
-                  onBlur={() => handleBlur('street')}
-                  placeholder="123 Main Street"
-                  className={inputClass('street')}
-                  aria-required={true}
-                  aria-invalid={!!showError('street')}
-                  aria-describedby={showError('street') ? 'street-error' : undefined}
-                />
-                {showError('street') && (
-                  <p id="street-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
-                    <AlertCircle size={12} /> {errors.street}
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="city" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                    City <span className="text-red-500" aria-hidden="true">*</span>
-                  </label>
-                  <input
-                    id="city"
-                    type="text"
-                    value={orderForm.deliveryAddress?.city || ''}
-                    onChange={(e) => handleAddressChange('city', e.target.value)}
-                    onBlur={() => handleBlur('city')}
-                    className={inputClass('city')}
-                    aria-required={true}
-                    aria-invalid={!!showError('city')}
-                    aria-describedby={showError('city') ? 'city-error' : undefined}
-                  />
-                  {showError('city') && (
-                    <p id="city-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
-                      <AlertCircle size={12} /> {errors.city}
-                    </p>
-                  )}
+                  <div>
+                    <label htmlFor="headcount" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Headcount <span className="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <input
+                      id="headcount"
+                      type="number"
+                      min="1"
+                      value={orderForm.headcount || ''}
+                      onChange={(e) => onUpdateForm({ headcount: parseInt(e.target.value) || 0 })}
+                      onBlur={() => handleBlur('headcount')}
+                      placeholder="Number of guests"
+                      className={inputClass('headcount')}
+                      aria-required={true}
+                      aria-invalid={!!showError('headcount')}
+                      aria-describedby={showError('headcount') ? 'headcount-error' : undefined}
+                    />
+                    {showError('headcount') && (
+                      <p id="headcount-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                        <AlertCircle size={12} /> {errors.headcount}
+                      </p>
+                    )}
+                  </div>
                 </div>
+              </>
+            )}
+          </section>
 
-                <div>
-                  <label htmlFor="state" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                    State <span className="text-red-500" aria-hidden="true">*</span>
-                  </label>
-                  <input
-                    id="state"
-                    type="text"
-                    value={orderForm.deliveryAddress?.state || ''}
-                    onChange={(e) => handleAddressChange('state', e.target.value)}
-                    onBlur={() => handleBlur('state')}
-                    className={inputClass('state')}
-                    aria-required={true}
-                    aria-invalid={!!showError('state')}
-                    aria-describedby={showError('state') ? 'state-error' : undefined}
-                  />
-                  {showError('state') && (
-                    <p id="state-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
-                      <AlertCircle size={12} /> {errors.state}
-                    </p>
-                  )}
+          {/* SB-19: Section 2: Contact & Delivery (Collapsible) */}
+          <section className="rounded-lg border" style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }} aria-labelledby="section-2-heading">
+            <button
+              onClick={() => toggleSection(2)}
+              className="w-full px-6 py-4 flex items-center gap-3 hover:opacity-80 transition-opacity"
+              aria-expanded={openSections.has(2)}
+              aria-controls="section-2-content"
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white" style={{ backgroundColor: 'var(--aurora-primary, #6366f1)' }}>
+                2
+              </div>
+              <h2 id="section-2-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
+                Contact & Delivery
+              </h2>
+              {isSectionValid[2] && (
+                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" />
+              )}
+              {openSections.has(2) ? (
+                <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
+              ) : (
+                <ChevronDown size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
+              )}
+            </button>
+            {openSections.has(2) && (
+              <>
+                <div className="border-t" style={{ borderColor: 'var(--aurora-border)' }} />
+                <div id="section-2-content" className="px-6 py-4 space-y-4">
+                  <div>
+                    <label htmlFor="contact-name" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Contact Name <span className="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <input
+                      id="contact-name"
+                      type="text"
+                      value={orderForm.contactName}
+                      onChange={(e) => onUpdateForm({ contactName: e.target.value })}
+                      onBlur={() => handleBlur('contactName')}
+                      placeholder="Full name"
+                      className={inputClass('contactName')}
+                      aria-required={true}
+                      aria-invalid={!!showError('contactName')}
+                      aria-describedby={showError('contactName') ? 'contact-name-error' : undefined}
+                    />
+                    {showError('contactName') && (
+                      <p id="contact-name-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                        <AlertCircle size={12} /> {errors.contactName}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="contact-phone" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Contact Phone <span className="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <input
+                      id="contact-phone"
+                      type="tel"
+                      value={orderForm.contactPhone}
+                      onChange={(e) => onUpdateForm({ contactPhone: e.target.value })}
+                      onBlur={() => handleBlur('contactPhone')}
+                      placeholder="(555) 123-4567"
+                      className={inputClass('contactPhone')}
+                      aria-required={true}
+                      aria-invalid={!!showError('contactPhone')}
+                      aria-describedby={showError('contactPhone') ? 'contact-phone-error' : undefined}
+                    />
+                    {showError('contactPhone') && (
+                      <p id="contact-phone-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                        <AlertCircle size={12} /> {errors.contactPhone}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label htmlFor="street" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Street Address <span className="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <AddressAutocomplete
+                      id="street"
+                      value={orderForm.deliveryAddress?.street || ''}
+                      onChange={(val) => handleAddressChange('street', val)}
+                      onSelect={handleAddressAutocomplete}
+                      onBlur={() => handleBlur('street')}
+                      placeholder="123 Main Street"
+                      className={inputClass('street')}
+                      aria-required={true}
+                      aria-invalid={!!showError('street')}
+                      aria-describedby={showError('street') ? 'street-error' : undefined}
+                    />
+                    {showError('street') && (
+                      <p id="street-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                        <AlertCircle size={12} /> {errors.street}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="city" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        City <span className="text-red-500" aria-hidden="true">*</span>
+                      </label>
+                      <input
+                        id="city"
+                        type="text"
+                        value={orderForm.deliveryAddress?.city || ''}
+                        onChange={(e) => handleAddressChange('city', e.target.value)}
+                        onBlur={() => handleBlur('city')}
+                        className={inputClass('city')}
+                        aria-required={true}
+                        aria-invalid={!!showError('city')}
+                        aria-describedby={showError('city') ? 'city-error' : undefined}
+                      />
+                      {showError('city') && (
+                        <p id="city-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                          <AlertCircle size={12} /> {errors.city}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="state" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        State <span className="text-red-500" aria-hidden="true">*</span>
+                      </label>
+                      <input
+                        id="state"
+                        type="text"
+                        value={orderForm.deliveryAddress?.state || ''}
+                        onChange={(e) => handleAddressChange('state', e.target.value)}
+                        onBlur={() => handleBlur('state')}
+                        className={inputClass('state')}
+                        aria-required={true}
+                        aria-invalid={!!showError('state')}
+                        aria-describedby={showError('state') ? 'state-error' : undefined}
+                      />
+                      {showError('state') && (
+                        <p id="state-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                          <AlertCircle size={12} /> {errors.state}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="zip" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      ZIP Code <span className="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <input
+                      id="zip"
+                      type="text"
+                      value={orderForm.deliveryAddress?.zip || ''}
+                      onChange={(e) => handleAddressChange('zip', e.target.value)}
+                      onBlur={() => handleBlur('zip')}
+                      placeholder="95112"
+                      className={inputClass('zip')}
+                      aria-required={true}
+                      aria-invalid={!!showError('zip')}
+                      aria-describedby={showError('zip') ? 'zip-error' : undefined}
+                    />
+                    {showError('zip') && (
+                      <p id="zip-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                        <AlertCircle size={12} /> {errors.zip}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label htmlFor="zip" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                  ZIP Code <span className="text-red-500" aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="zip"
-                  type="text"
-                  value={orderForm.deliveryAddress?.zip || ''}
-                  onChange={(e) => handleAddressChange('zip', e.target.value)}
-                  onBlur={() => handleBlur('zip')}
-                  placeholder="95112"
-                  className={inputClass('zip')}
-                  aria-required={true}
-                  aria-invalid={!!showError('zip')}
-                  aria-describedby={showError('zip') ? 'zip-error' : undefined}
-                />
-                {showError('zip') && (
-                  <p id="zip-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
-                    <AlertCircle size={12} /> {errors.zip}
-                  </p>
-                )}
-              </div>
-            </div>
+              </>
+            )}
           </section>
 
-          {/* Section 3: Order For Context */}
-          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="orderfor-heading">
-            <h2 id="orderfor-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
-              Who is this order for?
-            </h2>
-            <OrderForSelector
-              value={orderForm.orderForContext}
-              onChange={(ctx) => onUpdateForm({ orderForContext: ctx })}
-              errors={submitAttempted || touched['orderFor'] ? {
-                recipientName: errors.recipientName,
-                recipientContact: errors.recipientContact,
-                organizationName: errors.organizationName,
-              } : undefined}
-              onBlur={(field) => handleBlur(field)}
-            />
-          </section>
+          {/* SB-19: Section 3: Order Preferences (Collapsible) */}
+          <section className="rounded-lg border" style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }} aria-labelledby="section-3-heading">
+            <button
+              onClick={() => toggleSection(3)}
+              className="w-full px-6 py-4 flex items-center gap-3 hover:opacity-80 transition-opacity"
+              aria-expanded={openSections.has(3)}
+              aria-controls="section-3-content"
+            >
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white" style={{ backgroundColor: 'var(--aurora-primary, #6366f1)' }}>
+                3
+              </div>
+              <h2 id="section-3-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
+                Order Preferences
+              </h2>
+              {isSectionValid[3] && (
+                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" />
+              )}
+              {openSections.has(3) ? (
+                <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
+              ) : (
+                <ChevronDown size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
+              )}
+            </button>
+            {openSections.has(3) && (
+              <>
+                <div className="border-t" style={{ borderColor: 'var(--aurora-border)' }} />
+                <div id="section-3-content" className="px-6 py-4 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Who is this order for?
+                    </label>
+                    <OrderForSelector
+                      value={orderForm.orderForContext}
+                      onChange={(ctx) => onUpdateForm({ orderForContext: ctx })}
+                      errors={submitAttempted || touched['orderFor'] ? {
+                        recipientName: errors.recipientName,
+                        recipientContact: errors.recipientContact,
+                        organizationName: errors.organizationName,
+                      } : undefined}
+                      onBlur={(field) => handleBlur(field)}
+                    />
+                  </div>
 
-          {/* Section 4: Special Instructions */}
-          <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="instructions-heading">
-            <h2 id="instructions-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
-              Special Instructions
-            </h2>
-            <textarea
-              id="special-instructions"
-              value={orderForm.specialInstructions}
-              onChange={(e) => {
-                if (e.target.value.length <= SPECIAL_INSTRUCTIONS_MAX) {
-                  onUpdateForm({ specialInstructions: e.target.value });
-                }
-              }}
-              placeholder="Add any special requests or dietary restrictions..."
-              rows={4}
-              maxLength={SPECIAL_INSTRUCTIONS_MAX}
-              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none"
-              style={{ borderColor: 'var(--aurora-border)' }}
-              aria-label="Special instructions"
-              aria-describedby="instructions-count"
-            />
-            <p id="instructions-count" className="text-xs text-right mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
-              {orderForm.specialInstructions.length}/{SPECIAL_INSTRUCTIONS_MAX}
-            </p>
+                  <div>
+                    <label htmlFor="special-instructions" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Special Instructions
+                    </label>
+                    <textarea
+                      id="special-instructions"
+                      value={orderForm.specialInstructions}
+                      onChange={(e) => {
+                        if (e.target.value.length <= SPECIAL_INSTRUCTIONS_MAX) {
+                          onUpdateForm({ specialInstructions: e.target.value });
+                        }
+                      }}
+                      placeholder="Add any special requests or dietary restrictions..."
+                      rows={4}
+                      maxLength={SPECIAL_INSTRUCTIONS_MAX}
+                      className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors resize-none"
+                      style={{ borderColor: 'var(--aurora-border)' }}
+                      aria-label="Special instructions"
+                      aria-describedby="instructions-count"
+                    />
+                    <p id="instructions-count" className="text-xs text-right mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
+                      {orderForm.specialInstructions.length}/{SPECIAL_INSTRUCTIONS_MAX}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </section>
 
           {/* Section 5: Order Summary */}

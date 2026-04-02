@@ -322,6 +322,65 @@ export async function createQuoteResponse(response: Omit<CateringQuoteResponse, 
   return docRef.id;
 }
 
+/**
+ * Check whether a quote response is still editable.
+ * Rules:
+ *  - Status must be 'submitted' (not accepted/declined)
+ *  - Within 24 hours of creation
+ */
+export function isQuoteResponseEditable(response: CateringQuoteResponse): boolean {
+  if (response.status !== 'submitted') return false;
+
+  // Time-since-creation check
+  const createdMs = response.createdAt?.toMillis?.()
+    || (response.createdAt?.seconds ? response.createdAt.seconds * 1000 : 0);
+  if (!createdMs) return false;
+  if (Date.now() - createdMs >= QUOTE_EDIT_WINDOW_MS) return false;
+
+  return true;
+}
+
+/**
+ * Update an existing quote response (only allowed within edit window).
+ * Allows vendors to edit their submitted quotes before the customer accepts/declines.
+ */
+export async function updateQuoteResponse(
+  responseId: string,
+  updates: {
+    quotedItems?: QuotedItem[];
+    subtotal?: number;
+    serviceFee?: number;
+    deliveryFee?: number;
+    total?: number;
+    estimatedPrepTime?: string;
+    message?: string;
+  },
+): Promise<void> {
+  const ref = doc(db, QUOTE_RESPONSES_COL, responseId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Quote response not found');
+  const data = snap.data() as CateringQuoteResponse;
+
+  // Guard: status must be submitted
+  if (data.status !== 'submitted') throw new Error('Only submitted quotes can be edited');
+
+  // Guard: within 24hr creation window
+  const createdMs = data.createdAt?.toMillis?.()
+    || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+  if (createdMs && Date.now() - createdMs >= QUOTE_EDIT_WINDOW_MS) {
+    throw new Error('Edit window (24 hours) has expired');
+  }
+
+  // Strip undefined keys
+  const cleanUpdates: Record<string, any> = {};
+  for (const [k, v] of Object.entries(updates)) {
+    if (v !== undefined) cleanUpdates[k] = v;
+  }
+  cleanUpdates.updatedAt = serverTimestamp();
+
+  await updateDoc(ref, cleanUpdates);
+}
+
 export async function fetchQuoteResponsesByRequest(requestId: string): Promise<CateringQuoteResponse[]> {
   try {
     const q = query(
