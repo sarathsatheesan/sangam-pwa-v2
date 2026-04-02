@@ -18,6 +18,9 @@ interface CateringItemListProps {
   items: CateringMenuItem[];
   businesses: any[];
   onAddToCart: (item: CateringMenuItem) => void;
+  onUpdateQty?: (menuItemId: string, qty: number) => void;
+  onRemoveFromCart?: (menuItemId: string) => void;
+  cartItems?: Array<{ menuItemId: string; qty: number }>;
   searchQuery: string;
   dietaryFilter: string[];
   sortOrder?: SortOrder;
@@ -63,6 +66,9 @@ export default function CateringItemList({
   items,
   businesses,
   onAddToCart,
+  onUpdateQty,
+  onRemoveFromCart,
+  cartItems,
   searchQuery,
   dietaryFilter,
   sortOrder = 'default',
@@ -90,10 +96,12 @@ export default function CateringItemList({
     return items.filter(item => {
       // Search filter
       const searchLower = searchQuery.toLowerCase();
+      const bizName = businessMap[item.businessId]?.name?.toLowerCase() || '';
       const matchesSearch =
         !searchQuery ||
         item.name.toLowerCase().includes(searchLower) ||
-        (item.description?.toLowerCase().includes(searchLower) ?? false);
+        (item.description?.toLowerCase().includes(searchLower) ?? false) ||
+        bizName.includes(searchLower);
 
       // Dietary filter (OR logic — item matches if it has ANY of the selected tags)
       const matchesDietary =
@@ -104,7 +112,7 @@ export default function CateringItemList({
 
       return matchesSearch && matchesDietary;
     });
-  }, [items, searchQuery, dietaryFilter]);
+  }, [items, searchQuery, dietaryFilter, businessMap]);
 
   // Sort items within groups
   const sortedItems = useMemo(() => {
@@ -334,13 +342,19 @@ export default function CateringItemList({
 
                   {/* Items grid */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {businessItems.map(item => (
-                      <CateringItemCard
-                        key={item.id}
-                        item={item}
-                        onAddToCart={onAddToCart}
-                      />
-                    ))}
+                    {businessItems.map(item => {
+                      const cartItem = cartItems?.find(ci => ci.menuItemId === item.id);
+                      return (
+                        <CateringItemCard
+                          key={item.id}
+                          item={item}
+                          onAddToCart={onAddToCart}
+                          onUpdateQty={onUpdateQty}
+                          onRemoveFromCart={onRemoveFromCart}
+                          cartQty={cartItem?.qty}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               );

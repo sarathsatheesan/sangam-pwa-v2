@@ -7,6 +7,9 @@ import { formatPrice } from '@/services/cateringService';
 interface CateringItemCardProps {
   item: CateringMenuItem;
   onAddToCart: (item: CateringMenuItem) => void;
+  onUpdateQty?: (menuItemId: string, qty: number) => void;
+  onRemoveFromCart?: (menuItemId: string) => void;
+  cartQty?: number;
 }
 
 const DIETARY_TAG_INFO: Record<string, { bg: string; text: string; icon: string }> = {
@@ -23,31 +26,46 @@ const DIETARY_TAG_INFO: Record<string, { bg: string; text: string; icon: string 
 export default function CateringItemCard({
   item,
   onAddToCart,
+  onUpdateQty,
+  onRemoveFromCart,
+  cartQty,
 }: CateringItemCardProps): ReturnType<FC> {
-  const [qty, setQty] = useState(0);
+  // Use cartQty from parent (source of truth) if available, otherwise local state
+  const [localQty, setLocalQty] = useState(0);
+  const qty = cartQty ?? localQty;
 
   const minQty = item.minOrderQty || 1;
   const maxQty = item.maxOrderQty;
 
   const handleAddToCart = () => {
-    setQty(minQty);
+    setLocalQty(minQty);
     onAddToCart(item);
   };
 
   const handleIncrement = () => {
     if (!maxQty || qty < maxQty) {
       const newQty = qty + 1;
-      setQty(newQty);
-      onAddToCart(item);
+      setLocalQty(newQty);
+      if (onUpdateQty) {
+        onUpdateQty(item.id, newQty);
+      } else {
+        onAddToCart(item);
+      }
     }
   };
 
   const handleDecrement = () => {
     const newQty = qty - 1;
     if (newQty <= 0) {
-      setQty(0);
+      setLocalQty(0);
+      if (onRemoveFromCart) {
+        onRemoveFromCart(item.id);
+      }
     } else {
-      setQty(newQty);
+      setLocalQty(newQty);
+      if (onUpdateQty) {
+        onUpdateQty(item.id, newQty);
+      }
     }
   };
 

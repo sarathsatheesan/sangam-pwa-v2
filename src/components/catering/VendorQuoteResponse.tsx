@@ -897,17 +897,32 @@ export default function VendorQuoteResponse({
                             </p>
                           )}
 
-                          {/* Edit Quote button */}
-                          {canEdit && (
-                            <button
-                              onClick={() => handleEditPendingResponse(response, request)}
-                              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors mt-2"
-                              style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}
-                            >
-                              <Edit size={16} />
-                              Edit Quote
-                            </button>
-                          )}
+                          {/* Edit Quote button with edit window countdown */}
+                          {canEdit && (() => {
+                            const createdMs = response.createdAt?.toMillis?.() || (response.createdAt?.seconds ? response.createdAt.seconds * 1000 : 0);
+                            const expiresMs = createdMs + 24 * 60 * 60 * 1000;
+                            const remainingMs = Math.max(0, expiresMs - Date.now());
+                            const remainingHrs = Math.floor(remainingMs / (60 * 60 * 1000));
+                            const remainingMins = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+                            const isUrgent = remainingHrs < 4;
+                            return (
+                              <div className="mt-2 space-y-1">
+                                <button
+                                  onClick={() => handleEditPendingResponse(response, request)}
+                                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                                  style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}
+                                >
+                                  <Edit size={16} />
+                                  Edit Quote
+                                </button>
+                                {createdMs > 0 && (
+                                  <p className={`text-xs text-center ${isUrgent ? 'font-medium' : ''}`} style={{ color: isUrgent ? '#D97706' : 'var(--aurora-text-muted)' }}>
+                                    {remainingHrs > 0 ? `${remainingHrs}h ${remainingMins}m` : `${remainingMins}m`} left to edit
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </>
                       )}
                     </div>

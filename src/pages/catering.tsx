@@ -270,6 +270,8 @@ export default function CateringPage() {
   }, []);
 
   const handlePlaceOrder = useCallback(async () => {
+    // Guard against double-submit
+    if (submitting) return;
     if (!user || !userProfile) {
       addToast('You must be logged in to place an order', 'error');
       return;
@@ -367,7 +369,7 @@ export default function CateringPage() {
     } finally {
       setSubmitting(false);
     }
-  }, [user, userProfile, state, addToast, allCateringBusinesses]);
+  }, [user, userProfile, state, addToast, allCateringBusinesses, submitting]);
 
   // ── RFP Handlers ──
   const handleSubmitRFP = useCallback(async () => {
@@ -881,6 +883,9 @@ export default function CateringPage() {
               items={state.menuItems}
               businesses={state.businesses}
               onAddToCart={handleAddToCart}
+              onUpdateQty={handleUpdateCartQty}
+              onRemoveFromCart={handleRemoveFromCart}
+              cartItems={state.cart.items}
               searchQuery={state.searchQuery}
               dietaryFilter={state.dietaryFilter}
               sortOrder={state.sortOrder}
@@ -1380,6 +1385,13 @@ export default function CateringPage() {
               Your cart has {state.cart.items.length} item{state.cart.items.length !== 1 ? 's' : ''} from{' '}
               <strong>{state.cart.businessName}</strong>.
             </p>
+            {state.cart.items.length > 0 && state.cart.items.length <= 5 && (
+              <ul className="text-xs mb-2 ml-3 space-y-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
+                {state.cart.items.map(ci => (
+                  <li key={ci.menuItemId}>• {ci.name} × {ci.qty}</li>
+                ))}
+              </ul>
+            )}
             <p className="text-sm mb-5" style={{ color: 'var(--aurora-text-secondary)' }}>
               Adding from <strong>{state.pendingVendorSwitch.businessName}</strong> will replace your current cart.
             </p>

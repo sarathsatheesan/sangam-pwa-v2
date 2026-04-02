@@ -544,10 +544,10 @@ export default function CateringCheckout({
                     <OrderForSelector
                       value={orderForm.orderForContext}
                       onChange={(ctx) => onUpdateForm({ orderForContext: ctx })}
-                      errors={submitAttempted || touched['orderFor'] ? {
-                        recipientName: errors.recipientName,
-                        recipientContact: errors.recipientContact,
-                        organizationName: errors.organizationName,
+                      errors={submitAttempted || touched['recipientName'] || touched['recipientContact'] || touched['organizationName'] ? {
+                        recipientName: touched['recipientName'] || submitAttempted ? errors.recipientName : undefined,
+                        recipientContact: touched['recipientContact'] || submitAttempted ? errors.recipientContact : undefined,
+                        organizationName: touched['organizationName'] || submitAttempted ? errors.organizationName : undefined,
                       } : undefined}
                       onBlur={(field) => handleBlur(field)}
                     />

@@ -19,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
 import OrderTimeline from './OrderTimeline';
-import { doc, getDoc, updateDoc, serverTimestamp, collection, addDoc, query, orderBy, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, collection, addDoc, query, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { STATUS_THEME, CUSTOMER_STATUS_LABELS } from '@/constants/cateringStatusTheme';
 
@@ -775,6 +775,7 @@ function PaymentInfoSection({
   paymentStatus?: string;
   onPaymentConfirmed?: () => void;
 }) {
+  const { addToast } = useToast();
   const [info, setInfo] = useState<{ paymentUrl?: string; paymentMethod?: string; paymentNote?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -812,6 +813,7 @@ function PaymentInfoSection({
       setShowConfirmDialog(false);
     } catch (err) {
       console.error('Failed to confirm payment:', err);
+      addToast('Payment confirmation failed. Please try again.', 'error');
     } finally {
       setConfirming(false);
     }
@@ -1024,10 +1026,11 @@ function InlineMessagingModal({
   const order = orders.find(o => o.id === orderId);
   if (!order) return null;
 
-  // Load existing messages when modal opens
+  // Load existing messages and subscribe to real-time updates
   useEffect(() => {
     if (!user || !order) return;
     let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
 
     (async () => {
       try {
@@ -1039,20 +1042,23 @@ function InlineMessagingModal({
         if (cancelled) return;
         setConversationId(convId);
 
-        // Load messages from Firestore
+        // Subscribe to real-time message updates
         const messagesRef = collection(db, 'conversations', convId, 'messages');
         const q = query(messagesRef, orderBy('timestamp', 'asc'));
-        const snapshot = await getDocs(q);
-
-        if (!cancelled) {
-          setMessages(
-            snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-            } as any))
-          );
-          setLoadingMessages(false);
-        }
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          if (!cancelled) {
+            setMessages(
+              snapshot.docs.map(d => ({
+                id: d.id,
+                ...d.data(),
+              } as any))
+            );
+            setLoadingMessages(false);
+          }
+        }, (error) => {
+          console.error('Message subscription error:', error);
+          if (!cancelled) setLoadingMessages(false);
+        });
       } catch (error) {
         console.error('Failed to load messages:', error);
         if (!cancelled) {
@@ -1063,6 +1069,7 @@ function InlineMessagingModal({
 
     return () => {
       cancelled = true;
+      if (unsubscribe) unsubscribe();
     };
   }, [user, order, orderId]);
 
@@ -1089,8 +1096,7 @@ function InlineMessagingModal({
       });
 
       setMessage('');
-      addToast('Message sent!', 'success');
-      onClose();
+      // Don't close modal — messages update in real-time via onSnapshot
     } catch (error) {
       console.error('Failed to send message:', error);
       addToast('Failed to send message', 'error');

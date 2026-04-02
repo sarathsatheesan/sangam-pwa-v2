@@ -17,14 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** March 30, 2026 (Last updated: Session 25)
+**Date:** April 1, 2026 (Last updated: Session 26)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** `25bde2f` — feat: large effort batch — template marketplace, versioning, analytics drill-down (#29-36) (Session 25)
-**Uncommitted:** Templates nav button fix (src/pages/catering.tsx) — needs commit + push + deploy
+**Latest Commit:** `e571003` — feat(catering): implement 7 P3 low-priority polish & accessibility fixes (Session 26)
+**Uncommitted:** None — all changes committed and pushed
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
-**Live bundle:** Build clean, deploy from macOS terminal needed (Firebase auth not available in VM). Deploy command: `npx vite build && npx firebase deploy --only hosting && cd functions && npm run build && cd .. && npx firebase deploy --only functions`
+**Live bundle:** Build clean, deploy from macOS terminal needed (Firebase auth not available in VM). Deploy command: `npx vite build && npx firebase deploy --only hosting && cd functions && npm run build && cd .. && npx firebase deploy --only functions`. All Session 26 changes committed and pushed — deploy needed.
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides)
 
 ---
 
@@ -185,6 +185,28 @@ Phase 4 highlights: Extracted `PersonCard` component (464 lines, 6 variants: gri
      ================================================================ -->
 ## 2. Decisions Made and Why
 
+### Session 26: Round 2 Service Blueprint Audit — 30 Findings Across 4 Priority Tiers
+
+- **sessionStorage over localStorage for checkout form persistence** — Checkout form data is saved to `sessionStorage` (not `localStorage`) so it auto-clears when the browser tab is closed. Catering orders are time-sensitive — stale delivery dates or addresses from previous sessions would cause more harm than the convenience of persistence across sessions. `sessionStorage` gives intra-session persistence (navigating between checkout steps) without cross-session data leakage.
+
+- **State-based tax lookup table over API-based tax calculation** — A static `STATE_TAX_RATES: Record<string, number>` with all 50 states + DC replaces the hardcoded 8.25% tax rate. While a tax API (Avalara, TaxJar) would be more accurate for jurisdictional nuances, a static lookup is sufficient for estimates and avoids API costs and latency. The `getEstimatedTaxRate(state?)` function falls back to `DEFAULT_TAX_RATE` (8.25%) when no state is provided. Can be upgraded to API-based calculation when payment integration is added.
+
+- **Two-step payment confirmation over direct Firestore payment write** — The payment flow sends users to an external payment link (vendor's payment URL), then requires them to click "I've Completed Payment" to update `paymentStatus: 'paid'` in Firestore. This two-step flow acknowledges that the app doesn't yet have integrated payment processing — the vendor's external payment system is the source of truth, and the confirmation button is a user-attested status update. When Stripe/Square integration is added, this can be replaced with webhook-driven status updates.
+
+- **Clip-width technique for half-star ratings over SVG gradient fills** — Half-star rendering uses a `<div>` with `overflow: hidden` and dynamic `width` based on `Math.min(1, Math.max(0, rating - (star - 1)))`. This is simpler and more cross-browser compatible than SVG `linearGradient` or `clipPath` approaches, and works with any star icon.
+
+- **5-second undo window for cart removal over confirmation dialog** — An undo toast bar is less disruptive than a confirmation dialog for cart item removal. The item is visually removed immediately (filtered from `visibleItems`) but retained in state behind `removedItem` + `undoTimerRef`. This follows the Gmail/Google pattern of optimistic removal with undo.
+
+- **24-hour edit window for vendor quote responses** — `isQuoteResponseEditable()` checks both `status === 'submitted'` AND `createdAt` within 24 hours. This prevents vendors from changing quotes after customers have started making decisions, while allowing reasonable corrections shortly after submission. The window is enforced both client-side (UI gating) and in the service function.
+
+- **Parallel agent implementation strategy** — The 30 findings were implemented using parallel subagents grouped by file affinity to minimize merge conflicts. Each agent received specific line ranges and non-overlapping edit targets. This allowed completing all 30 items in a single session with 4 clean commits (one per priority tier).
+
+- **Role-based status transitions in Firestore rules (not just client-side)** — Added `isValidStatusTransition()` helper and role-based `allow update` rules to `firestore.rules` for catering orders. Client-side checks in `updateOrderStatus()` with optional `callerRole` param provide a first line of defense, but the Firestore rules enforce authorization server-side. Customers can only cancel their own orders; vendors can only update orders for their business.
+
+- **`prefers-reduced-motion` media query for animation accessibility** — The pulsing amber dot on modified orders uses `animate-ping` which can trigger motion sensitivity. A `prefersReducedMotion` state via `window.matchMedia('(prefers-reduced-motion: reduce)')` conditionally disables the animation. This follows WCAG 2.3.3 (Animation from Interactions).
+
+- **URL hash for order deep linking (not query params)** — Order expansion state is synced to `window.location.hash` (`#order-{id}`) via `replaceState`. Hash changes don't trigger page reloads and don't appear in server logs (unlike query params). On mount, `expandedOrder` is initialized from the hash, enabling shareable order links.
+
 ### Session 22: Catering Module — Phase 1 + Phase 2 RFP + Firestore Fixes
 
 - **Explicit payload builders over object spread for Firestore writes** — The `...response` spread pattern includes all object properties, including `undefined` optional fields that Firestore rejects. Explicit payload builders (`const payload: Record<string, any> = { field1: value1, ... }; if (optionalField) payload.optionalField = optionalField;`) are safer because they only include fields with actual values. This also avoids corrupting Firebase sentinel values like `serverTimestamp()` which look like regular objects to generic utilities but must be passed through unmodified. Applied to both `createQuoteRequest` and `createQuoteResponse` in `cateringService.ts`.
@@ -244,6 +266,46 @@ Phase 4 highlights: Extracted `PersonCard` component (464 lines, 6 variants: gri
   - `CateringCategoryGrid.tsx`: `aria-label` with category name and caterer count on each button
   - `CateringItemList.tsx`: `role="checkbox"`, `aria-checked` on dietary filter pills, `aria-label` on search input
   - `CateringCheckout.tsx`: `aria-labelledby` on sections, `htmlFor` on all labels, `aria-required`/`aria-invalid`/`aria-describedby` on all inputs, `role="alert"` on error messages, `role="list"` on order summary
+
+**Session 26 focused on (April 1, 2026):** Round 2 Service Blueprint Audit — implementing all 30 findings (SB-18 through SB-47) from the comprehensive service blueprint audit, organized across 4 priority tiers (P0 Critical, P1 High, P2 Medium, P3 Low). This session completed all 30 items (29 implemented, 1 confirmed already done) with 4 git commits, zero build errors.
+
+- **P0 Critical (5 items — SB-18, SB-19, SB-20, SB-24, SB-27)**:
+  - **SB-18 Inline Quantity Stepper**: Replaced simple "Add" button in `CateringItemCard.tsx` with qty=0 → Add button, qty>0 → [-/qty/+] stepper respecting `minOrderQty`/`maxOrderQty` constraints
+  - **SB-19 Collapsible Checkout Sections**: 3 numbered collapsible sections (Delivery, Order For, Payment) with green checkmarks on valid sections in `CateringCheckout.tsx`
+  - **SB-20 Session Storage Persistence**: Checkout form data auto-saved to `sessionStorage` (key: `ethnicity_checkout_form`) and restored on mount, cleared on tab close
+  - **SB-24 Low Stock Badge Enhancement**: `CateringItemCard.tsx` now shows "N left" when `stockCount` is available, falls back to "Low Stock" generic badge
+  - **SB-27 Two-Step Payment Flow**: External payment link → "I've Completed Payment" confirmation button → Firestore `paymentStatus: 'paid'` update in `CateringOrderStatus.tsx`
+
+- **P1 High (8 items — SB-21, SB-25, SB-26, SB-28, SB-29, SB-30, SB-31, SB-32)**:
+  - **SB-21 Undo Cart Removal**: 5-second undo window with amber toast bar when removing items from `CateringCart.tsx`
+  - **SB-25 Accessible Radio Inputs**: Replaced styled `<div>` buttons with `<label>` + `<input type="radio" className="sr-only">` + `role="radiogroup"` in `OrderForSelector.tsx`
+  - **SB-26 OrderForContext Validation**: Added `recipientName`/`recipientContact`/`organizationName` validation with error props and onBlur integration
+  - **SB-28 State-Based Tax**: 50-state + DC tax rate lookup table (`STATE_TAX_RATES: Record<string, number>`) replacing hardcoded 8.25% in `CateringCheckout.tsx`
+  - **SB-29 Batch Decline All**: Confirmation dialog for declining all pending quote requests in `VendorCateringDashboard.tsx`
+  - **SB-30 Quote Edit Window**: New `isQuoteResponseEditable()` (24hr window + status check) and `updateQuoteResponse()` in `cateringQuotes.ts`, with edit UI in `VendorQuoteResponse.tsx`
+  - **SB-31 ETA Time Picker**: Native `type="time"` picker + duration mode toggle with `formatEtaValue()` helper in `VendorCateringDashboard.tsx`
+  - **SB-32 Vendor Pause/Resume**: `isPaused`/`cateringPaused` Firestore field, pause/resume banner in `VendorCateringDashboard.tsx`
+
+- **P2 Medium (9 items — SB-22, SB-23, SB-33, SB-34, SB-35, SB-36, SB-37, SB-38, SB-39)**:
+  - **SB-22 Half-Star Reviews**: Clip-width technique for fractional star rendering in `CateringReviews.tsx`
+  - **SB-23 Search Clear Button**: X icon clear button with `pr-10` input padding in `CateringItemList.tsx`
+  - **SB-33 Audio Mute Toggle**: `audioMuted` state persisted to localStorage, `Volume2/VolumeX` toggle in vendor dashboard
+  - **SB-34 Vendor Assignment Badges**: Per-item "Assigned to [name]" badge replacing price input for items assigned to other vendors in `VendorQuoteResponse.tsx`
+  - **SB-35 Modification Alert**: Pulsing amber dot on orders with `vendorModified && !accepted && !rejected` in `CateringOrderStatus.tsx`
+  - **SB-36 Rejection Rollback**: Rejects vendor modifications by reverting to `order.originalItems` and recalculating total
+  - **SB-37 Delivery Address Modal**: Pre-finalization delivery address capture in `QuoteComparison.tsx`
+  - **SB-38 Quote Expiry Check**: Expiry validation in `handleAcceptItems` with "Accept Anyway" warning modal
+  - **SB-39 Multi-Vendor RFP Summary**: `vendorSummary` useMemo grouping items by vendor with per-vendor subtotals + grand total
+
+- **P3 Low (8 items — SB-40, SB-41, SB-42, SB-43, SB-44, SB-45, SB-46, SB-47)**:
+  - **SB-40 Role-Based Firestore Rules**: `callerRole` param on `updateOrderStatus()`, `callerUid` on `cancelOrder()`, enhanced `firestore.rules` with `isValidStatusTransition()` helper
+  - **SB-41 Reduced Motion**: `prefers-reduced-motion` media query conditionally disabling `animate-ping` animations
+  - **SB-42 Status Badge Icons**: Expanded StatusBadge config with emoji icons (⏳, ✓, 🍳, ✔, 🚗, ✅, ✗) for each order status
+  - **SB-43 Deep Linking**: `expandedOrder` initialized from `window.location.hash`, synced via `replaceState` for URL bookmarking
+  - **SB-44 Inline Messaging**: InlineMessagingModal rewritten with actual Firestore message writes + message history loading
+  - **SB-45 Category Ratings**: Optional per-category (foodQuality, presentation, delivery, value, service) 5-star breakdown in `CateringReviewForm.tsx`
+  - **SB-46 Review Moderation Panel**: NEW `ReviewModerationPanel.tsx` component with flagged review queue, dismiss/hide actions, integrated into vendor dashboard
+  - **SB-47 Recurring Order Overrides**: Confirmed already implemented in `RecurringOrderManager.tsx` — skipped
 
 **Session 25 focused on (March 30, 2026):** Catering Module — Medium Effort Features (#13-14, #17-22) + Large Effort Architecture (#27-28) + Large Effort Features (#29-36) + Bug Fix (Templates nav). This session completed 19 items total.
 
@@ -1282,6 +1344,73 @@ src/
 - Admin review queue with approve/reject workflow
 - Zero impact on existing individual sign-up flow
 
+### Session 26 (April 1, 2026) — Round 2 Service Blueprint Audit: 30 Findings (SB-18 through SB-47)
+
+**All 30 findings implemented across 4 priority tiers, 4 git commits, zero build errors.**
+
+| Finding | Description | File(s) | Commit | Status |
+|---------|-------------|---------|--------|--------|
+| SB-18 | Inline quantity stepper | `CateringItemCard.tsx` | `2e20c84` (P0) | ✅ |
+| SB-19 | Collapsible checkout sections | `CateringCheckout.tsx` | `2e20c84` (P0) | ✅ |
+| SB-20 | Session storage persistence | `CateringCheckout.tsx` | `2e20c84` (P0) | ✅ |
+| SB-21 | Undo cart removal | `CateringCart.tsx` | `aa06530` (P1) | ✅ |
+| SB-22 | Half-star reviews | `CateringReviews.tsx` | `dcfef06` (P2) | ✅ |
+| SB-23 | Search clear button | `CateringItemList.tsx` | `dcfef06` (P2) | ✅ |
+| SB-24 | Low stock badge "N left" | `CateringItemCard.tsx` | `2e20c84` (P0) | ✅ |
+| SB-25 | Accessible radio inputs | `OrderForSelector.tsx` | `aa06530` (P1) | ✅ |
+| SB-26 | OrderForContext validation | `OrderForSelector.tsx`, `CateringCheckout.tsx` | `aa06530` (P1) | ✅ |
+| SB-27 | Two-step payment flow | `CateringOrderStatus.tsx` | `2e20c84` (P0) | ✅ |
+| SB-28 | State-based tax rates | `CateringCheckout.tsx` | `aa06530` (P1) | ✅ |
+| SB-29 | Batch decline all | `VendorCateringDashboard.tsx` | `aa06530` (P1) | ✅ |
+| SB-30 | Quote edit window | `cateringQuotes.ts`, `VendorQuoteResponse.tsx`, `index.ts` | `aa06530` (P1) | ✅ |
+| SB-31 | ETA time picker | `VendorCateringDashboard.tsx` | `aa06530` (P1) | ✅ |
+| SB-32 | Vendor pause/resume | `VendorCateringDashboard.tsx` | `aa06530` (P1) | ✅ |
+| SB-33 | Audio mute toggle | `VendorCateringDashboard.tsx` | `dcfef06` (P2) | ✅ |
+| SB-34 | Vendor assignment badges | `VendorQuoteResponse.tsx` | `dcfef06` (P2) | ✅ |
+| SB-35 | Modification alert dot | `CateringOrderStatus.tsx` | `dcfef06` (P2) | ✅ |
+| SB-36 | Rejection rollback | `CateringOrderStatus.tsx` | `dcfef06` (P2) | ✅ |
+| SB-37 | Delivery address modal | `QuoteComparison.tsx` | `dcfef06` (P2) | ✅ |
+| SB-38 | Quote expiry check | `QuoteComparison.tsx` | `dcfef06` (P2) | ✅ |
+| SB-39 | Multi-vendor RFP summary | `QuoteComparison.tsx` | `dcfef06` (P2) | ✅ |
+| SB-40 | Role-based Firestore rules | `cateringOrders.ts`, `firestore.rules` | `e571003` (P3) | ✅ |
+| SB-41 | Reduced motion support | `CateringOrderStatus.tsx` | `e571003` (P3) | ✅ |
+| SB-42 | Status badge icons | `CateringOrderStatus.tsx` | `e571003` (P3) | ✅ |
+| SB-43 | Order deep linking | `CateringOrderStatus.tsx` | `e571003` (P3) | ✅ |
+| SB-44 | Inline messaging modal | `CateringOrderStatus.tsx` | `e571003` (P3) | ✅ |
+| SB-45 | Category-level ratings | `CateringReviewForm.tsx` | `e571003` (P3) | ✅ |
+| SB-46 | Review moderation panel | `ReviewModerationPanel.tsx` (NEW), `VendorCateringDashboard.tsx` | `e571003` (P3) | ✅ |
+| SB-47 | Recurring order overrides | Already implemented in `RecurringOrderManager.tsx` | — | ✅ (skipped) |
+
+**Git Commits (Session 26):**
+- `2e20c84` — feat(catering): implement 5 P0 critical UX fixes from service blueprint audit
+- `aa06530` — feat(catering): implement 8 P1 high-priority UX fixes from service blueprint audit
+- `dcfef06` — feat(catering): implement 9 P2 medium-priority UX fixes from service blueprint audit
+- `e571003` — feat(catering): implement 7 P3 low-priority polish & accessibility fixes
+
+**New files (Session 26):**
+- `src/components/catering/ReviewModerationPanel.tsx` — Flagged review queue with dismiss/hide actions for vendor moderation
+
+**New service functions (Session 26):**
+- `updateQuoteResponse(responseId, updates)` in `cateringQuotes.ts` — validates status + 24hr edit window, strips undefined, adds updatedAt
+- `isQuoteResponseEditable(response)` in `cateringQuotes.ts` — checks status='submitted' AND within 24hrs of creation
+
+**Modified files (Session 26) — 21 files:**
+- `src/components/catering/CateringItemCard.tsx` — inline qty stepper, low stock "N left" badge
+- `src/components/catering/CateringCheckout.tsx` — collapsible sections, sessionStorage, state-based tax, OrderForContext validation
+- `src/components/catering/CateringOrderStatus.tsx` — two-step payment, modification alerts, rejection rollback, reduced motion, status icons, deep linking, inline messaging
+- `src/components/catering/OrderForSelector.tsx` — accessible radio inputs, error props
+- `src/components/catering/CateringCart.tsx` — undo removal with 5s window
+- `src/components/catering/CateringReviews.tsx` — half-star rendering
+- `src/components/catering/CateringReviewForm.tsx` — category-level ratings
+- `src/components/catering/CateringItemList.tsx` — search clear button
+- `src/components/catering/VendorCateringDashboard.tsx` — batch decline, ETA time picker, vendor pause, audio mute, review moderation integration
+- `src/components/catering/VendorQuoteResponse.tsx` — quote edit window, vendor assignment badges
+- `src/components/catering/QuoteComparison.tsx` — delivery address modal, quote expiry check, multi-vendor summary
+- `src/services/catering/cateringQuotes.ts` — updateQuoteResponse, isQuoteResponseEditable
+- `src/services/catering/cateringOrders.ts` — callerRole param, callerUid on cancel
+- `src/services/catering/index.ts` — barrel re-exports for new functions
+- `firestore.rules` — role-based catering order rules with isValidStatusTransition()
+
 ---
 
 <!-- ================================================================
@@ -1373,7 +1502,8 @@ src/
 - **Phase 5 (Reviews):** ✅ COMPLETE (Session 23)
 - **Phase 6 (Favorites, Recurring, Templates):** ✅ COMPLETE (Session 23)
 - **UX Audit + 4 Critical Fixes:** ✅ COMPLETE (Session 24) — vendor switch dialog, checkout validation, accessibility, Firestore undefined cleanup
-- **Uncommitted changes:** Session 23 bug fixes + Session 24 critical fixes need commit + deploy
+- **Round 2 Service Blueprint Audit (30 findings SB-18 through SB-47):** ✅ COMPLETE (Session 26) — all 30 findings implemented across 4 priority tiers, 4 commits, zero build errors
+- **All changes committed and pushed to GitHub** — deploy to Firebase Hosting needed from macOS terminal
 
 **New files created in Sessions 23-24:**
 - `src/components/catering/CateringOrderStatus.tsx` — Customer order tracking with visual timeline
@@ -1428,22 +1558,22 @@ src/
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — Commit & Deploy Sessions 23-24 Changes
-- **Sessions 23-24 changes are uncommitted** — 7 new component files + 12 modified files (Catering Phases 3-6 + UX critical fixes). Build is clean (8.18s). Commit and deploy from macOS terminal:
+### Immediate — Deploy Session 26 Changes to Firebase
+- **All Session 26 changes are committed and pushed** — 4 commits (P0 through P3), 30 service blueprint findings implemented. Deploy from macOS terminal:
   ```bash
   cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
   npm run build
   firebase deploy --only firestore:rules,hosting,functions
-  git add src/components/catering/ src/pages/catering.tsx src/reducers/cateringReducer.ts \
-    src/services/cateringService.ts firestore.rules functions/src/index.ts
-  git commit -m "feat: Catering Phases 3-6 (Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring, Templates) + UX audit critical fixes (Sessions 23-24)"
-  git push origin main
   ```
-- **After deploy, test on live site:**
-  1. Add item from one vendor, then try adding from a different vendor → should see confirmation dialog
-  2. Go to Checkout → leave fields empty → click Place Order → should see inline validation errors
-  3. Place a successful order → navigate to Saved → My Favorites → verify favorite auto-saved
-  4. Set Recurring and Save as Template → should work without undefined field errors
+- **After deploy, test on live site (Session 26 changes):**
+  1. Add item to cart → verify inline qty stepper ([-/qty/+]) appears after first add
+  2. Go to Checkout → verify 3 collapsible sections with numbered badges → navigate away and return → verify form data persists
+  3. Open a delivered order → click Payment section → verify external payment link + "I've Completed Payment" button
+  4. Navigate to Vendor Dashboard → verify Pause/Resume toggle, Audio Mute button, Batch Decline All
+  5. Open CateringReviews → verify half-star rendering (e.g., 4.5 stars)
+  6. Remove item from cart → verify amber undo toast bar with 5-second window
+  7. Share an order URL with `#order-{id}` → verify deep link opens the correct order expanded
+  8. Review Firestore security rules for catering orders — new role-based transitions
 - **App is deployed and live** at `https://mithr-1e5f4.web.app`.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions deployed** — `transcribeVoiceMessage`, `sendNewMessageNotification`, and `processRecurringCateringOrders` (daily 6 AM PT) are on Cloud Run.
@@ -1586,6 +1716,8 @@ git add <files> && git commit -m "message" && git push origin main
 | `src/hooks/useGooglePlaces.ts` | Google Places Autocomplete hook — singleton script loader, session tokens for billing optimization, getPlacePredictions, getPlaceDetails with structured address parsing. NEW in Session 21. |
 | `src/pages/business/register.tsx` | Business registration page — gates on `business_signup_enabled` feature flag, renders BusinessRegistrationWizard. NEW in Session 21. |
 | `.env` | Google Places API key (`VITE_GOOGLE_MAPS_API_KEY`). Already in `.gitignore`. NEW in Session 21. |
+| `src/components/catering/ReviewModerationPanel.tsx` | Flagged review queue for vendors. Fetches via `fetchFlaggedReviews(businessId)`, dismiss flag / hide review actions. NEW in Session 26. |
+| `src/services/catering/cateringQuotes.ts` | Quote functions including `isQuoteResponseEditable()` (24hr window) and `updateQuoteResponse()`. NEW functions added in Session 26. |
 | `src/pages/catering.tsx` | Catering module orchestrator. Nav pills (categories, My Quotes, Vendor), view routing via cateringReducer, vendor detection for all approved business owners, RFP submission, quote handling. Session 22. |
 | `src/reducers/cateringReducer.ts` | Catering state: views (`categories`/`items`/`checkout`/`orders`/`vendor`/`rfp`/`quotes`), cart, orders, RFP form with `items: QuoteRequestItem[]`, quote requests/responses. Session 22. |
 | `src/services/cateringService.ts` | All Firestore CRUD for catering. Explicit payload builders (no spread). Client-side sorting (no `orderBy()`). Collections: `cateringMenuItems`, `cateringOrders`, `cateringQuoteRequests`, `cateringQuoteResponses`. Session 22. |
@@ -1658,6 +1790,12 @@ git add <files> && git commit -m "message" && git push origin main
 - **React 19 `useRef()` requires initial value** — In React 19 types, `useRef<T>()` with no argument causes TS2554. Always pass an initial value: `useRef<T>(undefined)` or `useRef<T>(null)`.
 - **`UserData` has `name` not `displayName`** — The `UserData` interface in `AuthContext.tsx` uses `name` field. Firebase `User` object has `displayName`. Don't confuse them — use `userProfile?.name` for profile data and `user.displayName` for Firebase auth data.
 - **`env(safe-area-inset-bottom)` needs Tailwind fallback** — Not all browsers support `env()`. Always provide a Tailwind class as the base positioning (e.g., `bottom-24`) and use inline `style={{ bottom: 'calc(Xrem + env(safe-area-inset-bottom, 0px))' }}` as an enhancement. The inline style overrides the Tailwind class when supported.
+- **Barrel re-export gap when adding new functions** — When adding new functions to domain sub-modules under `src/services/catering/`, you MUST also add them to the barrel re-export in `src/services/catering/index.ts`. Otherwise, Vite build fails with "is not exported" errors. This caught us with `updateQuoteResponse` and `isQuoteResponseEditable` in Session 26.
+- **`sessionStorage` for checkout form persistence (not `localStorage`)** — Catering checkout form data uses `sessionStorage` (key: `ethnicity_checkout_form`) so it clears on tab close. This prevents stale delivery dates/addresses from persisting across sessions. `sessionStorage` is the correct choice for time-sensitive form data.
+- **State-based tax rates are estimates** — The `STATE_TAX_RATES` lookup in `CateringCheckout.tsx` provides state-level estimates only. For actual tax calculation with jurisdictional accuracy, integrate a tax API (Avalara, TaxJar) when payment processing is added.
+- **`prefers-reduced-motion` for all pulsing/ping animations** — Any use of `animate-ping`, `animate-pulse`, or similar motion effects should be gated behind `window.matchMedia('(prefers-reduced-motion: reduce)')`. The pattern: `const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)` + `useEffect` with `matchMedia` listener.
+- **Quote edit window is 24 hours from creation** — `isQuoteResponseEditable()` in `cateringQuotes.ts` allows edits only when status is 'submitted' AND `createdAt` is within 24 hours. This is enforced both in the service function and in the UI. After 24 hours, the edit button disappears.
+- **`verbatimModuleSyntax` requires `import type` for type-only imports** — The tsconfig has `verbatimModuleSyntax: true`, meaning all type-only imports MUST use `import type { ... }` syntax. Failing to do so causes TypeScript errors. This affected several files during Session 26 implementation.
 - **`@supports not selector(:focus-visible)` for older browsers** — Added to `src/index.css`. Applies `:focus` outline on `[role="button"]` elements when `:focus-visible` is not supported (iOS Safari < 15.4). Zero runtime cost CSS-only fallback.
 - **Firebase `serverTimestamp()` is a FieldValue sentinel, not a plain object** — NEVER pass it through generic object utilities like `stripUndefined`, `Object.entries()`, `JSON.parse(JSON.stringify())`, or any recursive traversal. These will destroy the sentinel, producing `{}` instead of a server timestamp. Always handle `serverTimestamp()` as a top-level field in explicit payload builders, never as part of a spread or generic object transformation.
 - **Firestore queries with `where()` + `orderBy()` on different fields require composite indexes** — Without them, queries silently return empty results (not errors). Two solutions: (1) create composite indexes in `firestore.indexes.json` and deploy, or (2) remove `orderBy()` and sort client-side. Session 22 chose option 2 for all catering queries as the pragmatic immediate solution.
@@ -1759,4 +1897,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Updated March 30, 2026 (Session 25) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). UNCOMMITTED: Templates nav button fix in src/pages/catering.tsx. PENDING DEPLOY: commit + push + `npx vite build && npx firebase deploy --only hosting` + `cd functions && npm run build && cd .. && npx firebase deploy --only functions`. Next: (1) commit and deploy Templates nav fix, (2) test template marketplace and vendor analytics on deployed site, (3) review Firestore security rules for new template usageLog subcollection, (4) Phase 7 improvements from UX audit (loading skeletons, cart persistence, order cancellation, in-app messaging). Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*
+*Updated April 1, 2026 (Session 26) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). ALL COMMITTED AND PUSHED. PENDING DEPLOY: `npx vite build && npx firebase deploy --only hosting` + `cd functions && npm run build && cd .. && npx firebase deploy --only functions`. Next: (1) deploy and test all SB audit fixes on live site, (2) review Firestore security rules for new role-based catering order transitions, (3) Phase 7 improvements from UX audit (loading skeletons, cart persistence with localStorage, order cancellation, further in-app messaging enhancements). Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*
