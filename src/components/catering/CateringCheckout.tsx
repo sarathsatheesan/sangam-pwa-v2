@@ -672,7 +672,7 @@ export default function CateringCheckout({
           )}
 
           {/* Footer Actions */}
-          <div className="flex gap-3 sticky bottom-0 py-4 -mx-4 px-4" style={{ backgroundColor: 'var(--aurora-bg)', borderTop: `1px solid var(--aurora-border)` }}>
+          <div className="flex gap-3 sticky bottom-0 py-4 -mx-4 px-4" style={{ backgroundColor: 'var(--aurora-bg)', borderTop: `1px solid var(--aurora-border)`, boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.08)' }}>
             <button
               onClick={onBack}
               disabled={loading}

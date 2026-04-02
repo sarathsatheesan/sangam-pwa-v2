@@ -520,8 +520,23 @@ export default function CateringPage() {
             {getTitle() && (
               <div className="flex items-center gap-2 min-w-0">
                 <ChefHat size={22} className="shrink-0" style={{ color: 'var(--aurora-primary, #6366F1)' }} />
-                <h1 className="text-lg font-bold truncate" style={{ color: 'var(--aurora-text, #1E2132)' }}>
+                <h1 className="text-lg font-bold truncate hidden sm:block" style={{ color: 'var(--aurora-text, #1E2132)' }}>
                   {getTitle()}
+                </h1>
+                {/* Mobile: shorter title to prevent truncation */}
+                <h1 className="text-base font-bold truncate sm:hidden" style={{ color: 'var(--aurora-text, #1E2132)' }}>
+                  {(() => {
+                    const title = getTitle();
+                    const shortNames: Record<string, string> = {
+                      'Restaurant & Food': 'Food',
+                      'Grocery & Market': 'Grocery',
+                      'Vendor Dashboard': 'Dashboard',
+                      'My Orders': 'Orders',
+                      'My Quotes': 'Quotes',
+                      'Saved Orders': 'Saved',
+                    };
+                    return shortNames[title || ''] || title;
+                  })()}
                 </h1>
               </div>
             )}

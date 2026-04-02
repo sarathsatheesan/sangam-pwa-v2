@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { useMemo, useState } from 'react';
-import { Search, Star, UtensilsCrossed, Badge, ArrowUpDown, X } from 'lucide-react';
+import { Search, Star, UtensilsCrossed, Badge, ArrowUpDown, X, ChevronDown } from 'lucide-react';
 import type { CateringMenuItem } from '@/services/cateringService';
 import CateringItemCard from './CateringItemCard';
 
@@ -234,15 +234,18 @@ export default function CateringItemList({
 
           {/* Sort dropdown */}
           {onSortChange && (
-            <div className="relative flex items-center gap-1.5">
+            <div
+              className="relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-colors hover:border-indigo-300"
+              style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}
+            >
               <ArrowUpDown
-                className="h-3.5 w-3.5"
+                className="h-3.5 w-3.5 shrink-0"
                 style={{ color: 'var(--aurora-text-muted)' }}
               />
               <select
                 value={sortOrder}
                 onChange={(e) => onSortChange(e.target.value as SortOrder)}
-                className="appearance-none bg-transparent text-xs font-medium pr-5 cursor-pointer outline-none transition-colors hover:text-gray-900"
+                className="appearance-none bg-transparent text-xs font-medium pr-4 cursor-pointer outline-none transition-colors"
                 aria-label="Sort items"
                 style={{ color: 'var(--aurora-text-secondary)' }}
               >
@@ -252,6 +255,10 @@ export default function CateringItemList({
                   </option>
                 ))}
               </select>
+              <ChevronDown
+                className="h-3 w-3 shrink-0 pointer-events-none absolute right-2"
+                style={{ color: 'var(--aurora-text-muted)' }}
+              />
             </div>
           )}
         </div>

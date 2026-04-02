@@ -83,11 +83,11 @@ export default function CateringCategoryGrid({
               <h3 className="text-center text-sm font-semibold line-clamp-2" style={{ color: 'var(--aurora-text)' }}>
                 {category}
               </h3>
-              {count > 0 && (
-                <p className="mt-2 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
-                  {count} {count === 1 ? 'caterer' : 'caterers'}
-                </p>
-              )}
+              <p className="mt-2 text-xs" style={{ color: count > 0 ? 'var(--aurora-text-muted)' : 'var(--aurora-text-disabled, #A0A4B8)' }}>
+                {count > 0
+                  ? `${count} ${count === 1 ? 'caterer' : 'caterers'}`
+                  : 'No caterers yet'}
+              </p>
             </button>
           );
         })}

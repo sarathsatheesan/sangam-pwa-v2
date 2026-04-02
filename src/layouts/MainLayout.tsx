@@ -1,5 +1,5 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import AppHeader from '../components/layout/AppHeader';
 import ModuleSelector from '../components/layout/ModuleSelector';
 import AppFooter from '../components/layout/AppFooter';
@@ -8,6 +8,10 @@ import GlobalCallOverlay from '../components/GlobalCallOverlay';
 import GroupCallOverlay from '../components/GroupCallOverlay';
 
 export const MainLayout: React.FC = () => {
+  const location = useLocation();
+  // Hide footer in commerce-focused modules to maximize product content area
+  const hideFooter = location.pathname.startsWith('/catering');
+
   return (
     <div className="flex flex-col overflow-hidden aurora-bg-subtle" style={{ height: 'var(--app-height, 100vh)' }}>
       {/* Header */}
@@ -21,8 +25,8 @@ export const MainLayout: React.FC = () => {
         <Outlet />
       </main>
 
-      {/* Footer — desktop only, with safe area bottom */}
-      <AppFooter />
+      {/* Footer — hidden in catering module to maximize content area */}
+      {!hideFooter && <AppFooter />}
 
       {/* Toast notifications */}
       <ToastContainer />
