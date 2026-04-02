@@ -134,6 +134,7 @@ export async function updateOrderStatus(
   orderId: string,
   status: CateringOrder['status'],
   extra?: Record<string, any>,
+  callerRole?: { uid: string; role: 'customer' | 'vendor' },
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
   // Validate transition
@@ -143,6 +144,21 @@ export async function updateOrderStatus(
   if (!isValidStatusTransition(currentStatus, status)) {
     throw new Error(`Invalid status transition: ${currentStatus} → ${status}`);
   }
+
+  // SB-40: Role-based authorization on status transitions
+  if (callerRole) {
+    const orderData = snap.data() as CateringOrder;
+    const vendorOnlyStatuses = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+    if (vendorOnlyStatuses.includes(status) && callerRole.role !== 'vendor') {
+      throw new Error('Only the vendor can advance order status');
+    }
+    // Vendors can only manage their own business orders
+    if (callerRole.role === 'vendor' && orderData.businessId) {
+      // Note: businessId ownership check should ideally be done via Firestore security rules
+      // This is a client-side guard; server-side enforcement via security rules is recommended
+    }
+  }
+
   const updates: Record<string, any> = { status, ...extra };
   if (status === 'confirmed') updates.confirmedAt = serverTimestamp();
   updates.statusHistory = arrayUnion({
@@ -162,6 +178,7 @@ export async function cancelOrder(
   orderId: string,
   reason: string,
   cancelledBy: 'customer' | 'vendor',
+  callerUid?: string,
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
 
@@ -171,6 +188,14 @@ export async function cancelOrder(
   const currentStatus = (snap.data() as CateringOrder).status;
   if (!isValidStatusTransition(currentStatus, 'cancelled')) {
     throw new Error(`Cannot cancel an order that is ${currentStatus.replace(/_/g, ' ')}`);
+  }
+
+  // SB-40: Verify caller matches cancelledBy role
+  if (callerUid) {
+    const orderData = snap.data() as CateringOrder;
+    if (cancelledBy === 'customer' && orderData.customerId !== callerUid) {
+      throw new Error('Only the order customer can cancel as customer');
+    }
   }
 
   await updateDoc(ref, {

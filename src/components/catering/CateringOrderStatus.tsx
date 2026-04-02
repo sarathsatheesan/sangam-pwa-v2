@@ -14,7 +14,7 @@ import {
   MessageSquare, AlertTriangle,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
-import { subscribeToCustomerOrders, formatPrice, batchHasReviewedOrders, cancelOrder, getBusinessPaymentInfo, findOrCreateConversation, notifyVendorModificationRejected } from '@/services/cateringService';
+import { subscribeToCustomerOrders, formatPrice, batchHasReviewedOrders, cancelOrder, getBusinessPaymentInfo, findOrCreateConversation, notifyVendorModificationRejected, updateOrderPaymentStatus } from '@/services/cateringService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
@@ -530,7 +530,15 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         </span>
                       )}
                       {['confirmed', 'preparing', 'ready'].includes(order.status) && (
-                        <PaymentInfoSection businessId={order.businessId} orderId={order.id} total={order.total} />
+                        <PaymentInfoSection
+                          businessId={order.businessId}
+                          orderId={order.id}
+                          total={order.total}
+                          paymentStatus={order.paymentStatus}
+                          onPaymentConfirmed={() => {
+                            addToast('Payment confirmed! Vendor has been notified.', 'success');
+                          }}
+                        />
                       )}
 
                       {/* ── Message Vendor (#14) ── */}
@@ -697,10 +705,25 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
   );
 }
 
-// ── Payment Info Section (#13) ──
-function PaymentInfoSection({ businessId, orderId, total }: { businessId: string; orderId: string; total: number }) {
+// ── Payment Info Section (SB-27) ──
+function PaymentInfoSection({
+  businessId,
+  orderId,
+  total,
+  paymentStatus,
+  onPaymentConfirmed,
+}: {
+  businessId: string;
+  orderId: string;
+  total: number;
+  paymentStatus?: string;
+  onPaymentConfirmed?: () => void;
+}) {
   const [info, setInfo] = useState<{ paymentUrl?: string; paymentMethod?: string; paymentNote?: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [paymentLinkClicked, setPaymentLinkClicked] = useState(false);
 
   useEffect(() => {
     getBusinessPaymentInfo(businessId)
@@ -712,35 +735,137 @@ function PaymentInfoSection({ businessId, orderId, total }: { businessId: string
   if (loading) return null;
   if (!info || (!info.paymentUrl && !info.paymentMethod && !info.paymentNote)) return null;
 
-  return (
-    <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'rgba(99,102,241,0.03)' }}>
-      <div className="flex items-center gap-2">
-        <CreditCard size={14} style={{ color: '#6366F1' }} />
-        <span className="text-xs font-semibold" style={{ color: '#6366F1' }}>Payment Information</span>
+  // Already paid
+  if (paymentStatus === 'paid') {
+    return (
+      <div className="rounded-xl border p-3 flex items-center gap-2" style={{ borderColor: '#A7F3D0', backgroundColor: '#ECFDF5' }}>
+        <CheckCircle2 size={16} style={{ color: '#059669' }} />
+        <span className="text-sm font-medium" style={{ color: '#059669' }}>Payment confirmed</span>
       </div>
-      {info.paymentMethod && (
-        <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-          <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Method:</span> {info.paymentMethod}
-        </p>
+    );
+  }
+
+  const handleConfirmPayment = async () => {
+    setConfirming(true);
+    try {
+      await updateOrderPaymentStatus(orderId, 'paid', {
+        paymentMethod: info?.paymentMethod || 'External',
+        paymentNote: 'Customer confirmed payment via app',
+      });
+      if (onPaymentConfirmed) onPaymentConfirmed();
+      setShowConfirmDialog(false);
+    } catch (err) {
+      console.error('Failed to confirm payment:', err);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="rounded-xl border p-4 space-y-3" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'rgba(99,102,241,0.03)' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CreditCard size={14} style={{ color: '#6366F1' }} />
+            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#6366F1' }}>Payment Required</span>
+          </div>
+          <span className="text-lg font-bold" style={{ color: 'var(--aurora-text)' }}>{formatPrice(total)}</span>
+        </div>
+
+        {/* Payment Method */}
+        {info.paymentMethod && (
+          <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+            <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Method:</span>
+            {info.paymentMethod}
+          </div>
+        )}
+
+        {/* Instructions */}
+        {info.paymentNote && (
+          <div className="text-xs p-2.5 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
+            {info.paymentNote}
+          </div>
+        )}
+
+        {/* Steps */}
+        <div className="space-y-2 pt-1">
+          {/* Step 1: Pay via external link */}
+          {info.paymentUrl && (
+            <a
+              href={info.paymentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setPaymentLinkClicked(true)}
+              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
+              style={{ backgroundColor: '#6366F1' }}
+            >
+              <ExternalLink size={14} />
+              Step 1: Pay {formatPrice(total)}
+            </a>
+          )}
+
+          {/* Step 2: Confirm payment */}
+          <button
+            onClick={() => setShowConfirmDialog(true)}
+            disabled={info.paymentUrl ? !paymentLinkClicked : false}
+            className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: (info.paymentUrl && !paymentLinkClicked) ? 'var(--aurora-surface-variant)' : '#059669',
+              color: (info.paymentUrl && !paymentLinkClicked) ? 'var(--aurora-text-muted)' : '#fff',
+              border: (info.paymentUrl && !paymentLinkClicked) ? '1px solid var(--aurora-border)' : 'none',
+            }}
+          >
+            <CheckCircle2 size={14} />
+            {info.paymentUrl ? 'Step 2: I\'ve Completed Payment' : 'I\'ve Completed Payment'}
+          </button>
+        </div>
+
+        {info.paymentUrl && !paymentLinkClicked && (
+          <p className="text-[10px] text-center" style={{ color: 'var(--aurora-text-muted)' }}>
+            Click the payment link above first, then confirm your payment.
+          </p>
+        )}
+      </div>
+
+      {/* Confirm Payment Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <div className="w-full max-w-sm rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#ECFDF5' }}>
+                <CheckCircle2 size={20} style={{ color: '#059669' }} />
+              </div>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Confirm Payment</h3>
+            </div>
+            <p className="text-sm mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Please confirm that you have completed payment of <strong>{formatPrice(total)}</strong>.
+            </p>
+            <p className="text-xs mb-5" style={{ color: 'var(--aurora-text-muted)' }}>
+              The vendor will be notified that you've marked this order as paid. If payment hasn't been received, the vendor may follow up.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                className="px-4 py-2.5 text-sm rounded-lg border font-medium transition-colors"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
+              >
+                Not Yet
+              </button>
+              <button
+                onClick={handleConfirmPayment}
+                disabled={confirming}
+                className="px-4 py-2.5 text-sm rounded-lg text-white font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                style={{ backgroundColor: '#059669' }}
+              >
+                {confirming && <Loader2 size={14} className="animate-spin" />}
+                Yes, I've Paid
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-      {info.paymentNote && (
-        <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-          {info.paymentNote}
-        </p>
-      )}
-      {info.paymentUrl && (
-        <a
-          href={info.paymentUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
-          style={{ backgroundColor: '#6366F1' }}
-        >
-          <ExternalLink size={14} />
-          Pay {formatPrice(total)}
-        </a>
-      )}
-    </div>
+    </>
   );
 }
 

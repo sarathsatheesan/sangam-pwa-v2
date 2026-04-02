@@ -552,10 +552,19 @@ export async function acceptQuoteResponseItems(
 /**
  * Finalize a partially-accepted request — mark it as fully accepted and auto-decline remaining.
  * Called when the customer clicks "Finalize Order" after assigning all items they want.
+ * SB-37: Now accepts an optional deliveryAddress to be stored with the request.
  */
-export async function finalizeQuoteRequest(requestId: string): Promise<void> {
+export async function finalizeQuoteRequest(
+  requestId: string,
+  deliveryAddress?: { street: string; city: string; state: string; zip: string },
+): Promise<void> {
   const requestRef = doc(db, QUOTE_REQUESTS_COL, requestId);
-  await updateDoc(requestRef, { status: 'accepted' });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updatePayload: Record<string, any> = { status: 'accepted' };
+  if (deliveryAddress) {
+    updatePayload.deliveryAddress = deliveryAddress;
+  }
+  await updateDoc(requestRef, updatePayload);
 
   // Auto-decline any remaining submitted responses
   const allResponses = await fetchQuoteResponsesByRequest(requestId);

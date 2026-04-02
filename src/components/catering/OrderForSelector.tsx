@@ -1,10 +1,12 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, AlertCircle } from 'lucide-react';
 import type { OrderForContext } from '@/services/cateringService';
 import { useState } from 'react';
 
 interface OrderForSelectorProps {
   value: OrderForContext;
   onChange: (ctx: OrderForContext) => void;
+  errors?: { recipientName?: string; recipientContact?: string; organizationName?: string };
+  onBlur?: (field: string) => void;
 }
 
 const relationships = ['Colleague', 'Family', 'Friend', 'Client', 'Other'];
@@ -12,6 +14,8 @@ const relationships = ['Colleague', 'Family', 'Friend', 'Client', 'Other'];
 export default function OrderForSelector({
   value,
   onChange,
+  errors,
+  onBlur,
 }: OrderForSelectorProps) {
   const [expandedOption, setExpandedOption] = useState<
     'self' | 'individual' | 'organization' | 'anonymous'
@@ -90,33 +94,59 @@ export default function OrderForSelector({
 
         {value.type === 'individual' && (
           <div className="mt-3 ml-8 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-            <input
-              type="text"
-              placeholder="Recipient name"
-              value={value.recipientName || ''}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  recipientName: e.target.value,
-                })
-              }
-              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
-              style={{ borderColor: 'var(--aurora-border)' }}
-            />
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Recipient Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Full name"
+                value={value.recipientName || ''}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    recipientName: e.target.value,
+                  })
+                }
+                onBlur={() => onBlur?.('recipientName')}
+                className={`w-full rounded-lg border px-4 py-2.5 focus:ring-2 outline-none transition-colors ${
+                  errors?.recipientName ? 'border-red-400 focus:ring-red-300 focus:border-red-500' : 'focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+                style={!errors?.recipientName ? { borderColor: 'var(--aurora-border)' } : {}}
+              />
+              {errors?.recipientName && (
+                <p className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                  <AlertCircle size={12} /> {errors.recipientName}
+                </p>
+              )}
+            </div>
 
-            <input
-              type="text"
-              placeholder="Recipient contact (email/phone)"
-              value={value.recipientContact || ''}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  recipientContact: e.target.value,
-                })
-              }
-              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
-              style={{ borderColor: 'var(--aurora-border)' }}
-            />
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Recipient Contact <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Email or phone number"
+                value={value.recipientContact || ''}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    recipientContact: e.target.value,
+                  })
+                }
+                onBlur={() => onBlur?.('recipientContact')}
+                className={`w-full rounded-lg border px-4 py-2.5 focus:ring-2 outline-none transition-colors ${
+                  errors?.recipientContact ? 'border-red-400 focus:ring-red-300 focus:border-red-500' : 'focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+                style={!errors?.recipientContact ? { borderColor: 'var(--aurora-border)' } : {}}
+              />
+              {errors?.recipientContact && (
+                <p className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                  <AlertCircle size={12} /> {errors.recipientContact}
+                </p>
+              )}
+            </div>
 
             <div className="relative">
               <select
@@ -168,33 +198,51 @@ export default function OrderForSelector({
 
         {value.type === 'organization' && (
           <div className="mt-3 ml-8 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-            <input
-              type="text"
-              placeholder="Organization name"
-              value={value.organizationName || ''}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  organizationName: e.target.value,
-                })
-              }
-              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
-              style={{ borderColor: 'var(--aurora-border)' }}
-            />
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Organization Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Company or organization name"
+                value={value.organizationName || ''}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    organizationName: e.target.value,
+                  })
+                }
+                onBlur={() => onBlur?.('organizationName')}
+                className={`w-full rounded-lg border px-4 py-2.5 focus:ring-2 outline-none transition-colors ${
+                  errors?.organizationName ? 'border-red-400 focus:ring-red-300 focus:border-red-500' : 'focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+                style={!errors?.organizationName ? { borderColor: 'var(--aurora-border)' } : {}}
+              />
+              {errors?.organizationName && (
+                <p className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                  <AlertCircle size={12} /> {errors.organizationName}
+                </p>
+              )}
+            </div>
 
-            <input
-              type="text"
-              placeholder="Department (optional)"
-              value={value.department || ''}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  department: e.target.value,
-                })
-              }
-              className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
-              style={{ borderColor: 'var(--aurora-border)' }}
-            />
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Department (optional)
+              </label>
+              <input
+                type="text"
+                placeholder="Department name"
+                value={value.department || ''}
+                onChange={(e) =>
+                  onChange({
+                    ...value,
+                    department: e.target.value,
+                  })
+                }
+                className="w-full rounded-lg border px-4 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                style={{ borderColor: 'var(--aurora-border)' }}
+              />
+            </div>
           </div>
         )}
       </div>

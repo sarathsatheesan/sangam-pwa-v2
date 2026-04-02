@@ -3,7 +3,7 @@ import {
   Star, Clock, DollarSign, CheckCircle2, XCircle, Check,
   ChevronDown, ChevronUp, ShieldCheck, Loader2, ArrowLeft,
   MessageSquare, Package, Square, CheckSquare, AlertCircle,
-  HelpCircle, X,
+  HelpCircle, X, MapPin,
 } from 'lucide-react';
 import { notifyQuoteAccepted } from '@/services/notificationService';
 import type { CateringQuoteRequest, CateringQuoteResponse, ItemAssignment } from '@/services/cateringService';
@@ -32,6 +32,16 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [finalizingOrder, setFinalizingOrder] = useState(false);
+
+  // SB-37: Delivery address form state
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState({
+    street: '',
+    city: quoteRequest.deliveryCity || '',
+    state: '',
+    zip: '',
+  });
+  const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
 
   // Item-level selection: Map<responseId, Set<itemName>>
   const [selectedItems, setSelectedItems] = useState<Record<string, Set<string>>>({});
@@ -214,6 +224,10 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   };
 
   // ── Finalize order (close remaining) ──
+  // SB-37: This is now handled in the address form modal's finalization button
+  // The button click now shows the address form first (setShowAddressForm(true))
+  // and the form collects the address before calling finalizeQuoteRequest
+  // This function is kept for reference but is no longer directly called
   const handleFinalizeOrder = async () => {
     setFinalizingOrder(true);
     try {
@@ -409,7 +423,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
           {/* Finalize button — visible when some items assigned but not auto-closed */}
           {isPartiallyAccepted && !allAssigned && assignedCount > 0 && (
             <button
-              onClick={handleFinalizeOrder}
+              onClick={() => setShowAddressForm(true)}
               disabled={finalizingOrder}
               className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
               style={{ backgroundColor: '#059669' }}
@@ -801,6 +815,127 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                 style={{ backgroundColor: '#6366F1' }}
               >
                 Reassign Items
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SB-37: Delivery Address Form — required before finalization */}
+      {showAddressForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <div className="w-full max-w-md rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+            <div className="flex items-center gap-2 mb-4">
+              <MapPin size={20} style={{ color: '#6366F1' }} />
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Delivery Address</h3>
+            </div>
+            <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Please provide the full delivery address for your event.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+                  Street Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={deliveryAddress.street}
+                  onChange={(e) => setDeliveryAddress(prev => ({ ...prev, street: e.target.value }))}
+                  placeholder="123 Main Street"
+                  className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                    addressErrors.street ? 'border-red-400' : ''
+                  }`}
+                  style={{ borderColor: addressErrors.street ? undefined : 'var(--aurora-border)' }}
+                />
+                {addressErrors.street && <p className="text-xs text-red-500 mt-1">{addressErrors.street}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+                    City <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryAddress.city}
+                    onChange={(e) => setDeliveryAddress(prev => ({ ...prev, city: e.target.value }))}
+                    className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                      addressErrors.city ? 'border-red-400' : ''
+                    }`}
+                    style={{ borderColor: addressErrors.city ? undefined : 'var(--aurora-border)' }}
+                  />
+                  {addressErrors.city && <p className="text-xs text-red-500 mt-1">{addressErrors.city}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+                    State <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryAddress.state}
+                    onChange={(e) => setDeliveryAddress(prev => ({ ...prev, state: e.target.value }))}
+                    className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                      addressErrors.state ? 'border-red-400' : ''
+                    }`}
+                    style={{ borderColor: addressErrors.state ? undefined : 'var(--aurora-border)' }}
+                  />
+                  {addressErrors.state && <p className="text-xs text-red-500 mt-1">{addressErrors.state}</p>}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+                  ZIP Code <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={deliveryAddress.zip}
+                  onChange={(e) => setDeliveryAddress(prev => ({ ...prev, zip: e.target.value }))}
+                  placeholder="95112"
+                  className={`w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                    addressErrors.zip ? 'border-red-400' : ''
+                  }`}
+                  style={{ borderColor: addressErrors.zip ? undefined : 'var(--aurora-border)' }}
+                />
+                {addressErrors.zip && <p className="text-xs text-red-500 mt-1">{addressErrors.zip}</p>}
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end mt-5">
+              <button
+                onClick={() => { setShowAddressForm(false); setAddressErrors({}); }}
+                className="px-4 py-2.5 text-sm rounded-lg border font-medium transition-colors"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  // Validate
+                  const errs: Record<string, string> = {};
+                  if (!deliveryAddress.street.trim()) errs.street = 'Required';
+                  if (!deliveryAddress.city.trim()) errs.city = 'Required';
+                  if (!deliveryAddress.state.trim()) errs.state = 'Required';
+                  if (!deliveryAddress.zip.trim()) errs.zip = 'Required';
+                  else if (!/^\d{5}(-\d{4})?$/.test(deliveryAddress.zip.trim())) errs.zip = 'Invalid ZIP';
+                  if (Object.keys(errs).length > 0) { setAddressErrors(errs); return; }
+                  setAddressErrors({});
+                  setShowAddressForm(false);
+                  // Proceed with finalization, passing address
+                  setFinalizingOrder(true);
+                  try {
+                    await finalizeQuoteRequest(quoteRequest.id, deliveryAddress);
+                    addToast('Order finalized! Check your orders tab.', 'success', 5000);
+                    if (onViewOrders) onViewOrders();
+                  } catch (err: any) {
+                    addToast(err.message || 'Failed to finalize order', 'error');
+                  } finally {
+                    setFinalizingOrder(false);
+                  }
+                }}
+                disabled={finalizingOrder}
+                className="px-4 py-2.5 text-sm rounded-lg text-white font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                {finalizingOrder && <Loader2 size={14} className="animate-spin" />}
+                Finalize Order
               </button>
             </div>
           </div>

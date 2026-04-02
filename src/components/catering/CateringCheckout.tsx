@@ -51,6 +51,9 @@ interface FieldError {
   city?: string;
   state?: string;
   zip?: string;
+  recipientName?: string;
+  recipientContact?: string;
+  organizationName?: string;
 }
 
 function validateForm(form: CateringCheckoutProps['orderForm']): FieldError {
@@ -90,6 +93,20 @@ function validateForm(form: CateringCheckoutProps['orderForm']): FieldError {
     errors.zip = 'ZIP code is required';
   } else if (!/^\d{5}(-\d{4})?$/.test(form.deliveryAddress.zip.trim())) {
     errors.zip = 'Please enter a valid ZIP code';
+  }
+
+  // OrderForContext validation (SB-26)
+  if (form.orderForContext.type === 'individual') {
+    if (!form.orderForContext.recipientName?.trim()) {
+      errors.recipientName = 'Recipient name is required';
+    }
+    if (!form.orderForContext.recipientContact?.trim()) {
+      errors.recipientContact = 'Recipient contact is required';
+    }
+  } else if (form.orderForContext.type === 'organization') {
+    if (!form.orderForContext.organizationName?.trim()) {
+      errors.organizationName = 'Organization name is required';
+    }
   }
 
   return errors;
@@ -388,6 +405,12 @@ export default function CateringCheckout({
             <OrderForSelector
               value={orderForm.orderForContext}
               onChange={(ctx) => onUpdateForm({ orderForContext: ctx })}
+              errors={submitAttempted || touched['orderFor'] ? {
+                recipientName: errors.recipientName,
+                recipientContact: errors.recipientContact,
+                organizationName: errors.organizationName,
+              } : undefined}
+              onBlur={(field) => handleBlur(field)}
             />
           </section>
 

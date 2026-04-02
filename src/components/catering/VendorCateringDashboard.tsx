@@ -138,6 +138,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const [batchMode, setBatchMode] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  const [showBatchDeclineConfirm, setShowBatchDeclineConfirm] = useState(false);
 
   const toggleOrderSelection = (orderId: string) => {
     setSelectedOrders(prev => {
@@ -596,7 +597,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
               {batchLoading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
               Accept All
             </button>
-            <button onClick={() => handleBatchAction('cancelled')} disabled={batchLoading}
+            <button onClick={() => setShowBatchDeclineConfirm(true)} disabled={batchLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50"
               style={{ backgroundColor: '#EF4444' }}
             >
@@ -1231,6 +1232,45 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 style={{ backgroundColor: '#6366F1' }}
               >
                 {sendingMessage ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SB-29: Batch Decline Confirmation Dialog */}
+      {showBatchDeclineConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <div className="w-full max-w-sm rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FEE2E2' }}>
+                <AlertCircle size={20} style={{ color: '#EF4444' }} />
+              </div>
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Decline All Orders?</h3>
+            </div>
+            <p className="text-sm mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+              You are about to decline <strong>{selectedOrders.size}</strong> order{selectedOrders.size > 1 ? 's' : ''}. This action cannot be undone.
+            </p>
+            <p className="text-sm mb-5" style={{ color: 'var(--aurora-text-muted)' }}>
+              Affected customers will be notified that their orders were declined.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowBatchDeclineConfirm(false)}
+                className="px-4 py-2.5 text-sm rounded-lg border font-medium transition-colors"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={() => {
+                  setShowBatchDeclineConfirm(false);
+                  handleBatchAction('cancelled');
+                }}
+                className="px-4 py-2.5 text-sm rounded-lg text-white font-medium transition-colors"
+                style={{ backgroundColor: '#EF4444' }}
+              >
+                Yes, Decline All
               </button>
             </div>
           </div>

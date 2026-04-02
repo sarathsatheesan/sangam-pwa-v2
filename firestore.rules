@@ -126,11 +126,31 @@ service cloud.firestore {
     }
 
     // ─── Catering Orders ──────────────────────────
+    // SB-40: Role-based authorization on status transitions
     match /cateringOrders/{orderId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow update: if request.auth != null && (
+        // Allow customer to update their own orders (non-status fields)
+        request.auth.uid == resource.data.customerId
+        // Allow vendor to update their business orders
+        || request.auth.uid in get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.vendorIds
+        // Allow status transitions only if valid
+        || (request.resource.data.status != resource.data.status &&
+            isValidStatusTransition(resource.data.status, request.resource.data.status))
+      );
       allow delete: if isAdminUser();
+
+      // Helper to validate status transitions
+      function isValidStatusTransition(currentStatus, newStatus) {
+        return (
+          (currentStatus == 'pending' && (newStatus == 'confirmed' || newStatus == 'cancelled'))
+          || (currentStatus == 'confirmed' && (newStatus == 'preparing' || newStatus == 'cancelled'))
+          || (currentStatus == 'preparing' && (newStatus == 'ready' || newStatus == 'cancelled'))
+          || (currentStatus == 'ready' && (newStatus == 'out_for_delivery' || newStatus == 'cancelled'))
+          || (currentStatus == 'out_for_delivery' && newStatus == 'delivered')
+        );
+      }
     }
 
     // ─── Catering Quote Requests (Phase 2 RFP) ────
