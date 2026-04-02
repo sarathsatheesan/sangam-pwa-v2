@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, ShoppingCart, Trash2, Minus, Plus } from 'lucide-react';
 import type { OrderItem } from '@/services/cateringService';
 import { calculateOrderTotal, formatPrice } from '@/services/cateringService';
@@ -79,6 +79,43 @@ export default function CateringCart({
   const total = calculateOrderTotal(items);
   const { modalRef, handleKeyDown } = useModalA11y(isOpen, onClose);
 
+  const [removedItem, setRemovedItem] = useState<{ item: OrderItem; index: number } | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    };
+  }, []);
+
+  // Filter out visually hidden items
+  const visibleItems = items.filter(i => i.menuItemId !== removedItem?.item.menuItemId);
+
+  const handleRemoveClick = (item: OrderItem, index: number) => {
+    // If there's already a pending removal, commit it immediately
+    if (removedItem && undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      onRemove(removedItem.item.menuItemId);
+    }
+
+    // Store the current item as pending removal
+    setRemovedItem({ item, index });
+
+    // Start a 5-second timer
+    const timer = setTimeout(() => {
+      onRemove(item.menuItemId);
+      setRemovedItem(null);
+    }, 5000);
+
+    undoTimerRef.current = timer;
+  };
+
+  const handleUndo = () => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setRemovedItem(null);
+  };
+
   return (
     <>
       {/* Overlay */}
@@ -133,7 +170,7 @@ export default function CateringCart({
             <>
               {/* Items List */}
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                {items.map((item) => (
+                {visibleItems.map((item) => (
                   <div
                     key={item.menuItemId}
                     className="border rounded-lg p-4"
@@ -142,7 +179,7 @@ export default function CateringCart({
                     <div className="flex justify-between items-start mb-3">
                       <h3 className="font-medium" style={{ color: 'var(--aurora-text)' }}>{item.name}</h3>
                       <button
-                        onClick={() => onRemove(item.menuItemId)}
+                        onClick={() => handleRemoveClick(item, items.indexOf(item))}
                         className="p-2 hover:bg-red-50 rounded transition-colors"
                         style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         aria-label="Remove item"
@@ -203,6 +240,22 @@ export default function CateringCart({
                     </div>
                   </div>
                 ))}
+
+                {/* Undo Bar */}
+                {removedItem && (
+                  <div className="flex items-center justify-between px-4 py-2.5 rounded-lg mb-2" style={{ backgroundColor: '#FEF3C7', border: '1px solid #FDE68A' }}>
+                    <span className="text-sm" style={{ color: '#92400E' }}>
+                      Removed {removedItem.item.name}
+                    </span>
+                    <button
+                      onClick={handleUndo}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-md transition-colors"
+                      style={{ color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.1)' }}
+                    >
+                      Undo
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}

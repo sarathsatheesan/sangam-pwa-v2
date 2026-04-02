@@ -46,51 +46,69 @@ export default function OrderForSelector({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" role="radiogroup" aria-label="Who is this order for?">
       {/* For Myself */}
-      <button
-        onClick={() => handleTypeChange('self')}
-        className={`w-full text-left p-4 border rounded-lg transition-all ${
+      <label
+        className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
           value.type === 'self'
-            ? 'border-indigo-500 bg-indigo-50'
-            : 'border-gray-200 hover:border-gray-300'
+            ? 'bg-indigo-50'
+            : 'hover:border-gray-300'
         }`}
+        style={{ borderColor: value.type === 'self' ? '#6366F1' : 'var(--aurora-border)' }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-5 h-5 rounded-full border-2 transition-colors ${
-              value.type === 'self'
-                ? 'border-indigo-500 bg-indigo-500'
-                : 'border-gray-300'
-            }`}
-          />
-          <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>For Myself</span>
+        <input
+          type="radio"
+          name="order-for-type"
+          value="self"
+          checked={value.type === 'self'}
+          onChange={() => handleTypeChange('self')}
+          className="sr-only"
+        />
+        <div
+          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+            value.type === 'self' ? '' : ''
+          }`}
+          style={{ borderColor: value.type === 'self' ? '#6366F1' : 'var(--aurora-text-muted)' }}
+        >
+          {value.type === 'self' && (
+            <div className="w-2 h-2 rounded-full bg-white" />
+          )}
         </div>
-      </button>
+        <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>For Myself</span>
+      </label>
 
       {/* On Behalf of Someone */}
       <div>
-        <button
-          onClick={() => handleTypeChange('individual')}
-          className={`w-full text-left p-4 border rounded-lg transition-all ${
+        <label
+          className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
             value.type === 'individual'
-              ? 'border-indigo-500 bg-indigo-50'
-              : 'border-gray-200 hover:border-gray-300'
+              ? 'bg-indigo-50'
+              : 'hover:border-gray-300'
           }`}
+          style={{ borderColor: value.type === 'individual' ? '#6366F1' : 'var(--aurora-border)' }}
         >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-5 h-5 rounded-full border-2 transition-colors ${
-                value.type === 'individual'
-                  ? 'border-indigo-500 bg-indigo-500'
-                  : 'border-gray-300'
-              }`}
-            />
-            <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
-              On Behalf of Someone
-            </span>
+          <input
+            type="radio"
+            name="order-for-type"
+            value="individual"
+            checked={value.type === 'individual'}
+            onChange={() => handleTypeChange('individual')}
+            className="sr-only"
+          />
+          <div
+            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+              value.type === 'individual' ? '' : ''
+            }`}
+            style={{ borderColor: value.type === 'individual' ? '#6366F1' : 'var(--aurora-text-muted)' }}
+          >
+            {value.type === 'individual' && (
+              <div className="w-2 h-2 rounded-full bg-white" />
+            )}
           </div>
-        </button>
+          <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
+            On Behalf of Someone
+          </span>
+        </label>
 
         {value.type === 'individual' && (
           <div className="mt-3 ml-8 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -174,27 +192,36 @@ export default function OrderForSelector({
 
       {/* For a Team/Department */}
       <div>
-        <button
-          onClick={() => handleTypeChange('organization')}
-          className={`w-full text-left p-4 border rounded-lg transition-all ${
+        <label
+          className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
             value.type === 'organization'
-              ? 'border-indigo-500 bg-indigo-50'
-              : 'border-gray-200 hover:border-gray-300'
+              ? 'bg-indigo-50'
+              : 'hover:border-gray-300'
           }`}
+          style={{ borderColor: value.type === 'organization' ? '#6366F1' : 'var(--aurora-border)' }}
         >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-5 h-5 rounded-full border-2 transition-colors ${
-                value.type === 'organization'
-                  ? 'border-indigo-500 bg-indigo-500'
-                  : 'border-gray-300'
-              }`}
-            />
-            <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
-              For a Team/Department
-            </span>
+          <input
+            type="radio"
+            name="order-for-type"
+            value="organization"
+            checked={value.type === 'organization'}
+            onChange={() => handleTypeChange('organization')}
+            className="sr-only"
+          />
+          <div
+            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+              value.type === 'organization' ? '' : ''
+            }`}
+            style={{ borderColor: value.type === 'organization' ? '#6366F1' : 'var(--aurora-text-muted)' }}
+          >
+            {value.type === 'organization' && (
+              <div className="w-2 h-2 rounded-full bg-white" />
+            )}
           </div>
-        </button>
+          <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
+            For a Team/Department
+          </span>
+        </label>
 
         {value.type === 'organization' && (
           <div className="mt-3 ml-8 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -248,25 +275,34 @@ export default function OrderForSelector({
       </div>
 
       {/* Prefer Not to Say */}
-      <button
-        onClick={() => handleTypeChange('anonymous')}
-        className={`w-full text-left p-4 border rounded-lg transition-all ${
+      <label
+        className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
           value.type === 'anonymous'
-            ? 'border-indigo-500 bg-indigo-50'
-            : 'border-gray-200 hover:border-gray-300'
+            ? 'bg-indigo-50'
+            : 'hover:border-gray-300'
         }`}
+        style={{ borderColor: value.type === 'anonymous' ? '#6366F1' : 'var(--aurora-border)' }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-5 h-5 rounded-full border-2 transition-colors ${
-              value.type === 'anonymous'
-                ? 'border-indigo-500 bg-indigo-500'
-                : 'border-gray-300'
-            }`}
-          />
-          <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Prefer Not to Say</span>
+        <input
+          type="radio"
+          name="order-for-type"
+          value="anonymous"
+          checked={value.type === 'anonymous'}
+          onChange={() => handleTypeChange('anonymous')}
+          className="sr-only"
+        />
+        <div
+          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+            value.type === 'anonymous' ? '' : ''
+          }`}
+          style={{ borderColor: value.type === 'anonymous' ? '#6366F1' : 'var(--aurora-text-muted)' }}
+        >
+          {value.type === 'anonymous' && (
+            <div className="w-2 h-2 rounded-full bg-white" />
+          )}
         </div>
-      </button>
+        <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Prefer Not to Say</span>
+      </label>
     </div>
   );
 }

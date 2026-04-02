@@ -412,8 +412,14 @@ export default function VendorQuoteResponse({
                         {form.items.map((qi, idx) => {
                           const requestItem = request.items[idx];
                           const pricingLabel = (requestItem?.pricingType || qi.pricingType || 'per_unit').replace(/_/g, ' ');
+
+                          // Check if this item is assigned to another vendor
+                          const assignedToOther = (request.itemAssignments || []).find(
+                            (a) => a.itemName === qi.name && a.businessId !== businessId
+                          );
+
                           return (
-                            <div key={idx} className="space-y-2 pb-3 border-b last:border-b-0" style={{ borderColor: 'var(--aurora-border)' }}>
+                            <div key={idx} className="space-y-2 pb-3 border-b last:border-b-0" style={{ borderColor: 'var(--aurora-border)', opacity: assignedToOther ? 0.5 : 1 }}>
                               <div className="flex items-center gap-3">
                                 <div className="flex-1">
                                   <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>
@@ -424,37 +430,47 @@ export default function VendorQuoteResponse({
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <DollarSign size={14} style={{ color: 'var(--aurora-text-secondary)' }} />
-                                  <PriceInput
-                                    cents={qi.unitPrice}
-                                    onCentsChange={(c) => updateQuoteItem(request.id, idx, { unitPrice: c })}
-                                    className="w-24 rounded-lg border px-2 py-1.5 text-sm text-right outline-none focus:ring-2 focus:ring-indigo-500/30"
-                                    style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                                  />
-                                  <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>/{pricingLabel.split(' ').pop()}</span>
+                                  {assignedToOther ? (
+                                    <span className="text-[11px] px-2 py-1 rounded-full font-medium" style={{ backgroundColor: '#D1FAE5', color: '#059669' }}>
+                                      Assigned to {assignedToOther.businessName}
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <DollarSign size={14} style={{ color: 'var(--aurora-text-secondary)' }} />
+                                      <PriceInput
+                                        cents={qi.unitPrice}
+                                        onCentsChange={(c) => updateQuoteItem(request.id, idx, { unitPrice: c })}
+                                        className="w-24 rounded-lg border px-2 py-1.5 text-sm text-right outline-none focus:ring-2 focus:ring-indigo-500/30"
+                                        style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                      />
+                                      <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>/{pricingLabel.split(' ').pop()}</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                               {/* Tray size selector */}
-                              <div className="flex items-center gap-2 ml-1">
-                                <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>Tray size:</span>
-                                {(['small', 'medium', 'large'] as const).map((size) => (
-                                  <button
-                                    key={size}
-                                    type="button"
-                                    onClick={() => updateQuoteItem(request.id, idx, { traySize: qi.traySize === size ? undefined : size })}
-                                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                                      qi.traySize === size ? 'text-white' : 'border hover:opacity-80'
-                                    }`}
-                                    style={
-                                      qi.traySize === size
-                                        ? { backgroundColor: '#6366F1' }
-                                        : { borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }
-                                    }
-                                  >
-                                    {size.charAt(0).toUpperCase() + size.slice(1)}
-                                  </button>
-                                ))}
-                              </div>
+                              {!assignedToOther && (
+                                <div className="flex items-center gap-2 ml-1">
+                                  <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>Tray size:</span>
+                                  {(['small', 'medium', 'large'] as const).map((size) => (
+                                    <button
+                                      key={size}
+                                      type="button"
+                                      onClick={() => updateQuoteItem(request.id, idx, { traySize: qi.traySize === size ? undefined : size })}
+                                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                                        qi.traySize === size ? 'text-white' : 'border hover:opacity-80'
+                                      }`}
+                                      style={
+                                        qi.traySize === size
+                                          ? { backgroundColor: '#6366F1' }
+                                          : { borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }
+                                      }
+                                    >
+                                      {size.charAt(0).toUpperCase() + size.slice(1)}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           );
                         })}

@@ -31,6 +31,7 @@ import type { CateringNotification } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import OrderTimeline from './OrderTimeline';
+import ReviewModerationPanel from './ReviewModerationPanel';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { STATUS_THEME } from '@/constants/cateringStatusTheme';
@@ -65,6 +66,17 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bgColor: str
       { ...theme, icon: STATUS_ICONS[key] || <Clock size={14} /> },
     ]),
   );
+
+// SB-31: Format ETA value based on mode (time or duration)
+function formatEtaValue(value: string, mode: string): string {
+  if (!value) return '';
+  if (mode === 'duration') return `~${value} min`;
+  // Convert 24h to 12h format
+  const [h, m] = value.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+}
 
 export default function VendorCateringDashboard({ businessId, businessName }: VendorCateringDashboardProps) {
   const { user } = useAuth();
@@ -133,6 +145,10 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
   // ETA inputs per order (vendor enters before dispatching for delivery)
   const [etaInputs, setEtaInputs] = useState<Record<string, string>>({});
+
+  // SB-32: Vendor pause/capacity toggle
+  const [isPaused, setIsPaused] = useState(false);
+  const [pauseLoading, setPauseLoading] = useState(false);
 
   // ── Batch selection state (#17) ──
   const [batchMode, setBatchMode] = useState(false);
@@ -205,6 +221,21 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
     });
     return unsub;
   }, [user?.uid]);
+
+  // SB-32: Load vendor pause state
+  useEffect(() => {
+    const loadPauseState = async () => {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('@/services/firebase');
+        const bizSnap = await getDoc(doc(db, 'businesses', businessId));
+        if (bizSnap.exists()) {
+          setIsPaused(bizSnap.data()?.cateringPaused === true);
+        }
+      } catch { /* silent */ }
+    };
+    loadPauseState();
+  }, [businessId]);
 
   const startEditOrder = (order: CateringOrder) => {
     setEditingOrderId(order.id);
@@ -368,6 +399,24 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
       addToast(err.message || 'Failed to update order', 'error');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  // SB-32: Toggle vendor pause state
+  const handleTogglePause = async () => {
+    setPauseLoading(true);
+    const newPaused = !isPaused;
+    setIsPaused(newPaused); // Optimistic
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('@/services/firebase');
+      await updateDoc(doc(db, 'businesses', businessId), {
+        cateringPaused: newPaused,
+      });
+    } catch {
+      setIsPaused(!newPaused); // Revert
+    } finally {
+      setPauseLoading(false);
     }
   };
 
@@ -544,6 +593,43 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
             </span>
           )}
         </div>
+      </div>
+
+      {/* SB-32: Vendor Pause Toggle */}
+      <div className="flex items-center justify-between p-3 rounded-xl mb-4" style={{
+        backgroundColor: isPaused ? '#FEF2F2' : 'rgba(99,102,241,0.04)',
+        border: `1px solid ${isPaused ? '#FECACA' : 'var(--aurora-border)'}`,
+      }}>
+        <div className="flex items-center gap-2">
+          {isPaused ? (
+            <>
+              <span className="text-base">⏸️</span>
+              <div>
+                <span className="text-sm font-medium" style={{ color: '#991B1B' }}>Accepting Orders: Paused</span>
+                <p className="text-[10px]" style={{ color: '#B91C1C' }}>New catering requests won't be shown to you</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="text-base">✅</span>
+              <div>
+                <span className="text-sm font-medium" style={{ color: '#059669' }}>Accepting Orders: Active</span>
+                <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>You'll receive new catering requests</p>
+              </div>
+            </>
+          )}
+        </div>
+        <button
+          onClick={handleTogglePause}
+          disabled={pauseLoading}
+          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          style={{
+            backgroundColor: isPaused ? '#059669' : '#EF4444',
+            color: '#fff',
+          }}
+        >
+          {pauseLoading ? '...' : isPaused ? 'Resume' : 'Pause'}
+        </button>
       </div>
 
       {/* ── Payment settings panel (#13) ── */}
@@ -990,22 +1076,23 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                     )}
                     {order.status === 'preparing' && (
                       <div className="space-y-2">
-                        {/* SB-17: Prep time estimate input */}
+                        {/* SB-17 & SB-31: Prep time estimate input with time validation */}
                         <div className="flex items-center gap-2">
                           <input
-                            type="text"
-                            placeholder="Est. ready by (e.g. 2:30 PM)"
+                            type="time"
                             value={etaInputs[`prep_${order.id}`] || ''}
                             onChange={(e) => setEtaInputs(prev => ({ ...prev, [`prep_${order.id}`]: e.target.value }))}
                             className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500/30"
                             style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                            aria-label="Estimated ready time"
                           />
                           {etaInputs[`prep_${order.id}`]?.trim() && (
                             <button
                               onClick={() => {
                                 const eta = etaInputs[`prep_${order.id}`]?.trim();
                                 if (eta) {
-                                  handleStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: eta }).catch(() => {});
+                                  const formattedEta = formatEtaValue(eta, 'time');
+                                  handleStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: formattedEta }).catch(() => {});
                                   addToast('Prep time estimate shared with customer', 'success');
                                 }
                               }}
@@ -1029,20 +1116,48 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                     )}
                     {order.status === 'ready' && (
                       <div className="space-y-2">
+                        {/* SB-31: Delivery ETA with time/duration toggle */}
                         <div className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            placeholder="ETA (e.g. 2:30 PM, 30 min)"
-                            value={etaInputs[order.id] || ''}
-                            onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
-                            className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
+                          <select
+                            value={etaInputs[`mode_${order.id}`] || 'time'}
+                            onChange={(e) => setEtaInputs(prev => ({ ...prev, [`mode_${order.id}`]: e.target.value, [order.id]: '' }))}
+                            className="rounded-lg border px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-sky-500/30"
                             style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                          />
+                          >
+                            <option value="time">Specific time</option>
+                            <option value="duration">Duration (minutes)</option>
+                          </select>
+                          {(etaInputs[`mode_${order.id}`] || 'time') === 'time' ? (
+                            <input
+                              type="time"
+                              value={etaInputs[order.id] || ''}
+                              onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                              className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
+                              style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                            />
+                          ) : (
+                            <div className="flex items-center gap-1 flex-1">
+                              <input
+                                type="number"
+                                min="5"
+                                max="480"
+                                step="5"
+                                placeholder="30"
+                                value={etaInputs[order.id] || ''}
+                                onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                className="w-20 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
+                                style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                              />
+                              <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>minutes</span>
+                            </div>
+                          )}
                         </div>
                         <button
                           onClick={() => {
                             const eta = etaInputs[order.id]?.trim();
-                            handleStatusChange(order.id, 'out_for_delivery', eta ? { estimatedDeliveryTime: eta } : undefined);
+                            const mode = etaInputs[`mode_${order.id}`] || 'time';
+                            const formattedEta = eta ? formatEtaValue(eta, mode) : undefined;
+                            handleStatusChange(order.id, 'out_for_delivery', formattedEta ? { estimatedDeliveryTime: formattedEta } : undefined);
                           }}
                           disabled={isActionLoading}
                           className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
@@ -1125,6 +1240,10 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
           )}
         </div>
       )}
+
+      {/* SB-46: Review Moderation */}
+      <ReviewModerationPanel businessId={businessId} />
+
       {/* Cancel order dialog */}
       {cancellingOrderId && (
         <div ref={cancelModalRef} onKeyDown={cancelKeyDown} className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">

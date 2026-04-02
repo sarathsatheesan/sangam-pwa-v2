@@ -44,16 +44,39 @@ interface CateringReviewsProps {
 // ── Star display component ──
 function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
   return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          size={size}
-          fill={star <= Math.round(rating) ? '#F59E0B' : 'none'}
-          stroke={star <= Math.round(rating) ? '#F59E0B' : 'var(--aurora-text-muted)'}
-          strokeWidth={1.5}
-        />
-      ))}
+    <div className="flex items-center gap-0.5" role="img" aria-label={`${rating} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((star) => {
+        const fill = Math.min(1, Math.max(0, rating - (star - 1))); // 0, partial, or 1
+        const isFull = fill >= 1;
+        const isHalf = fill > 0 && fill < 1;
+
+        return (
+          <div key={star} className="relative" style={{ width: size, height: size }}>
+            {/* Empty star background */}
+            <Star
+              size={size}
+              fill="none"
+              stroke="var(--aurora-text-muted)"
+              strokeWidth={1.5}
+              className="absolute inset-0"
+            />
+            {/* Filled portion (full or partial via clip) */}
+            {(isFull || isHalf) && (
+              <div
+                className="absolute inset-0 overflow-hidden"
+                style={{ width: isFull ? '100%' : `${Math.round(fill * 100)}%` }}
+              >
+                <Star
+                  size={size}
+                  fill="#F59E0B"
+                  stroke="#F59E0B"
+                  strokeWidth={1.5}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

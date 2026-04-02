@@ -123,6 +123,44 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   const isFullyAccepted = quoteRequest.status === 'accepted';
   const isPartiallyAccepted = quoteRequest.status === 'partially_accepted';
 
+  // SB-39: Compute vendor summary from assignedItemsMap
+  const vendorSummary = useMemo(() => {
+    const vendors = new Map<string, { businessName: string; items: string[]; subtotal: number }>();
+
+    assignedItemsMap.forEach((assignment, itemName) => {
+      const existing = vendors.get(assignment.businessId) || {
+        businessName: assignment.businessName,
+        items: [],
+        subtotal: 0,
+      };
+      existing.items.push(itemName);
+
+      // Find the price from the vendor's response
+      const response = responses.find(r => r.id === assignment.responseId);
+      const quotedItem = response?.quotedItems.find(qi => qi.name === itemName);
+      if (quotedItem) {
+        existing.subtotal += quotedItem.unitPrice * quotedItem.qty;
+      }
+
+      vendors.set(assignment.businessId, existing);
+    });
+
+    return vendors;
+  }, [assignedItemsMap, responses]);
+
+  const multiVendor = vendorSummary.size > 1;
+  const grandTotal = useMemo(() => {
+    let total = 0;
+    vendorSummary.forEach(v => { total += v.subtotal; });
+    // Add service/delivery fees from accepted responses
+    responses.forEach(r => {
+      if (r.status === 'accepted' || r.status === 'partially_accepted') {
+        total += (r.serviceFee || 0) + (r.deliveryFee || 0);
+      }
+    });
+    return total;
+  }, [vendorSummary, responses]);
+
   // ── Item selection handlers ──
   const toggleItemSelection = (responseId: string, itemName: string) => {
     setSelectedItems((prev) => {
@@ -433,6 +471,34 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
               );
             })}
           </div>
+
+          {/* SB-39: Multi-Vendor Order Summary */}
+          {assignedCount > 0 && vendorSummary.size > 0 && (
+            <div className="rounded-xl border p-4 space-y-3 mt-4" style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}>
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                Order Summary — {vendorSummary.size} Vendor{vendorSummary.size > 1 ? 's' : ''}
+              </h3>
+              {Array.from(vendorSummary.entries()).map(([bizId, vendor]) => (
+                <div key={bizId} className="flex items-start justify-between py-2 border-b last:border-b-0" style={{ borderColor: 'var(--aurora-border)' }}>
+                  <div>
+                    <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>{vendor.businessName}</span>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
+                      {vendor.items.join(', ')}
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold" style={{ color: '#6366F1' }}>
+                    {formatPrice(vendor.subtotal)}
+                  </span>
+                </div>
+              ))}
+              {multiVendor && (
+                <div className="flex justify-between pt-2 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                  <span className="text-sm font-bold" style={{ color: 'var(--aurora-text)' }}>Estimated Total</span>
+                  <span className="text-lg font-bold" style={{ color: '#6366F1' }}>{formatPrice(grandTotal)}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Finalize button — visible when some items assigned but not auto-closed */}
           {isPartiallyAccepted && !allAssigned && assignedCount > 0 && (

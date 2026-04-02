@@ -112,7 +112,27 @@ function validateForm(form: CateringCheckoutProps['orderForm']): FieldError {
   return errors;
 }
 
-const ESTIMATED_TAX_RATE = 0.0825; // 8.25% default
+// SB-28: State-based estimated tax rates (approximate, not authoritative)
+const STATE_TAX_RATES: Record<string, number> = {
+  AL: 0.04, AZ: 0.056, AR: 0.065, CA: 0.0725, CO: 0.029,
+  CT: 0.0635, DE: 0, FL: 0.06, GA: 0.04, HI: 0.04,
+  ID: 0.06, IL: 0.0625, IN: 0.07, IA: 0.06, KS: 0.065,
+  KY: 0.06, LA: 0.0445, ME: 0.055, MD: 0.06, MA: 0.0625,
+  MI: 0.06, MN: 0.06875, MS: 0.07, MO: 0.04225, MT: 0,
+  NE: 0.055, NV: 0.0685, NH: 0, NJ: 0.06625, NM: 0.05125,
+  NY: 0.04, NC: 0.0475, ND: 0.05, OH: 0.0575, OK: 0.045,
+  OR: 0, PA: 0.06, RI: 0.07, SC: 0.06, SD: 0.042,
+  TN: 0.07, TX: 0.0625, UT: 0.061, VT: 0.06, VA: 0.053,
+  WA: 0.065, WV: 0.06, WI: 0.05, WY: 0.04, DC: 0.06,
+};
+const DEFAULT_TAX_RATE = 0.0825;
+
+function getEstimatedTaxRate(state?: string): number {
+  if (!state) return DEFAULT_TAX_RATE;
+  const normalized = state.trim().toUpperCase();
+  return STATE_TAX_RATES[normalized] ?? DEFAULT_TAX_RATE;
+}
+
 const DELIVERY_FEE = 0; // $0 placeholder — vendor-specific in future
 
 // SB-20: Persist checkout form to sessionStorage
@@ -127,7 +147,8 @@ export default function CateringCheckout({
   loading,
 }: CateringCheckoutProps) {
   const subtotal = calculateOrderTotal(cart.items);
-  const estimatedTax = Math.round(subtotal * ESTIMATED_TAX_RATE);
+  const taxRate = getEstimatedTaxRate(orderForm.deliveryAddress?.state);
+  const estimatedTax = Math.round(subtotal * taxRate);
   const total = subtotal + estimatedTax + DELIVERY_FEE;
   const tomorrow = useMemo(() => getTomorrow(), []);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -594,9 +615,16 @@ export default function CateringCheckout({
                 <span>Subtotal</span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
-              <div className="flex justify-between items-center text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
-                <span>Estimated Tax (8.25%)</span>
-                <span>{formatPrice(estimatedTax)}</span>
+              <div>
+                <div className="flex justify-between items-center text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                  <span>Estimated Tax</span>
+                  <span>{formatPrice(estimatedTax)}</span>
+                </div>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
+                  {orderForm.deliveryAddress?.state
+                    ? `Based on ${orderForm.deliveryAddress.state.toUpperCase()} state rate (~${(taxRate * 100).toFixed(1)}%). Actual tax may vary.`
+                    : 'Estimate only — enter delivery address for a better estimate.'}
+                </p>
               </div>
               {DELIVERY_FEE > 0 ? (
                 <div className="flex justify-between items-center text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
