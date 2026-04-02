@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { useMemo, useState } from 'react';
-import { Search, Star, UtensilsCrossed, Badge, ArrowUpDown } from 'lucide-react';
+import { Search, Star, UtensilsCrossed, Badge, ArrowUpDown, X } from 'lucide-react';
 import type { CateringMenuItem } from '@/services/cateringService';
 import CateringItemCard from './CateringItemCard';
 
@@ -156,13 +156,22 @@ export default function CateringItemList({
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             aria-label="Search catering items by name or description"
-            className="w-full rounded-lg border py-2.5 pl-10 pr-4 text-sm placeholder-gray-500 transition-colors duration-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-full rounded-lg border py-2.5 pl-10 pr-10 text-sm placeholder-gray-500 transition-colors duration-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
             style={{
               borderColor: 'var(--aurora-border)',
               backgroundColor: 'var(--aurora-surface)',
               color: 'var(--aurora-text)',
             }}
           />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="Clear search"
+            >
+              <X size={14} style={{ color: 'var(--aurora-text-muted)' }} />
+            </button>
+          )}
         </div>
 
         {/* Dietary filter pills + Sort dropdown row */}

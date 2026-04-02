@@ -9,7 +9,7 @@ import {
   Package, Clock, CheckCircle2, XCircle, ChevronDown, ChevronUp,
   User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck, Ban,
   Square, CheckSquare, Pencil, CreditCard, ExternalLink, Save, X, Bell,
-  MessageSquare,
+  MessageSquare, Volume2, VolumeX,
 } from 'lucide-react';
 import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import {
@@ -109,29 +109,32 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
         if (newPendingOrders.length > 0) {
           const newest = newPendingOrders[0];
           setNewOrderBanner({ orderId: newest.id, customerName: newest.customerName || 'Customer', total: newest.total });
-          // Play audio chime (Web Audio API — no external dependency)
+          // SB-33: Play audio chime (guarded by audioMuted)
+          // Web Audio API — no external dependency
           // Cross-browser: resume() required for iOS Safari & Chrome autoplay policy
-          try {
-            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            // iOS Safari / Chrome require explicit resume after user gesture
-            if (audioCtx.state === 'suspended') {
-              await audioCtx.resume();
-            }
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-            osc.frequency.setValueAtTime(1100, audioCtx.currentTime + 0.1);
-            osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2);
-            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-            osc.start(audioCtx.currentTime);
-            osc.stop(audioCtx.currentTime + 0.5);
-            // Clean up audio context after playback to free resources (Safari memory)
-            setTimeout(() => { audioCtx.close().catch(() => {}); }, 1000);
-          } catch { /* audio not available — silent fallback */ }
+          if (!audioMuted) {
+            try {
+              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              // iOS Safari / Chrome require explicit resume after user gesture
+              if (audioCtx.state === 'suspended') {
+                await audioCtx.resume();
+              }
+              const osc = audioCtx.createOscillator();
+              const gain = audioCtx.createGain();
+              osc.connect(gain);
+              gain.connect(audioCtx.destination);
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+              osc.frequency.setValueAtTime(1100, audioCtx.currentTime + 0.1);
+              osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.2);
+              gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+              osc.start(audioCtx.currentTime);
+              osc.stop(audioCtx.currentTime + 0.5);
+              // Clean up audio context after playback to free resources (Safari memory)
+              setTimeout(() => { audioCtx.close().catch(() => {}); }, 1000);
+            } catch { /* audio not available — silent fallback */ }
+          }
           // Auto-dismiss banner after 15 seconds
           setTimeout(() => setNewOrderBanner(null), 15000);
         }
@@ -149,6 +152,11 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   // SB-32: Vendor pause/capacity toggle
   const [isPaused, setIsPaused] = useState(false);
   const [pauseLoading, setPauseLoading] = useState(false);
+
+  // SB-33: Audio mute control
+  const [audioMuted, setAudioMuted] = useState(() => {
+    try { return localStorage.getItem('ethnicity_vendor_audio_muted') === 'true'; } catch { return false; }
+  });
 
   // ── Batch selection state (#17) ──
   const [batchMode, setBatchMode] = useState(false);
@@ -420,6 +428,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
     }
   };
 
+  // SB-33: Toggle audio mute
+  const handleToggleAudio = () => {
+    const newMuted = !audioMuted;
+    setAudioMuted(newMuted);
+    try { localStorage.setItem('ethnicity_vendor_audio_muted', String(newMuted)); } catch {}
+  };
+
   const filteredOrders = orders.filter((o) => {
     if (filter === 'pending') return o.status === 'pending';
     if (filter === 'active') return ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(o.status);
@@ -563,6 +578,16 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
               </div>
             )}
           </div>
+          {/* SB-33: Audio mute toggle */}
+          <button
+            onClick={handleToggleAudio}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: audioMuted ? 'var(--aurora-text-muted)' : 'var(--aurora-text-secondary)' }}
+            aria-label={audioMuted ? 'Unmute notifications' : 'Mute notifications'}
+            title={audioMuted ? 'Unmute notifications' : 'Mute notifications'}
+          >
+            {audioMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          </button>
           <button
             onClick={() => setShowPaymentSettings(!showPaymentSettings)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"

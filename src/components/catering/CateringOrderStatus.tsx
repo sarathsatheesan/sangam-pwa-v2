@@ -75,7 +75,25 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
   const { addToast } = useToast();
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  // SB-41: Detect prefers-reduced-motion for animations
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      setPrefersReducedMotion(mq.matches);
+      const listener = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+      mq.addEventListener('change', listener);
+      return () => mq.removeEventListener('change', listener);
+    }
+  }, []);
+  // SB-43: Initialize expandedOrder from URL hash
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#order-', '');
+      return hash && hash !== '' ? hash : null;
+    }
+    return null;
+  });
   const [reviewingOrder, setReviewingOrder] = useState<CateringOrder | null>(null);
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set());
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
@@ -92,6 +110,21 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
     !!cancellingOrderId,
     cancelDialogClose,
   );
+
+  // SB-43: Sync expanded order state to URL hash
+  const toggleExpandedOrder = useCallback((orderId: string) => {
+    setExpandedOrder((prev) => {
+      const newExpanded = prev === orderId ? null : orderId;
+      if (typeof window !== 'undefined') {
+        if (newExpanded) {
+          window.history.replaceState(null, '', `#order-${newExpanded}`);
+        } else {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
+      return newExpanded;
+    });
+  }, []);
 
   const handleCancelOrder = async () => {
     if (!cancellingOrderId) return;
@@ -191,7 +224,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
               >
                 {/* Order header */}
                 <button
-                  onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
+                  onClick={() => toggleExpandedOrder(order.id)}
                   className="w-full flex items-center justify-between p-4 text-left"
                 >
                   <div className="flex-1 min-w-0">
@@ -202,7 +235,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                       <StatusBadge status={order.status} />
                       {order.vendorModified && !order.modificationAccepted && !order.modificationRejected && (
                         <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                          <span className={`absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 ${!prefersReducedMotion ? 'animate-ping' : ''}`} />
                           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
                         </span>
                       )}
@@ -246,7 +279,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                     {order.status === 'preparing' && (
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <span className="relative flex h-2.5 w-2.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: '#8B5CF6' }} />
+                          <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${!prefersReducedMotion ? 'animate-ping' : ''}`} style={{ backgroundColor: '#8B5CF6' }} />
                           <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: '#8B5CF6' }} />
                         </span>
                         <span className="text-[11px] font-medium" style={{ color: '#6D28D9' }}>
@@ -941,14 +974,15 @@ function MessageVendorButton({
 
 // ── Status Badge ──
 function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; color: string; bg: string }> = {
-    pending: { label: 'Pending', color: '#92400E', bg: '#FEF3C7' },
-    confirmed: { label: 'Confirmed', color: '#3730A3', bg: '#EEF2FF' },
-    preparing: { label: 'Preparing', color: '#5B21B6', bg: '#F5F3FF' },
-    ready: { label: 'Ready', color: '#065F46', bg: '#D1FAE5' },
-    out_for_delivery: { label: 'On the Way', color: '#0369A1', bg: '#E0F2FE' },
-    delivered: { label: 'Delivered', color: '#059669', bg: '#A7F3D0' },
-    cancelled: { label: 'Cancelled', color: '#991B1B', bg: '#FEE2E2' },
+  // SB-42: Add icons for color-blind accessibility
+  const config: Record<string, { label: string; color: string; bg: string; icon: string }> = {
+    pending: { label: 'Pending', color: '#92400E', bg: '#FEF3C7', icon: '⏳' },
+    confirmed: { label: 'Confirmed', color: '#3730A3', bg: '#EEF2FF', icon: '✓' },
+    preparing: { label: 'Preparing', color: '#5B21B6', bg: '#F5F3FF', icon: '🍳' },
+    ready: { label: 'Ready', color: '#065F46', bg: '#D1FAE5', icon: '✔' },
+    out_for_delivery: { label: 'On the Way', color: '#0369A1', bg: '#E0F2FE', icon: '🚗' },
+    delivered: { label: 'Delivered', color: '#059669', bg: '#A7F3D0', icon: '✅' },
+    cancelled: { label: 'Cancelled', color: '#991B1B', bg: '#FEE2E2', icon: '✗' },
   };
   const c = config[status] || config.pending;
   return (
@@ -956,6 +990,7 @@ function StatusBadge({ status }: { status: string }) {
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
       style={{ backgroundColor: c.bg, color: c.color }}
     >
+      <span aria-hidden="true" className="mr-0.5">{c.icon}</span>
       {c.label}
     </span>
   );

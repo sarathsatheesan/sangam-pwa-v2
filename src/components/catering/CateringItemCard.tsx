@@ -93,7 +93,9 @@ export default function CateringItemCard({
         {item.stockStatus === 'low_stock' && !isDisabled && (
           <div className="absolute left-3 top-3">
             <span className="inline-block rounded-full bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white">
-              Low Stock
+              {item.stockCount != null && item.stockCount > 0
+                ? `${item.stockCount} left`
+                : 'Low Stock'}
             </span>
           </div>
         )}

@@ -29,6 +29,14 @@ const RATING_LABELS: Record<number, string> = {
   5: 'Excellent',
 };
 
+const REVIEW_CATEGORIES = [
+  { key: 'foodQuality', label: 'Food Quality', icon: '🍽️' },
+  { key: 'presentation', label: 'Presentation', icon: '✨' },
+  { key: 'delivery', label: 'Delivery', icon: '🚗' },
+  { key: 'value', label: 'Value for Money', icon: '💰' },
+  { key: 'service', label: 'Service', icon: '🤝' },
+] as const;
+
 export default function CateringReviewForm({ order, onClose, onSubmitted }: CateringReviewFormProps) {
   const { user, userProfile } = useAuth();
   const { addToast } = useToast();
@@ -36,6 +44,7 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
   const [hoverRating, setHoverRating] = useState(0);
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [categoryRatings, setCategoryRatings] = useState<Record<string, number>>({});
 
   const handleSubmit = useCallback(async () => {
     if (!user) {
@@ -71,6 +80,7 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
         eventType: order.eventType,
         itemsOrdered: order.items.map(i => i.name),
         headcount: order.headcount,
+        ...(Object.keys(categoryRatings).length > 0 ? { categoryRatings } : {}),
       });
 
       addToast('Review submitted! Thank you for your feedback.', 'success');
@@ -206,6 +216,44 @@ export default function CateringReviewForm({ order, onClose, onSubmitted }: Cate
                 {RATING_LABELS[Math.ceil(hoverRating || activeRating)] || ''}
               </p>
             )}
+          </div>
+
+          {/* SB-45: Structured Review Categories */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--aurora-text-muted)' }}>
+              Rate specific aspects <span className="font-normal">(optional)</span>
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              {REVIEW_CATEGORIES.map(cat => (
+                <div key={cat.key} className="flex items-center justify-between py-1.5 px-3 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)' }}>
+                  <span className="text-sm flex items-center gap-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+                    <span aria-hidden="true">{cat.icon}</span>
+                    {cat.label}
+                  </span>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setCategoryRatings(prev => ({
+                          ...prev,
+                          [cat.key]: prev[cat.key] === star ? 0 : star,
+                        }))}
+                        className="p-0.5"
+                        aria-label={`Rate ${cat.label} ${star} stars`}
+                      >
+                        <Star
+                          size={14}
+                          fill={(categoryRatings[cat.key] || 0) >= star ? '#F59E0B' : 'none'}
+                          stroke={(categoryRatings[cat.key] || 0) >= star ? '#F59E0B' : 'var(--aurora-text-muted)'}
+                          strokeWidth={1.5}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Review text */}
