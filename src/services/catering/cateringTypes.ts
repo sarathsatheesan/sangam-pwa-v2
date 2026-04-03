@@ -21,6 +21,8 @@ export interface CateringMenuItem {
   stockCount?: number;        // null = unlimited
   availableFrom?: string;     // ISO date — seasonal/time-window availability
   availableUntil?: string;
+  prepTimeMinutes?: number;   // UI-07: estimated prep time in minutes
+  popularityScore?: number;   // UI-07: 0-100 popularity index (based on order volume)
   createdAt?: any;
 }
 

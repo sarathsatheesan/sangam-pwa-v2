@@ -156,7 +156,7 @@ export default function CateringCart({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 rounded-lg transition-colors hover:opacity-80"
             aria-label="Close cart"
           >
             <X className="w-5 h-5" style={{ color: 'var(--aurora-text-secondary)' }} />
@@ -230,7 +230,7 @@ export default function CateringCart({
                             onUpdateQty(item.menuItemId, Math.max(minQty, item.qty - 1));
                           }}
                           disabled={item.qty <= (item.minOrderQty || 1)}
-                          className="p-2.5 hover:bg-gray-100 transition-colors disabled:opacity-30"
+                          className="p-2.5 transition-colors disabled:opacity-30 hover:opacity-70"
                           style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           aria-label="Decrease quantity"
                         >
@@ -248,7 +248,7 @@ export default function CateringCart({
                             onUpdateQty(item.menuItemId, item.qty + 1)
                           }
                           disabled={!!item.maxOrderQty && item.qty >= item.maxOrderQty}
-                          className="p-2.5 hover:bg-gray-100 transition-colors disabled:opacity-30"
+                          className="p-2.5 transition-colors disabled:opacity-30 hover:opacity-70"
                           style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           aria-label="Increase quantity"
                         >

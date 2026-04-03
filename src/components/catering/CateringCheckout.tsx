@@ -245,17 +245,20 @@ export default function CateringCheckout({
     `w-full rounded-lg border px-4 py-2.5 outline-none transition-colors ${
       showError(field)
         ? 'border-red-400 focus:ring-2 focus:ring-red-300 focus:border-red-500'
-        : 'border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500'
+        : 'focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500'
     }`;
+  const inputStyle = { borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text)' };
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--aurora-bg)' }}>
+      {/* UI-16: Keyframes for checkout micro-animations */}
+      <style>{`@keyframes checkPop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }`}</style>
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 flex items-center gap-3">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="p-2 rounded-lg transition-colors" style={{ backgroundColor: 'transparent' }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--aurora-surface-variant, #F3F4F6)'} onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             aria-label="Go back to menu"
           >
             <ArrowLeft className="w-5 h-5" style={{ color: 'var(--aurora-text-secondary)' }} />
@@ -274,14 +277,14 @@ export default function CateringCheckout({
               aria-expanded={openSections.has(1)}
               aria-controls="section-1-content"
             >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white" style={{ backgroundColor: 'var(--aurora-primary, #6366f1)' }}>
-                1
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[1] ? '#10B981' : 'var(--aurora-primary, #6366f1)' }}>
+                {isSectionValid[1] ? '✓' : '1'}
               </div>
               <h2 id="section-1-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
                 Event Details
               </h2>
               {isSectionValid[1] && (
-                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" />
+                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" style={{ animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
               )}
               {openSections.has(1) ? (
                 <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
@@ -352,14 +355,14 @@ export default function CateringCheckout({
               aria-expanded={openSections.has(2)}
               aria-controls="section-2-content"
             >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white" style={{ backgroundColor: 'var(--aurora-primary, #6366f1)' }}>
-                2
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[2] ? '#10B981' : 'var(--aurora-primary, #6366f1)' }}>
+                {isSectionValid[2] ? '✓' : '2'}
               </div>
               <h2 id="section-2-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
                 Contact & Delivery
               </h2>
               {isSectionValid[2] && (
-                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" />
+                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" style={{ animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
               )}
               {openSections.has(2) ? (
                 <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
@@ -520,14 +523,14 @@ export default function CateringCheckout({
               aria-expanded={openSections.has(3)}
               aria-controls="section-3-content"
             >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white" style={{ backgroundColor: 'var(--aurora-primary, #6366f1)' }}>
-                3
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[3] ? '#10B981' : 'var(--aurora-primary, #6366f1)' }}>
+                {isSectionValid[3] ? '✓' : '3'}
               </div>
               <h2 id="section-3-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
                 Order Preferences
               </h2>
               {isSectionValid[3] && (
-                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" />
+                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" style={{ animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
               )}
               {openSections.has(3) ? (
                 <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
@@ -683,7 +686,7 @@ export default function CateringCheckout({
             <button
               onClick={onBack}
               disabled={loading}
-              className="flex-1 px-6 py-3 border font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed lg:hidden"
+              className="flex-1 px-6 py-3 border font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed lg:hidden hover:opacity-80"
               style={{ borderColor: 'var(--aurora-border-glass)', color: 'var(--aurora-text-secondary)' }}
               aria-label="Go back to menu"
             >

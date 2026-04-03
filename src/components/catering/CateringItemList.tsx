@@ -174,7 +174,7 @@ export default function CateringItemList({
           {searchQuery && (
             <button
               onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors hover:opacity-70"
               aria-label="Clear search"
             >
               <X size={14} style={{ color: 'var(--aurora-text-muted)' }} />
@@ -199,7 +199,7 @@ export default function CateringItemList({
                   className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
                     isSelected
                       ? 'text-white'
-                      : 'border hover:border-gray-300'
+                      : 'border hover:opacity-80'
                   }`}
                   style={
                     isSelected

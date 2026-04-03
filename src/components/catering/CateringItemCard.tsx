@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Plus, Minus, Utensils, Users, Cake, Coffee, UtensilsCrossed, Soup, Salad } from 'lucide-react';
+import { Plus, Minus, Utensils, Users, Cake, Coffee, UtensilsCrossed, Soup, Salad, Clock, TrendingUp } from 'lucide-react';
 import type { CateringMenuItem } from '@/services/cateringService';
 import { formatPrice } from '@/services/cateringService';
 
@@ -32,6 +32,7 @@ export default function CateringItemCard({
 }: CateringItemCardProps): ReturnType<FC> {
   // Use cartQty from parent (source of truth) if available, otherwise local state
   const [localQty, setLocalQty] = useState(0);
+  const [addBounce, setAddBounce] = useState(false);
   const qty = cartQty ?? localQty;
 
   const minQty = item.minOrderQty || 1;
@@ -40,6 +41,9 @@ export default function CateringItemCard({
   const handleAddToCart = () => {
     setLocalQty(minQty);
     onAddToCart(item);
+    // UI-11: bounce micro-animation
+    setAddBounce(true);
+    setTimeout(() => setAddBounce(false), 300);
   };
 
   const handleIncrement = () => {
@@ -145,7 +149,7 @@ export default function CateringItemCard({
 
         {/* Unavailable / Out of Stock overlay */}
         {isDisabled && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/60">
+          <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(var(--aurora-bg-rgb, 255, 255, 255), 0.6)' }}>
             <span className="rounded-full px-3 py-1 text-xs font-semibold text-white" style={{ backgroundColor: '#1f2937' }}>
               {isOutOfStock ? 'Out of Stock' : 'Currently Unavailable'}
             </span>
@@ -163,6 +167,30 @@ export default function CateringItemCard({
           <p className="mt-1 line-clamp-2 text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
             {item.description}
           </p>
+        )}
+
+        {/* UI-07: Quick info pills — prep time, serves, popularity */}
+        {(item.prepTimeMinutes || item.servesCount || (item.popularityScore && item.popularityScore >= 70)) && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {item.prepTimeMinutes && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: 'var(--aurora-surface-variant, #F3F4F6)', color: 'var(--aurora-text-secondary)' }}>
+                <Clock size={10} aria-hidden="true" />
+                {item.prepTimeMinutes < 60 ? `${item.prepTimeMinutes}m` : `${Math.floor(item.prepTimeMinutes / 60)}h${item.prepTimeMinutes % 60 ? ` ${item.prepTimeMinutes % 60}m` : ''}`}
+              </span>
+            )}
+            {item.servesCount && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: 'var(--aurora-surface-variant, #F3F4F6)', color: 'var(--aurora-text-secondary)' }}>
+                <Users size={10} aria-hidden="true" />
+                Serves {item.servesCount}
+              </span>
+            )}
+            {item.popularityScore && item.popularityScore >= 70 && (
+              <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
+                <TrendingUp size={10} aria-hidden="true" />
+                Popular
+              </span>
+            )}
+          </div>
         )}
 
         {/* Dietary tags */}
@@ -192,21 +220,17 @@ export default function CateringItemCard({
               {formatPrice(item.price)}
             </span>
             <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>{pricingLabel}</span>
-            {item.servesCount && (
-              <span className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
-                <Users size={10} aria-hidden="true" />
-                Serves {item.servesCount}
-              </span>
-            )}
           </div>
 
           {qty === 0 ? (
             <button
               onClick={handleAddToCart}
               disabled={isDisabled}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: 'var(--aurora-primary, #6366F1)',
+                transform: addBounce ? 'scale(1.15)' : 'scale(1)',
+                transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
               }}
               onMouseEnter={e => {
                 if (!isDisabled) e.currentTarget.style.opacity = '0.9';

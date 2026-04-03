@@ -15,6 +15,14 @@ const CATERING_CATEGORIES = [
   'Other',
 ];
 
+// UI-02: Rich gradient backgrounds per category for glass-morphism cards
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  'Restaurant & Food': 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)',
+  'Tiffin': 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+  'Grocery & Market': 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+  'Other': 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+};
+
 export default function CateringCategoryGrid({
   onSelectCategory,
   businessCounts = {},
@@ -42,20 +50,20 @@ export default function CateringCategoryGrid({
         {/* All Categories button */}
         <button
           onClick={() => onSelectCategory('all')}
-          className="group relative flex flex-col items-center justify-center rounded-xl p-6 shadow-sm transition-transform duration-200 ease-out hover:scale-[1.02] cursor-pointer border"
-          style={{
-            borderLeft: '4px solid #6366F1',
-            backgroundColor: '#6366F1',
-            borderColor: 'var(--aurora-border)',
-          }}
+          className="group relative flex flex-col items-center justify-center rounded-2xl p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-lg cursor-pointer overflow-hidden"
+          style={{ backgroundImage: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%)', minHeight: '160px' }}
           aria-label={`Browse all categories — ${totalBusinessCount} ${totalBusinessCount === 1 ? 'caterer' : 'caterers'} available`}
         >
-          <div className="mb-3 text-5xl">🔍</div>
-          <h3 className="text-center text-sm font-semibold text-white line-clamp-2">
-            All Categories
-          </h3>
+          <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
+          <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
+          <div className="relative z-10 mb-3 text-5xl drop-shadow-md">🔍</div>
+          <div className="relative z-10 rounded-xl px-3 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+            <h3 className="text-center text-sm font-semibold text-white line-clamp-2">
+              All Categories
+            </h3>
+          </div>
           {totalBusinessCount > 0 && (
-            <p className="mt-2 text-xs text-white">
+            <p className="relative z-10 mt-2 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
               {totalBusinessCount} {totalBusinessCount === 1 ? 'caterer' : 'caterers'}
             </p>
           )}
@@ -63,27 +71,29 @@ export default function CateringCategoryGrid({
 
         {filteredCategories.map(category => {
           const emoji = CATEGORY_EMOJI_MAP[category] || '🍽️';
-          const color = CATEGORY_COLORS[category] || '#6366F1';
+          const gradient = CATEGORY_GRADIENTS[category] || 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)';
           const count = businessCounts[category] || 0;
 
           return (
             <button
               key={category}
               onClick={() => onSelectCategory(category)}
-              className="group relative flex flex-col items-center justify-center rounded-xl p-6 shadow-sm transition-transform duration-200 ease-out hover:scale-[1.02] cursor-pointer border"
-              style={{
-                borderLeft: `4px solid ${color}`,
-                backgroundColor: 'var(--aurora-surface)',
-                borderColor: 'var(--aurora-border)',
-              }}
+              className="group relative flex flex-col items-center justify-center rounded-2xl p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-lg cursor-pointer overflow-hidden"
+              style={{ backgroundImage: gradient, minHeight: '160px' }}
               aria-label={`Browse ${category} — ${count} ${count === 1 ? 'caterer' : 'caterers'} available`}
             >
-              {/* Left accent border handled via inline style */}
-              <div className="mb-3 text-5xl">{emoji}</div>
-              <h3 className="text-center text-sm font-semibold line-clamp-2" style={{ color: 'var(--aurora-text)' }}>
-                {category}
-              </h3>
-              <p className="mt-2 text-xs" style={{ color: count > 0 ? 'var(--aurora-text-muted)' : 'var(--aurora-text-disabled, #A0A4B8)' }}>
+              {/* Decorative circles */}
+              <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20" style={{ backgroundColor: 'white' }} />
+              <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
+
+              <div className="relative z-10 mb-3 text-5xl drop-shadow-md">{emoji}</div>
+              {/* Glass-morphism label */}
+              <div className="relative z-10 rounded-xl px-3 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+                <h3 className="text-center text-sm font-semibold text-white line-clamp-2">
+                  {category}
+                </h3>
+              </div>
+              <p className="relative z-10 mt-2 text-xs font-medium" style={{ color: count > 0 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)' }}>
                 {count > 0
                   ? `${count} ${count === 1 ? 'caterer' : 'caterers'}`
                   : 'No caterers yet'}

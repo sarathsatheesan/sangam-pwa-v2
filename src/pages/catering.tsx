@@ -814,6 +814,39 @@ export default function CateringPage() {
         {/* Categories view */}
         {state.view === 'categories' && !state.loading && (
           <div>
+            {/* UI-01: Hero banner with featured caterers */}
+            {allCateringBusinesses.length > 0 && (
+              <div className="relative overflow-hidden rounded-2xl mb-6" style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%)' }}>
+                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+                <div className="relative px-6 py-8 sm:py-10 sm:px-8">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+                    Catering for every occasion
+                  </h2>
+                  <p className="text-sm text-white/80 mb-5 max-w-md">
+                    From intimate dinners to grand celebrations — find the perfect caterer for your next event.
+                  </p>
+                  {/* Featured caterer pills */}
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                    {allCateringBusinesses.slice(0, 5).map((biz) => (
+                      <button
+                        key={biz.id}
+                        onClick={() => {
+                          handleSelectCategory('all');
+                        }}
+                        className="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-transform hover:scale-105 shrink-0"
+                        style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                      >
+                        <span className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold" style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}>
+                          {(biz.name || 'C').charAt(0).toUpperCase()}
+                        </span>
+                        {biz.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
               Browse caterers by cuisine type and place orders for your next event.
             </p>

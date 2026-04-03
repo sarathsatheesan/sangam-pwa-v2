@@ -739,14 +739,20 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
       {/* Orders list */}
       {filteredOrders.length === 0 ? (
         <div className="text-center py-12">
-          {/* SB-09: Onboarding empty state for new vendors */}
+          {/* SB-09 + UI-25: Enhanced onboarding empty state for new vendors */}
           {filter === 'all' && orders.length === 0 ? (
             <div className="max-w-sm mx-auto">
-              <Package size={40} className="mx-auto mb-4 opacity-30" />
-              <h3 className="text-base font-semibold mb-2" style={{ color: 'var(--aurora-text)' }}>
+              {/* Illustrated header with gradient */}
+              <div className="relative mx-auto mb-6 w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', boxShadow: '0 8px 24px rgba(99, 102, 241, 0.3)' }}>
+                <Package size={36} className="text-white" />
+                <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-green-400 flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">!</span>
+                </div>
+              </div>
+              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--aurora-text)' }}>
                 Welcome to Your Dashboard!
               </h3>
-              <p className="text-sm mb-5" style={{ color: 'var(--aurora-text-secondary)' }}>
+              <p className="text-sm mb-6" style={{ color: 'var(--aurora-text-secondary)' }}>
                 You&apos;re all set to receive catering orders. Here&apos;s how to get started:
               </p>
               <div className="text-left space-y-3 mb-5">
@@ -782,12 +788,18 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
               </button>
             </div>
           ) : (
-            <>
-              <Package size={40} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
-                No {filter === 'all' ? '' : filter} orders yet
+            /* UI-26: Contextual illustrated empty state per filter */
+            <div className="max-w-xs mx-auto">
+              <div className="mx-auto mb-4 w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--aurora-surface-variant, #F3F4F6)' }}>
+                <Package size={28} style={{ color: 'var(--aurora-text-muted)' }} />
+              </div>
+              <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--aurora-text)' }}>
+                {filter === 'pending' ? 'No pending orders' : filter === 'active' ? 'No active orders' : filter === 'completed' ? 'No completed orders' : 'No orders yet'}
+              </h4>
+              <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                {filter === 'pending' ? 'New orders will appear here when customers place them.' : filter === 'active' ? 'Orders you\'re currently preparing will show up here.' : filter === 'completed' ? 'Your delivered and fulfilled orders will appear here.' : 'Your orders will appear here once customers start placing them.'}
               </p>
-            </>
+            </div>
           )}
         </div>
       ) : (
