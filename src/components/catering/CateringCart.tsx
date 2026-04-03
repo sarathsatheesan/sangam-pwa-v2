@@ -138,7 +138,7 @@ export default function CateringCart({
       <div
         ref={modalRef}
         onKeyDown={handleKeyDown}
-        className={`fixed right-0 top-0 h-full w-full max-w-md shadow-lg z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed right-0 top-0 h-full w-full max-w-md shadow-lg z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
         style={{ backgroundColor: 'var(--aurora-surface)', willChange: 'transform', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
@@ -146,8 +146,8 @@ export default function CateringCart({
         aria-modal={isOpen}
         aria-label="Shopping cart"
       >
-        {/* Header */}
-        <div className="sticky top-0 border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+        {/* Header — fixed at top, never scrolls */}
+        <div className="shrink-0 border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
           <div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Your Cart</h2>
             {businessName && (
@@ -163,9 +163,9 @@ export default function CateringCart({
           </button>
         </div>
 
-        {/* Minimum order progress indicator */}
+        {/* Minimum order progress indicator — fixed below header */}
         {!isEmpty && minOrderAmount > 0 && (
-          <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--aurora-border)', backgroundColor: meetsMinimum ? 'rgba(16, 185, 129, 0.06)' : 'rgba(245, 158, 11, 0.06)' }}>
+          <div className="shrink-0 px-6 py-3 border-b" style={{ borderColor: 'var(--aurora-border)', backgroundColor: meetsMinimum ? 'rgba(16, 185, 129, 0.06)' : 'rgba(245, 158, 11, 0.06)' }}>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-medium" style={{ color: meetsMinimum ? '#059669' : '#D97706' }}>
                 {meetsMinimum ? 'Minimum order met!' : `Add ${formatPrice(remaining)} more`}
@@ -191,8 +191,8 @@ export default function CateringCart({
           </div>
         )}
 
-        {/* Content */}
-        <div className="flex flex-col h-full">
+        {/* Content — fills remaining space, items scroll within */}
+        <div className="flex flex-col flex-1 min-h-0">
           {isEmpty ? (
             <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
               <ShoppingCart className="w-12 h-12 mb-4" style={{ color: 'var(--aurora-text-muted)' }} />
@@ -292,8 +292,8 @@ export default function CateringCart({
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="sticky bottom-0 border-t px-6 py-4 space-y-3" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+              {/* Footer — pinned at bottom, never scrolls */}
+              <div className="shrink-0 border-t px-6 py-4 space-y-3" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-sm">
                     <span style={{ color: 'var(--aurora-text-muted)' }}>Subtotal</span>
