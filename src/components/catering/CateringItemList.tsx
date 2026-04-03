@@ -151,7 +151,7 @@ export default function CateringItemList({
   return (
     <div className="w-full space-y-6">
       {/* Search and Filter Section — sticky on mobile for easy access while scrolling */}
-      <div className="space-y-4 sticky top-0 z-10 -mx-4 px-4 pt-2 pb-3 sm:static sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:z-auto" style={{ backgroundColor: 'var(--aurora-bg)' }}>
+      <div className="space-y-4 sticky top-0 z-10 -mx-4 px-4 pt-2 pb-3 sm:static sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:z-auto" style={{ backgroundColor: 'var(--aurora-bg)', paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}>
         {/* Search bar */}
         <div className="relative">
           <Search
@@ -235,7 +235,7 @@ export default function CateringItemList({
           {/* Sort dropdown */}
           {onSortChange && (
             <div
-              className="relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-colors hover:border-indigo-300"
+              className="relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-colors hover:opacity-80"
               style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}
             >
               <ArrowUpDown
@@ -277,7 +277,12 @@ export default function CateringItemList({
             ([businessId, businessItems]) => {
               const business = businessMap[businessId];
 
-              if (!business) return null;
+              if (!business) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn(`[CateringItemList] Missing business data for id: ${businessId}`);
+                }
+                return null;
+              }
 
               return (
                 <div

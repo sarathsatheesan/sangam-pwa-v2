@@ -251,8 +251,7 @@ export default function CateringCheckout({
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--aurora-bg)' }}>
-      {/* UI-16: Keyframes for checkout micro-animations */}
-      <style>{`@keyframes checkPop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.2); } 100% { transform: scale(1); opacity: 1; } }`}</style>
+      {/* UI-16: checkPop keyframe now in global index.css (BUG-005) */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 flex items-center gap-3">
@@ -277,14 +276,14 @@ export default function CateringCheckout({
               aria-expanded={openSections.has(1)}
               aria-controls="section-1-content"
             >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[1] ? '#10B981' : 'var(--aurora-primary, #6366f1)' }}>
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[1] ? 'var(--aurora-success, #10B981)' : 'var(--aurora-primary, #6366f1)' }}>
                 {isSectionValid[1] ? '✓' : '1'}
               </div>
               <h2 id="section-1-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
                 Event Details
               </h2>
               {isSectionValid[1] && (
-                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" style={{ animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+                <CheckCircle2 size={20} className="flex-shrink-0" aria-hidden="true" style={{ color: 'var(--aurora-success, #10B981)', animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }} />
               )}
               {openSections.has(1) ? (
                 <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
@@ -355,14 +354,14 @@ export default function CateringCheckout({
               aria-expanded={openSections.has(2)}
               aria-controls="section-2-content"
             >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[2] ? '#10B981' : 'var(--aurora-primary, #6366f1)' }}>
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[2] ? 'var(--aurora-success, #10B981)' : 'var(--aurora-primary, #6366f1)' }}>
                 {isSectionValid[2] ? '✓' : '2'}
               </div>
               <h2 id="section-2-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
                 Contact & Delivery
               </h2>
               {isSectionValid[2] && (
-                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" style={{ animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+                <CheckCircle2 size={20} className="flex-shrink-0" aria-hidden="true" style={{ color: 'var(--aurora-success, #10B981)', animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }} />
               )}
               {openSections.has(2) ? (
                 <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
@@ -523,14 +522,14 @@ export default function CateringCheckout({
               aria-expanded={openSections.has(3)}
               aria-controls="section-3-content"
             >
-              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[3] ? '#10B981' : 'var(--aurora-primary, #6366f1)' }}>
+              <div className="flex items-center justify-center w-8 h-8 rounded-full font-semibold text-white transition-colors duration-300" style={{ backgroundColor: isSectionValid[3] ? 'var(--aurora-success, #10B981)' : 'var(--aurora-primary, #6366f1)' }}>
                 {isSectionValid[3] ? '✓' : '3'}
               </div>
               <h2 id="section-3-heading" className="text-lg font-semibold flex-1 text-left" style={{ color: 'var(--aurora-text)' }}>
                 Order Preferences
               </h2>
               {isSectionValid[3] && (
-                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" aria-hidden="true" style={{ animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+                <CheckCircle2 size={20} className="flex-shrink-0" aria-hidden="true" style={{ color: 'var(--aurora-success, #10B981)', animation: 'checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }} />
               )}
               {openSections.has(3) ? (
                 <ChevronUp size={20} style={{ color: 'var(--aurora-text-secondary)' }} aria-hidden="true" />
@@ -586,6 +585,26 @@ export default function CateringCheckout({
               </>
             )}
           </section>
+
+          {/* Validation summary on submit (BUG-003: placed in left form column) */}
+          {submitAttempted && hasErrors && (
+            <div
+              className="border border-red-200 rounded-lg p-4 flex items-start gap-3"
+              style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)' }}
+              role="alert"
+              aria-live="polite"
+            >
+              <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-800">Please fix the following before placing your order:</p>
+                <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
+                  {Object.values(errors).map((msg, i) => (
+                    <li key={i}>{msg}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
 
         </div>
 
@@ -661,28 +680,9 @@ export default function CateringCheckout({
             </div>
           </section>
 
-          {/* Validation summary on submit */}
-          {submitAttempted && hasErrors && (
-            <div
-              className="border border-red-200 rounded-lg p-4 flex items-start gap-3"
-              style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)' }}
-              role="alert"
-              aria-live="polite"
-            >
-              <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-800">Please fix the following before placing your order:</p>
-                <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
-                  {Object.values(errors).map((msg, i) => (
-                    <li key={i}>{msg}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
           {/* Footer Actions */}
-          <div className="flex gap-3 sticky bottom-0 py-4 lg:static lg:py-0 lg:shadow-none -mx-4 px-4 lg:mx-0 lg:px-0" style={{ backgroundColor: 'var(--aurora-bg)', borderTop: `1px solid var(--aurora-border)`, boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.08)' }}>
+          {/* BUG-004: Use sticky on mobile only; lg:static avoids nested sticky conflict */}
+          <div className="flex gap-3 sticky bottom-0 py-4 lg:static lg:py-0 -mx-4 px-4 lg:mx-0 lg:px-0" style={{ backgroundColor: 'var(--aurora-bg)', borderTop: `1px solid var(--aurora-border)` }}>
             <button
               onClick={onBack}
               disabled={loading}

@@ -10,7 +10,7 @@ import GroupCallOverlay from '../components/GroupCallOverlay';
 export const MainLayout: React.FC = () => {
   const location = useLocation();
   // Hide footer in commerce-focused modules to maximize product content area
-  const hideFooter = location.pathname.startsWith('/catering');
+  const hideFooter = location.pathname === '/catering' || location.pathname.startsWith('/catering/');
 
   return (
     <div className="flex flex-col overflow-hidden aurora-bg-subtle" style={{ height: 'var(--app-height, 100vh)' }}>

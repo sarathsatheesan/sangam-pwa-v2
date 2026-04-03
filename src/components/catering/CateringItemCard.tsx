@@ -84,7 +84,7 @@ export default function CateringItemCard({
   const isDisabled = isUnavailable || isOutOfStock;
 
   return (
-    <div className={`flex flex-col overflow-hidden rounded-xl border shadow-sm transition-shadow duration-200 ${isDisabled ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isDisabled ? ' — ' : ''}${isOutOfStock ? 'out of stock' : isDisabled ? 'currently unavailable' : ''}`}>
+    <div className={`flex flex-col overflow-hidden rounded-xl border shadow-sm transition-shadow duration-200 ${isDisabled ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isOutOfStock ? ' — out of stock' : isUnavailable ? ' — currently unavailable' : ''}`}>
       {/* Photo area */}
       <div className="relative aspect-[5/3] w-full" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
         {item.photoUrl ? (
@@ -170,9 +170,9 @@ export default function CateringItemCard({
         )}
 
         {/* UI-07: Quick info pills — prep time, serves, popularity */}
-        {(item.prepTimeMinutes || item.servesCount || (item.popularityScore && item.popularityScore >= 70)) && (
+        {((item.prepTimeMinutes != null && item.prepTimeMinutes > 0) || item.servesCount || (item.popularityScore != null && item.popularityScore >= 70)) && (
           <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {item.prepTimeMinutes && (
+            {item.prepTimeMinutes != null && item.prepTimeMinutes > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: 'var(--aurora-surface-variant, #F3F4F6)', color: 'var(--aurora-text-secondary)' }}>
                 <Clock size={10} aria-hidden="true" />
                 {item.prepTimeMinutes < 60 ? `${item.prepTimeMinutes}m` : `${Math.floor(item.prepTimeMinutes / 60)}h${item.prepTimeMinutes % 60 ? ` ${item.prepTimeMinutes % 60}m` : ''}`}
@@ -184,7 +184,7 @@ export default function CateringItemCard({
                 Serves {item.servesCount}
               </span>
             )}
-            {item.popularityScore && item.popularityScore >= 70 && (
+            {item.popularityScore != null && item.popularityScore >= 70 && (
               <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}>
                 <TrendingUp size={10} aria-hidden="true" />
                 Popular

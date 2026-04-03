@@ -534,6 +534,12 @@ export default function CateringPage() {
                       'My Orders': 'Orders',
                       'My Quotes': 'Quotes',
                       'Saved Orders': 'Saved',
+                      'Request for Price': 'RFP',
+                      'Quote Responses': 'Quotes',
+                      'Order Confirmed': 'Confirmed',
+                      'My Favorites': 'Favorites',
+                      'Recurring Orders': 'Recurring',
+                      'Order Templates': 'Templates',
                     };
                     return shortNames[title || ''] || title;
                   })()}
@@ -831,6 +837,7 @@ export default function CateringPage() {
                       <button
                         key={biz.id}
                         onClick={() => {
+                          dispatch({ type: 'SET_SEARCH_QUERY', payload: biz.name || '' });
                           handleSelectCategory('all');
                         }}
                         className="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-transform hover:scale-105 shrink-0"
@@ -842,6 +849,15 @@ export default function CateringPage() {
                         {biz.name}
                       </button>
                     ))}
+                    {allCateringBusinesses.length > 5 && (
+                      <button
+                        onClick={() => handleSelectCategory('all')}
+                        className="flex items-center rounded-full px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-transform hover:scale-105 shrink-0"
+                        style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+                      >
+                        +{allCateringBusinesses.length - 5} more
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

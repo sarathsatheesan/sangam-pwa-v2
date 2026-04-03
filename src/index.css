@@ -61,6 +61,8 @@
    ═══════════════════════════════════════════════ */
 :root {
   --aurora-bg: #F5F6FA;
+  --aurora-bg-rgb: 245, 246, 250;
+  --aurora-success: #10B981;
   --aurora-surface: #FFFFFF;
   --aurora-surface-variant: #EDF0F7;
   --aurora-text: #1E2132;
@@ -103,6 +105,8 @@
    ═══════════════════════════════════════════════ */
 :root.dark {
   --aurora-bg: #1A1B2E;
+  --aurora-bg-rgb: 26, 27, 46;
+  --aurora-success: #34D399;
   --aurora-surface: #232438;
   --aurora-surface-variant: #2C2D42;
   --aurora-text: #F0F1F5;
@@ -435,6 +439,22 @@
 .animate-fade-in {
   -webkit-animation: fadeIn 0.3s ease-out both;
   animation: fadeIn 0.3s ease-out both;
+}
+
+/* BUG-005: checkPop animation for checkout stepper (moved from inline <style>) */
+@keyframes checkPop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* BUG-007: Respect prefers-reduced-motion for all animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @keyframes typingBounce {

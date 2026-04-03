@@ -81,7 +81,7 @@ export default function CateringCart({
   const isEmpty = items.length === 0;
   const total = calculateOrderTotal(items);
   const meetsMinimum = minOrderAmount <= 0 || total >= minOrderAmount;
-  const progressPct = minOrderAmount > 0 ? Math.min(100, Math.round((total / minOrderAmount) * 100)) : 100;
+  const progressPct = minOrderAmount > 0 ? Math.min(100, Math.floor((total / minOrderAmount) * 100)) : 100;
   const remaining = minOrderAmount > 0 ? Math.max(0, minOrderAmount - total) : 0;
   const { modalRef, handleKeyDown } = useModalA11y(isOpen, onClose);
 

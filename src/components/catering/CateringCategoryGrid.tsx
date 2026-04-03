@@ -32,7 +32,8 @@ export default function CateringCategoryGrid({
     CATERING_CATEGORIES.includes(cat)
   );
 
-  const totalAvailable = Object.values(businessCounts).reduce((sum, c) => sum + c, 0) + totalBusinessCount;
+  // BUG-012: Use totalBusinessCount if provided, otherwise derive from category counts (avoid double-counting)
+  const totalAvailable = totalBusinessCount > 0 ? totalBusinessCount : Object.values(businessCounts).reduce((sum, c) => sum + c, 0);
   const showEmptyState = totalAvailable === 0;
 
   return (
@@ -50,9 +51,9 @@ export default function CateringCategoryGrid({
         {/* All Categories button */}
         <button
           onClick={() => onSelectCategory('all')}
-          className="group relative flex flex-col items-center justify-center rounded-2xl p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-lg cursor-pointer overflow-hidden"
+          className="group relative flex flex-col items-center justify-center rounded-2xl p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-lg cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-600 focus-visible:outline-none"
           style={{ backgroundImage: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%)', minHeight: '160px' }}
-          aria-label={`Browse all categories — ${totalBusinessCount} ${totalBusinessCount === 1 ? 'caterer' : 'caterers'} available`}
+          aria-label={`Browse all categories — ${totalAvailable} ${totalAvailable === 1 ? 'caterer' : 'caterers'} available`}
         >
           <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
           <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
@@ -78,7 +79,7 @@ export default function CateringCategoryGrid({
             <button
               key={category}
               onClick={() => onSelectCategory(category)}
-              className="group relative flex flex-col items-center justify-center rounded-2xl p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-lg cursor-pointer overflow-hidden"
+              className="group relative flex flex-col items-center justify-center rounded-2xl p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-lg cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:outline-none"
               style={{ backgroundImage: gradient, minHeight: '160px' }}
               aria-label={`Browse ${category} — ${count} ${count === 1 ? 'caterer' : 'caterers'} available`}
             >
