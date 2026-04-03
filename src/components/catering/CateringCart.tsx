@@ -63,6 +63,8 @@ interface CateringCartProps {
   onRemove: (menuItemId: string) => void;
   onClear: () => void;
   onCheckout: () => void;
+  /** Minimum order amount in cents. Pass 0 to disable the indicator. */
+  minOrderAmount?: number;
 }
 
 export default function CateringCart({
@@ -74,9 +76,13 @@ export default function CateringCart({
   onRemove,
   onClear,
   onCheckout,
+  minOrderAmount = 5000,
 }: CateringCartProps) {
   const isEmpty = items.length === 0;
   const total = calculateOrderTotal(items);
+  const meetsMinimum = minOrderAmount <= 0 || total >= minOrderAmount;
+  const progressPct = minOrderAmount > 0 ? Math.min(100, Math.round((total / minOrderAmount) * 100)) : 100;
+  const remaining = minOrderAmount > 0 ? Math.max(0, minOrderAmount - total) : 0;
   const { modalRef, handleKeyDown } = useModalA11y(isOpen, onClose);
 
   const [removedItem, setRemovedItem] = useState<{ item: OrderItem; index: number } | null>(null);
@@ -156,6 +162,34 @@ export default function CateringCart({
             <X className="w-5 h-5" style={{ color: 'var(--aurora-text-secondary)' }} />
           </button>
         </div>
+
+        {/* Minimum order progress indicator */}
+        {!isEmpty && minOrderAmount > 0 && (
+          <div className="px-6 py-3 border-b" style={{ borderColor: 'var(--aurora-border)', backgroundColor: meetsMinimum ? 'rgba(16, 185, 129, 0.06)' : 'rgba(245, 158, 11, 0.06)' }}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium" style={{ color: meetsMinimum ? '#059669' : '#D97706' }}>
+                {meetsMinimum ? 'Minimum order met!' : `Add ${formatPrice(remaining)} more`}
+              </span>
+              <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                {formatPrice(total)} / {formatPrice(minOrderAmount)}
+              </span>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--aurora-surface-variant, #E5E7EB)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-500 ease-out"
+                style={{
+                  width: `${progressPct}%`,
+                  backgroundColor: meetsMinimum ? '#10B981' : '#F59E0B',
+                }}
+                role="progressbar"
+                aria-valuenow={progressPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={meetsMinimum ? 'Minimum order amount met' : `${progressPct}% towards minimum order of ${formatPrice(minOrderAmount)}`}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex flex-col h-full">
@@ -294,10 +328,12 @@ export default function CateringCart({
                   </button>
                   <button
                     onClick={onCheckout}
-                    className="flex-1 text-white font-medium rounded-lg py-2.5 transition-colors hover:opacity-90"
+                    disabled={!meetsMinimum}
+                    className="flex-1 text-white font-medium rounded-lg py-2.5 transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ backgroundColor: 'var(--color-aurora-indigo, #6366F1)' }}
+                    aria-label={meetsMinimum ? 'Proceed to checkout' : `Add ${formatPrice(remaining)} more to meet minimum order`}
                   >
-                    Proceed to Checkout
+                    {meetsMinimum ? 'Proceed to Checkout' : `${formatPrice(remaining)} more to checkout`}
                   </button>
                 </div>
               </div>

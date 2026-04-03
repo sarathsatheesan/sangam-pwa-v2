@@ -250,7 +250,7 @@ export default function CateringCheckout({
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--aurora-bg)' }}>
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8 flex items-center gap-3">
           <button
@@ -263,7 +263,9 @@ export default function CateringCheckout({
           <h1 className="text-2xl font-bold" style={{ color: 'var(--aurora-text)' }}>Checkout</h1>
         </div>
 
-        <div className="space-y-6">
+        <div className="lg:grid lg:grid-cols-5 lg:gap-8">
+        {/* Left column: form sections */}
+        <div className="lg:col-span-3 space-y-6">
           {/* SB-19: Section 1: Event Details (Collapsible) */}
           <section className="rounded-lg border" style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }} aria-labelledby="section-1-heading">
             <button
@@ -582,6 +584,11 @@ export default function CateringCheckout({
             )}
           </section>
 
+        </div>
+
+        {/* Right column: Order Summary (sticky on desktop) */}
+        <div className="lg:col-span-2 mt-6 lg:mt-0">
+          <div className="lg:sticky lg:top-8 space-y-6">
           {/* Section 5: Order Summary */}
           <section className="rounded-lg p-6 border-t-4 border-indigo-500" style={{ backgroundColor: 'var(--aurora-surface)' }} aria-labelledby="summary-heading">
             <h2 id="summary-heading" className="text-lg font-semibold mb-4" style={{ color: 'var(--aurora-text)' }}>
@@ -672,11 +679,11 @@ export default function CateringCheckout({
           )}
 
           {/* Footer Actions */}
-          <div className="flex gap-3 sticky bottom-0 py-4 -mx-4 px-4" style={{ backgroundColor: 'var(--aurora-bg)', borderTop: `1px solid var(--aurora-border)`, boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.08)' }}>
+          <div className="flex gap-3 sticky bottom-0 py-4 lg:static lg:py-0 lg:shadow-none -mx-4 px-4 lg:mx-0 lg:px-0" style={{ backgroundColor: 'var(--aurora-bg)', borderTop: `1px solid var(--aurora-border)`, boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.08)' }}>
             <button
               onClick={onBack}
               disabled={loading}
-              className="flex-1 px-6 py-3 border font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-6 py-3 border font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed lg:hidden"
               style={{ borderColor: 'var(--aurora-border-glass)', color: 'var(--aurora-text-secondary)' }}
               aria-label="Go back to menu"
             >
@@ -692,6 +699,8 @@ export default function CateringCheckout({
               Place Order
             </button>
           </div>
+          </div>
+        </div>
         </div>
       </div>
     </div>

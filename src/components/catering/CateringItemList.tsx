@@ -150,8 +150,8 @@ export default function CateringItemList({
 
   return (
     <div className="w-full space-y-6">
-      {/* Search and Filter Section */}
-      <div className="space-y-4">
+      {/* Search and Filter Section — sticky on mobile for easy access while scrolling */}
+      <div className="space-y-4 sticky top-0 z-10 -mx-4 px-4 pt-2 pb-3 sm:static sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:z-auto" style={{ backgroundColor: 'var(--aurora-bg)' }}>
         {/* Search bar */}
         <div className="relative">
           <Search
@@ -285,64 +285,83 @@ export default function CateringItemList({
                   className="space-y-4"
                   style={{ contentVisibility: 'auto', containIntrinsicBlockSize: 'auto 400px' } as React.CSSProperties}
                 >
-                  {/* Business header */}
+                  {/* Business header — card-style with avatar */}
                   <div
-                    className="flex items-center justify-between border-b pb-3"
-                    style={{ borderColor: 'var(--aurora-border)' }}
+                    className="flex items-center gap-4 rounded-xl border p-4 shadow-sm"
+                    style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}
                   >
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <h2 className="font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                          {business.name}
-                        </h2>
-                        <div className="mt-1 flex items-center gap-3">
-                          {/* Rating stars */}
-                          {business.rating && (
-                            <div className="flex items-center gap-1">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`h-3.5 w-3.5 ${
-                                    i < Math.floor(business.rating)
-                                      ? 'fill-amber-400 text-amber-400'
-                                      : ''
-                                  }`}
-                                  strokeWidth={2}
-                                  style={
-                                    i < Math.floor(business.rating)
-                                      ? undefined
-                                      : { color: 'var(--aurora-text-muted)' }
-                                  }
-                                />
-                              ))}
-                              <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                                {business.rating?.toFixed(1) ?? 'N/A'}
-                              </span>
-                              {business.reviews > 0 && (
-                                <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
-                                  ({business.reviews})
-                                </span>
-                              )}
-                            </div>
-                          )}
+                    {/* Vendor avatar */}
+                    <div
+                      className="flex items-center justify-center w-12 h-12 rounded-full shrink-0 font-bold text-lg text-white"
+                      style={{
+                        backgroundColor: (() => {
+                          const colors = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
+                          let hash = 0;
+                          for (let i = 0; i < (business.name || '').length; i++) hash = business.name.charCodeAt(i) + ((hash << 5) - hash);
+                          return colors[Math.abs(hash) % colors.length];
+                        })(),
+                      }}
+                      aria-hidden="true"
+                    >
+                      {(business.name || 'V').charAt(0).toUpperCase()}
+                    </div>
 
-                          {/* Verified badge */}
-                          {business.verified && (
-                            <div className="flex items-center gap-1">
-                              <Badge className="h-3.5 w-3.5 text-green-600" />
-                              <span className="text-xs font-medium text-green-600">
-                                Verified
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Heritage tag */}
-                          {business.heritage && (
-                            <span className="inline-block rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
-                              {business.heritage}
+                    <div className="flex-1 min-w-0">
+                      <h2 className="font-semibold text-base truncate" style={{ color: 'var(--aurora-text)' }}>
+                        {business.name}
+                      </h2>
+                      <div className="mt-1 flex items-center gap-3 flex-wrap">
+                        {/* Rating stars */}
+                        {business.rating && (
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3.5 w-3.5 ${
+                                  i < Math.floor(business.rating)
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : ''
+                                }`}
+                                strokeWidth={2}
+                                style={
+                                  i < Math.floor(business.rating)
+                                    ? undefined
+                                    : { color: 'var(--aurora-text-muted)' }
+                                }
+                              />
+                            ))}
+                            <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                              {business.rating?.toFixed(1) ?? 'N/A'}
                             </span>
-                          )}
-                        </div>
+                            {business.reviews > 0 && (
+                              <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                                ({business.reviews})
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Verified badge */}
+                        {business.verified && (
+                          <div className="flex items-center gap-1">
+                            <Badge className="h-3.5 w-3.5 text-green-600" />
+                            <span className="text-xs font-medium text-green-600">
+                              Verified
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Heritage tag */}
+                        {business.heritage && (
+                          <span className="inline-block rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
+                            {business.heritage}
+                          </span>
+                        )}
+
+                        {/* Item count */}
+                        <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                          {businessItems.length} {businessItems.length === 1 ? 'item' : 'items'}
+                        </span>
                       </div>
                     </div>
                   </div>

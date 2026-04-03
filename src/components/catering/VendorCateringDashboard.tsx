@@ -859,7 +859,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
                 {/* Expanded details */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 space-y-3 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                  <div className="mx-3 mb-4 mt-1 p-4 space-y-3 rounded-lg border shadow-sm" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
                     {/* Contact info */}
                     <div className="grid grid-cols-2 gap-3 pt-3 text-sm">
                       <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>

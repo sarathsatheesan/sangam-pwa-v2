@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Plus, Minus, Utensils, Users } from 'lucide-react';
+import { Plus, Minus, Utensils, Users, Cake, Coffee, UtensilsCrossed, Soup, Salad } from 'lucide-react';
 import type { CateringMenuItem } from '@/services/cateringService';
 import { formatPrice } from '@/services/cateringService';
 
@@ -92,8 +92,33 @@ export default function CateringItemCard({
             className="h-full w-full object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br" style={{ backgroundImage: 'linear-gradient(to bottom right, var(--aurora-surface-variant), var(--aurora-surface-variant))' }}>
-            <Utensils className="h-8 w-8" strokeWidth={1.5} style={{ color: 'var(--aurora-text-muted)' }} />
+          <div className="flex h-full w-full items-center justify-center" style={{
+            backgroundImage: (() => {
+              const gradients: Record<string, string> = {
+                Appetizer: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                Entree: 'linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%)',
+                Dessert: 'linear-gradient(135deg, #FCE7F3 0%, #FBCFE8 100%)',
+                Side: 'linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)',
+                Beverage: 'linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%)',
+              };
+              return gradients[item.category] || 'linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%)';
+            })(),
+          }}>
+            <div className="flex flex-col items-center gap-1.5 opacity-60">
+              {(() => {
+                const icons: Record<string, React.ReactNode> = {
+                  Appetizer: <Salad className="h-10 w-10" strokeWidth={1.2} style={{ color: '#92400E' }} />,
+                  Entree: <UtensilsCrossed className="h-10 w-10" strokeWidth={1.2} style={{ color: '#1E40AF' }} />,
+                  Dessert: <Cake className="h-10 w-10" strokeWidth={1.2} style={{ color: '#BE185D' }} />,
+                  Side: <Soup className="h-10 w-10" strokeWidth={1.2} style={{ color: '#047857' }} />,
+                  Beverage: <Coffee className="h-10 w-10" strokeWidth={1.2} style={{ color: '#6D28D9' }} />,
+                };
+                return icons[item.category] || <Utensils className="h-10 w-10" strokeWidth={1.2} style={{ color: '#6B7280' }} />;
+              })()}
+              <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--aurora-text-muted)' }}>
+                No photo yet
+              </span>
+            </div>
           </div>
         )}
 
