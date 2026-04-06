@@ -90,6 +90,9 @@ export function subscribeToFavorites(
       return bTime - aTime;
     });
     callback(favorites);
+  }, (err) => {
+    console.warn('subscribeToFavorites error:', err);
+    callback([]);
   });
 }
 
@@ -285,6 +288,9 @@ export function subscribeToRecurringOrders(
   return onSnapshot(q, (snap) => {
     const recs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RecurringOrder));
     callback(recs);
+  }, (err) => {
+    console.warn('subscribeToRecurringOrders error:', err);
+    callback([]);
   });
 }
 

@@ -208,6 +208,9 @@ export function subscribeToCateringNotifications(
       return bTime - aTime;
     });
     callback(results);
+  }, (err) => {
+    console.warn('subscribeToCateringNotifications error:', err);
+    callback([]);
   });
 }
 

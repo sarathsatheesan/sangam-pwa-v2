@@ -324,6 +324,8 @@ export function subscribeToTemplates(
   const unsubOwn = onSnapshot(qOwn, (snap) => {
     ownTemplates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
     callback(dedupeTemplates([...ownTemplates, ...orgTemplates]));
+  }, (err) => {
+    console.warn('subscribeToTemplates (own) listener error:', err);
   });
 
   let unsubOrg: Unsubscribe | null = null;
@@ -335,6 +337,8 @@ export function subscribeToTemplates(
     unsubOrg = onSnapshot(qOrg, (snap) => {
       orgTemplates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
       callback(dedupeTemplates([...ownTemplates, ...orgTemplates]));
+    }, (err) => {
+      console.warn('subscribeToTemplates (org) listener error:', err);
     });
   }
 

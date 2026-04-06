@@ -10,6 +10,7 @@
 // ═════════════════════════════════════════════════════════════════════════════════
 
 import React, { useReducer, useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store, Search,
@@ -1298,6 +1299,7 @@ export default function CateringPage() {
               ))}
             </div>
 
+            <ErrorBoundary fallbackMessage="Something went wrong loading this tab. Click below to retry.">
             <React.Suspense fallback={<LazyFallback />}>
             {vendorTab === 'orders' && (
               <VendorCateringDashboard
@@ -1335,6 +1337,7 @@ export default function CateringPage() {
                 />
             )}
             </React.Suspense>
+            </ErrorBoundary>
           </div>
         )}
         {/* Phase 6: Favorites view */}
