@@ -608,7 +608,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         <OrderMessages
                           orderId={order.id}
                           currentUserId={user.uid}
-                          currentUserName={userProfile?.displayName || user.displayName || 'Customer'}
+                          currentUserName={user.displayName || 'Customer'}
                           currentUserRole="customer"
                         />
                       )}
