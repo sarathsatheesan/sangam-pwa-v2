@@ -88,6 +88,9 @@ export interface CateringOrder {
   vendorModifiedAt?: any;
   vendorModificationNote?: string;
   originalItems?: OrderItem[];  // Snapshot before vendor modification
+  modificationAccepted?: boolean;
+  modificationRejected?: boolean;
+  modificationRespondedAt?: any;
   createdAt?: any;
   confirmedAt?: any;
   declinedReason?: string;
@@ -133,6 +136,7 @@ export interface CateringQuoteRequest {
   id: string;
   customerId: string;
   // Privacy: NO customer name/email/phone stored here
+  customerName?: string;          // Optional customer name for vendor display
   deliveryCity: string;           // Only city shared with caterers
   cuisineCategory: string;
   eventType?: string;             // corporate_meeting | wedding | cultural_festival | religious | birthday | other

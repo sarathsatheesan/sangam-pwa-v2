@@ -19,6 +19,7 @@ import {
   subscribeToBusinessQuoteResponses,
   formatPrice,
 } from '@/services/cateringService';
+import { useToast } from '@/contexts/ToastContext';
 
 interface VendorAnalyticsProps {
   businessId: string;
@@ -30,6 +31,7 @@ type TimeRange = '7d' | '30d' | '90d' | 'all';
 const PIE_COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
 
 export default function VendorAnalytics({ businessId, businessName }: VendorAnalyticsProps) {
+  const { addToast } = useToast();
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [quoteResponses, setQuoteResponses] = useState<CateringQuoteResponse[]>([]);
   const [loading, setLoading] = useState(true);

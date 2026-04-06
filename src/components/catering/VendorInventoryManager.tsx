@@ -38,7 +38,7 @@ export default function VendorInventoryManager({ businessId, businessName, onBac
   const [editAvailUntil, setEditAvailUntil] = useState('');
   const [undoAction, setUndoAction] = useState<{
     itemId: string;
-    previousStock: { stockStatus?: string; stockCount?: number };
+    previousStock: { stockStatus?: StockStatus; stockCount?: number };
     timer: ReturnType<typeof setTimeout>;
   } | null>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | StockStatus>('all');

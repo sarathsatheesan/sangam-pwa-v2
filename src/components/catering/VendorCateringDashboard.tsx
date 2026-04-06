@@ -1059,6 +1059,11 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                                 {statusCfg.icon}
                                 {statusCfg.label}
                               </span>
+                              {order.rfpOrigin && (
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: 'rgba(139,92,246,0.1)', color: '#7C3AED' }}>
+                                  RFP
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
                               <span className="flex items-center gap-1">

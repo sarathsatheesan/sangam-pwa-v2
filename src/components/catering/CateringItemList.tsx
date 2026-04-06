@@ -278,7 +278,7 @@ export default function CateringItemList({
               const business = businessMap[businessId];
 
               if (!business) {
-                if (process.env.NODE_ENV === 'development') {
+                if (import.meta.env.DEV) {
                   console.warn(`[CateringItemList] Missing business data for id: ${businessId}`);
                 }
                 return null;

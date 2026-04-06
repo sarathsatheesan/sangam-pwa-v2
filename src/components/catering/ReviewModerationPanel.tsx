@@ -100,7 +100,7 @@ export default function ReviewModerationPanel({ businessId }: ReviewModerationPa
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
-                {review.customerName || 'Anonymous'}
+                {review.userName || 'Anonymous'}
               </span>
               <div className="flex items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map(s => (
@@ -115,7 +115,7 @@ export default function ReviewModerationPanel({ businessId }: ReviewModerationPa
 
           {/* Review text */}
           <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
-            {review.text || review.comment || 'No text provided'}
+            {review.text || 'No text provided'}
           </p>
 
           {/* Flag reason */}
