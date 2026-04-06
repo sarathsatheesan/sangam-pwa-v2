@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Package, Clock, Users, MapPin, Send, Loader2,
   ChevronDown, ChevronUp, ShieldCheck, Plus, Trash2, DollarSign,
-  Bell, CheckCircle2, XCircle, Check, Edit, ArrowUpDown, BellRing, Timer,
+  Bell, CheckCircle2, XCircle, Check, Edit, BellRing, Timer,
 } from 'lucide-react';
 import { notifyVendorQuoteReceived } from '@/services/notificationService';
 
@@ -319,28 +319,9 @@ export default function VendorQuoteResponse({
   // ── Section helpers ──
   const toggleSection = (key: string) =>
     setSectionExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
-  const toggleSort = (key: string) => {
-    setSortDir((prev) => {
-      const current = prev[key];
-      const cycle: Record<string, 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc'> = {
-        'date-newest': 'date-oldest',
-        'date-oldest': 'name-asc',
-        'name-asc': 'name-desc',
-        'name-desc': 'date-newest',
-      };
-      return { ...prev, [key]: cycle[current] };
-    });
-  };
-
-  const getSortLabel = (sortType: 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc'): string => {
-    const labels: Record<string, string> = {
-      'date-newest': 'Date ↓',
-      'date-oldest': 'Date ↑',
-      'name-asc': 'Name A-Z',
-      'name-desc': 'Name Z-A',
-    };
-    return labels[sortType] || 'Sort';
-  };
+  type SortOption = 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc';
+  const setSort = (key: string, value: SortOption) =>
+    setSortDir((prev) => ({ ...prev, [key]: value }));
 
   const saveReminderSettings = (updates: Partial<typeof reminderSettings>) => {
     setReminderSettings((prev: typeof reminderSettings) => {
@@ -544,15 +525,18 @@ export default function VendorQuoteResponse({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); toggleSort('open'); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium"
-              style={{ color: '#F59E0B' }}
+            <select
+              value={sortDir.open}
+              onChange={(e) => { e.stopPropagation(); setSort('open', e.target.value as SortOption); }}
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs font-medium rounded-lg border px-2 py-1 outline-none appearance-none cursor-pointer"
+              style={{ color: '#F59E0B', borderColor: 'rgba(245, 158, 11, 0.3)', backgroundColor: 'rgba(245, 158, 11, 0.06)', WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: '1.5rem', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23F59E0B\' stroke-width=\'2\'%3E%3Cpath d=\'M7 10l5 5 5-5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.4rem center' }}
             >
-              <ArrowUpDown size={14} />
-              {getSortLabel(sortDir.open)}
-            </button>
+              <option value="date-newest">Date: Newest</option>
+              <option value="date-oldest">Date: Oldest</option>
+              <option value="name-asc">Name: A → Z</option>
+              <option value="name-desc">Name: Z → A</option>
+            </select>
             {sectionExpanded.open ? <ChevronUp size={18} style={{ color: '#F59E0B' }} /> : <ChevronDown size={18} style={{ color: '#F59E0B' }} />}
           </div>
         </button>
@@ -800,15 +784,18 @@ export default function VendorQuoteResponse({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); toggleSort('accepted'); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium"
-              style={{ color: '#22C55E' }}
+            <select
+              value={sortDir.accepted}
+              onChange={(e) => { e.stopPropagation(); setSort('accepted', e.target.value as SortOption); }}
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs font-medium rounded-lg border px-2 py-1 outline-none appearance-none cursor-pointer"
+              style={{ color: '#22C55E', borderColor: 'rgba(34, 197, 94, 0.3)', backgroundColor: 'rgba(34, 197, 94, 0.06)', WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: '1.5rem', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2322C55E\' stroke-width=\'2\'%3E%3Cpath d=\'M7 10l5 5 5-5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.4rem center' }}
             >
-              <ArrowUpDown size={14} />
-              {getSortLabel(sortDir.accepted)}
-            </button>
+              <option value="date-newest">Date: Newest</option>
+              <option value="date-oldest">Date: Oldest</option>
+              <option value="name-asc">Name: A → Z</option>
+              <option value="name-desc">Name: Z → A</option>
+            </select>
             {sectionExpanded.accepted ? <ChevronUp size={18} style={{ color: '#22C55E' }} /> : <ChevronDown size={18} style={{ color: '#22C55E' }} />}
           </div>
         </button>
@@ -985,15 +972,18 @@ export default function VendorQuoteResponse({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); toggleSort('pending'); }}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium"
-                style={{ color: '#6366F1' }}
+              <select
+                value={sortDir.pending}
+                onChange={(e) => { e.stopPropagation(); setSort('pending', e.target.value as SortOption); }}
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs font-medium rounded-lg border px-2 py-1 outline-none appearance-none cursor-pointer"
+                style={{ color: '#6366F1', borderColor: 'rgba(99, 102, 241, 0.3)', backgroundColor: 'rgba(99, 102, 241, 0.06)', WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: '1.5rem', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236366F1\' stroke-width=\'2\'%3E%3Cpath d=\'M7 10l5 5 5-5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.4rem center' }}
               >
-                <ArrowUpDown size={14} />
-                {getSortLabel(sortDir.pending)}
-              </button>
+                <option value="date-newest">Date: Newest</option>
+                <option value="date-oldest">Date: Oldest</option>
+                <option value="name-asc">Name: A → Z</option>
+                <option value="name-desc">Name: Z → A</option>
+              </select>
               {sectionExpanded.pending ? <ChevronUp size={18} style={{ color: '#6366F1' }} /> : <ChevronDown size={18} style={{ color: '#6366F1' }} />}
             </div>
           </button>

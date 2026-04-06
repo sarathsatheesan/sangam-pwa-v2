@@ -597,10 +597,27 @@ button, a, [role="button"] {
   isolation: isolate;
 }
 
-/* Touch target sizing for mobile — buttons inside accordion headers */
+/* Touch target sizing for mobile — buttons & selects inside accordion headers */
 @media (pointer: coarse) {
-  .rounded-2xl button[type="button"] {
+  .rounded-2xl button[type="button"],
+  .rounded-2xl select {
     min-height: 44px;
-    min-width: 44px;
   }
+}
+
+/* Cross-browser select dropdown normalization */
+select.appearance-none {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  text-overflow: ellipsis;
+}
+/* Firefox: remove inner focus ring and dropdown arrow */
+select.appearance-none::-moz-focus-inner { border: 0; }
+/* IE/Edge legacy: remove default dropdown arrow */
+select.appearance-none::-ms-expand { display: none; }
+/* Ensure option text is readable in all themes */
+select.appearance-none option {
+  color: #1f2937;
+  background-color: #ffffff;
 }
