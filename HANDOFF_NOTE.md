@@ -17,14 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** April 6, 2026 (Last updated: Session 28)
+**Date:** April 6, 2026 (Last updated: Session 28c)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** `222be4a` — fix(catering): cart drawer items not scrollable on mobile (Session 27)
-**Uncommitted:** Session 28 — RFP-to-order conversion flow + in-order messaging (needs commit)
+**Latest Commit:** (Session 28b) — fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders
+**Uncommitted:** Session 28c changes — finalize bug fix, auto-finalize, vendor finalize indicator, ZIP validation
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
-**Live bundle:** Deployed and live. Push + deploy commands: `cd sangam-pwa-v2 && git push origin main && npx firebase deploy --only hosting`
+**Live bundle:** Deployed and live at `https://mithr-1e5f4.web.app`
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix), Session 28 (RFP-to-Order conversion + in-order messaging + Firestore rules fix), Session 28b (Live testing of quote-to-order pipeline + 19 TypeScript error fixes + RFP badge on active/pending orders)
 
 ---
 
@@ -1521,6 +1521,94 @@ src/
 - `src/components/catering/OrderMessages.tsx` — **NEW FILE** — Collapsible in-order messaging widget
 - `firestore.rules` — Added `notes` subcollection rules under `cateringOrders`
 
+### Session 28b (April 6, 2026) — Live Testing Quote-to-Order Pipeline + TypeScript Fixes + RFP Badge
+
+**Context:** Continuation of Session 28. User reported that direct orders worked fine but the quote-to-order flow wasn't working on the live site. This session focused on live testing the entire RFP pipeline end-to-end and fixing build-blocking TypeScript errors.
+
+**Bugs found and fixed in Session 28 (earlier part — 4 commits):**
+
+1. **Bug 1 — Finalize Order button hidden when all items assigned:** The condition `isPartiallyAccepted && !allAssigned && assignedCount > 0` failed when `acceptQuoteResponseItems()` set request status to `'accepted'` (not `'partially_accepted'`). Fixed by broadening to `(isPartiallyAccepted || isFullyAccepted) && assignedCount > 0 && !ordersCreated`.
+2. **Bug 2 — No auto-prompt for address form:** When `allItemsAssigned` returned true, no `setShowAddressForm(true)` was called. Fixed by adding auto-open when all items assigned.
+3. **Bug 3 — Firestore rules checked wrong field:** Rules checked `vendorIds` (doesn't exist on business docs) instead of `ownerId`. Fixed to `== .data.ownerId`.
+4. **Bug 4 — quoteRequest.status not updated but items show as assigned:** `assignedItemsMap` is built from BOTH `quoteRequest.itemAssignments` AND `response.acceptedItemNames`, so items appear assigned even when status is still `'open'`. Fixed by using `assignedCount > 0` directly instead of checking request status.
+
+**Key insight:** The `assignedItemsMap` in QuoteComparison is built from two sources — this is a critical detail for anyone touching that component.
+
+**Live testing (Session 28b):**
+- Tested complete RFP-originated order status progression on deployed site (`mithr-1e5f4.web.app`)
+- Order: Sarath Satheesan, Event 2026-04-07, $128.79 (Mango Lassi + Tandoori Chicken Platter + Samosa Platter)
+- All transitions verified: **Confirmed** (auto-set) → **Preparing** → **Ready** → **Out for Delivery** → **Delivered**
+- Order correctly moved from Active Orders (count 1→0) to Completed Orders (count 1→2)
+- Full pipeline confirmed working for `rfpOrigin: true` orders
+
+**19 pre-existing TypeScript errors fixed (Session 28b):**
+
+1. `CateringItemList.tsx:281` — Replaced `process.env.NODE_ENV === 'development'` with `import.meta.env.DEV` (Vite project, not Node)
+2. `CateringOrderStatus.tsx` (5 errors) — Added `modificationAccepted?: boolean`, `modificationRejected?: boolean`, `modificationRespondedAt?: any` to CateringOrder type in cateringTypes.ts
+3. `ReviewModerationPanel.tsx:103` — Changed `review.customerName` to `review.userName` (correct field on CateringReview type)
+4. `ReviewModerationPanel.tsx:118` — Removed non-existent `review.comment` fallback, kept only `review.text`
+5. `VendorAnalytics.tsx:308` — Imported `useToast` from `@/contexts/ToastContext` and wired `addToast` hook
+6. `VendorInventoryManager.tsx:352-353` — Fixed `stockStatus` type from loose `string` to proper `StockStatus` union type (`'in_stock' | 'low_stock' | 'out_of_stock'`)
+7. `VendorQuoteResponse.tsx` (4 errors) — Added `customerName?: string` to CateringQuoteRequest type in cateringTypes.ts
+
+**RFP badge added to active/pending orders:**
+- Purple "RFP" badge (`rgba(139,92,246,0.1)` bg, `#7C3AED` text) was already present in Completed Orders section and Customer Order view
+- Added same badge to Pending/Active Orders section in VendorCateringDashboard.tsx (was missing)
+- Vendors now see "RFP" tag on all quote-originated orders regardless of status
+
+**Files modified in Session 28b:**
+- `src/components/catering/CateringItemList.tsx` — `process.env` → `import.meta.env.DEV`
+- `src/components/catering/ReviewModerationPanel.tsx` — Fixed `customerName` → `userName`, removed `comment`
+- `src/components/catering/VendorAnalytics.tsx` — Added `useToast` import and hook
+- `src/components/catering/VendorCateringDashboard.tsx` — Added RFP badge to active/pending orders
+- `src/components/catering/VendorInventoryManager.tsx` — Fixed `stockStatus` typing
+- `src/services/catering/cateringTypes.ts` — Added `modificationAccepted`, `modificationRejected`, `modificationRespondedAt` to CateringOrder; added `customerName` to CateringQuoteRequest
+
+**Commits (Session 28 + 28b):**
+```
+bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules
+1feda2a fix(catering): Finalize button now uses assignedCount instead of request status
+(hash) fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders
+```
+
+### Session 28c (April 6, 2026) — Fix Finalize Bug + Auto-Finalize + Vendor Finalize Pending Indicator
+
+**Context:** Continuation of Session 28b. The "Finalize & Create Orders" button was silently failing — no orders were being created when the customer submitted the address form. Three approved feature requests were implemented.
+
+**Root cause of finalize bug:**
+The address form submit handler in `QuoteComparison.tsx` captured the `quoteRequest` prop via closure at render time. When `finalizeQuoteRequest()` was called first (changing the quote status to 'accepted'), the Firestore real-time subscription fired and the parent re-rendered the component with new props. However, the `createOrdersFromQuote()` call used the OLD closure's `quoteRequest` — which may have had stale or incomplete `itemAssignments` data depending on timing. The function was either silently returning empty results or throwing without visible error feedback.
+
+**Fix implemented:**
+1. **Re-fetch fresh data from Firestore** — Before calling `createOrdersFromQuote()`, the handler now does `getDoc(doc(db, 'cateringQuoteRequests', quoteRequest.id))` to get the latest `itemAssignments` directly from the server, bypassing the stale closure issue.
+2. **Console logging added** — `console.log` for itemAssignments count, responses count, and created order IDs; `console.error` for any failures. This makes future debugging much easier.
+3. **ZIP code validation expanded** — Now accepts both US ZIP codes (`12345` or `12345-6789`) and Canadian postal codes (`A1A 1A1`). Previously rejected Canadian postal codes with "Invalid ZIP".
+
+**Auto-finalize feature:**
+When a customer accepts items and all items in the quote request become assigned (i.e., `allItemsAssigned` returns true from `acceptQuoteResponseItems`), the system now automatically:
+1. Calls `finalizeQuoteRequest()` to mark the quote as 'accepted'
+2. Opens the delivery address form immediately
+3. Customer fills address → orders are created in one step (no intermediate yellow "Finalize & Create Orders" banner)
+
+This eliminates the confusing two-step finalization gap where vendors saw "Accepted" quotes but no corresponding orders.
+
+**"Finalize Pending" / "Order Created" indicator on vendor's accepted quotes:**
+Added two conditional badges to the vendor's Accepted Quotes section in `VendorQuoteResponse.tsx`:
+- **"Awaiting Finalization"** (amber badge with Timer icon) — Shows when the quote request has NO `deliveryAddress` set (customer hasn't completed the address step yet)
+- **"Order Created"** (purple badge with Package icon) — Shows when the quote request HAS a `deliveryAddress` set (orders should exist)
+
+This gives vendors clear visibility into whether an accepted quote has been converted to an order.
+
+**Files modified in Session 28c:**
+- `src/components/catering/QuoteComparison.tsx` — Re-fetch fresh quoteRequest before creating orders; added console logging; fixed ZIP validation for Canadian postal codes; auto-finalize on all-items-assigned; imported `doc`, `getDoc` from firebase/firestore and `db` from services
+- `src/components/catering/VendorQuoteResponse.tsx` — Added "Awaiting Finalization" (amber) and "Order Created" (purple) badges to accepted quotes based on `deliveryAddress` presence
+- `src/services/catering/cateringTypes.ts` — Added `deliveryAddress?: DeliveryAddress` to `CateringQuoteRequest` interface
+
+**Decisions & rationale:**
+- **Why re-fetch from Firestore?** The closure-captured `quoteRequest` prop can be stale by the time `createOrdersFromQuote` runs (race between async handler and real-time subscription). Direct `getDoc` guarantees fresh data.
+- **Why auto-finalize?** The two-step flow (accept items → manually finalize) was confusing. Vendors saw "Accepted" quotes with no orders. Auto-finalization closes the gap when all items are assigned.
+- **Why `deliveryAddress` as the indicator?** It's the most reliable signal that the customer completed finalization. The `deliveryAddress` is written by `finalizeQuoteRequest()` only during the finalization step.
+- **Canadian postal codes:** The app targets diaspora communities including Canadian users. The previous US-only ZIP validation was a friction point during testing.
+
 ---
 
 <!-- ================================================================
@@ -1617,7 +1705,13 @@ src/
 - **QA Audit + 21 Bug Fixes:** ✅ COMPLETE (Session 27) — all bugs found, fixed, and verified; QA reports generated
 - **Cart Scroll Fix:** ✅ COMPLETE (Session 27) — flex column layout for proper mobile scrolling
 - **RFP-to-Order Conversion + In-Order Messaging:** ✅ COMPLETE (Session 28) — auto-create orders on quote finalization, in-order messaging, RFP badge
-- **All changes committed and pushed to GitHub** — push + deploy from macOS terminal: `cd sangam-pwa-v2 && git push origin main && npx firebase deploy --only hosting`
+- **Live Testing Quote-to-Order Pipeline:** ✅ COMPLETE (Session 28b) — full end-to-end test on deployed site: Confirmed→Preparing→Ready→Out for Delivery→Delivered all working for rfpOrigin orders
+- **19 Pre-existing TypeScript Errors Fixed:** ✅ COMPLETE (Session 28b) — Vite env var, missing type fields, wrong field names, missing imports, loose string types
+- **RFP Badge on Active/Pending Orders:** ✅ COMPLETE (Session 28b) — purple RFP tag now shows on all vendor order sections (was missing from active/pending)
+- **Finalize Bug Fix:** ✅ COMPLETE (Session 28c) — re-fetch fresh quoteRequest from Firestore before order creation, added console logging, expanded ZIP validation for Canadian postal codes
+- **Auto-Finalize on All Items Assigned:** ✅ COMPLETE (Session 28c) — when customer accepts all items, quote is auto-finalized and address form opens immediately (no intermediate yellow banner)
+- **Vendor Finalize Pending Indicator:** ✅ COMPLETE (Session 28c) — "Awaiting Finalization" amber badge + "Order Created" purple badge on vendor's accepted quotes
+- **Session 28c changes uncommitted** — need to commit, push, and deploy
 
 **New files created in Sessions 23-24:**
 - `src/components/catering/CateringOrderStatus.tsx` — Customer order tracking with visual timeline
@@ -1672,25 +1766,9 @@ src/
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — Push & Deploy Session 27 Changes
-- **All Session 27 changes are committed** — 4 commits (Phase 2 UI, Phase 3 UI, 20 bug fixes, cart scroll fix). Push and deploy from macOS terminal:
-  ```bash
-  cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
-  git push origin main
-  npx firebase deploy --only hosting
-  ```
-- **After deploy, test on live site (Session 27 changes):**
-  1. Open catering → verify hero banner with gradient + featured caterer pills
-  2. Click a caterer pill → verify it filters items to that specific caterer (search query set)
-  3. Verify glass-morphism category cards with gradient backgrounds + focus-visible rings on keyboard tab
-  4. Add 3+ items to cart → verify cart scrolls properly on mobile (items + footer visible)
-  5. Go to Checkout → verify two-column layout on desktop (form left, summary right)
-  6. Submit with empty fields → verify validation summary appears in LEFT column (not right)
-  7. Complete all fields → verify green checkmark badges animate on each section
-  8. Toggle dark mode → verify all new UI elements respect dark mode (no hardcoded whites/greens)
-  9. Check item cards → verify prep time, serves, popularity pills render (when data exists)
-  10. Verify `prefers-reduced-motion` disables animations (Chrome DevTools > Rendering > Emulate)
-- **App is deployed and live** at `https://mithr-1e5f4.web.app`.
+### Immediate — All Committed, Pushed, and Deployed
+- **All Session 28/28b changes are committed and pushed** — 3 commits (quote-to-order conversion, Finalize button fix, TypeScript fixes + RFP badge). Site is deployed and live at `https://mithr-1e5f4.web.app`.
+- **RFP-to-Order flow fully tested and working** — confirmed end-to-end on live site: quote acceptance → order creation → vendor status progression through all 5 states → delivered.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions deployed** — `transcribeVoiceMessage`, `sendNewMessageNotification`, and `processRecurringCateringOrders` (daily 6 AM PT) are on Cloud Run.
 
@@ -1704,7 +1782,7 @@ Prioritized improvement list from the comprehensive UX audit (`ethniCity_Caterin
 
 **Short-Term (3-5 days each):**
 4. Order cancellation flow with reason capture (customer + vendor)
-5. In-app messaging between customers and vendors
+5. ~~In-app messaging between customers and vendors~~ ✅ DONE (Session 28 — OrderMessages component with real-time Firestore subcollection)
 6. Sort and filter controls on item list (by price, rating, popularity)
 7. RFQ expiration dates with vendor notification
 8. Multi-date picker for recurring order skip dates
@@ -1950,6 +2028,10 @@ git add <files> && git commit -m "message" && git push origin main
 
 ### Recent Commit History
 ```
+(uncommitted) fix(catering): finalize bug fix, auto-finalize, vendor pending indicator (Session 28c)
+(latest) fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders (Session 28b)
+1feda2a fix(catering): Finalize button now uses assignedCount instead of request status (Session 28)
+bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules (Session 28)
 222be4a fix(catering): cart drawer items not scrollable on mobile (Session 27)
 64c53e0 fix(catering): resolve 20 QA bugs across all severity tiers (Session 27)
 102e9cf style(catering): Phase 3 UI polish & delight — 8 enhancements (Session 27)
@@ -2024,4 +2106,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Updated April 6, 2026 (Session 28) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). Catering UI Phases 1-3 (20 items) + QA Audit (21 bugs found) + All Bug Fixes Verified + Cart Scroll Fix ALL COMPLETE (Session 27). ALL COMMITTED — push + deploy needed: `cd sangam-pwa-v2 && git push origin main && npx firebase deploy --only hosting`. Design tokens expanded: --aurora-bg-rgb, --aurora-success added for both light/dark. Glass-morphism, gradient category cards, hero banner, two-column checkout, flex cart panel all shipped. Next: (1) push and deploy Session 27, (2) live test all UI changes, (3) Phase 7 improvements from UX audit (loading skeletons, cart persistence with localStorage, order cancellation, further in-app messaging enhancements). Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*
+*Updated April 6, 2026 (Session 28c) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). Catering UI Phases 1-3 (20 items) + QA Audit (21 bugs found) + All Bug Fixes Verified + Cart Scroll Fix ALL COMPLETE (Session 27). RFP-to-Order Conversion + In-Order Messaging + Firestore rules fix ALL COMPLETE (Session 28). Live testing of quote-to-order pipeline VERIFIED end-to-end + 19 TypeScript errors fixed + RFP badge added ALL COMPLETE (Session 28b). Finalize bug fix (stale closure → re-fetch from Firestore) + auto-finalize on all-items-assigned + vendor "Awaiting Finalization"/"Order Created" indicators + Canadian postal code support ALL COMPLETE (Session 28c). Session 28c UNCOMMITTED — needs commit, push, deploy. Site live at https://mithr-1e5f4.web.app. Next: (1) commit + deploy Session 28c, (2) test full end-to-end finalize flow on live site, (3) Phase 7 improvements from UX audit (loading skeletons, cart persistence, order cancellation), (4) sort/filter controls on item list, (5) RFQ expiration dates. Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*

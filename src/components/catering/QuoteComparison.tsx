@@ -16,6 +16,8 @@ import {
   createOrdersFromQuote,
   formatPrice,
 } from '@/services/cateringService';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -251,8 +253,16 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       );
 
       if (result.allItemsAssigned) {
-        addToast(`All items assigned! Please provide delivery address to finalize your order.`, 'success', 5000);
-        // Auto-open address form to finalize order creation
+        // Auto-finalize: all items are assigned, auto-mark the quote as accepted
+        // and prompt for delivery address to create orders immediately
+        try {
+          await finalizeQuoteRequest(quoteRequest.id);
+          console.log('[QuoteComparison] Auto-finalized quote request:', quoteRequest.id);
+        } catch (finalizeErr) {
+          console.warn('[QuoteComparison] Auto-finalize status update failed (non-critical):', finalizeErr);
+        }
+        addToast(`All items accepted from ${response.businessName}! Provide a delivery address to complete your order.`, 'success', 5000);
+        // Auto-open address form to create orders
         setShowAddressForm(true);
       } else {
         addToast(`${itemNames.length} item${itemNames.length > 1 ? 's' : ''} accepted from ${response.businessName}. Your contact details have been shared.`, 'success', 5000);
@@ -288,9 +298,14 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     setFinalizingOrder(true);
     try {
       await finalizeQuoteRequest(quoteRequest.id);
+      // Re-fetch fresh data to avoid stale closure
+      const freshSnap = await getDoc(doc(db, 'cateringQuoteRequests', quoteRequest.id));
+      const freshQR = freshSnap.exists()
+        ? { id: freshSnap.id, ...freshSnap.data() } as CateringQuoteRequest
+        : quoteRequest;
       // Auto-create orders (fallback path without address — uses deliveryCity only)
-      const fallbackAddress = { street: '', city: quoteRequest.deliveryCity || '', state: '', zip: '' };
-      const orderIds = await createOrdersFromQuote(quoteRequest, responses, fallbackAddress);
+      const fallbackAddress = { street: '', city: freshQR.deliveryCity || '', state: '', zip: '' };
+      const orderIds = await createOrdersFromQuote(freshQR, responses, fallbackAddress);
       setOrdersCreated(true);
       addToast(
         orderIds.length === 1
@@ -303,6 +318,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
         setTimeout(() => onViewOrders(), 1500);
       }
     } catch (err: any) {
+      console.error('[QuoteComparison] handleFinalizeOrder error:', err);
       addToast(err.message || 'Failed to finalize order', 'error');
     } finally {
       setFinalizingOrder(false);
@@ -1051,7 +1067,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   if (!deliveryAddress.city.trim()) errs.city = 'Required';
                   if (!deliveryAddress.state.trim()) errs.state = 'Required';
                   if (!deliveryAddress.zip.trim()) errs.zip = 'Required';
-                  else if (!/^\d{5}(-\d{4})?$/.test(deliveryAddress.zip.trim())) errs.zip = 'Invalid ZIP';
+                  // Accept US ZIP (12345 or 12345-6789) and Canadian postal codes (A1A 1A1)
+                  else if (!/^\d{5}(-\d{4})?$/.test(deliveryAddress.zip.trim()) &&
+                           !/^[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d$/.test(deliveryAddress.zip.trim())) errs.zip = 'Invalid ZIP/postal code';
                   if (Object.keys(errs).length > 0) { setAddressErrors(errs); return; }
                   setAddressErrors({});
                   setShowAddressForm(false);
@@ -1059,8 +1077,17 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   setFinalizingOrder(true);
                   try {
                     await finalizeQuoteRequest(quoteRequest.id, deliveryAddress);
+                    // Re-fetch the latest quoteRequest from Firestore to avoid stale closure data
+                    // (the subscription may not have propagated the itemAssignments update yet)
+                    const freshSnap = await getDoc(doc(db, 'cateringQuoteRequests', quoteRequest.id));
+                    const freshQuoteRequest = freshSnap.exists()
+                      ? { id: freshSnap.id, ...freshSnap.data() } as CateringQuoteRequest
+                      : quoteRequest;
+                    console.log('[QuoteComparison] Finalize: itemAssignments count =', (freshQuoteRequest.itemAssignments || []).length);
+                    console.log('[QuoteComparison] Finalize: responses count =', responses.length);
                     // Auto-create orders for each accepted vendor
-                    const orderIds = await createOrdersFromQuote(quoteRequest, responses, deliveryAddress);
+                    const orderIds = await createOrdersFromQuote(freshQuoteRequest, responses, deliveryAddress);
+                    console.log('[QuoteComparison] Orders created:', orderIds);
                     setOrdersCreated(true);
                     addToast(
                       orderIds.length === 1
@@ -1071,6 +1098,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                     );
                     if (onViewOrders) onViewOrders();
                   } catch (err: any) {
+                    console.error('[QuoteComparison] Finalize error:', err);
                     addToast(err.message || 'Failed to finalize order', 'error');
                   } finally {
                     setFinalizingOrder(false);

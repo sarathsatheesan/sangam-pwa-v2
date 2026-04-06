@@ -837,6 +837,25 @@ export default function VendorQuoteResponse({
                           <CheckCircle2 size={10} />
                           {isPartial ? 'Partial' : 'Accepted'}
                         </span>
+                        {/* Finalize Pending indicator: shows when quote is accepted but customer hasn't provided delivery address yet */}
+                        {request && !request.deliveryAddress && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                            style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
+                          >
+                            <Timer size={10} />
+                            Awaiting Finalization
+                          </span>
+                        )}
+                        {request && request.deliveryAddress && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                            style={{ backgroundColor: 'rgba(139,92,246,0.1)', color: '#7C3AED' }}
+                          >
+                            <Package size={10} />
+                            Order Created
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
                         {request && <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>}

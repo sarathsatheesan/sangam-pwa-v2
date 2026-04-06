@@ -150,6 +150,7 @@ export interface CateringQuoteRequest {
   selectedBusinessId?: string;    // Which vendor was selected (full accept — legacy)
   itemAssignments?: ItemAssignment[];  // Item-level assignments to different vendors
   targetBusinessIds?: string[];   // Specific businesses to request from (empty = broadcast to all in category)
+  deliveryAddress?: DeliveryAddress;  // Set when customer finalizes with full address
   responseCount: number;          // How many vendors responded
   expiresAt?: any;
   createdAt?: any;
