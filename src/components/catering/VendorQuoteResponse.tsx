@@ -492,30 +492,29 @@ export default function VendorQuoteResponse({
         {/* Section header — collapsible */}
         <button
           onClick={() => toggleSection('open')}
-          className="w-full flex items-center justify-between px-4 py-3"
+          className="w-full flex items-center justify-between p-4 text-left transition-colors"
+          style={{
+            backgroundColor: sectionExpanded.open ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.04)',
+            borderBottom: sectionExpanded.open ? '1px solid var(--aurora-border)' : 'none',
+          }}
         >
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#F59E0B' }} />
-            <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Open Requests</span>
-            {openRequests.length > 0 && (
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#D97706' }}>
+          <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold" style={{ color: '#F59E0B' }}>Open Requests</h3>
+              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#F59E0B' }}>
                 {openRequests.length}
               </span>
-            )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            {sectionExpanded.open && openRequests.length > 1 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleSort('open'); }}
-                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
-                style={{ color: 'var(--aurora-text-secondary)', backgroundColor: 'rgba(99,102,241,0.06)' }}
-                title={`Sort by date: ${sortDir.open}`}
-              >
-                <ArrowUpDown size={12} />
-                {sortDir.open === 'newest' ? 'Newest' : 'Oldest'}
-              </button>
-            )}
-            {sectionExpanded.open ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleSort('open'); }}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: '#F59E0B' }}
+            >
+              <ArrowUpDown size={16} />
+            </button>
+            {sectionExpanded.open ? <ChevronUp size={18} style={{ color: '#F59E0B' }} /> : <ChevronDown size={18} style={{ color: '#F59E0B' }} />}
           </div>
         </button>
 
@@ -747,30 +746,29 @@ export default function VendorQuoteResponse({
       <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
         <button
           onClick={() => toggleSection('accepted')}
-          className="w-full flex items-center justify-between px-4 py-3"
+          className="w-full flex items-center justify-between p-4 text-left transition-colors"
+          style={{
+            backgroundColor: sectionExpanded.accepted ? 'rgba(34, 197, 94, 0.08)' : 'rgba(34, 197, 94, 0.04)',
+            borderBottom: sectionExpanded.accepted ? '1px solid var(--aurora-border)' : 'none',
+          }}
         >
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#059669' }} />
-            <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Accepted</span>
-            {acceptedResponses.length > 0 && (
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(5, 150, 105, 0.1)', color: '#059669' }}>
+          <div className="flex items-center gap-3 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold" style={{ color: '#22C55E' }}>Accepted</h3>
+              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#22C55E' }}>
                 {acceptedResponses.length}
               </span>
-            )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            {sectionExpanded.accepted && acceptedResponses.length > 1 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleSort('accepted'); }}
-                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
-                style={{ color: 'var(--aurora-text-secondary)', backgroundColor: 'rgba(99,102,241,0.06)' }}
-                title={`Sort by date: ${sortDir.accepted}`}
-              >
-                <ArrowUpDown size={12} />
-                {sortDir.accepted === 'newest' ? 'Newest' : 'Oldest'}
-              </button>
-            )}
-            {sectionExpanded.accepted ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleSort('accepted'); }}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: '#22C55E' }}
+            >
+              <ArrowUpDown size={16} />
+            </button>
+            {sectionExpanded.accepted ? <ChevronUp size={18} style={{ color: '#22C55E' }} /> : <ChevronDown size={18} style={{ color: '#22C55E' }} />}
           </div>
         </button>
 
@@ -786,121 +784,135 @@ export default function VendorQuoteResponse({
             {acceptedResponses.map((response) => {
               const request = requests.find((r) => r.id === response.quoteRequestId);
               const isPartial = response.status === 'partially_accepted';
+              const isExpAccepted = expandedId === `accepted-${response.id}`;
 
               return (
                 <div
                   key={response.id}
-                  className="p-4 rounded-2xl border-2"
-                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: '#059669' }}
+                  className="rounded-2xl border overflow-hidden"
+                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
                 >
-                  {/* Pill title: Customer Name · Date + Status badge */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                        {response.customerName || request?.cuisineCategory || 'Catering'} · {request ? formatEventDate(request.eventDate) : ''}
-                      </span>
-                      <span
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
-                      >
-                        <CheckCircle2 size={12} />
-                        {isPartial ? 'Partially Accepted' : 'Accepted'}
-                      </span>
-                    </div>
-                    <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
-                      {formatPrice(response.total)}
-                    </span>
-                  </div>
-
-                  {/* Request details */}
-                  {request && (
-                    <div className="mb-3">
-                      <div className="flex items-center gap-3 flex-wrap text-xs mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        <span>{request.cuisineCategory}</span>
-                        {request.eventType && (
-                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
-                            {request.eventType.replace(/_/g, ' ')}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
-                        <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} />
-                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
+                  {/* Collapsible pill header */}
+                  <button
+                    onClick={() => setExpandedId(isExpAccepted ? null : `accepted-${response.id}`)}
+                    className="w-full flex items-center justify-between p-4 text-left"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                          {response.customerName || request?.cuisineCategory || 'Catering'} · {request ? formatEventDate(request.eventDate) : ''}
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                          style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
+                        >
+                          <CheckCircle2 size={10} />
+                          {isPartial ? 'Partial' : 'Accepted'}
                         </span>
                       </div>
-                      {/* Full item breakdown */}
-                      <div className="space-y-1">
-                        {response.quotedItems?.map((qi, i) => (
-                          <div key={i} className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                            <span>{qi.name} x {qi.qty} ({qi.pricingType?.replace(/_/g, ' ') || 'per unit'}){qi.traySize ? ` · ${qi.traySize}` : ''}</span>
-                            <span>{formatPrice(qi.unitPrice * qi.qty)}</span>
-                          </div>
-                        ))}
-                        {response.serviceFee != null && response.serviceFee > 0 && (
-                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                            <span>Service fee</span><span>{formatPrice(response.serviceFee)}</span>
-                          </div>
-                        )}
-                        {response.deliveryFee != null && response.deliveryFee > 0 && (
-                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                            <span>Delivery fee</span><span>{formatPrice(response.deliveryFee)}</span>
-                          </div>
-                        )}
+                      <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        {request && <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>}
+                        {request && <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>}
+                        <span>{request?.cuisineCategory}</span>
+                        <span className="font-medium" style={{ color: '#6366F1' }}>{formatPrice(response.total)}</span>
                       </div>
-                      {request.specialInstructions && (
-                        <p className="text-xs mt-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
-                          Customer note: {request.specialInstructions}
-                        </p>
+                    </div>
+                    {isExpAccepted ? <ChevronUp size={18} className="opacity-40" /> : <ChevronDown size={18} className="opacity-40" />}
+                  </button>
+
+                  {isExpAccepted && (
+                    <div className="px-4 pb-4 space-y-3 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                      {/* Request details */}
+                      {request && (
+                        <div className="pt-3">
+                          <div className="flex items-center gap-3 flex-wrap text-xs mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            {request.eventType && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                                {request.eventType.replace(/_/g, ' ')}
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <Clock size={12} />
+                              {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
+                            </span>
+                          </div>
+                          {/* Full item breakdown */}
+                          <div className="space-y-1">
+                            {response.quotedItems?.map((qi, i) => (
+                              <div key={i} className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <span>{qi.name} x {qi.qty} ({qi.pricingType?.replace(/_/g, ' ') || 'per unit'}){qi.traySize ? ` · ${qi.traySize}` : ''}</span>
+                                <span>{formatPrice(qi.unitPrice * qi.qty)}</span>
+                              </div>
+                            ))}
+                            {response.serviceFee != null && response.serviceFee > 0 && (
+                              <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <span>Service fee</span><span>{formatPrice(response.serviceFee)}</span>
+                              </div>
+                            )}
+                            {response.deliveryFee != null && response.deliveryFee > 0 && (
+                              <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <span>Delivery fee</span><span>{formatPrice(response.deliveryFee)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}>
+                              <span>Total</span><span style={{ color: '#6366F1' }}>{formatPrice(response.total)}</span>
+                            </div>
+                          </div>
+                          {request.specialInstructions && (
+                            <p className="text-xs mt-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
+                              Customer note: {request.specialInstructions}
+                            </p>
+                          )}
+                        </div>
                       )}
-                    </div>
-                  )}
 
-                  {/* Accepted items */}
-                  {response.acceptedItemNames && response.acceptedItemNames.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        Accepted Items
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {response.acceptedItemNames.map((name) => (
-                          <span
-                            key={name}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
-                            style={{ backgroundColor: 'rgba(5, 150, 105, 0.1)', color: '#059669' }}
-                          >
-                            <Check size={10} />
-                            {name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                      {/* Accepted items */}
+                      {response.acceptedItemNames && response.acceptedItemNames.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            Accepted Items
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {response.acceptedItemNames.map((name) => (
+                              <span
+                                key={name}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                                style={{ backgroundColor: 'rgba(5, 150, 105, 0.1)', color: '#059669' }}
+                              >
+                                <Check size={10} />
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-                  {/* Customer contact details — the key info vendors need */}
-                  {response.customerName && (
-                    <div
-                      className="p-3 rounded-xl"
-                      style={{ backgroundColor: '#D1FAE5' }}
-                    >
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#059669' }}>
-                        Customer Contact
-                      </p>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium" style={{ color: '#065F46' }}>
-                          {response.customerName}
-                        </p>
-                        {response.customerPhone && (
-                          <p className="text-xs" style={{ color: '#065F46' }}>
-                            Phone: {response.customerPhone}
+                      {/* Customer contact details */}
+                      {response.customerName && (
+                        <div
+                          className="p-3 rounded-xl"
+                          style={{ backgroundColor: '#D1FAE5' }}
+                        >
+                          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#059669' }}>
+                            Customer Contact
                           </p>
-                        )}
-                        {response.customerEmail && (
-                          <p className="text-xs" style={{ color: '#065F46' }}>
-                            Email: {response.customerEmail}
-                          </p>
-                        )}
-                      </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium" style={{ color: '#065F46' }}>
+                              {response.customerName}
+                            </p>
+                            {response.customerPhone && (
+                              <p className="text-xs" style={{ color: '#065F46' }}>
+                                Phone: {response.customerPhone}
+                              </p>
+                            )}
+                            {response.customerEmail && (
+                              <p className="text-xs" style={{ color: '#065F46' }}>
+                                Email: {response.customerEmail}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -917,27 +929,29 @@ export default function VendorQuoteResponse({
         <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
           <button
             onClick={() => toggleSection('pending')}
-            className="w-full flex items-center justify-between px-4 py-3"
+            className="w-full flex items-center justify-between p-4 text-left transition-colors"
+            style={{
+              backgroundColor: sectionExpanded.pending ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.04)',
+              borderBottom: sectionExpanded.pending ? '1px solid var(--aurora-border)' : 'none',
+            }}
           >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6366F1' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Awaiting Decision</span>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}>
-                {pendingResponses.length}
-              </span>
+            <div className="flex items-center gap-3 flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold" style={{ color: '#6366F1' }}>Awaiting Decision</h3>
+                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#6366F1' }}>
+                  {pendingResponses.length}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              {sectionExpanded.pending && pendingResponses.length > 1 && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleSort('pending'); }}
-                  className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
-                  style={{ color: 'var(--aurora-text-secondary)', backgroundColor: 'rgba(99,102,241,0.06)' }}
-                >
-                  <ArrowUpDown size={12} />
-                  {sortDir.pending === 'newest' ? 'Newest' : 'Oldest'}
-                </button>
-              )}
-              {sectionExpanded.pending ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSort('pending'); }}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: '#6366F1' }}
+              >
+                <ArrowUpDown size={16} />
+              </button>
+              {sectionExpanded.pending ? <ChevronUp size={18} style={{ color: '#6366F1' }} /> : <ChevronDown size={18} style={{ color: '#6366F1' }} />}
             </div>
           </button>
 
@@ -1201,16 +1215,23 @@ export default function VendorQuoteResponse({
         <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
           <button
             onClick={() => toggleSection('declined')}
-            className="w-full flex items-center justify-between px-4 py-3"
+            className="w-full flex items-center justify-between p-4 text-left transition-colors"
+            style={{
+              backgroundColor: sectionExpanded.declined ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.04)',
+              borderBottom: sectionExpanded.declined ? '1px solid var(--aurora-border)' : 'none',
+            }}
           >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#EF4444' }} />
-              <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Declined</span>
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
-                {declinedResponses.length}
-              </span>
+            <div className="flex items-center gap-3 flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold" style={{ color: '#EF4444' }}>Declined</h3>
+                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#EF4444' }}>
+                  {declinedResponses.length}
+                </span>
+              </div>
             </div>
-            {sectionExpanded.declined ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+            <div className="flex items-center gap-2">
+              {sectionExpanded.declined ? <ChevronUp size={18} style={{ color: '#EF4444' }} /> : <ChevronDown size={18} style={{ color: '#EF4444' }} />}
+            </div>
           </button>
 
           {sectionExpanded.declined && (
