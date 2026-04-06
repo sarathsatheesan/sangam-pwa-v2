@@ -17,14 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** April 1, 2026 (Last updated: Session 26)
+**Date:** April 6, 2026 (Last updated: Session 28)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** `e571003` — feat(catering): implement 7 P3 low-priority polish & accessibility fixes (Session 26)
-**Uncommitted:** None — all changes committed and pushed
+**Latest Commit:** `222be4a` — fix(catering): cart drawer items not scrollable on mobile (Session 27)
+**Uncommitted:** Session 28 — RFP-to-order conversion flow + in-order messaging (needs commit)
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
-**Live bundle:** Build clean, deploy from macOS terminal needed (Firebase auth not available in VM). Deploy command: `npx vite build && npx firebase deploy --only hosting && cd functions && npm run build && cd .. && npx firebase deploy --only functions`. All Session 26 changes committed and pushed — deploy needed.
+**Live bundle:** Deployed and live. Push + deploy commands: `cd sangam-pwa-v2 && git push origin main && npx firebase deploy --only hosting`
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix)
 
 ---
 
@@ -167,6 +167,43 @@ Phase 4 highlights: Extracted `PersonCard` component (464 lines, 6 variants: gri
 - **Cross-Browser Compatibility**: Clipboard API fallbacks for quote sharing, CSS mobile Safari fixes, explicit Vite build targets `['es2020', 'chrome87', 'firefox78', 'safari14', 'edge88']`.
 
 - **Admin Catering Section**: Added Catering tab to admin panel with catering orders list, stats, caterer businesses view, and order management.
+
+**Session 27 focused on:** Catering UI Overhaul — 3 phases of visual enhancements (20 items total), comprehensive QA audit, 21 bug fixes, and a live cart scroll fix:
+
+- **Phase 1 — Quick Wins (5 items)**: Styled sort dropdown with border + ChevronDown icon, category-specific "No caterers yet" empty states, mobile short title mapping for truncation prevention, footer hidden on catering module for content maximization, styled search input with aurora theme variables.
+
+- **Phase 2 — High-Impact UX (6 items)**: Two-column desktop checkout layout (`lg:grid lg:grid-cols-5 lg:gap-8` — form in col-span-3, order summary in col-span-2 with sticky positioning), card-style vendor headers with avatar initials and business metadata, category-specific gradient placeholders with matching icons for items without photos, minimum order progress bar with amber/green states and remaining amount display, sticky mobile search bar, vendor header with category/rating/item count badges.
+
+- **Phase 3 — Polish & Delight (8 items)**: Hero banner with gradient background and featured caterer pills on categories view, glass-morphism category cards with gradient backgrounds and decorative circles, dark mode compatibility audit (replaced hardcoded `hover:bg-gray-100` and `border-gray-300` with opacity-based and aurora variable alternatives), green step badges with checkmark animation on checkout sections, quick info pills (prep time, serves, popularity) on menu item cards, enhanced vendor dashboard onboarding empty state with gradient icon and contextual filter-aware empty states, metadata enrichment (`prepTimeMinutes`, `popularityScore` added to `CateringMenuItem` type).
+
+- **QA Audit**: Acted as QA engineer — created comprehensive test plan across all 20 UI items, executed tests via code review + live site verification, found 21 bugs across 4 severity tiers (2 CRITICAL, 5 HIGH, 8 MEDIUM, 6 LOW). Generated `Catering_UI_QA_Report.docx` with detailed findings.
+
+- **Bug Fix Pass (21 bugs)**: Fixed all bugs in priority order:
+  - **CRITICAL**: BUG-001 (missing `--aurora-bg-rgb` and `--aurora-success` CSS variables in both light/dark mode), BUG-002 (hero caterer pills all calling same handler — now dispatch `SET_SEARCH_QUERY` with vendor name), BUG-003 (validation summary in wrong column — moved from right order summary column to left form column)
+  - **HIGH**: BUG-004 (nested sticky conflict — footer uses `lg:static` on desktop), BUG-005 (inline `<style>` tag moved to global `index.css` `@keyframes checkPop`), BUG-006 (aria-label trailing separator — ternary logic fix), BUG-007 (`prefers-reduced-motion` global rule added), BUG-008 (hardcoded `#10B981` replaced with `var(--aurora-success)` with fallbacks), BUG-009 (route check `startsWith('/catering')` → exact match + trailing slash)
+  - **MEDIUM**: BUG-010 (animation `forwards` fill-mode), BUG-011 (null/0 guards for `prepTimeMinutes`/`popularityScore`), BUG-012 (double-counting in category grid), BUG-013 (mobile sticky `safe-area-inset-top`), BUG-014 (`Math.floor` instead of `Math.round` for progress bar), BUG-015 (`focus-visible` ring on glass-morphism cards), BUG-016 (sort dropdown hover with opacity instead of hardcoded color)
+  - **LOW**: BUG-018 (complete `shortNames` mapping), BUG-019 (dev-mode console.warn for missing business data), BUG-020 ("+N more" pill for >5 caterers), BUG-021 (contextual empty states accepted as correct UX)
+  - **N/A**: BUG-017 (scroll buttons don't exist in codebase)
+
+- **QA Verification**: Re-tested all 21 bugs — 20 PASS, 1 N/A. Generated `Catering_QA_Verification_Report.docx` with detailed evidence per bug.
+
+- **Live Bug Fix — Cart Scroll**: User reported cart items not scrollable on mobile. Root cause: content wrapper had `h-full` without accounting for header/progress bar height. Fixed by restructuring panel to flex column layout with `shrink-0` header, `flex-1 min-h-0` content area, and `overflow-y-auto` on items list.
+
+- **Session 27 Commits** (5 total):
+  - `da9ef3f` — style(catering): Phase 2 UI enhancements — 6 high-impact UX changes
+  - `102e9cf` — style(catering): Phase 3 UI polish & delight — 8 enhancements
+  - `64c53e0` — fix(catering): resolve 20 QA bugs across all severity tiers
+  - `222be4a` — fix(catering): cart drawer items not scrollable on mobile
+
+- **Design Decisions (Session 27)**:
+  - **Glass-morphism pattern**: `backdrop-filter: blur(8px)` with `rgba(255,255,255,0.2)` overlays for category cards and hero pills — gives premium frosted glass appearance on gradient backgrounds
+  - **Aurora design tokens**: All new colors use CSS variables with fallbacks (`var(--aurora-success, #10B981)`) — never hardcoded values alone
+  - **`--aurora-bg-rgb` variable**: Added `245, 246, 250` (light) / `26, 27, 46` (dark) for use in `rgba()` expressions where CSS variables can't be used directly
+  - **`--aurora-success` variable**: `#10B981` (light) / `#34D399` (dark) for consistent green across themes
+  - **Two-column checkout**: 5-column grid with 3:2 split — form sections in left col, order summary sticky in right col. On mobile, stacks vertically.
+  - **Category card gradients**: Each cuisine type has a distinct gradient (orange for Restaurant & Food, green for Tiffin, blue for Grocery & Market, purple for Other) to create visual diversity
+  - **Step badge animation**: `checkPop` keyframe with cubic-bezier bounce for section completion feedback
+  - **Flex layout for cart panel**: Replaced `h-full` + `sticky` approach with proper flex column layout (`shrink-0` for fixed areas, `flex-1 min-h-0` for scrollable area) — more robust across all screen sizes
 
 **Key architectural change in Session 20:** The `cp` sync pattern for `discover.tsx` was ELIMINATED. Unlike `messages.tsx` and `business.tsx` which still require `cp` sync, `discover.tsx` was verified to only be imported from `src/pages/discover.tsx` (not `main/`). The duplicate `src/pages/main/discover.tsx` was deleted. This is the first page to break free of the duplicate architecture.
 
@@ -1411,6 +1448,79 @@ src/
 - `src/services/catering/index.ts` — barrel re-exports for new functions
 - `firestore.rules` — role-based catering order rules with isValidStatusTransition()
 
+### Session 27 (April 3, 2026) — Catering UI Phases 1-3 + QA Audit + 21 Bug Fixes + Cart Scroll Fix
+
+**Phase 1 — Quick Wins (5 items):** Sort dropdown styling, "No caterers yet" empty states, mobile short title mapping, footer hidden on catering, styled search input.
+
+**Phase 2 — High-Impact UX (6 items):** Two-column desktop checkout (5-col grid, 3:2 split), card-style vendor headers with avatars, category-specific gradient placeholders with icons, minimum order progress bar (amber/green), sticky mobile search, vendor header badges.
+
+**Phase 3 — Polish & Delight (8 items):** Hero banner with featured caterer pills, glass-morphism category cards, dark mode audit, green step badges with checkPop animation, quick info pills (prepTime/serves/popularity), enhanced vendor onboarding empty state, metadata enrichment (prepTimeMinutes, popularityScore on CateringMenuItem).
+
+**QA Audit:** Created comprehensive test plan, executed all tests, found 21 bugs. Generated `Catering_UI_QA_Report.docx`.
+
+**Bug Fix Pass:** Fixed 20 of 21 bugs (1 N/A — component doesn't exist). All verified via code review + grep assertions + production build. Generated `Catering_QA_Verification_Report.docx`.
+
+**Live Bug Fix:** Cart drawer not scrollable on mobile — restructured from `h-full` to flex column layout with `shrink-0`/`flex-1 min-h-0` pattern.
+
+**Commits (4):**
+| Hash | Description |
+|------|------------|
+| `da9ef3f` | Phase 2 UI enhancements — 6 high-impact UX changes |
+| `102e9cf` | Phase 3 UI polish & delight — 8 enhancements |
+| `64c53e0` | 20 QA bug fixes across all severity tiers |
+| `222be4a` | Cart drawer scroll fix for mobile |
+
+**Files modified in Session 27:**
+- `src/index.css` — Added `--aurora-bg-rgb`, `--aurora-success` (light+dark), `@keyframes checkPop`, `@media (prefers-reduced-motion: reduce)`
+- `src/pages/catering.tsx` — Hero banner, featured caterer pills with vendor-specific navigation, "+N more" overflow pill, complete shortNames mapping
+- `src/components/catering/CateringCheckout.tsx` — Two-column layout, validation summary moved to left column, green step badges, aurora-success variables, animation forwards fill-mode, nested sticky fix
+- `src/components/catering/CateringItemCard.tsx` — Category gradients, quick info pills, aria-label fix, null guards for prepTime/popularity
+- `src/components/catering/CateringItemList.tsx` — Styled sort dropdown, sticky search with safe-area-inset, vendor card headers, dark mode hover fix, dev-mode missing business warning
+- `src/components/catering/CateringCategoryGrid.tsx` — Glass-morphism cards, gradient backgrounds, decorative circles, focus-visible rings, double-count fix
+- `src/components/catering/CateringCart.tsx` — Progress bar Math.floor, flex column layout for scroll fix
+- `src/components/catering/VendorCateringDashboard.tsx` — Enhanced onboarding empty state, filter-aware contextual empty states
+- `src/layouts/MainLayout.tsx` — Route check exact match for `/catering`
+- `src/services/catering/cateringTypes.ts` — Added `prepTimeMinutes?` and `popularityScore?` to CateringMenuItem
+
+**Reports generated:**
+- `Catering_UI_QA_Report.docx` — 21 bugs with severity, reproduction steps, expected vs actual
+- `Catering_QA_Verification_Report.docx` — Pass/fail evidence for all 21 bugs post-fix
+
+### Session 28 (April 6, 2026) — RFP-to-Order Conversion Flow + In-Order Messaging
+
+**Problem identified:** When a customer accepts a vendor's RFP quote and finalizes, NO `CateringOrder` records were being created. The quote statuses updated and customer details were revealed to vendors, but there were no trackable orders. The "Track Your Orders" button navigated to an empty orders view.
+
+**User decisions:** (1) Auto-create order on acceptance, (2) Identical flow to direct orders, (3) In-order messaging between customer and vendor.
+
+**What was built:**
+
+1. **CateringOrder type extended** — Added `quoteRequestId?`, `quoteResponseId?`, `rfpOrigin?` fields for RFP backreference
+2. **OrderNote type** — New interface for in-order messaging (`id`, `orderId`, `senderId`, `senderName`, `senderRole`, `text`, `createdAt`)
+3. **`createOrdersFromQuote()` service function** — Groups `itemAssignments` by vendor, creates one `CateringOrder` per vendor with status `confirmed` (auto-confirmed since quote was already accepted), backreferences to quote request/response
+4. **`addOrderNote()` + `subscribeToOrderNotes()`** — Firestore subcollection CRUD for `cateringOrders/{id}/notes`
+5. **OrderMessages component** — Collapsible real-time chat widget with own/other message bubbles, auto-scroll, Enter-to-send
+6. **QuoteComparison wired** — Both finalization paths (address form modal + legacy handler) now call `createOrdersFromQuote()` after `finalizeQuoteRequest()`
+7. **CateringOrderStatus wired** — OrderMessages component added for customer view, RFP badge in order header
+8. **VendorCateringDashboard wired** — OrderMessages component added for vendor view, RFP badge in order header
+9. **Firestore rules** — `cateringOrders/{orderId}/notes/{noteId}` subcollection rules added
+
+**Key architecture notes:**
+- Orders from RFP start at `confirmed` status (not `pending`) since vendor already accepted the quote
+- Multi-vendor RFPs create SEPARATE orders — one per vendor in `itemAssignments`
+- `menuItemId` for RFP items uses synthetic format: `rfp_{responseId}_{itemName}` (not real menu item IDs)
+- Tax estimated at 8.25% (same as direct orders)
+- Customer details pulled from any accepted `CateringQuoteResponse`
+
+**Files modified in Session 28:**
+- `src/services/catering/cateringTypes.ts` — Added `quoteRequestId?`, `quoteResponseId?`, `rfpOrigin?` to CateringOrder; new `OrderNote` interface
+- `src/services/catering/cateringOrders.ts` — New `createOrdersFromQuote()`, `addOrderNote()`, `subscribeToOrderNotes()` functions
+- `src/services/catering/index.ts` — Barrel re-exports for new types and functions
+- `src/components/catering/QuoteComparison.tsx` — Both finalization handlers now auto-create orders
+- `src/components/catering/CateringOrderStatus.tsx` — OrderMessages widget + RFP badge for customer
+- `src/components/catering/VendorCateringDashboard.tsx` — OrderMessages widget + RFP badge for vendor
+- `src/components/catering/OrderMessages.tsx` — **NEW FILE** — Collapsible in-order messaging widget
+- `firestore.rules` — Added `notes` subcollection rules under `cateringOrders`
+
 ---
 
 <!-- ================================================================
@@ -1503,7 +1613,11 @@ src/
 - **Phase 6 (Favorites, Recurring, Templates):** ✅ COMPLETE (Session 23)
 - **UX Audit + 4 Critical Fixes:** ✅ COMPLETE (Session 24) — vendor switch dialog, checkout validation, accessibility, Firestore undefined cleanup
 - **Round 2 Service Blueprint Audit (30 findings SB-18 through SB-47):** ✅ COMPLETE (Session 26) — all 30 findings implemented across 4 priority tiers, 4 commits, zero build errors
-- **All changes committed and pushed to GitHub** — deploy to Firebase Hosting needed from macOS terminal
+- **UI Overhaul Phases 1-3 (20 items):** ✅ COMPLETE (Session 27) — quick wins, high-impact UX, polish & delight
+- **QA Audit + 21 Bug Fixes:** ✅ COMPLETE (Session 27) — all bugs found, fixed, and verified; QA reports generated
+- **Cart Scroll Fix:** ✅ COMPLETE (Session 27) — flex column layout for proper mobile scrolling
+- **RFP-to-Order Conversion + In-Order Messaging:** ✅ COMPLETE (Session 28) — auto-create orders on quote finalization, in-order messaging, RFP badge
+- **All changes committed and pushed to GitHub** — push + deploy from macOS terminal: `cd sangam-pwa-v2 && git push origin main && npx firebase deploy --only hosting`
 
 **New files created in Sessions 23-24:**
 - `src/components/catering/CateringOrderStatus.tsx` — Customer order tracking with visual timeline
@@ -1558,22 +1672,24 @@ src/
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — Deploy Session 26 Changes to Firebase
-- **All Session 26 changes are committed and pushed** — 4 commits (P0 through P3), 30 service blueprint findings implemented. Deploy from macOS terminal:
+### Immediate — Push & Deploy Session 27 Changes
+- **All Session 27 changes are committed** — 4 commits (Phase 2 UI, Phase 3 UI, 20 bug fixes, cart scroll fix). Push and deploy from macOS terminal:
   ```bash
   cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
-  npm run build
-  firebase deploy --only firestore:rules,hosting,functions
+  git push origin main
+  npx firebase deploy --only hosting
   ```
-- **After deploy, test on live site (Session 26 changes):**
-  1. Add item to cart → verify inline qty stepper ([-/qty/+]) appears after first add
-  2. Go to Checkout → verify 3 collapsible sections with numbered badges → navigate away and return → verify form data persists
-  3. Open a delivered order → click Payment section → verify external payment link + "I've Completed Payment" button
-  4. Navigate to Vendor Dashboard → verify Pause/Resume toggle, Audio Mute button, Batch Decline All
-  5. Open CateringReviews → verify half-star rendering (e.g., 4.5 stars)
-  6. Remove item from cart → verify amber undo toast bar with 5-second window
-  7. Share an order URL with `#order-{id}` → verify deep link opens the correct order expanded
-  8. Review Firestore security rules for catering orders — new role-based transitions
+- **After deploy, test on live site (Session 27 changes):**
+  1. Open catering → verify hero banner with gradient + featured caterer pills
+  2. Click a caterer pill → verify it filters items to that specific caterer (search query set)
+  3. Verify glass-morphism category cards with gradient backgrounds + focus-visible rings on keyboard tab
+  4. Add 3+ items to cart → verify cart scrolls properly on mobile (items + footer visible)
+  5. Go to Checkout → verify two-column layout on desktop (form left, summary right)
+  6. Submit with empty fields → verify validation summary appears in LEFT column (not right)
+  7. Complete all fields → verify green checkmark badges animate on each section
+  8. Toggle dark mode → verify all new UI elements respect dark mode (no hardcoded whites/greens)
+  9. Check item cards → verify prep time, serves, popularity pills render (when data exists)
+  10. Verify `prefers-reduced-motion` disables animations (Chrome DevTools > Rendering > Emulate)
 - **App is deployed and live** at `https://mithr-1e5f4.web.app`.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions deployed** — `transcribeVoiceMessage`, `sendNewMessageNotification`, and `processRecurringCateringOrders` (daily 6 AM PT) are on Cloud Run.
@@ -1807,6 +1923,10 @@ git add <files> && git commit -m "message" && git push origin main
 - **`onKeyDown` on mobile only fires with external keyboards** — Adding `onKeyDown` handlers (Enter/Space) to cards is correct behavior — it won't interfere with touch interaction. Keyboard events only fire when a hardware keyboard is connected (Bluetooth keyboards, etc.).
 - **Discover page `activeTab` union type** — Must be `'discover' | 'network' | 'pending'`. The pending tab has its own filter that checks `detail.initiatedBy !== user?.uid` to show only incoming requests. Don't confuse with the Network tab which shows connected users.
 - **Discover Page Enhancement Roadmap** — `Discover_Page_Enhancement_Roadmap.docx` in workspace folder contains all 38 items across 4 phases. Phase 1 (10 items) is complete. Phase 2 (9 items) focuses on performance and data layer optimization.
+- **Aurora design token pattern for new colors** — Always use `var(--aurora-X, fallback)` pattern. Never use hardcoded hex alone. `--aurora-bg-rgb` (comma-separated RGB) exists for `rgba()` usage: `rgba(var(--aurora-bg-rgb, 255, 255, 255), 0.6)`. `--aurora-success` is `#10B981` (light) / `#34D399` (dark) for green states.
+- **Glass-morphism pattern** — `backdrop-filter: blur(8px)` + `rgba(255,255,255,0.2)` background + `-webkit-backdrop-filter` for Safari. Used on category cards, hero pills, and frosted labels. Always include WebKit prefix.
+- **Flex layout for fixed-header scrollable panels** — Use `flex flex-col` on outer container, `shrink-0` on fixed header/footer areas, `flex-1 min-h-0` on scrollable content with `overflow-y-auto`. Never use `h-full` on inner content when header/footer consume space above/below (causes overflow beyond viewport). This pattern was validated in the CateringCart scroll fix.
+- **`prefers-reduced-motion` is globally handled** — `index.css` has a `@media (prefers-reduced-motion: reduce)` rule that sets `animation-duration: 0.01ms !important` on all elements. Individual components don't need their own reduced-motion handling.
 
 ### Constraints
 - **No Firebase Storage for profile images or file attachments** — Using base64 in Firestore (1MB doc limit, ~700KB raw file max)
@@ -1830,6 +1950,11 @@ git add <files> && git commit -m "message" && git push origin main
 
 ### Recent Commit History
 ```
+222be4a fix(catering): cart drawer items not scrollable on mobile (Session 27)
+64c53e0 fix(catering): resolve 20 QA bugs across all severity tiers (Session 27)
+102e9cf style(catering): Phase 3 UI polish & delight — 8 enhancements (Session 27)
+da9ef3f style(catering): Phase 2 UI enhancements — 6 high-impact UX changes (Session 27)
+3724a6f style(catering): Phase 1 UI quick wins — 5 enhancements (Session 27)
 (pending) fix: add direct Templates nav button to catering page (Session 25)
 25bde2f feat: large effort batch — template marketplace, versioning, analytics drill-down (#29-36) (Session 25)
 0b74293 refactor: split cateringService into domain modules + add optimistic updates (#27-28) (Session 25)
@@ -1868,13 +1993,15 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
 ### CSS Variable Reference (key vars)
 ```css
 /* Light mode */
---aurora-bg: #F5F7FA;           --aurora-surface: #FFFFFF;
---aurora-text: #1B2033;         --aurora-text-secondary: #6B6E82;
---aurora-border: #E8E9F0;       --msg-own-bubble: #E0E7FF;
+--aurora-bg: #F5F6FA;           --aurora-surface: #FFFFFF;
+--aurora-bg-rgb: 245, 246, 250; --aurora-success: #10B981;
+--aurora-text: #1E2132;         --aurora-text-secondary: #5B5E72;
+--aurora-border: #E2E5EF;       --msg-own-bubble: #E0E7FF;
 --msg-text: #111B21;            --msg-icon: #54656F;
 
 /* Dark mode (:root.dark) */
 --aurora-bg: #1A1B2E;           --aurora-surface: #232438;
+--aurora-bg-rgb: 26, 27, 46;    --aurora-success: #34D399;
 --aurora-text: #F0F1F5;         --aurora-text-secondary: #A0A3B5;
 --aurora-border: rgba(255,255,255,0.1);  --msg-own-bubble: #2D2F5E;
 --msg-text: #F0F1F5;            --msg-icon: #8B8FA3;
@@ -1897,4 +2024,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Updated April 1, 2026 (Session 26) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). ALL COMMITTED AND PUSHED. PENDING DEPLOY: `npx vite build && npx firebase deploy --only hosting` + `cd functions && npm run build && cd .. && npx firebase deploy --only functions`. Next: (1) deploy and test all SB audit fixes on live site, (2) review Firestore security rules for new role-based catering order transitions, (3) Phase 7 improvements from UX audit (loading skeletons, cart persistence with localStorage, order cancellation, further in-app messaging enhancements). Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*
+*Updated April 6, 2026 (Session 28) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). Catering UI Phases 1-3 (20 items) + QA Audit (21 bugs found) + All Bug Fixes Verified + Cart Scroll Fix ALL COMPLETE (Session 27). ALL COMMITTED — push + deploy needed: `cd sangam-pwa-v2 && git push origin main && npx firebase deploy --only hosting`. Design tokens expanded: --aurora-bg-rgb, --aurora-success added for both light/dark. Glass-morphism, gradient category cards, hero banner, two-column checkout, flex cart panel all shipped. Next: (1) push and deploy Session 27, (2) live test all UI changes, (3) Phase 7 improvements from UX audit (loading skeletons, cart persistence with localStorage, order cancellation, further in-app messaging enhancements). Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*

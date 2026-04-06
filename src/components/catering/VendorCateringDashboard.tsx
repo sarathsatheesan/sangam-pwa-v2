@@ -31,6 +31,7 @@ import type { CateringNotification } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
 import OrderTimeline from './OrderTimeline';
+import OrderMessages from './OrderMessages';
 import ReviewModerationPanel from './ReviewModerationPanel';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '@/services/firebase';
@@ -843,6 +844,11 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                         {statusCfg.icon}
                         {statusCfg.label}
                       </span>
+                      {order.rfpOrigin && (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: 'rgba(139,92,246,0.1)', color: '#7C3AED' }}>
+                          RFP
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
                       <span className="flex items-center gap-1">
@@ -1054,6 +1060,16 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                         <span className="font-medium">Note: </span>
                         {order.specialInstructions}
                       </div>
+                    )}
+
+                    {/* ── In-order messages ── */}
+                    {!['cancelled'].includes(order.status) && user && (
+                      <OrderMessages
+                        orderId={order.id}
+                        currentUserId={user.uid}
+                        currentUserName={businessName || 'Vendor'}
+                        currentUserRole="vendor"
+                      />
                     )}
 
                     {/* Message Customer button */}

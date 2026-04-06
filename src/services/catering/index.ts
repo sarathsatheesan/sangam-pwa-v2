@@ -22,6 +22,7 @@ export type {
   OccurrenceOverride,
   RecurringOrder,
   OrderTemplate,
+  OrderNote,
 } from './cateringTypes';
 
 // Menu items & inventory
@@ -54,6 +55,9 @@ export {
   getBusinessPaymentInfo,
   updateOrderPaymentStatus,
   findOrCreateConversation,
+  createOrdersFromQuote,
+  addOrderNote,
+  subscribeToOrderNotes,
 } from './cateringOrders';
 
 // Quote requests & responses

@@ -19,7 +19,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { CateringOrder, OrderItem } from './cateringTypes';
+import type { CateringOrder, OrderItem, OrderNote, CateringQuoteRequest, CateringQuoteResponse } from './cateringTypes';
 import { notifyCustomerStatusChange, notifyCustomerOrderModified } from './cateringNotifications';
 
 const ORDERS_COL = 'cateringOrders';
@@ -405,4 +405,157 @@ export async function findOrCreateConversation(
   }
 
   return convRef.id;
+}
+
+// ── RFP → Order conversion ──
+
+/**
+ * Create CateringOrders from a finalized quote request.
+ * Groups accepted item assignments by vendor and creates one order per vendor.
+ * Orders start as 'confirmed' since the vendor already accepted the quote.
+ *
+ * @param quoteRequest - The finalized CateringQuoteRequest (must have itemAssignments)
+ * @param responses - All CateringQuoteResponses for this request (to get pricing & customer details)
+ * @param deliveryAddress - Full delivery address from the finalization form
+ * @returns Array of created order IDs
+ */
+export async function createOrdersFromQuote(
+  quoteRequest: CateringQuoteRequest,
+  responses: CateringQuoteResponse[],
+  deliveryAddress: { street: string; city: string; state: string; zip: string },
+): Promise<string[]> {
+  const assignments = quoteRequest.itemAssignments || [];
+  if (assignments.length === 0) throw new Error('No item assignments found on this quote request');
+
+  // Group assignments by vendor (businessId → assignments[])
+  const vendorGroups = new Map<string, typeof assignments>();
+  for (const a of assignments) {
+    if (!vendorGroups.has(a.businessId)) vendorGroups.set(a.businessId, []);
+    vendorGroups.get(a.businessId)!.push(a);
+  }
+
+  // Find the response that has customer details (any accepted/partially_accepted response will do)
+  const acceptedResponse = responses.find(
+    (r) => r.status === 'accepted' || r.status === 'partially_accepted',
+  );
+  const customerName = acceptedResponse?.customerName || '';
+  const customerEmail = acceptedResponse?.customerEmail || '';
+  const customerPhone = acceptedResponse?.customerPhone || '';
+
+  const orderIds: string[] = [];
+
+  for (const [businessId, vendorAssignments] of vendorGroups) {
+    // Find this vendor's response to get quoted pricing
+    const response = responses.find((r) => r.businessId === businessId);
+    if (!response) continue; // shouldn't happen
+
+    const businessName = vendorAssignments[0]?.businessName || response.businessName;
+    const assignedItemNames = new Set(vendorAssignments.map((a) => a.itemName));
+
+    // Build OrderItems from the vendor's quotedItems, filtered to only accepted items
+    const orderItems: OrderItem[] = response.quotedItems
+      .filter((qi) => assignedItemNames.has(qi.name))
+      .map((qi) => ({
+        menuItemId: `rfp_${response.id}_${qi.name.replace(/\s+/g, '_').toLowerCase()}`,
+        name: qi.name,
+        qty: qi.qty,
+        unitPrice: qi.unitPrice,
+        pricingType: qi.pricingType,
+      }));
+
+    if (orderItems.length === 0) continue;
+
+    const subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+    const tax = Math.round(subtotal * 0.0825);
+    const total = subtotal + tax;
+
+    const order: Omit<CateringOrder, 'id'> = {
+      customerId: quoteRequest.customerId,
+      customerName,
+      customerEmail,
+      customerPhone,
+      businessId,
+      businessName,
+      items: orderItems,
+      subtotal,
+      tax,
+      total,
+      status: 'confirmed', // auto-confirmed — vendor already accepted the quote
+      eventDate: quoteRequest.eventDate,
+      deliveryAddress: {
+        street: deliveryAddress.street,
+        city: deliveryAddress.city,
+        state: deliveryAddress.state,
+        zip: deliveryAddress.zip,
+      },
+      headcount: quoteRequest.headcount,
+      specialInstructions: quoteRequest.specialInstructions,
+      orderForContext: quoteRequest.orderForContext,
+      contactName: customerName,
+      contactPhone: customerPhone,
+      eventType: quoteRequest.eventType,
+      // RFP backreference
+      quoteRequestId: quoteRequest.id,
+      quoteResponseId: response.id,
+      rfpOrigin: true,
+    };
+
+    // Use addDoc directly (not createOrder) to set status as 'confirmed' not 'pending'
+    const cleanOrder = Object.fromEntries(
+      Object.entries(order).filter(([, v]) => v !== undefined),
+    );
+    const docRef = await addDoc(collection(db, ORDERS_COL), {
+      ...cleanOrder,
+      createdAt: serverTimestamp(),
+      confirmedAt: serverTimestamp(),
+      statusHistory: [{
+        status: 'confirmed',
+        timestamp: Timestamp.now(),
+      }],
+    });
+    orderIds.push(docRef.id);
+  }
+
+  return orderIds;
+}
+
+// ── In-order messaging (OrderNotes subcollection) ──
+
+const ORDER_NOTES_SUB = 'notes';
+
+/**
+ * Send a note (message) within an order thread.
+ */
+export async function addOrderNote(
+  orderId: string,
+  note: Omit<OrderNote, 'id' | 'createdAt'>,
+): Promise<string> {
+  const notesCol = collection(db, ORDERS_COL, orderId, ORDER_NOTES_SUB);
+  const docRef = await addDoc(notesCol, {
+    ...note,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+/**
+ * Subscribe to real-time order notes for a specific order.
+ */
+export function subscribeToOrderNotes(
+  orderId: string,
+  callback: (notes: OrderNote[]) => void,
+): Unsubscribe {
+  const notesCol = collection(db, ORDERS_COL, orderId, ORDER_NOTES_SUB);
+  return onSnapshot(notesCol, (snap) => {
+    const results = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderNote));
+    results.sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
+      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+      return aTime - bTime; // chronological order (oldest first)
+    });
+    callback(results);
+  }, (err) => {
+    console.warn('subscribeToOrderNotes error:', err);
+    callback([]);
+  });
 }

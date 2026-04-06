@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
 import OrderTimeline from './OrderTimeline';
+import OrderMessages from './OrderMessages';
 import { doc, getDoc, updateDoc, serverTimestamp, collection, addDoc, query, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { STATUS_THEME, CUSTOMER_STATUS_LABELS } from '@/constants/cateringStatusTheme';
@@ -233,6 +234,11 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         {order.businessName}
                       </span>
                       <StatusBadge status={order.status} />
+                      {order.rfpOrigin && (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: 'rgba(139,92,246,0.1)', color: '#7C3AED' }}>
+                          RFP
+                        </span>
+                      )}
                       {order.vendorModified && !order.modificationAccepted && !order.modificationRejected && (
                         <span className="relative flex h-2.5 w-2.5">
                           <span className={`absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 ${!prefersReducedMotion ? 'animate-ping' : ''}`} />
@@ -594,6 +600,16 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                           onPaymentConfirmed={() => {
                             addToast('Payment confirmed! Vendor has been notified.', 'success');
                           }}
+                        />
+                      )}
+
+                      {/* ── In-order messages ── */}
+                      {!['cancelled'].includes(order.status) && user && (
+                        <OrderMessages
+                          orderId={order.id}
+                          currentUserId={user.uid}
+                          currentUserName={userProfile?.displayName || user.displayName || 'Customer'}
+                          currentUserRole="customer"
                         />
                       )}
 

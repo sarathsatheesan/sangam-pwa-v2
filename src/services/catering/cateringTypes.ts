@@ -95,6 +95,22 @@ export interface CateringOrder {
   cancelledBy?: string;
   cancelledAt?: any;
   statusHistory?: Array<{ status: string; timestamp: any }>;
+  // RFP-origin tracking — back-reference to the quote that spawned this order
+  quoteRequestId?: string;
+  quoteResponseId?: string;
+  rfpOrigin?: boolean;          // true when order was auto-created from an accepted RFP
+}
+
+// ── In-order messaging (customer ↔ vendor notes within an order) ──
+
+export interface OrderNote {
+  id: string;
+  orderId: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'customer' | 'vendor';
+  text: string;
+  createdAt: any;
 }
 
 export interface QuoteRequestItem {

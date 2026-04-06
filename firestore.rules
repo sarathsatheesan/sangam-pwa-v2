@@ -151,6 +151,14 @@ service cloud.firestore {
           || (currentStatus == 'out_for_delivery' && newStatus == 'delivered')
         );
       }
+
+      // ── In-order messaging subcollection (customer ↔ vendor notes) ──
+      match /notes/{noteId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+          && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false; // Notes are immutable
+      }
     }
 
     // ─── Catering Quote Requests (Phase 2 RFP) ────

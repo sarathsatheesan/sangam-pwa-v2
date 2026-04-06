@@ -13,6 +13,7 @@ import {
   acceptQuoteResponse,
   declineQuoteResponse,
   finalizeQuoteRequest,
+  createOrdersFromQuote,
   formatPrice,
 } from '@/services/cateringService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -284,8 +285,16 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     setFinalizingOrder(true);
     try {
       await finalizeQuoteRequest(quoteRequest.id);
-      addToast('Order finalized! Track your order below.', 'success', 5000);
-      // Redirect to order tracking after short delay so toast is visible
+      // Auto-create orders (fallback path without address — uses deliveryCity only)
+      const fallbackAddress = { street: '', city: quoteRequest.deliveryCity || '', state: '', zip: '' };
+      const orderIds = await createOrdersFromQuote(quoteRequest, responses, fallbackAddress);
+      addToast(
+        orderIds.length === 1
+          ? 'Order created! Track it below.'
+          : `${orderIds.length} orders created — one per vendor.`,
+        'success',
+        5000,
+      );
       if (onViewOrders) {
         setTimeout(() => onViewOrders(), 1500);
       }
@@ -1017,7 +1026,15 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   setFinalizingOrder(true);
                   try {
                     await finalizeQuoteRequest(quoteRequest.id, deliveryAddress);
-                    addToast('Order finalized! Check your orders tab.', 'success', 5000);
+                    // Auto-create orders for each accepted vendor
+                    const orderIds = await createOrdersFromQuote(quoteRequest, responses, deliveryAddress);
+                    addToast(
+                      orderIds.length === 1
+                        ? 'Order created! Track it in your orders tab.'
+                        : `${orderIds.length} orders created — one per vendor. Track them in your orders tab.`,
+                      'success',
+                      5000,
+                    );
                     if (onViewOrders) onViewOrders();
                   } catch (err: any) {
                     addToast(err.message || 'Failed to finalize order', 'error');
