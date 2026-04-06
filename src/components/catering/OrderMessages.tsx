@@ -66,10 +66,10 @@ export default function OrderMessages({
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
     if (isToday) {
-      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     }
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
-      ' ' + date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+      ' ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
   const unreadCount = 0; // Future: track read status

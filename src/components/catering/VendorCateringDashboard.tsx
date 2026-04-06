@@ -9,7 +9,7 @@ import {
   Package, Clock, CheckCircle2, XCircle, ChevronDown, ChevronUp,
   User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck, Ban,
   Square, CheckSquare, Pencil, CreditCard, ExternalLink, Save, X, Bell,
-  MessageSquare, Volume2, VolumeX,
+  MessageSquare, Volume2, VolumeX, ArrowUpDown, BellRing, Timer,
 } from 'lucide-react';
 import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import {
@@ -87,6 +87,45 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
   const { addToast } = useToast();
+
+  // ── Accordion section state ──
+  const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({
+    pending: false,   // collapsed by default
+    active: true,     // expanded by default
+    completed: false, // collapsed by default
+  });
+  const toggleSection = (key: string) => setSectionExpanded(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // ── Independent sort per section (by date) ──
+  type SortDir = 'newest' | 'oldest';
+  const [sortDir, setSortDir] = useState<Record<string, SortDir>>({
+    pending: 'newest',
+    active: 'newest',
+    completed: 'newest',
+  });
+  const toggleSort = (key: string) => setSortDir(prev => ({
+    ...prev,
+    [key]: prev[key] === 'newest' ? 'oldest' : 'newest',
+  }));
+
+  // ── Vendor reminder preferences ──
+  const [reminderSettings, setReminderSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`ethnicity_vendor_reminders_${businessId}`);
+      return saved ? JSON.parse(saved) : {
+        pendingAlert: true,        // alert on new pending orders
+        preparingReminder: true,   // remind when order is in preparing too long
+        eventDayReminder: true,    // remind on event day morning
+        reminderLeadHours: 24,     // hours before event to remind
+      };
+    } catch { return { pendingAlert: true, preparingReminder: true, eventDayReminder: true, reminderLeadHours: 24 }; }
+  });
+  const [showReminderSettings, setShowReminderSettings] = useState(false);
+
+  const saveReminderSettings = (settings: typeof reminderSettings) => {
+    setReminderSettings(settings);
+    try { localStorage.setItem(`ethnicity_vendor_reminders_${businessId}`, JSON.stringify(settings)); } catch {}
+  };
 
   // ── SB-14: New order alert state ──
   const [newOrderBanner, setNewOrderBanner] = useState<{ orderId: string; customerName: string; total: number } | null>(null);
@@ -230,6 +269,44 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
     });
     return unsub;
   }, [user?.uid]);
+
+  // ── Reminder engine — check orders on interval and surface alerts ──
+  const [activeReminders, setActiveReminders] = useState<Array<{ id: string; type: string; message: string; orderId: string }>>([]);
+  useEffect(() => {
+    if (!reminderSettings.pendingAlert && !reminderSettings.preparingReminder && !reminderSettings.eventDayReminder) return;
+    const check = () => {
+      const now = Date.now();
+      const reminders: typeof activeReminders = [];
+
+      for (const order of orders) {
+        const eventMs = order.eventDate?.toDate?.()?.getTime?.() || (order.eventDate?.seconds ? order.eventDate.seconds * 1000 : 0);
+        const createdMs = order.createdAt?.toDate?.()?.getTime?.() || (order.createdAt?.seconds ? order.createdAt.seconds * 1000 : 0);
+
+        // Pending orders sitting > 30 min
+        if (reminderSettings.pendingAlert && order.status === 'pending' && createdMs && (now - createdMs) > 30 * 60 * 1000) {
+          reminders.push({ id: `pending_${order.id}`, type: 'pending', message: `Order from ${order.customerName} has been waiting ${Math.round((now - createdMs) / 60000)} min`, orderId: order.id });
+        }
+        // Preparing > 2 hours
+        if (reminderSettings.preparingReminder && order.status === 'preparing') {
+          const confirmedMs = order.confirmedAt?.toDate?.()?.getTime?.() || (order.confirmedAt?.seconds ? order.confirmedAt.seconds * 1000 : 0);
+          if (confirmedMs && (now - confirmedMs) > 2 * 60 * 60 * 1000) {
+            reminders.push({ id: `preparing_${order.id}`, type: 'preparing', message: `Order for ${order.customerName} has been preparing for ${Math.round((now - confirmedMs) / 3600000)}h`, orderId: order.id });
+          }
+        }
+        // Event day reminder
+        if (reminderSettings.eventDayReminder && eventMs && !['delivered', 'cancelled'].includes(order.status)) {
+          const hoursUntilEvent = (eventMs - now) / (1000 * 60 * 60);
+          if (hoursUntilEvent > 0 && hoursUntilEvent <= reminderSettings.reminderLeadHours) {
+            reminders.push({ id: `event_${order.id}`, type: 'event', message: `Event for ${order.customerName} is in ${hoursUntilEvent < 1 ? 'less than 1 hour' : `${Math.round(hoursUntilEvent)}h`}`, orderId: order.id });
+          }
+        }
+      }
+      setActiveReminders(reminders);
+    };
+    check();
+    const interval = setInterval(check, 60000); // Re-check every minute
+    return () => clearInterval(interval);
+  }, [orders, reminderSettings]);
 
   // SB-32: Load vendor pause state
   useEffect(() => {
@@ -457,6 +534,25 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
   const pendingCount = orders.filter(o => o.status === 'pending').length;
 
+  // ── Accordion section groupings ──
+  const sortOrders = (list: CateringOrder[], dir: SortDir): CateringOrder[] => {
+    return [...list].sort((a, b) => {
+      const aMs = a.eventDate?.toDate?.()?.getTime?.() || (a.eventDate?.seconds ? a.eventDate.seconds * 1000 : 0);
+      const bMs = b.eventDate?.toDate?.()?.getTime?.() || (b.eventDate?.seconds ? b.eventDate.seconds * 1000 : 0);
+      return dir === 'newest' ? bMs - aMs : aMs - bMs;
+    });
+  };
+  const pendingOrders = sortOrders(orders.filter(o => o.status === 'pending'), sortDir.pending);
+  const activeOrders = sortOrders(orders.filter(o => ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(o.status)), sortDir.active);
+  const completedOrders = sortOrders(orders.filter(o => ['delivered', 'cancelled'].includes(o.status)), sortDir.completed);
+
+  const formatEventDate = (eventDate: any): string => {
+    if (!eventDate) return '—';
+    const d = eventDate.toDate?.() || (eventDate.seconds ? new Date(eventDate.seconds * 1000) : null);
+    if (!d) return String(eventDate);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -589,6 +685,25 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
           >
             {audioMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
+          {/* Reminder settings toggle */}
+          <button
+            onClick={() => setShowReminderSettings(!showReminderSettings)}
+            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
+            style={{
+              borderColor: showReminderSettings ? '#8B5CF6' : 'var(--aurora-border)',
+              color: showReminderSettings ? '#8B5CF6' : 'var(--aurora-text-secondary)',
+              backgroundColor: showReminderSettings ? 'rgba(139,92,246,0.05)' : 'transparent',
+            }}
+            aria-label="Reminder settings"
+          >
+            <BellRing size={12} />
+            Reminders
+            {activeReminders.length > 0 && (
+              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: '#8B5CF6' }}>
+                {activeReminders.length > 9 ? '9+' : activeReminders.length}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => setShowPaymentSettings(!showPaymentSettings)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
@@ -695,6 +810,87 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
         </div>
       )}
 
+      {/* ── Reminder Settings Panel ── */}
+      {showReminderSettings && (
+        <div className="p-4 rounded-xl border space-y-3" style={{ borderColor: '#8B5CF6', backgroundColor: 'rgba(139,92,246,0.03)' }}>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold" style={{ color: '#8B5CF6' }}>Reminder Settings</p>
+            <button onClick={() => setShowReminderSettings(false)} className="p-1"><X size={14} style={{ color: 'var(--aurora-text-muted)' }} /></button>
+          </div>
+          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+            Configure when you receive order reminders and alerts.
+          </p>
+          <label className="flex items-center justify-between gap-3 py-2">
+            <div>
+              <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Pending order alerts</span>
+              <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>Alert when an order sits pending for 30+ minutes</p>
+            </div>
+            <input type="checkbox" checked={reminderSettings.pendingAlert}
+              onChange={(e) => saveReminderSettings({ ...reminderSettings, pendingAlert: e.target.checked })}
+              className="accent-purple-600 w-4 h-4" />
+          </label>
+          <label className="flex items-center justify-between gap-3 py-2">
+            <div>
+              <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Preparing too long</span>
+              <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>Remind when an order has been preparing for 2+ hours</p>
+            </div>
+            <input type="checkbox" checked={reminderSettings.preparingReminder}
+              onChange={(e) => saveReminderSettings({ ...reminderSettings, preparingReminder: e.target.checked })}
+              className="accent-purple-600 w-4 h-4" />
+          </label>
+          <label className="flex items-center justify-between gap-3 py-2">
+            <div>
+              <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Event day reminder</span>
+              <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>Remind when an event date is approaching</p>
+            </div>
+            <input type="checkbox" checked={reminderSettings.eventDayReminder}
+              onChange={(e) => saveReminderSettings({ ...reminderSettings, eventDayReminder: e.target.checked })}
+              className="accent-purple-600 w-4 h-4" />
+          </label>
+          {reminderSettings.eventDayReminder && (
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Remind</label>
+              <select
+                value={reminderSettings.reminderLeadHours}
+                onChange={(e) => saveReminderSettings({ ...reminderSettings, reminderLeadHours: Number(e.target.value) })}
+                className="rounded-lg border px-2 py-1.5 text-xs outline-none"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+              >
+                <option value={6}>6 hours</option>
+                <option value={12}>12 hours</option>
+                <option value={24}>24 hours</option>
+                <option value={48}>48 hours</option>
+              </select>
+              <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>before the event</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Active Reminders Banner ── */}
+      {activeReminders.length > 0 && (
+        <div className="space-y-1.5">
+          {activeReminders.slice(0, 3).map((r) => (
+            <button
+              key={r.id}
+              onClick={() => { setExpandedOrder(r.orderId); setSectionExpanded(prev => ({ ...prev, [r.type === 'event' ? 'active' : r.type]: true })); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs transition-colors hover:opacity-80"
+              style={{
+                backgroundColor: r.type === 'pending' ? '#FEF3C7' : r.type === 'preparing' ? '#DBEAFE' : '#F3E8FF',
+                color: r.type === 'pending' ? '#92400E' : r.type === 'preparing' ? '#1E40AF' : '#6B21A8',
+              }}
+            >
+              {r.type === 'pending' ? <Timer size={14} /> : r.type === 'preparing' ? <Clock size={14} /> : <BellRing size={14} />}
+              <span className="font-medium flex-1">{r.message}</span>
+              <ChevronDown size={12} />
+            </button>
+          ))}
+          {activeReminders.length > 3 && (
+            <p className="text-[10px] text-center" style={{ color: 'var(--aurora-text-muted)' }}>+{activeReminders.length - 3} more reminders</p>
+          )}
+        </div>
+      )}
+
       {/* ── Batch action bar (#17) ── */}
       {batchMode && selectedOrders.size > 0 && (
         <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: 'rgba(99,102,241,0.06)' }}>
@@ -720,28 +916,14 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
         </div>
       )}
 
-      {/* Filter tabs */}
-      <div className="flex gap-2">
-        {(['all', 'pending', 'active', 'completed'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize"
-            style={{
-              backgroundColor: filter === f ? 'var(--aurora-primary, #6366F1)' : 'var(--aurora-surface-variant, #EDF0F7)',
-              color: filter === f ? '#fff' : 'var(--aurora-text-secondary)',
-            }}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* ACCORDION SECTIONS: Pending → Active → Completed               */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
 
-      {/* Orders list */}
-      {filteredOrders.length === 0 ? (
+      {/* Global empty state for brand-new vendors */}
+      {orders.length === 0 ? (
         <div className="text-center py-12">
-          {/* SB-09 + UI-25: Enhanced onboarding empty state for new vendors */}
-          {filter === 'all' && orders.length === 0 ? (
+          {true && (
             <div className="max-w-sm mx-auto">
               {/* Illustrated header with gradient */}
               <div className="relative mx-auto mb-6 w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', boxShadow: '0 8px 24px rgba(99, 102, 241, 0.3)' }}>
@@ -788,509 +970,961 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 Set Up Payment Info
               </button>
             </div>
-          ) : (
-            /* UI-26: Contextual illustrated empty state per filter */
-            <div className="max-w-xs mx-auto">
-              <div className="mx-auto mb-4 w-16 h-16 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--aurora-surface-variant, #F3F4F6)' }}>
-                <Package size={28} style={{ color: 'var(--aurora-text-muted)' }} />
-              </div>
-              <h4 className="text-sm font-semibold mb-1" style={{ color: 'var(--aurora-text)' }}>
-                {filter === 'pending' ? 'No pending orders' : filter === 'active' ? 'No active orders' : filter === 'completed' ? 'No completed orders' : 'No orders yet'}
-              </h4>
-              <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
-                {filter === 'pending' ? 'New orders will appear here when customers place them.' : filter === 'active' ? 'Orders you\'re currently preparing will show up here.' : filter === 'completed' ? 'Your delivered and fulfilled orders will appear here.' : 'Your orders will appear here once customers start placing them.'}
-              </p>
-            </div>
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {paginatedOrders.map((order) => {
-            const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
-            const isExpanded = expandedOrder === order.id;
-            const isActionLoading = actionLoading === order.id;
-
-            return (
-              <div
-                key={order.id}
-                className="rounded-xl border overflow-hidden"
-                style={{
-                  backgroundColor: 'var(--aurora-surface, #fff)',
-                  borderColor: 'var(--aurora-border, #E2E5EF)',
-                }}
+        <div className="space-y-4">
+          {/* SECTION: PENDING ORDERS */}
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)' }}>
+            {/* Section Header */}
+            <button
+              onClick={() => toggleSection('pending')}
+              className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-opacity-50"
+              style={{
+                backgroundColor: sectionExpanded.pending ? 'rgba(245, 158, 11, 0.08)' : 'rgba(245, 158, 11, 0.04)',
+                borderBottom: sectionExpanded.pending ? '1px solid var(--aurora-border)' : 'none'
+              }}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold" style={{ color: '#F59E0B' }}>Pending Orders</h3>
+                  <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#F59E0B' }}>
+                    {pendingOrders.length}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSort('pending'); }}
+                className="p-1.5 rounded-lg transition-colors hover:bg-gray-200/50"
+                style={{ color: '#F59E0B' }}
               >
-                {/* Order header */}
-                <button
-                  className="w-full flex items-center justify-between p-4 text-left"
-                  onClick={() => batchMode && order.status === 'pending' ? toggleOrderSelection(order.id) : setExpandedOrder(isExpanded ? null : order.id)}
-                >
-                  {/* Batch checkbox */}
-                  {batchMode && order.status === 'pending' && (
-                    <div className="mr-3 flex-shrink-0" onClick={(e) => { e.stopPropagation(); toggleOrderSelection(order.id); }}>
-                      {selectedOrders.has(order.id)
-                        ? <CheckSquare size={18} style={{ color: '#6366F1' }} />
-                        : <Square size={18} style={{ color: 'var(--aurora-text-muted)' }} />}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                        {order.customerName}
-                      </span>
-                      <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: statusCfg.bgColor, color: statusCfg.color }}
-                      >
-                        {statusCfg.icon}
-                        {statusCfg.label}
-                      </span>
-                      {order.rfpOrigin && (
-                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: 'rgba(139,92,246,0.1)', color: '#7C3AED' }}>
-                          RFP
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
-                      <span className="flex items-center gap-1">
-                        <Calendar size={12} />
-                        {order.eventDate?.toDate?.()
-                          ? order.eventDate.toDate().toLocaleDateString('en-US')
-                          : order.eventDate}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users size={12} />
-                        {order.headcount} guests
-                      </span>
-                      <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
-                        {formatPrice(order.total)}
-                      </span>
-                      {order.estimatedDeliveryTime && order.status === 'out_for_delivery' && (
-                        <span className="flex items-center gap-1 font-medium" style={{ color: '#0369A1' }}>
-                          <Truck size={12} />
-                          ETA: {order.estimatedDeliveryTime}
-                        </span>
-                      )}
-                    </div>
+                <ArrowUpDown size={16} />
+              </button>
+              {sectionExpanded.pending ? <ChevronUp size={18} style={{ color: '#F59E0B' }} /> : <ChevronDown size={18} style={{ color: '#F59E0B' }} />}
+            </button>
+
+            {/* Section Content */}
+            {sectionExpanded.pending && (
+              <div className="p-3 space-y-3">
+                {pendingOrders.length === 0 ? (
+                  <div className="text-center py-6 text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
+                    No pending orders
                   </div>
-                  {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
+                ) : (
+                  pendingOrders.map((order) => {
+                    const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+                    const isExpanded = expandedOrder === order.id;
+                    const isActionLoading = actionLoading === order.id;
 
-                {/* Expanded details */}
-                {isExpanded && (
-                  <div className="mx-3 mb-4 mt-1 p-4 space-y-3 rounded-lg border shadow-sm" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
-                    {/* Contact info */}
-                    <div className="grid grid-cols-2 gap-3 pt-3 text-sm">
-                      <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        <User size={14} />
-                        {order.contactName}
-                      </div>
-                      <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        <Phone size={14} />
-                        {order.contactPhone}
-                      </div>
-                      <div className="col-span-2 flex items-start gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        <MapPin size={14} className="mt-0.5 shrink-0" />
-                        {order.deliveryAddress?.formattedAddress ||
-                          [order.deliveryAddress?.street, order.deliveryAddress?.city, order.deliveryAddress?.state, order.deliveryAddress?.zip]
-                            .filter(Boolean).join(', ')}
-                      </div>
-                    </div>
-
-                    {/* Order Timeline */}
-                    <div className="pt-2">
-                      <OrderTimeline order={order} perspective="vendor" />
-                    </div>
-
-                    {/* Items */}
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--aurora-text-muted)' }}>
-                        Items
-                      </h4>
-                      <div className="space-y-1">
-                        {order.items.map((item, i) => (
-                          <div key={i} className="flex justify-between text-sm">
-                            <span style={{ color: 'var(--aurora-text)' }}>
-                              {item.qty}x {item.name}
-                            </span>
-                            <span style={{ color: 'var(--aurora-text-secondary)' }}>
-                              {formatPrice(item.unitPrice * item.qty)}
-                            </span>
-                          </div>
-                        ))}
-                        <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
-                          <span>Total</span>
-                          <span>{formatPrice(order.total)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ── Order modification form (#18) ── */}
-                    {editingOrderId === order.id ? (
-                      <div className="p-3 rounded-xl border space-y-2" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.02)' }}>
-                        <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>Modify Order Items</p>
-                        {editItems.map((item, i) => (
-                          <div key={i} className="flex items-center gap-2 text-sm">
-                            <input type="number" min="0" value={editItems[i].qty}
-                              onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, qty: Math.max(0, parseInt(e.target.value) || 0) } : it))}
-                              className="w-14 text-center rounded-lg border px-2 py-1 text-xs" style={{ borderColor: 'var(--aurora-border)' }}
-                            />
-                            {/* V-07: Make new item names editable */}
-                            {item.menuItemId.startsWith('added_') ? (
-                              <input
-                                type="text"
-                                value={item.name}
-                                onChange={(e) => {
-                                  const updated = [...editItems];
-                                  const idx = updated.findIndex(it => it.menuItemId === item.menuItemId);
-                                  if (idx >= 0) updated[idx] = { ...updated[idx], name: e.target.value };
-                                  setEditItems(updated);
-                                }}
-                                placeholder="Item name"
-                                className="flex-1 text-sm border rounded px-2 py-1" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                              />
-                            ) : (
-                              <span className="flex-1 truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
-                            )}
-                            {/* SB-03: Display price in dollars, store in cents */}
-                            <span className="text-xs mr-0.5" style={{ color: 'var(--aurora-text-muted)' }}>$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={(editItems[i].unitPrice / 100).toFixed(2)}
-                              onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, unitPrice: Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100)) } : it))}
-                              placeholder="0.00"
-                              className="w-20 text-center text-sm border rounded px-1 py-1" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                            />
-                            <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * editItems[i].qty)}</span>
-                          </div>
-                        ))}
-                        {/* V-07: Add new item button */}
-                        <div className="border-t pt-3 mt-3" style={{ borderColor: 'var(--aurora-border)' }}>
-                          <button
-                            onClick={() => {
-                              setEditItems(prev => [...prev, {
-                                menuItemId: `added_${Date.now()}`,
-                                name: '',
-                                qty: 1,
-                                unitPrice: 0,
-                                pricingType: 'per_person',
-                              }]);
-                            }}
-                            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-                          >
-                            + Add Item
-                          </button>
-                        </div>
-                        <p className="text-xs font-medium text-right" style={{ color: 'var(--aurora-text)' }}>
-                          New total: {formatPrice(editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0))}
-                        </p>
-                        <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)}
-                          placeholder="Reason for modification (e.g. item out of stock)..." rows={2}
-                          className="w-full rounded-lg border px-3 py-2 text-xs outline-none resize-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                        />
-                        <div className="flex gap-2">
-                          <button onClick={() => setEditingOrderId(null)} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border" style={{ borderColor: 'var(--aurora-border)' }}>Cancel</button>
-                          <button onClick={() => handleSaveModification(order)} disabled={editSaving}
-                            className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: '#6366F1' }}
-                          >{editSaving ? <Loader2 size={12} className="animate-spin mx-auto" /> : 'Save Changes'}</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Vendor modification notice + rejection badge (F-06) + SB-15 recovery */}
-                        {order.vendorModified && (
-                          <div>
-                            <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: (order as any).modificationRejected ? '#FEE2E2' : '#FEF3C7', color: (order as any).modificationRejected ? '#991B1B' : '#92400E' }}>
-                              <span className="font-medium">
-                                {(order as any).modificationRejected ? '✗ Customer rejected modification: ' : (order as any).modificationAccepted ? '✓ Customer accepted modification: ' : 'Modified: '}
-                              </span>
-                              {order.vendorModificationNote || 'Items adjusted by vendor'}
+                    return (
+                      <div
+                        key={order.id}
+                        className="rounded-xl border overflow-hidden"
+                        style={{
+                          backgroundColor: 'var(--aurora-surface, #fff)',
+                          borderColor: 'var(--aurora-border, #E2E5EF)',
+                        }}
+                      >
+                        {/* Order header */}
+                        <button
+                          className="w-full flex items-center justify-between p-4 text-left"
+                          onClick={() => batchMode && order.status === 'pending' ? toggleOrderSelection(order.id) : setExpandedOrder(isExpanded ? null : order.id)}
+                        >
+                          {/* Batch checkbox */}
+                          {batchMode && order.status === 'pending' && (
+                            <div className="mr-3 flex-shrink-0" onClick={(e) => { e.stopPropagation(); toggleOrderSelection(order.id); }}>
+                              {selectedOrders.has(order.id)
+                                ? <CheckSquare size={18} style={{ color: '#6366F1' }} />
+                                : <Square size={18} style={{ color: 'var(--aurora-text-muted)' }} />}
                             </div>
-                            {/* SB-15: Rejection recovery — Revert + Counter-Proposal */}
-                            {(order as any).modificationRejected && order.originalItems && ['confirmed', 'preparing'].includes(order.status) && (
-                              <div className="flex items-center gap-2 mt-2">
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                                {order.customerName} · {formatEventDate(order.eventDate)}
+                              </span>
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                style={{ backgroundColor: statusCfg.bgColor, color: statusCfg.color }}
+                              >
+                                {statusCfg.icon}
+                                {statusCfg.label}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                              <span className="flex items-center gap-1">
+                                <Users size={12} />
+                                {order.headcount} guests
+                              </span>
+                              <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
+                                {formatPrice(order.total)}
+                              </span>
+                            </div>
+                          </div>
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </button>
+
+                        {/* Expanded details */}
+                        {isExpanded && (
+                          <div className="mx-3 mb-4 mt-1 p-4 space-y-3 rounded-lg border shadow-sm" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
+                            {/* Contact info */}
+                            <div className="grid grid-cols-2 gap-3 pt-3 text-sm">
+                              <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <User size={14} />
+                                {order.contactName}
+                              </div>
+                              <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <Phone size={14} />
+                                {order.contactPhone}
+                              </div>
+                              <div className="col-span-2 flex items-start gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <MapPin size={14} className="mt-0.5 shrink-0" />
+                                {order.deliveryAddress?.formattedAddress ||
+                                  [order.deliveryAddress?.street, order.deliveryAddress?.city, order.deliveryAddress?.state, order.deliveryAddress?.zip]
+                                    .filter(Boolean).join(', ')}
+                              </div>
+                            </div>
+
+                            {/* Order Timeline */}
+                            <div className="pt-2">
+                              <OrderTimeline order={order} perspective="vendor" />
+                            </div>
+
+                            {/* Items */}
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--aurora-text-muted)' }}>
+                                Items
+                              </h4>
+                              <div className="space-y-1">
+                                {order.items.map((item, i) => (
+                                  <div key={i} className="flex justify-between text-sm">
+                                    <span style={{ color: 'var(--aurora-text)' }}>
+                                      {item.qty}x {item.name}
+                                    </span>
+                                    <span style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      {formatPrice(item.unitPrice * item.qty)}
+                                    </span>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                                  <span>Total</span>
+                                  <span>{formatPrice(order.total)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* ── Order modification form (#18) ── */}
+                            {editingOrderId === order.id ? (
+                              <div className="p-3 rounded-xl border space-y-2" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.02)' }}>
+                                <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>Modify Order Items</p>
+                                {editItems.map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2 text-sm">
+                                    <input type="number" min="0" value={editItems[i].qty}
+                                      onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, qty: Math.max(0, parseInt(e.target.value) || 0) } : it))}
+                                      className="w-14 text-center rounded-lg border px-2 py-1 text-xs" style={{ borderColor: 'var(--aurora-border)' }}
+                                    />
+                                    {/* V-07: Make new item names editable */}
+                                    {item.menuItemId.startsWith('added_') ? (
+                                      <input
+                                        type="text"
+                                        value={item.name}
+                                        onChange={(e) => {
+                                          const updated = [...editItems];
+                                          const idx = updated.findIndex(it => it.menuItemId === item.menuItemId);
+                                          if (idx >= 0) updated[idx] = { ...updated[idx], name: e.target.value };
+                                          setEditItems(updated);
+                                        }}
+                                        placeholder="Item name"
+                                        className="flex-1 text-sm border rounded px-2 py-1" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                      />
+                                    ) : (
+                                      <span className="flex-1 truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
+                                    )}
+                                    {/* SB-03: Display price in dollars, store in cents */}
+                                    <span className="text-xs mr-0.5" style={{ color: 'var(--aurora-text-muted)' }}>$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={(editItems[i].unitPrice / 100).toFixed(2)}
+                                      onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, unitPrice: Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100)) } : it))}
+                                      placeholder="0.00"
+                                      className="w-20 text-center text-sm border rounded px-1 py-1" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                    />
+                                    <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * editItems[i].qty)}</span>
+                                  </div>
+                                ))}
+                                {/* V-07: Add new item button */}
+                                <div className="border-t pt-3 mt-3" style={{ borderColor: 'var(--aurora-border)' }}>
+                                  <button
+                                    onClick={() => {
+                                      setEditItems(prev => [...prev, {
+                                        menuItemId: `added_${Date.now()}`,
+                                        name: '',
+                                        qty: 1,
+                                        unitPrice: 0,
+                                        pricingType: 'per_person',
+                                      }]);
+                                    }}
+                                    className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                                  >
+                                    + Add Item
+                                  </button>
+                                </div>
+                                <p className="text-xs font-medium text-right" style={{ color: 'var(--aurora-text)' }}>
+                                  New total: {formatPrice(editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0))}
+                                </p>
+                                <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)}
+                                  placeholder="Reason for modification (e.g. item out of stock)..." rows={2}
+                                  className="w-full rounded-lg border px-3 py-2 text-xs outline-none resize-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                />
+                                <div className="flex gap-2">
+                                  <button onClick={() => setEditingOrderId(null)} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border" style={{ borderColor: 'var(--aurora-border)' }}>Cancel</button>
+                                  <button onClick={() => handleSaveModification(order)} disabled={editSaving}
+                                    className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: '#6366F1' }}
+                                  >{editSaving ? <Loader2 size={12} className="animate-spin mx-auto" /> : 'Save Changes'}</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Vendor modification notice + rejection badge (F-06) + SB-15 recovery */}
+                                {order.vendorModified && (
+                                  <div>
+                                    <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: (order as any).modificationRejected ? '#FEE2E2' : '#FEF3C7', color: (order as any).modificationRejected ? '#991B1B' : '#92400E' }}>
+                                      <span className="font-medium">
+                                        {(order as any).modificationRejected ? '✗ Customer rejected modification: ' : (order as any).modificationAccepted ? '✓ Customer accepted modification: ' : 'Modified: '}
+                                      </span>
+                                      {order.vendorModificationNote || 'Items adjusted by vendor'}
+                                    </div>
+                                    {/* SB-15: Rejection recovery — Revert + Counter-Proposal */}
+                                    {(order as any).modificationRejected && order.originalItems && ['confirmed', 'preparing'].includes(order.status) && (
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <button
+                                          onClick={async () => {
+                                            try {
+                                              const origSubtotal = calculateOrderTotal(order.originalItems!);
+                                              const origTax = Math.round(origSubtotal * 0.0825);
+                                              await vendorModifyOrder(order.id, {
+                                                items: order.originalItems!,
+                                                subtotal: origSubtotal,
+                                                tax: origTax,
+                                                total: origSubtotal + origTax,
+                                                note: 'Reverted to original order items per customer request',
+                                              });
+                                              addToast('Order reverted to original items', 'success');
+                                            } catch (err: any) {
+                                              addToast(err.message || 'Failed to revert order', 'error');
+                                            }
+                                          }}
+                                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
+                                          style={{ borderColor: '#10B981', color: '#059669', backgroundColor: '#ECFDF5' }}
+                                        >
+                                          Revert to Original
+                                        </button>
+                                        <button
+                                          onClick={() => startEditOrder(order)}
+                                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
+                                          style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: '#EEF2FF' }}
+                                        >
+                                          <Pencil size={10} /> Send Counter-Proposal
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {/* Edit order button for confirmed/preparing */}
+                                {['confirmed', 'preparing'].includes(order.status) && (
+                                  <button onClick={() => startEditOrder(order)}
+                                    className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#6366F1' }}
+                                  >
+                                    <Pencil size={12} /> Modify order items
+                                  </button>
+                                )}
+                              </>
+                            )}
+
+                            {/* Special instructions */}
+                            {order.specialInstructions && (
+                              <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)' }}>
+                                <span className="font-medium">Note: </span>
+                                {order.specialInstructions}
+                              </div>
+                            )}
+
+                            {/* ── In-order messages ── */}
+                            {!['cancelled'].includes(order.status) && user && (
+                              <OrderMessages
+                                orderId={order.id}
+                                currentUserId={user.uid}
+                                currentUserName={businessName || 'Vendor'}
+                                currentUserRole="vendor"
+                              />
+                            )}
+
+                            {/* Message Customer button */}
+                            {!['cancelled', 'delivered'].includes(order.status) && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await findOrCreateConversation(
+                                      order.customerId, user!.uid, `Re: Order #${order.id.slice(0, 8)}`
+                                    );
+                                    setMessagingOrderId(order.id);
+                                  } catch (err) {
+                                    addToast('Could not start conversation', 'error');
+                                  }
+                                }}
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border"
+                                style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.04)' }}
+                              >
+                                <MessageSquare size={14} />
+                                Message Customer
+                              </button>
+                            )}
+
+                            {/* Action buttons */}
+                            {order.status === 'pending' && (
+                              <div className="flex gap-2 pt-2">
                                 <button
-                                  onClick={async () => {
-                                    try {
-                                      const origSubtotal = calculateOrderTotal(order.originalItems!);
-                                      const origTax = Math.round(origSubtotal * 0.0825);
-                                      await vendorModifyOrder(order.id, {
-                                        items: order.originalItems!,
-                                        subtotal: origSubtotal,
-                                        tax: origTax,
-                                        total: origSubtotal + origTax,
-                                        note: 'Reverted to original order items per customer request',
-                                      });
-                                      addToast('Order reverted to original items', 'success');
-                                    } catch (err: any) {
-                                      addToast(err.message || 'Failed to revert order', 'error');
-                                    }
-                                  }}
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
-                                  style={{ borderColor: '#10B981', color: '#059669', backgroundColor: '#ECFDF5' }}
+                                  onClick={() => handleStatusChange(order.id, 'confirmed')}
+                                  disabled={isActionLoading}
+                                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                                  style={{ backgroundColor: '#10B981' }}
                                 >
-                                  Revert to Original
+                                  {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                  Accept
                                 </button>
                                 <button
-                                  onClick={() => startEditOrder(order)}
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
-                                  style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: '#EEF2FF' }}
+                                  onClick={() => handleStatusChange(order.id, 'cancelled')}
+                                  disabled={isActionLoading}
+                                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                                  style={{ backgroundColor: '#EF4444' }}
                                 >
-                                  <Pencil size={10} /> Send Counter-Proposal
+                                  {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                                  Decline
                                 </button>
                               </div>
                             )}
                           </div>
                         )}
-                        {/* Edit order button for confirmed/preparing */}
-                        {['confirmed', 'preparing'].includes(order.status) && (
-                          <button onClick={() => startEditOrder(order)}
-                            className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#6366F1' }}
-                          >
-                            <Pencil size={12} /> Modify order items
-                          </button>
-                        )}
-                      </>
-                    )}
-
-                    {/* Special instructions */}
-                    {order.specialInstructions && (
-                      <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)' }}>
-                        <span className="font-medium">Note: </span>
-                        {order.specialInstructions}
                       </div>
-                    )}
-
-                    {/* ── In-order messages ── */}
-                    {!['cancelled'].includes(order.status) && user && (
-                      <OrderMessages
-                        orderId={order.id}
-                        currentUserId={user.uid}
-                        currentUserName={businessName || 'Vendor'}
-                        currentUserRole="vendor"
-                      />
-                    )}
-
-                    {/* Message Customer button */}
-                    {!['cancelled', 'delivered'].includes(order.status) && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            await findOrCreateConversation(
-                              order.customerId, user!.uid, `Re: Order #${order.id.slice(0, 8)}`
-                            );
-                            setMessagingOrderId(order.id);
-                          } catch (err) {
-                            addToast('Could not start conversation', 'error');
-                          }
-                        }}
-                        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border"
-                        style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.04)' }}
-                      >
-                        <MessageSquare size={14} />
-                        Message Customer
-                      </button>
-                    )}
-
-                    {/* Action buttons */}
-                    {order.status === 'pending' && (
-                      <div className="flex gap-2 pt-2">
-                        <button
-                          onClick={() => handleStatusChange(order.id, 'confirmed')}
-                          disabled={isActionLoading}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                          style={{ backgroundColor: '#10B981' }}
-                        >
-                          {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                          Accept
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(order.id, 'cancelled')}
-                          disabled={isActionLoading}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                          style={{ backgroundColor: '#EF4444' }}
-                        >
-                          {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
-                          Decline
-                        </button>
-                      </div>
-                    )}
-                    {order.status === 'confirmed' && (
-                      <button
-                        onClick={() => handleStatusChange(order.id, 'preparing')}
-                        disabled={isActionLoading}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                        style={{ backgroundColor: 'var(--aurora-primary, #6366F1)' }}
-                      >
-                        {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
-                        Mark as Preparing
-                      </button>
-                    )}
-                    {order.status === 'preparing' && (
-                      <div className="space-y-2">
-                        {/* SB-17 & SB-31: Prep time estimate input with time validation */}
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="time"
-                            value={etaInputs[`prep_${order.id}`] || ''}
-                            onChange={(e) => setEtaInputs(prev => ({ ...prev, [`prep_${order.id}`]: e.target.value }))}
-                            className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500/30"
-                            style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                            aria-label="Estimated ready time"
-                          />
-                          {etaInputs[`prep_${order.id}`]?.trim() && (
-                            <button
-                              onClick={() => {
-                                const eta = etaInputs[`prep_${order.id}`]?.trim();
-                                if (eta) {
-                                  const formattedEta = formatEtaValue(eta, 'time');
-                                  handleStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: formattedEta }).catch(() => {});
-                                  addToast('Prep time estimate shared with customer', 'success');
-                                }
-                              }}
-                              className="px-3 py-2 rounded-lg text-xs font-medium text-white"
-                              style={{ backgroundColor: '#8B5CF6' }}
-                            >
-                              Share
-                            </button>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleStatusChange(order.id, 'ready')}
-                          disabled={isActionLoading}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                          style={{ backgroundColor: '#10B981' }}
-                        >
-                          {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                          Mark as Ready
-                        </button>
-                      </div>
-                    )}
-                    {order.status === 'ready' && (
-                      <div className="space-y-2">
-                        {/* SB-31: Delivery ETA with time/duration toggle */}
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={etaInputs[`mode_${order.id}`] || 'time'}
-                            onChange={(e) => setEtaInputs(prev => ({ ...prev, [`mode_${order.id}`]: e.target.value, [order.id]: '' }))}
-                            className="rounded-lg border px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-sky-500/30"
-                            style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                          >
-                            <option value="time">Specific time</option>
-                            <option value="duration">Duration (minutes)</option>
-                          </select>
-                          {(etaInputs[`mode_${order.id}`] || 'time') === 'time' ? (
-                            <input
-                              type="time"
-                              value={etaInputs[order.id] || ''}
-                              onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
-                              className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
-                              style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                            />
-                          ) : (
-                            <div className="flex items-center gap-1 flex-1">
-                              <input
-                                type="number"
-                                min="5"
-                                max="480"
-                                step="5"
-                                placeholder="30"
-                                value={etaInputs[order.id] || ''}
-                                onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
-                                className="w-20 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
-                                style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                              />
-                              <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>minutes</span>
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => {
-                            const eta = etaInputs[order.id]?.trim();
-                            const mode = etaInputs[`mode_${order.id}`] || 'time';
-                            const formattedEta = eta ? formatEtaValue(eta, mode) : undefined;
-                            handleStatusChange(order.id, 'out_for_delivery', formattedEta ? { estimatedDeliveryTime: formattedEta } : undefined);
-                          }}
-                          disabled={isActionLoading}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                          style={{ backgroundColor: '#0EA5E9' }}
-                        >
-                          {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
-                          Dispatch for Delivery
-                        </button>
-                      </div>
-                    )}
-                    {order.status === 'out_for_delivery' && (
-                      <div className="space-y-2">
-                        {order.estimatedDeliveryTime && (
-                          <div className="flex items-center gap-1.5 text-xs p-2 rounded-lg" style={{ backgroundColor: '#E0F2FE', color: '#0369A1' }}>
-                            <Clock size={12} />
-                            <span className="font-medium">ETA: {order.estimatedDeliveryTime}</span>
-                          </div>
-                        )}
-                        <button
-                          onClick={() => handleStatusChange(order.id, 'delivered')}
-                          disabled={isActionLoading}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                          style={{ backgroundColor: '#059669' }}
-                        >
-                          {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                          Mark as Delivered
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Cancel button for non-pending active orders */}
-                    {['confirmed', 'preparing', 'ready'].includes(order.status) && (
-                      <button
-                        onClick={() => { setCancellingOrderId(order.id); setCancelReason(''); setCancelOtherText(''); }}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border mt-2"
-                        style={{ borderColor: '#FCA5A5', color: '#DC2626', backgroundColor: '#FEF2F2' }}
-                      >
-                        <Ban size={14} />
-                        Cancel Order
-                      </button>
-                    )}
-
-                    {/* Cancellation reason display */}
-                    {order.status === 'cancelled' && (order.cancellationReason || order.declinedReason) && (
-                      <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
-                        <span className="font-medium" style={{ color: '#991B1B' }}>
-                          {order.cancelledBy === 'customer' ? 'Cancelled by customer: ' : 'Reason: '}
-                        </span>
-                        <span style={{ color: '#DC2626' }}>{order.cancellationReason || order.declinedReason}</span>
-                      </div>
-                    )}
-                  </div>
+                    );
+                  })
                 )}
               </div>
-            );
-          })}
-          {/* V-06: Pagination controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t pt-4 mt-4" style={{ borderColor: 'var(--aurora-border)' }}>
-              <span className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
-                Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, filteredOrders.length)} of {filteredOrders.length}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 text-sm rounded-lg border disabled:opacity-40 hover:bg-gray-50" style={{ borderColor: 'var(--aurora-border)' }}
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 text-sm rounded-lg border disabled:opacity-40 hover:bg-gray-50" style={{ borderColor: 'var(--aurora-border)' }}
-                >
-                  Next
-                </button>
+            )}
+          </div>
+
+          {/* SECTION: ACTIVE ORDERS */}
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)' }}>
+            {/* Section Header */}
+            <button
+              onClick={() => toggleSection('active')}
+              className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-opacity-50"
+              style={{
+                backgroundColor: sectionExpanded.active ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.04)',
+                borderBottom: sectionExpanded.active ? '1px solid var(--aurora-border)' : 'none'
+              }}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold" style={{ color: '#6366F1' }}>Active Orders</h3>
+                  <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#6366F1' }}>
+                    {activeOrders.length}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSort('active'); }}
+                className="p-1.5 rounded-lg transition-colors hover:bg-gray-200/50"
+                style={{ color: '#6366F1' }}
+              >
+                <ArrowUpDown size={16} />
+              </button>
+              {sectionExpanded.active ? <ChevronUp size={18} style={{ color: '#6366F1' }} /> : <ChevronDown size={18} style={{ color: '#6366F1' }} />}
+            </button>
+
+            {/* Section Content */}
+            {sectionExpanded.active && (
+              <div className="p-3 space-y-3">
+                {activeOrders.length === 0 ? (
+                  <div className="text-center py-6 text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
+                    No active orders
+                  </div>
+                ) : (
+                  activeOrders.map((order) => {
+                    const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+                    const isExpanded = expandedOrder === order.id;
+                    const isActionLoading = actionLoading === order.id;
+
+                    return (
+                      <div
+                        key={order.id}
+                        className="rounded-xl border overflow-hidden"
+                        style={{
+                          backgroundColor: 'var(--aurora-surface, #fff)',
+                          borderColor: 'var(--aurora-border, #E2E5EF)',
+                        }}
+                      >
+                        {/* Order header */}
+                        <button
+                          className="w-full flex items-center justify-between p-4 text-left"
+                          onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                                {order.customerName} · {formatEventDate(order.eventDate)}
+                              </span>
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                style={{ backgroundColor: statusCfg.bgColor, color: statusCfg.color }}
+                              >
+                                {statusCfg.icon}
+                                {statusCfg.label}
+                              </span>
+                              {order.rfpOrigin && (
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ backgroundColor: 'rgba(139,92,246,0.1)', color: '#7C3AED' }}>
+                                  RFP
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                              <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
+                                {formatPrice(order.total)}
+                              </span>
+                            </div>
+                          </div>
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </button>
+
+                        {/* Expanded details */}
+                        {isExpanded && (
+                          <div className="mx-3 mb-4 mt-1 p-4 space-y-3 rounded-lg border shadow-sm" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
+                            {/* Contact info */}
+                            <div className="grid grid-cols-2 gap-3 pt-3 text-sm">
+                              <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <User size={14} />
+                                {order.contactName}
+                              </div>
+                              <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <Phone size={14} />
+                                {order.contactPhone}
+                              </div>
+                              <div className="col-span-2 flex items-start gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <MapPin size={14} className="mt-0.5 shrink-0" />
+                                {order.deliveryAddress?.formattedAddress ||
+                                  [order.deliveryAddress?.street, order.deliveryAddress?.city, order.deliveryAddress?.state, order.deliveryAddress?.zip]
+                                    .filter(Boolean).join(', ')}
+                              </div>
+                            </div>
+
+                            {/* Order Timeline */}
+                            <div className="pt-2">
+                              <OrderTimeline order={order} perspective="vendor" />
+                            </div>
+
+                            {/* Items */}
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--aurora-text-muted)' }}>
+                                Items
+                              </h4>
+                              <div className="space-y-1">
+                                {order.items.map((item, i) => (
+                                  <div key={i} className="flex justify-between text-sm">
+                                    <span style={{ color: 'var(--aurora-text)' }}>
+                                      {item.qty}x {item.name}
+                                    </span>
+                                    <span style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      {formatPrice(item.unitPrice * item.qty)}
+                                    </span>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                                  <span>Total</span>
+                                  <span>{formatPrice(order.total)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* ── Order modification form (#18) ── */}
+                            {editingOrderId === order.id ? (
+                              <div className="p-3 rounded-xl border space-y-2" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.02)' }}>
+                                <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>Modify Order Items</p>
+                                {editItems.map((item, i) => (
+                                  <div key={i} className="flex items-center gap-2 text-sm">
+                                    <input type="number" min="0" value={editItems[i].qty}
+                                      onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, qty: Math.max(0, parseInt(e.target.value) || 0) } : it))}
+                                      className="w-14 text-center rounded-lg border px-2 py-1 text-xs" style={{ borderColor: 'var(--aurora-border)' }}
+                                    />
+                                    {/* V-07: Make new item names editable */}
+                                    {item.menuItemId.startsWith('added_') ? (
+                                      <input
+                                        type="text"
+                                        value={item.name}
+                                        onChange={(e) => {
+                                          const updated = [...editItems];
+                                          const idx = updated.findIndex(it => it.menuItemId === item.menuItemId);
+                                          if (idx >= 0) updated[idx] = { ...updated[idx], name: e.target.value };
+                                          setEditItems(updated);
+                                        }}
+                                        placeholder="Item name"
+                                        className="flex-1 text-sm border rounded px-2 py-1" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                      />
+                                    ) : (
+                                      <span className="flex-1 truncate" style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
+                                    )}
+                                    {/* SB-03: Display price in dollars, store in cents */}
+                                    <span className="text-xs mr-0.5" style={{ color: 'var(--aurora-text-muted)' }}>$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={(editItems[i].unitPrice / 100).toFixed(2)}
+                                      onChange={(e) => setEditItems(prev => prev.map((it, idx) => idx === i ? { ...it, unitPrice: Math.max(0, Math.round((parseFloat(e.target.value) || 0) * 100)) } : it))}
+                                      placeholder="0.00"
+                                      className="w-20 text-center text-sm border rounded px-1 py-1" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                    />
+                                    <span style={{ color: 'var(--aurora-text-secondary)' }}>{formatPrice(item.unitPrice * editItems[i].qty)}</span>
+                                  </div>
+                                ))}
+                                {/* V-07: Add new item button */}
+                                <div className="border-t pt-3 mt-3" style={{ borderColor: 'var(--aurora-border)' }}>
+                                  <button
+                                    onClick={() => {
+                                      setEditItems(prev => [...prev, {
+                                        menuItemId: `added_${Date.now()}`,
+                                        name: '',
+                                        qty: 1,
+                                        unitPrice: 0,
+                                        pricingType: 'per_person',
+                                      }]);
+                                    }}
+                                    className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                                  >
+                                    + Add Item
+                                  </button>
+                                </div>
+                                <p className="text-xs font-medium text-right" style={{ color: 'var(--aurora-text)' }}>
+                                  New total: {formatPrice(editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0))}
+                                </p>
+                                <textarea value={editNote} onChange={(e) => setEditNote(e.target.value)}
+                                  placeholder="Reason for modification (e.g. item out of stock)..." rows={2}
+                                  className="w-full rounded-lg border px-3 py-2 text-xs outline-none resize-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                />
+                                <div className="flex gap-2">
+                                  <button onClick={() => setEditingOrderId(null)} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border" style={{ borderColor: 'var(--aurora-border)' }}>Cancel</button>
+                                  <button onClick={() => handleSaveModification(order)} disabled={editSaving}
+                                    className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: '#6366F1' }}
+                                  >{editSaving ? <Loader2 size={12} className="animate-spin mx-auto" /> : 'Save Changes'}</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Vendor modification notice + rejection badge (F-06) + SB-15 recovery */}
+                                {order.vendorModified && (
+                                  <div>
+                                    <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: (order as any).modificationRejected ? '#FEE2E2' : '#FEF3C7', color: (order as any).modificationRejected ? '#991B1B' : '#92400E' }}>
+                                      <span className="font-medium">
+                                        {(order as any).modificationRejected ? '✗ Customer rejected modification: ' : (order as any).modificationAccepted ? '✓ Customer accepted modification: ' : 'Modified: '}
+                                      </span>
+                                      {order.vendorModificationNote || 'Items adjusted by vendor'}
+                                    </div>
+                                    {/* SB-15: Rejection recovery — Revert + Counter-Proposal */}
+                                    {(order as any).modificationRejected && order.originalItems && ['confirmed', 'preparing'].includes(order.status) && (
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <button
+                                          onClick={async () => {
+                                            try {
+                                              const origSubtotal = calculateOrderTotal(order.originalItems!);
+                                              const origTax = Math.round(origSubtotal * 0.0825);
+                                              await vendorModifyOrder(order.id, {
+                                                items: order.originalItems!,
+                                                subtotal: origSubtotal,
+                                                tax: origTax,
+                                                total: origSubtotal + origTax,
+                                                note: 'Reverted to original order items per customer request',
+                                              });
+                                              addToast('Order reverted to original items', 'success');
+                                            } catch (err: any) {
+                                              addToast(err.message || 'Failed to revert order', 'error');
+                                            }
+                                          }}
+                                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
+                                          style={{ borderColor: '#10B981', color: '#059669', backgroundColor: '#ECFDF5' }}
+                                        >
+                                          Revert to Original
+                                        </button>
+                                        <button
+                                          onClick={() => startEditOrder(order)}
+                                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
+                                          style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: '#EEF2FF' }}
+                                        >
+                                          <Pencil size={10} /> Send Counter-Proposal
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {/* Edit order button for confirmed/preparing */}
+                                {['confirmed', 'preparing'].includes(order.status) && (
+                                  <button onClick={() => startEditOrder(order)}
+                                    className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#6366F1' }}
+                                  >
+                                    <Pencil size={12} /> Modify order items
+                                  </button>
+                                )}
+                              </>
+                            )}
+
+                            {/* Special instructions */}
+                            {order.specialInstructions && (
+                              <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)' }}>
+                                <span className="font-medium">Note: </span>
+                                {order.specialInstructions}
+                              </div>
+                            )}
+
+                            {/* ── In-order messages ── */}
+                            {!['cancelled'].includes(order.status) && user && (
+                              <OrderMessages
+                                orderId={order.id}
+                                currentUserId={user.uid}
+                                currentUserName={businessName || 'Vendor'}
+                                currentUserRole="vendor"
+                              />
+                            )}
+
+                            {/* Message Customer button */}
+                            {!['cancelled', 'delivered'].includes(order.status) && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await findOrCreateConversation(
+                                      order.customerId, user!.uid, `Re: Order #${order.id.slice(0, 8)}`
+                                    );
+                                    setMessagingOrderId(order.id);
+                                  } catch (err) {
+                                    addToast('Could not start conversation', 'error');
+                                  }
+                                }}
+                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border"
+                                style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.04)' }}
+                              >
+                                <MessageSquare size={14} />
+                                Message Customer
+                              </button>
+                            )}
+
+                            {/* Action buttons - Status advancement for active orders */}
+                            {order.status === 'confirmed' && (
+                              <button
+                                onClick={() => handleStatusChange(order.id, 'preparing')}
+                                disabled={isActionLoading}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                                style={{ backgroundColor: 'var(--aurora-primary, #6366F1)' }}
+                              >
+                                {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+                                Mark as Preparing
+                              </button>
+                            )}
+                            {order.status === 'preparing' && (
+                              <div className="space-y-2">
+                                {/* SB-17 & SB-31: Prep time estimate input with time validation */}
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="time"
+                                    value={etaInputs[`prep_${order.id}`] || ''}
+                                    onChange={(e) => setEtaInputs(prev => ({ ...prev, [`prep_${order.id}`]: e.target.value }))}
+                                    className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500/30"
+                                    style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                    aria-label="Estimated ready time"
+                                  />
+                                  {etaInputs[`prep_${order.id}`]?.trim() && (
+                                    <button
+                                      onClick={() => {
+                                        const eta = etaInputs[`prep_${order.id}`]?.trim();
+                                        if (eta) {
+                                          const formattedEta = formatEtaValue(eta, 'time');
+                                          handleStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: formattedEta }).catch(() => {});
+                                          addToast('Prep time estimate shared with customer', 'success');
+                                        }
+                                      }}
+                                      className="px-3 py-2 rounded-lg text-xs font-medium text-white"
+                                      style={{ backgroundColor: '#8B5CF6' }}
+                                    >
+                                      Share
+                                    </button>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleStatusChange(order.id, 'ready')}
+                                  disabled={isActionLoading}
+                                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                                  style={{ backgroundColor: '#10B981' }}
+                                >
+                                  {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                  Mark as Ready
+                                </button>
+                              </div>
+                            )}
+                            {order.status === 'ready' && (
+                              <div className="space-y-2">
+                                {/* SB-31: Delivery ETA with time/duration toggle */}
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    value={etaInputs[`mode_${order.id}`] || 'time'}
+                                    onChange={(e) => setEtaInputs(prev => ({ ...prev, [`mode_${order.id}`]: e.target.value, [order.id]: '' }))}
+                                    className="rounded-lg border px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-sky-500/30"
+                                    style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                  >
+                                    <option value="time">Specific time</option>
+                                    <option value="duration">Duration (minutes)</option>
+                                  </select>
+                                  {(etaInputs[`mode_${order.id}`] || 'time') === 'time' ? (
+                                    <input
+                                      type="time"
+                                      value={etaInputs[order.id] || ''}
+                                      onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                      className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
+                                      style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                    />
+                                  ) : (
+                                    <div className="flex items-center gap-1 flex-1">
+                                      <input
+                                        type="number"
+                                        min="5"
+                                        max="480"
+                                        step="5"
+                                        placeholder="30"
+                                        value={etaInputs[order.id] || ''}
+                                        onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                        className="w-20 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
+                                        style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                      />
+                                      <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>minutes</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const eta = etaInputs[order.id]?.trim();
+                                    const mode = etaInputs[`mode_${order.id}`] || 'time';
+                                    const formattedEta = eta ? formatEtaValue(eta, mode) : undefined;
+                                    handleStatusChange(order.id, 'out_for_delivery', formattedEta ? { estimatedDeliveryTime: formattedEta } : undefined);
+                                  }}
+                                  disabled={isActionLoading}
+                                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                                  style={{ backgroundColor: '#0EA5E9' }}
+                                >
+                                  {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+                                  Dispatch for Delivery
+                                </button>
+                              </div>
+                            )}
+                            {order.status === 'out_for_delivery' && (
+                              <div className="space-y-2">
+                                {order.estimatedDeliveryTime && (
+                                  <div className="flex items-center gap-1.5 text-xs p-2 rounded-lg" style={{ backgroundColor: '#E0F2FE', color: '#0369A1' }}>
+                                    <Clock size={12} />
+                                    <span className="font-medium">ETA: {order.estimatedDeliveryTime}</span>
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => handleStatusChange(order.id, 'delivered')}
+                                  disabled={isActionLoading}
+                                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                                  style={{ backgroundColor: '#059669' }}
+                                >
+                                  {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                                  Mark as Delivered
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Cancel button for non-pending active orders */}
+                            {['confirmed', 'preparing', 'ready'].includes(order.status) && (
+                              <button
+                                onClick={() => { setCancellingOrderId(order.id); setCancelReason(''); setCancelOtherText(''); }}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border mt-2"
+                                style={{ borderColor: '#FCA5A5', color: '#DC2626', backgroundColor: '#FEF2F2' }}
+                              >
+                                <Ban size={14} />
+                                Cancel Order
+                              </button>
+                            )}
+
+                            {/* Cancellation reason display */}
+                            {order.status === 'cancelled' && (order.cancellationReason || order.declinedReason) && (
+                              <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
+                                <span className="font-medium" style={{ color: '#991B1B' }}>
+                                  {order.cancelledBy === 'customer' ? 'Cancelled by customer: ' : 'Reason: '}
+                                </span>
+                                <span style={{ color: '#DC2626' }}>{order.cancellationReason || order.declinedReason}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* SECTION: COMPLETED ORDERS */}
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)' }}>
+            {/* Section Header */}
+            <button
+              onClick={() => toggleSection('completed')}
+              className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-opacity-50"
+              style={{
+                backgroundColor: sectionExpanded.completed ? 'rgba(34, 197, 94, 0.08)' : 'rgba(34, 197, 94, 0.04)',
+                borderBottom: sectionExpanded.completed ? '1px solid var(--aurora-border)' : 'none'
+              }}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold" style={{ color: '#22C55E' }}>Completed Orders</h3>
+                  <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#22C55E' }}>
+                    {completedOrders.length}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSort('completed'); }}
+                className="p-1.5 rounded-lg transition-colors hover:bg-gray-200/50"
+                style={{ color: '#22C55E' }}
+              >
+                <ArrowUpDown size={16} />
+              </button>
+              {sectionExpanded.completed ? <ChevronUp size={18} style={{ color: '#22C55E' }} /> : <ChevronDown size={18} style={{ color: '#22C55E' }} />}
+            </button>
+
+            {/* Section Content */}
+            {sectionExpanded.completed && (
+              <div className="p-3 space-y-3">
+                {completedOrders.length === 0 ? (
+                  <div className="text-center py-6 text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
+                    No completed orders
+                  </div>
+                ) : (
+                  completedOrders.map((order) => {
+                    const statusCfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
+                    const isExpanded = expandedOrder === order.id;
+
+                    return (
+                      <div
+                        key={order.id}
+                        className="rounded-xl border overflow-hidden"
+                        style={{
+                          backgroundColor: 'var(--aurora-surface, #fff)',
+                          borderColor: 'var(--aurora-border, #E2E5EF)',
+                        }}
+                      >
+                        {/* Order header */}
+                        <button
+                          className="w-full flex items-center justify-between p-4 text-left"
+                          onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                                {order.customerName} · {formatEventDate(order.eventDate)}
+                              </span>
+                              <span
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                style={{ backgroundColor: statusCfg.bgColor, color: statusCfg.color }}
+                              >
+                                {statusCfg.icon}
+                                {statusCfg.label}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                              <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
+                                {formatPrice(order.total)}
+                              </span>
+                            </div>
+                          </div>
+                          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </button>
+
+                        {/* Expanded details - Read-only for completed orders */}
+                        {isExpanded && (
+                          <div className="mx-3 mb-4 mt-1 p-4 space-y-3 rounded-lg border shadow-sm" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
+                            {/* Contact info */}
+                            <div className="grid grid-cols-2 gap-3 pt-3 text-sm">
+                              <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <User size={14} />
+                                {order.contactName}
+                              </div>
+                              <div className="flex items-center gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <Phone size={14} />
+                                {order.contactPhone}
+                              </div>
+                              <div className="col-span-2 flex items-start gap-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                <MapPin size={14} className="mt-0.5 shrink-0" />
+                                {order.deliveryAddress?.formattedAddress ||
+                                  [order.deliveryAddress?.street, order.deliveryAddress?.city, order.deliveryAddress?.state, order.deliveryAddress?.zip]
+                                    .filter(Boolean).join(', ')}
+                              </div>
+                            </div>
+
+                            {/* Order Timeline */}
+                            <div className="pt-2">
+                              <OrderTimeline order={order} perspective="vendor" />
+                            </div>
+
+                            {/* Items */}
+                            <div>
+                              <h4 className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--aurora-text-muted)' }}>
+                                Items
+                              </h4>
+                              <div className="space-y-1">
+                                {order.items.map((item, i) => (
+                                  <div key={i} className="flex justify-between text-sm">
+                                    <span style={{ color: 'var(--aurora-text)' }}>
+                                      {item.qty}x {item.name}
+                                    </span>
+                                    <span style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      {formatPrice(item.unitPrice * item.qty)}
+                                    </span>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                                  <span>Total</span>
+                                  <span>{formatPrice(order.total)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Special instructions */}
+                            {order.specialInstructions && (
+                              <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)' }}>
+                                <span className="font-medium">Note: </span>
+                                {order.specialInstructions}
+                              </div>
+                            )}
+
+                            {/* Cancellation reason display */}
+                            {order.status === 'cancelled' && (order.cancellationReason || order.declinedReason) && (
+                              <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
+                                <span className="font-medium" style={{ color: '#991B1B' }}>
+                                  {order.cancelledBy === 'customer' ? 'Cancelled by customer: ' : 'Reason: '}
+                                </span>
+                                <span style={{ color: '#DC2626' }}>{order.cancellationReason || order.declinedReason}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
