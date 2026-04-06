@@ -513,8 +513,12 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
             </div>
           )}
 
-          {/* Finalize button — visible when items are assigned and orders not yet created */}
-          {(isPartiallyAccepted || isFullyAccepted) && assignedCount > 0 && !ordersCreated && (
+          {/* Finalize button — visible when any items are assigned and orders not yet created.
+              We check assignedCount directly rather than quoteRequest.status because the
+              assignedItemsMap is built from BOTH quoteRequest.itemAssignments AND
+              response.acceptedItemNames — so items can be assigned even if request status
+              wasn't updated to 'partially_accepted'. */}
+          {assignedCount > 0 && !ordersCreated && !allAssigned && !isFullyAccepted && (
             <button
               onClick={() => setShowAddressForm(true)}
               disabled={finalizingOrder}
@@ -532,8 +536,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
         </div>
       )}
 
-      {/* Status banner for fully accepted — show address form prompt if orders not yet created */}
-      {isFullyAccepted && !ordersCreated && (
+      {/* Status banner for fully accepted — show address form prompt if orders not yet created.
+          Use allAssigned || isFullyAccepted to handle cases where request status wasn't updated. */}
+      {(allAssigned || isFullyAccepted) && !ordersCreated && (
         <div
           className="p-3 rounded-xl space-y-2"
           style={{ backgroundColor: '#FEF3C7' }}
@@ -557,7 +562,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       )}
 
       {/* Status banner for orders successfully created */}
-      {isFullyAccepted && ordersCreated && (
+      {(allAssigned || isFullyAccepted) && ordersCreated && (
         <div
           className="p-3 rounded-xl space-y-2"
           style={{ backgroundColor: '#D1FAE5' }}
