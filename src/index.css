@@ -590,3 +590,17 @@ button, a, [role="button"] {
     margin-left: 0.5rem;
   }
 }
+
+/* iOS Safari: border-radius + overflow clipping fix */
+.rounded-2xl.overflow-hidden {
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+  isolation: isolate;
+}
+
+/* Touch target sizing for mobile — buttons inside accordion headers */
+@media (pointer: coarse) {
+  .rounded-2xl button[type="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

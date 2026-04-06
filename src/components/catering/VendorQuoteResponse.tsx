@@ -100,11 +100,11 @@ export default function VendorQuoteResponse({
     pending: true,     // Awaiting Decision expanded by default
     declined: false,   // Declined collapsed by default
   });
-  const [sortDir, setSortDir] = useState<Record<string, 'newest' | 'oldest'>>({
-    open: 'newest',
-    accepted: 'newest',
-    pending: 'newest',
-    declined: 'newest',
+  const [sortDir, setSortDir] = useState<Record<string, 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc'>>({
+    open: 'date-newest',
+    accepted: 'date-newest',
+    pending: 'date-newest',
+    declined: 'date-newest',
   });
 
   // ── Reminder state ──
@@ -319,8 +319,28 @@ export default function VendorQuoteResponse({
   // ── Section helpers ──
   const toggleSection = (key: string) =>
     setSectionExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
-  const toggleSort = (key: string) =>
-    setSortDir((prev) => ({ ...prev, [key]: prev[key] === 'newest' ? 'oldest' : 'newest' }));
+  const toggleSort = (key: string) => {
+    setSortDir((prev) => {
+      const current = prev[key];
+      const cycle: Record<string, 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc'> = {
+        'date-newest': 'date-oldest',
+        'date-oldest': 'name-asc',
+        'name-asc': 'name-desc',
+        'name-desc': 'date-newest',
+      };
+      return { ...prev, [key]: cycle[current] };
+    });
+  };
+
+  const getSortLabel = (sortType: 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc'): string => {
+    const labels: Record<string, string> = {
+      'date-newest': 'Date ↓',
+      'date-oldest': 'Date ↑',
+      'name-asc': 'Name A-Z',
+      'name-desc': 'Name Z-A',
+    };
+    return labels[sortType] || 'Sort';
+  };
 
   const saveReminderSettings = (updates: Partial<typeof reminderSettings>) => {
     setReminderSettings((prev: typeof reminderSettings) => {
@@ -342,19 +362,36 @@ export default function VendorQuoteResponse({
     return d.getTime();
   };
 
-  const sortRequests = (arr: CateringQuoteRequest[], dir: 'newest' | 'oldest') => {
+  const sortRequests = (arr: CateringQuoteRequest[], dir: 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc') => {
     return [...arr].sort((a, b) => {
-      const diff = getRequestEventMs(b) - getRequestEventMs(a);
-      return dir === 'newest' ? diff : -diff;
+      if (dir === 'date-newest' || dir === 'date-oldest') {
+        const diff = getRequestEventMs(b) - getRequestEventMs(a);
+        return dir === 'date-newest' ? diff : -diff;
+      } else if (dir === 'name-asc' || dir === 'name-desc') {
+        const nameA = a.customerName || a.cuisineCategory || '';
+        const nameB = b.customerName || b.cuisineCategory || '';
+        const comparison = nameA.localeCompare(nameB, 'en-US', { sensitivity: 'base' });
+        return dir === 'name-asc' ? comparison : -comparison;
+      }
+      return 0;
     });
   };
 
-  const sortResponses = (arr: CateringQuoteResponse[], dir: 'newest' | 'oldest') => {
+  const sortResponses = (arr: CateringQuoteResponse[], dir: 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc') => {
     return [...arr].sort((a, b) => {
       const reqA = requests.find((r) => r.id === a.quoteRequestId);
       const reqB = requests.find((r) => r.id === b.quoteRequestId);
-      const diff = getRequestEventMs(reqB as any || {} as any) - getRequestEventMs(reqA as any || {} as any);
-      return dir === 'newest' ? diff : -diff;
+
+      if (dir === 'date-newest' || dir === 'date-oldest') {
+        const diff = getRequestEventMs(reqB as any || {} as any) - getRequestEventMs(reqA as any || {} as any);
+        return dir === 'date-newest' ? diff : -diff;
+      } else if (dir === 'name-asc' || dir === 'name-desc') {
+        const nameA = a.customerName || (reqA ? reqA.cuisineCategory : '') || '';
+        const nameB = b.customerName || (reqB ? reqB.cuisineCategory : '') || '';
+        const comparison = nameA.localeCompare(nameB, 'en-US', { sensitivity: 'base' });
+        return dir === 'name-asc' ? comparison : -comparison;
+      }
+      return 0;
     });
   };
 
@@ -508,11 +545,13 @@ export default function VendorQuoteResponse({
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); toggleSort('open'); }}
-              className="p-1.5 rounded-lg transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium"
               style={{ color: '#F59E0B' }}
             >
-              <ArrowUpDown size={16} />
+              <ArrowUpDown size={14} />
+              {getSortLabel(sortDir.open)}
             </button>
             {sectionExpanded.open ? <ChevronUp size={18} style={{ color: '#F59E0B' }} /> : <ChevronDown size={18} style={{ color: '#F59E0B' }} />}
           </div>
@@ -762,11 +801,13 @@ export default function VendorQuoteResponse({
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={(e) => { e.stopPropagation(); toggleSort('accepted'); }}
-              className="p-1.5 rounded-lg transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium"
               style={{ color: '#22C55E' }}
             >
-              <ArrowUpDown size={16} />
+              <ArrowUpDown size={14} />
+              {getSortLabel(sortDir.accepted)}
             </button>
             {sectionExpanded.accepted ? <ChevronUp size={18} style={{ color: '#22C55E' }} /> : <ChevronDown size={18} style={{ color: '#22C55E' }} />}
           </div>
@@ -945,11 +986,13 @@ export default function VendorQuoteResponse({
             </div>
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); toggleSort('pending'); }}
-                className="p-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium"
                 style={{ color: '#6366F1' }}
               >
-                <ArrowUpDown size={16} />
+                <ArrowUpDown size={14} />
+                {getSortLabel(sortDir.pending)}
               </button>
               {sectionExpanded.pending ? <ChevronUp size={18} style={{ color: '#6366F1' }} /> : <ChevronDown size={18} style={{ color: '#6366F1' }} />}
             </div>

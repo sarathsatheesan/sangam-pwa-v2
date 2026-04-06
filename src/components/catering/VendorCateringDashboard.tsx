@@ -97,16 +97,34 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const toggleSection = (key: string) => setSectionExpanded(prev => ({ ...prev, [key]: !prev[key] }));
 
   // ── Independent sort per section (by date) ──
-  type SortDir = 'newest' | 'oldest';
+  type SortDir = 'date-newest' | 'date-oldest' | 'name-asc' | 'name-desc';
   const [sortDir, setSortDir] = useState<Record<string, SortDir>>({
-    pending: 'newest',
-    active: 'newest',
-    completed: 'newest',
+    pending: 'date-newest',
+    active: 'date-newest',
+    completed: 'date-newest',
   });
-  const toggleSort = (key: string) => setSortDir(prev => ({
-    ...prev,
-    [key]: prev[key] === 'newest' ? 'oldest' : 'newest',
-  }));
+  const toggleSort = (key: string) => setSortDir(prev => {
+    const cycleMap: Record<SortDir, SortDir> = {
+      'date-newest': 'date-oldest',
+      'date-oldest': 'name-asc',
+      'name-asc': 'name-desc',
+      'name-desc': 'date-newest',
+    };
+    return {
+      ...prev,
+      [key]: cycleMap[prev[key]],
+    };
+  });
+
+  const getSortLabel = (dir: SortDir): string => {
+    switch (dir) {
+      case 'date-newest': return 'Date ↓';
+      case 'date-oldest': return 'Date ↑';
+      case 'name-asc': return 'Name A-Z';
+      case 'name-desc': return 'Name Z-A';
+      default: return 'Date ↓';
+    }
+  };
 
   // ── Vendor reminder preferences ──
   const [reminderSettings, setReminderSettings] = useState(() => {
@@ -537,9 +555,15 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   // ── Accordion section groupings ──
   const sortOrders = (list: CateringOrder[], dir: SortDir): CateringOrder[] => {
     return [...list].sort((a, b) => {
+      if (dir === 'name-asc' || dir === 'name-desc') {
+        const nameA = (a.customerName || '').toLowerCase();
+        const nameB = (b.customerName || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB, 'en-US', { sensitivity: 'base' });
+        return dir === 'name-asc' ? cmp : -cmp;
+      }
       const aMs = a.eventDate?.toDate?.()?.getTime?.() || (a.eventDate?.seconds ? a.eventDate.seconds * 1000 : 0);
       const bMs = b.eventDate?.toDate?.()?.getTime?.() || (b.eventDate?.seconds ? b.eventDate.seconds * 1000 : 0);
-      return dir === 'newest' ? bMs - aMs : aMs - bMs;
+      return dir === 'date-newest' ? bMs - aMs : aMs - bMs;
     });
   };
   const pendingOrders = sortOrders(orders.filter(o => o.status === 'pending'), sortDir.pending);
@@ -994,11 +1018,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 </div>
               </div>
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); toggleSort('pending'); }}
-                className="p-1.5 rounded-lg transition-colors hover:bg-gray-200/50"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors"
                 style={{ color: '#F59E0B' }}
               >
-                <ArrowUpDown size={16} />
+                <ArrowUpDown size={14} />
+                {getSortLabel(sortDir.pending)}
               </button>
               {sectionExpanded.pending ? <ChevronUp size={18} style={{ color: '#F59E0B' }} /> : <ChevronDown size={18} style={{ color: '#F59E0B' }} />}
             </button>
@@ -1335,11 +1361,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 </div>
               </div>
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); toggleSort('active'); }}
-                className="p-1.5 rounded-lg transition-colors hover:bg-gray-200/50"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors"
                 style={{ color: '#6366F1' }}
               >
-                <ArrowUpDown size={16} />
+                <ArrowUpDown size={14} />
+                {getSortLabel(sortDir.active)}
               </button>
               {sectionExpanded.active ? <ChevronUp size={18} style={{ color: '#6366F1' }} /> : <ChevronDown size={18} style={{ color: '#6366F1' }} />}
             </button>
@@ -1793,11 +1821,13 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 </div>
               </div>
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); toggleSort('completed'); }}
-                className="p-1.5 rounded-lg transition-colors hover:bg-gray-200/50"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors"
                 style={{ color: '#22C55E' }}
               >
-                <ArrowUpDown size={16} />
+                <ArrowUpDown size={14} />
+                {getSortLabel(sortDir.completed)}
               </button>
               {sectionExpanded.completed ? <ChevronUp size={18} style={{ color: '#22C55E' }} /> : <ChevronDown size={18} style={{ color: '#22C55E' }} />}
             </button>
