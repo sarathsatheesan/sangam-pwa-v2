@@ -33,6 +33,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [finalizingOrder, setFinalizingOrder] = useState(false);
+  const [ordersCreated, setOrdersCreated] = useState(false);
 
   // SB-37: Delivery address form state
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -250,7 +251,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       );
 
       if (result.allItemsAssigned) {
-        addToast(`All items assigned! ${response.businessName} will receive your contact details.`, 'success', 5000);
+        addToast(`All items assigned! Please provide delivery address to finalize your order.`, 'success', 5000);
+        // Auto-open address form to finalize order creation
+        setShowAddressForm(true);
       } else {
         addToast(`${itemNames.length} item${itemNames.length > 1 ? 's' : ''} accepted from ${response.businessName}. Your contact details have been shared.`, 'success', 5000);
       }
@@ -288,6 +291,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       // Auto-create orders (fallback path without address — uses deliveryCity only)
       const fallbackAddress = { street: '', city: quoteRequest.deliveryCity || '', state: '', zip: '' };
       const orderIds = await createOrdersFromQuote(quoteRequest, responses, fallbackAddress);
+      setOrdersCreated(true);
       addToast(
         orderIds.length === 1
           ? 'Order created! Track it below.'
@@ -509,8 +513,8 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
             </div>
           )}
 
-          {/* Finalize button — visible when some items assigned but not auto-closed */}
-          {isPartiallyAccepted && !allAssigned && assignedCount > 0 && (
+          {/* Finalize button — visible when items are assigned and orders not yet created */}
+          {(isPartiallyAccepted || isFullyAccepted) && assignedCount > 0 && !ordersCreated && (
             <button
               onClick={() => setShowAddressForm(true)}
               disabled={finalizingOrder}
@@ -522,14 +526,38 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
               ) : (
                 <CheckCircle2 size={14} />
               )}
-              Finalize Order ({assignedCount} items)
+              {allAssigned ? 'Finalize Order & Create Orders' : `Finalize Order (${assignedCount} items)`}
             </button>
           )}
         </div>
       )}
 
-      {/* Status banner for fully accepted */}
-      {isFullyAccepted && (
+      {/* Status banner for fully accepted — show address form prompt if orders not yet created */}
+      {isFullyAccepted && !ordersCreated && (
+        <div
+          className="p-3 rounded-xl space-y-2"
+          style={{ backgroundColor: '#FEF3C7' }}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={18} style={{ color: '#D97706' }} />
+            <p className="text-sm font-medium" style={{ color: '#92400E' }}>
+              All items assigned! Provide a delivery address to create your orders.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAddressForm(true)}
+            disabled={finalizingOrder}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+            style={{ backgroundColor: '#059669' }}
+          >
+            {finalizingOrder ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            Finalize & Create Orders
+          </button>
+        </div>
+      )}
+
+      {/* Status banner for orders successfully created */}
+      {isFullyAccepted && ordersCreated && (
         <div
           className="p-3 rounded-xl space-y-2"
           style={{ backgroundColor: '#D1FAE5' }}
@@ -537,7 +565,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
           <div className="flex items-center gap-2">
             <CheckCircle2 size={18} style={{ color: '#059669' }} />
             <p className="text-sm font-medium" style={{ color: '#059669' }}>
-              Order finalized. Selected caterers will contact you shortly.
+              Orders created! Your vendors have been notified.
             </p>
           </div>
           {onViewOrders && (
@@ -1028,6 +1056,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                     await finalizeQuoteRequest(quoteRequest.id, deliveryAddress);
                     // Auto-create orders for each accepted vendor
                     const orderIds = await createOrdersFromQuote(quoteRequest, responses, deliveryAddress);
+                    setOrdersCreated(true);
                     addToast(
                       orderIds.length === 1
                         ? 'Order created! Track it in your orders tab.'

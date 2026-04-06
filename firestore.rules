@@ -133,8 +133,8 @@ service cloud.firestore {
       allow update: if request.auth != null && (
         // Allow customer to update their own orders (non-status fields)
         request.auth.uid == resource.data.customerId
-        // Allow vendor to update their business orders
-        || request.auth.uid in get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.vendorIds
+        // Allow vendor (business owner) to update their business orders
+        || request.auth.uid == get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.ownerId
         // Allow status transitions only if valid
         || (request.resource.data.status != resource.data.status &&
             isValidStatusTransition(resource.data.status, request.resource.data.status))
