@@ -424,7 +424,34 @@ export async function createOrdersFromQuote(
   responses: CateringQuoteResponse[],
   deliveryAddress: { street: string; city: string; state: string; zip: string },
 ): Promise<string[]> {
-  const assignments = quoteRequest.itemAssignments || [];
+  let assignments = quoteRequest.itemAssignments || [];
+
+  // Fallback: if no explicit itemAssignments exist (e.g., quote accepted before this field
+  // was implemented, or via legacy full-accept flow), derive assignments from accepted responses.
+  if (assignments.length === 0) {
+    const derived: typeof assignments = [];
+    for (const resp of responses) {
+      if (resp.status === 'accepted' || resp.status === 'partially_accepted') {
+        const itemNames = resp.acceptedItemNames && resp.acceptedItemNames.length > 0
+          ? resp.acceptedItemNames
+          : resp.quotedItems.map((qi) => qi.name);
+        for (const itemName of itemNames) {
+          if (!derived.some((d) => d.itemName === itemName)) {
+            derived.push({
+              itemName,
+              responseId: resp.id,
+              businessId: resp.businessId,
+              businessName: resp.businessName,
+              assignedAt: null as any, // Not critical for order creation
+            });
+          }
+        }
+      }
+    }
+    assignments = derived;
+    console.log('[createOrdersFromQuote] Used fallback: derived', derived.length, 'assignments from responses');
+  }
+
   if (assignments.length === 0) throw new Error('No item assignments found on this quote request');
 
   // Group assignments by vendor (businessId → assignments[])
