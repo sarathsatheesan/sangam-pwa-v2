@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Package, Clock, Users, MapPin, Send, Loader2,
   ChevronDown, ChevronUp, ShieldCheck, Plus, Trash2, DollarSign,
-  Bell, CheckCircle2, XCircle, Check, Edit,
+  Bell, CheckCircle2, XCircle, Check, Edit, ArrowUpDown, BellRing, Timer,
 } from 'lucide-react';
 import { notifyVendorQuoteReceived } from '@/services/notificationService';
 
@@ -92,6 +92,35 @@ export default function VendorQuoteResponse({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [editingResponseId, setEditingResponseId] = useState<string | null>(null);
+
+  // ── Accordion & sorting state ──
+  const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({
+    open: false,       // Open Requests collapsed by default
+    accepted: true,    // Accepted expanded by default
+    pending: true,     // Awaiting Decision expanded by default
+    declined: false,   // Declined collapsed by default
+  });
+  const [sortDir, setSortDir] = useState<Record<string, 'newest' | 'oldest'>>({
+    open: 'newest',
+    accepted: 'newest',
+    pending: 'newest',
+    declined: 'newest',
+  });
+
+  // ── Reminder state ──
+  const [reminderSettings, setReminderSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`vendor-quote-reminders-${businessId}`);
+      return saved ? JSON.parse(saved) : {
+        openRequestAlert: true,
+        acceptedReminder: true,
+        eventDayReminder: true,
+        reminderLeadHours: 24,
+      };
+    } catch { return { openRequestAlert: true, acceptedReminder: true, eventDayReminder: true, reminderLeadHours: 24 }; }
+  });
+  const [showReminderSettings, setShowReminderSettings] = useState(false);
+  const [activeReminders, setActiveReminders] = useState<Array<{ id: string; type: string; message: string; requestId: string }>>([]);
 
   // Track previous response statuses to detect real-time changes
   const prevResponseStatusRef = useRef<Record<string, string>>({});
@@ -287,14 +316,87 @@ export default function VendorQuoteResponse({
   const hasRespondedTo = (requestId: string) =>
     myResponses.some((r) => r.quoteRequestId === requestId);
 
+  // ── Section helpers ──
+  const toggleSection = (key: string) =>
+    setSectionExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleSort = (key: string) =>
+    setSortDir((prev) => ({ ...prev, [key]: prev[key] === 'newest' ? 'oldest' : 'newest' }));
+
+  const saveReminderSettings = (updates: Partial<typeof reminderSettings>) => {
+    setReminderSettings((prev: typeof reminderSettings) => {
+      const next = { ...prev, ...updates };
+      try { localStorage.setItem(`vendor-quote-reminders-${businessId}`, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const formatEventDate = (eventDate: any): string => {
+    if (!eventDate) return '';
+    const date = eventDate?.toDate?.() || new Date(eventDate?.seconds ? eventDate.seconds * 1000 : eventDate);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const getRequestEventMs = (req: CateringQuoteRequest): number => {
+    if (!req.eventDate) return 0;
+    const d = req.eventDate?.toDate?.() || new Date((req.eventDate as any)?.seconds ? (req.eventDate as any).seconds * 1000 : req.eventDate);
+    return d.getTime();
+  };
+
+  const sortRequests = (arr: CateringQuoteRequest[], dir: 'newest' | 'oldest') => {
+    return [...arr].sort((a, b) => {
+      const diff = getRequestEventMs(b) - getRequestEventMs(a);
+      return dir === 'newest' ? diff : -diff;
+    });
+  };
+
+  const sortResponses = (arr: CateringQuoteResponse[], dir: 'newest' | 'oldest') => {
+    return [...arr].sort((a, b) => {
+      const reqA = requests.find((r) => r.id === a.quoteRequestId);
+      const reqB = requests.find((r) => r.id === b.quoteRequestId);
+      const diff = getRequestEventMs(reqB as any || {} as any) - getRequestEventMs(reqA as any || {} as any);
+      return dir === 'newest' ? diff : -diff;
+    });
+  };
+
   // Filter out requests already responded to
-  const openRequests = requests.filter((r) => !hasRespondedTo(r.id));
+  const openRequests = sortRequests(requests.filter((r) => !hasRespondedTo(r.id)), sortDir.open);
   const respondedRequests = requests.filter((r) => hasRespondedTo(r.id));
 
   // Separate accepted responses for prominent display
-  const acceptedResponses = myResponses.filter((r) => r.status === 'accepted' || r.status === 'partially_accepted');
-  const pendingResponses = myResponses.filter((r) => r.status === 'submitted');
-  const declinedResponses = myResponses.filter((r) => r.status === 'declined');
+  const acceptedResponses = sortResponses(myResponses.filter((r) => r.status === 'accepted' || r.status === 'partially_accepted'), sortDir.accepted);
+  const pendingResponses = sortResponses(myResponses.filter((r) => r.status === 'submitted'), sortDir.pending);
+  const declinedResponses = sortResponses(myResponses.filter((r) => r.status === 'declined'), sortDir.declined);
+
+  // ── Reminder engine ──
+  useEffect(() => {
+    const check = () => {
+      const now = Date.now();
+      const reminders: Array<{ id: string; type: string; message: string; requestId: string }> = [];
+
+      if (reminderSettings.openRequestAlert) {
+        for (const req of requests.filter((r) => !hasRespondedTo(r.id))) {
+          const createdMs = req.createdAt?.toMillis?.() || (req.createdAt?.seconds ? req.createdAt.seconds * 1000 : 0);
+          if (createdMs > 0 && now - createdMs > 30 * 60 * 1000) {
+            reminders.push({ id: `open-${req.id}`, type: 'open', message: `Open request for ${req.cuisineCategory} (${req.headcount} guests) waiting >30 min`, requestId: req.id });
+          }
+        }
+      }
+      if (reminderSettings.eventDayReminder) {
+        const leadMs = (reminderSettings.reminderLeadHours || 24) * 60 * 60 * 1000;
+        for (const req of requests) {
+          const eventMs = getRequestEventMs(req);
+          if (eventMs > 0 && eventMs - now > 0 && eventMs - now < leadMs) {
+            reminders.push({ id: `event-${req.id}`, type: 'event', message: `Event for ${req.cuisineCategory} is within ${reminderSettings.reminderLeadHours}h — ${formatEventDate(req.eventDate)}`, requestId: req.id });
+          }
+        }
+      }
+      setActiveReminders(reminders);
+    };
+    check();
+    const interval = setInterval(check, 60_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requests, myResponses, reminderSettings]);
 
   if (loading) {
     return (
@@ -318,12 +420,107 @@ export default function VendorQuoteResponse({
         </p>
       </div>
 
-      {/* ══ Open requests (not yet responded to) ══ */}
-      <div>
-        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--aurora-text)' }}>
-          Open Requests ({openRequests.length})
-        </h3>
+      {/* ── Active Reminders Banner ── */}
+      {activeReminders.length > 0 && (
+        <div className="space-y-2">
+          {activeReminders.map((r) => (
+            <div
+              key={r.id}
+              className="flex items-center gap-2 p-3 rounded-xl text-xs font-medium"
+              style={{
+                backgroundColor: r.type === 'open' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(99, 102, 241, 0.08)',
+                color: r.type === 'open' ? '#D97706' : '#6366F1',
+              }}
+            >
+              {r.type === 'open' ? <Timer size={14} /> : <BellRing size={14} />}
+              {r.message}
+            </div>
+          ))}
+        </div>
+      )}
 
+      {/* ── Reminder Settings Toggle ── */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowReminderSettings(!showReminderSettings)}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors"
+          style={{ color: 'var(--aurora-text-secondary)', backgroundColor: showReminderSettings ? 'rgba(99,102,241,0.08)' : 'transparent' }}
+        >
+          <Bell size={14} /> Reminders
+        </button>
+      </div>
+
+      {showReminderSettings && (
+        <div className="p-4 rounded-2xl border space-y-3" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--aurora-text-secondary)' }}>Reminder Preferences</p>
+          {[
+            { key: 'openRequestAlert', label: 'Alert for unanswered requests (>30 min)' },
+            { key: 'eventDayReminder', label: 'Upcoming event day reminder' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center justify-between cursor-pointer">
+              <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>{label}</span>
+              <div
+                className="w-10 h-5 rounded-full relative transition-colors cursor-pointer"
+                style={{ backgroundColor: (reminderSettings as any)[key] ? '#6366F1' : 'var(--aurora-border)' }}
+                onClick={() => saveReminderSettings({ [key]: !(reminderSettings as any)[key] })}
+              >
+                <div
+                  className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+                  style={{ left: (reminderSettings as any)[key] ? '22px' : '2px' }}
+                />
+              </div>
+            </label>
+          ))}
+          <div className="flex items-center gap-2">
+            <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>Event lead time:</span>
+            <select
+              value={reminderSettings.reminderLeadHours}
+              onChange={(e) => saveReminderSettings({ reminderLeadHours: Number(e.target.value) })}
+              className="text-sm rounded-lg border px-2 py-1 outline-none"
+              style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text)' }}
+            >
+              {[6, 12, 24, 48, 72].map((h) => (
+                <option key={h} value={h}>{h}h</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* ══ Open requests (not yet responded to) ══ */}
+      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+        {/* Section header — collapsible */}
+        <button
+          onClick={() => toggleSection('open')}
+          className="w-full flex items-center justify-between px-4 py-3"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#F59E0B' }} />
+            <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Open Requests</span>
+            {openRequests.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#D97706' }}>
+                {openRequests.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {sectionExpanded.open && openRequests.length > 1 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSort('open'); }}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
+                style={{ color: 'var(--aurora-text-secondary)', backgroundColor: 'rgba(99,102,241,0.06)' }}
+                title={`Sort by date: ${sortDir.open}`}
+              >
+                <ArrowUpDown size={12} />
+                {sortDir.open === 'newest' ? 'Newest' : 'Oldest'}
+              </button>
+            )}
+            {sectionExpanded.open ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+          </div>
+        </button>
+
+        {sectionExpanded.open && (
+          <div className="border-t px-4 py-3" style={{ borderColor: 'var(--aurora-border)' }}>
         {openRequests.length === 0 ? (
           <div className="text-center py-8">
             <Package size={32} className="mx-auto mb-2 opacity-20" />
@@ -350,7 +547,7 @@ export default function VendorQuoteResponse({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                          {request.cuisineCategory} Catering
+                          {request.customerName || request.cuisineCategory} · {formatEventDate(request.eventDate)}
                         </span>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: '#D1FAE5', color: '#059669' }}>
                           {request.status === 'partially_accepted' ? 'Partial' : 'Open'}
@@ -359,10 +556,7 @@ export default function VendorQuoteResponse({
                       <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
                         <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>
                         <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} />
-                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : request.eventDate}
-                        </span>
+                        <span>{request.cuisineCategory}</span>
                       </div>
                     </div>
                     {isExpanded ? <ChevronUp size={18} className="opacity-40" /> : <ChevronDown size={18} className="opacity-40" />}
@@ -545,15 +739,49 @@ export default function VendorQuoteResponse({
             })}
           </div>
         )}
+          </div>
+        )}
       </div>
 
       {/* ══ Accepted quotes ══ */}
-      {acceptedResponses.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: '#059669' }}>
-            <CheckCircle2 size={16} />
-            Accepted ({acceptedResponses.length})
-          </h3>
+      <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+        <button
+          onClick={() => toggleSection('accepted')}
+          className="w-full flex items-center justify-between px-4 py-3"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#059669' }} />
+            <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Accepted</span>
+            {acceptedResponses.length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(5, 150, 105, 0.1)', color: '#059669' }}>
+                {acceptedResponses.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {sectionExpanded.accepted && acceptedResponses.length > 1 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleSort('accepted'); }}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
+                style={{ color: 'var(--aurora-text-secondary)', backgroundColor: 'rgba(99,102,241,0.06)' }}
+                title={`Sort by date: ${sortDir.accepted}`}
+              >
+                <ArrowUpDown size={12} />
+                {sortDir.accepted === 'newest' ? 'Newest' : 'Oldest'}
+              </button>
+            )}
+            {sectionExpanded.accepted ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+          </div>
+        </button>
+
+        {sectionExpanded.accepted && (
+          <div className="border-t px-4 py-3" style={{ borderColor: 'var(--aurora-border)' }}>
+        {acceptedResponses.length === 0 ? (
+          <div className="text-center py-6">
+            <CheckCircle2 size={28} className="mx-auto mb-2 opacity-20" />
+            <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>No accepted quotes yet</p>
+          </div>
+        ) : (
           <div className="space-y-3">
             {acceptedResponses.map((response) => {
               const request = requests.find((r) => r.id === response.quoteRequestId);
@@ -565,15 +793,20 @@ export default function VendorQuoteResponse({
                   className="p-4 rounded-2xl border-2"
                   style={{ backgroundColor: 'var(--aurora-surface)', borderColor: '#059669' }}
                 >
-                  {/* Status badge */}
+                  {/* Pill title: Customer Name · Date + Status badge */}
                   <div className="flex items-center justify-between mb-3">
-                    <span
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                      style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
-                    >
-                      <CheckCircle2 size={12} />
-                      {isPartial ? 'Partially Accepted' : 'Accepted'}
-                    </span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                        {response.customerName || request?.cuisineCategory || 'Catering'} · {request ? formatEventDate(request.eventDate) : ''}
+                      </span>
+                      <span
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                        style={{ backgroundColor: '#D1FAE5', color: '#059669' }}
+                      >
+                        <CheckCircle2 size={12} />
+                        {isPartial ? 'Partially Accepted' : 'Accepted'}
+                      </span>
+                    </div>
                     <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
                       {formatPrice(response.total)}
                     </span>
@@ -674,16 +907,42 @@ export default function VendorQuoteResponse({
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+          </div>
+        )}
+      </div>
 
       {/* ══ Pending quotes (submitted, awaiting customer decision) ══ */}
       {pendingResponses.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: '#6366F1' }}>
-            Awaiting Decision ({pendingResponses.length})
-          </h3>
-          <div className="space-y-2">
+        <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+          <button
+            onClick={() => toggleSection('pending')}
+            className="w-full flex items-center justify-between px-4 py-3"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6366F1' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Awaiting Decision</span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}>
+                {pendingResponses.length}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {sectionExpanded.pending && pendingResponses.length > 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleSort('pending'); }}
+                  className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors"
+                  style={{ color: 'var(--aurora-text-secondary)', backgroundColor: 'rgba(99,102,241,0.06)' }}
+                >
+                  <ArrowUpDown size={12} />
+                  {sortDir.pending === 'newest' ? 'Newest' : 'Oldest'}
+                </button>
+              )}
+              {sectionExpanded.pending ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+            </div>
+          </button>
+
+          {sectionExpanded.pending && (
+          <div className="border-t px-4 py-3 space-y-2" style={{ borderColor: 'var(--aurora-border)' }}>
             {pendingResponses.map((response) => {
               const request = requests.find((r) => r.id === response.quoteRequestId);
               const isExpanded = expandedId === `pending-${response.id}`;
@@ -706,12 +965,14 @@ export default function VendorQuoteResponse({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
-                          {request?.cuisineCategory || 'Catering'} · {request?.headcount || '?'} guests · {request?.deliveryCity || ''}
+                          {request?.customerName || request?.cuisineCategory || 'Catering'} · {request ? formatEventDate(request.eventDate) : ''}
                         </span>
                       </div>
-                      <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        Your quote: {isEditing && form ? formatPrice(formTotal) : formatPrice(response.total)}
-                      </p>
+                      <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        <span>{request?.headcount || '?'} guests</span>
+                        <span>{request?.deliveryCity || ''}</span>
+                        <span>Quote: {isEditing && form ? formatPrice(formTotal) : formatPrice(response.total)}</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span
@@ -931,16 +1192,29 @@ export default function VendorQuoteResponse({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
       {/* ══ Declined quotes ══ */}
       {declinedResponses.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--aurora-text-secondary)' }}>
-            Declined ({declinedResponses.length})
-          </h3>
-          <div className="space-y-2">
+        <div className="rounded-2xl border overflow-hidden" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
+          <button
+            onClick={() => toggleSection('declined')}
+            className="w-full flex items-center justify-between px-4 py-3"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#EF4444' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Declined</span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
+                {declinedResponses.length}
+              </span>
+            </div>
+            {sectionExpanded.declined ? <ChevronUp size={16} className="opacity-40" /> : <ChevronDown size={16} className="opacity-40" />}
+          </button>
+
+          {sectionExpanded.declined && (
+          <div className="border-t px-4 py-3 space-y-2" style={{ borderColor: 'var(--aurora-border)' }}>
             {declinedResponses.map((response) => {
               const request = requests.find((r) => r.id === response.quoteRequestId);
               const isExpanded = expandedId === `declined-${response.id}`;
@@ -957,7 +1231,7 @@ export default function VendorQuoteResponse({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
-                          {request?.cuisineCategory || 'Catering'} · {request?.headcount || '?'} guests · {request?.deliveryCity || ''}
+                          {request?.customerName || request?.cuisineCategory || 'Catering'} · {request ? formatEventDate(request.eventDate) : ''}
                         </span>
                       </div>
                       <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
@@ -1008,6 +1282,7 @@ export default function VendorQuoteResponse({
               );
             })}
           </div>
+          )}
         </div>
       )}
     </div>
