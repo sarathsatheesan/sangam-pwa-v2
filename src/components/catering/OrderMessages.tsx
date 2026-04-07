@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, MessageSquare, ChevronDown, ChevronUp, Check, CheckCheck } from 'lucide-react';
 import type { OrderNote } from '@/services/cateringService';
-import { addOrderNote, subscribeToOrderNotes } from '@/services/cateringService';
+import { addOrderNote, subscribeToOrderNotes, markOrderNotesRead } from '@/services/cateringService';
 
 interface OrderMessagesProps {
   orderId: string;
@@ -39,6 +39,17 @@ export default function OrderMessages({
     }
   }, [notes.length, expanded]);
 
+  // Mark messages as read when panel is expanded and there are unread messages
+  useEffect(() => {
+    if (!expanded || !currentUserId) return;
+    const hasUnread = notes.some(
+      (n) => n.senderId !== currentUserId && !(n.readBy || []).includes(currentUserId),
+    );
+    if (hasUnread) {
+      markOrderNotesRead(orderId, currentUserId).catch(() => {});
+    }
+  }, [expanded, notes, orderId, currentUserId]);
+
   const handleSend = async () => {
     const text = draft.trim();
     if (!text || sending) return;
@@ -72,7 +83,10 @@ export default function OrderMessages({
       ' ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
-  const unreadCount = 0; // Future: track read status
+  // Count unread messages from the OTHER party
+  const unreadCount = notes.filter(
+    (n) => n.senderId !== currentUserId && !(n.readBy || []).includes(currentUserId),
+  ).length;
 
   return (
     <div
@@ -85,17 +99,25 @@ export default function OrderMessages({
         className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium transition-colors hover:opacity-80"
         style={{ color: 'var(--aurora-text)' }}
         aria-expanded={expanded}
-        aria-label={`Order messages — ${notes.length} messages`}
+        aria-label={`Order messages — ${notes.length} messages${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
       >
         <div className="flex items-center gap-2">
           <MessageSquare size={16} style={{ color: 'var(--color-aurora-indigo, #6366F1)' }} />
           <span>Messages</span>
-          {notes.length > 0 && (
+          {notes.length > 0 && unreadCount === 0 && (
             <span
               className="text-xs px-1.5 py-0.5 rounded-full"
               style={{ backgroundColor: 'rgba(99,102,241,0.1)', color: 'var(--color-aurora-indigo, #6366F1)' }}
             >
               {notes.length}
+            </span>
+          )}
+          {unreadCount > 0 && (
+            <span
+              className="text-xs px-1.5 py-0.5 rounded-full font-semibold text-white"
+              style={{ backgroundColor: '#EF4444', minWidth: '20px', textAlign: 'center' }}
+            >
+              {unreadCount}
             </span>
           )}
         </div>
@@ -118,6 +140,9 @@ export default function OrderMessages({
             ) : (
               notes.map((note) => {
                 const isOwn = note.senderId === currentUserId;
+                const readBy = note.readBy || [];
+                // For own messages: show read receipt if the OTHER party has read it
+                const isRead = isOwn && readBy.length > 0;
                 return (
                   <div
                     key={note.id}
@@ -138,9 +163,19 @@ export default function OrderMessages({
                     >
                       {note.text}
                     </div>
-                    <span className="text-[10px] mt-0.5" style={{ color: 'var(--aurora-text-muted)' }}>
-                      {formatTime(note.createdAt)}
-                    </span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>
+                        {formatTime(note.createdAt)}
+                      </span>
+                      {/* Read receipt for own messages */}
+                      {isOwn && (
+                        isRead ? (
+                          <CheckCheck size={12} style={{ color: '#6366F1' }} aria-label="Read" />
+                        ) : (
+                          <Check size={12} style={{ color: 'var(--aurora-text-muted)' }} aria-label="Sent" />
+                        )
+                      )}
+                    </div>
                   </div>
                 );
               })

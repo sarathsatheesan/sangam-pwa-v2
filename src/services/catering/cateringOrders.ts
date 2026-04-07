@@ -596,3 +596,30 @@ export function subscribeToOrderNotes(
     callback([]);
   });
 }
+
+/**
+ * Mark all unread notes in an order as read by a specific user.
+ * Updates each note's `readBy` array and sets `readAt` timestamp (for sender's read receipt).
+ */
+export async function markOrderNotesRead(
+  orderId: string,
+  userId: string,
+): Promise<void> {
+  const notesCol = collection(db, ORDERS_COL, orderId, ORDER_NOTES_SUB);
+  const snap = await getDocs(notesCol);
+  const batch: Promise<void>[] = [];
+  for (const noteDoc of snap.docs) {
+    const data = noteDoc.data();
+    const readBy: string[] = data.readBy || [];
+    // Only update notes NOT sent by this user AND not already marked as read
+    if (data.senderId !== userId && !readBy.includes(userId)) {
+      batch.push(
+        updateDoc(doc(db, ORDERS_COL, orderId, ORDER_NOTES_SUB, noteDoc.id), {
+          readBy: arrayUnion(userId),
+          readAt: serverTimestamp(),
+        }),
+      );
+    }
+  }
+  await Promise.all(batch);
+}

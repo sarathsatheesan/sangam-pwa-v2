@@ -58,6 +58,7 @@ export {
   createOrdersFromQuote,
   addOrderNote,
   subscribeToOrderNotes,
+  markOrderNotesRead,
 } from './cateringOrders';
 
 // Quote requests & responses

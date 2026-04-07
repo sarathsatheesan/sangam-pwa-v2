@@ -114,6 +114,8 @@ export interface OrderNote {
   senderRole: 'customer' | 'vendor';
   text: string;
   createdAt: any;
+  readBy?: string[];     // Array of userIds who have read this note
+  readAt?: any;          // Timestamp when the OTHER party first read it (for sender's read receipt)
 }
 
 export interface QuoteRequestItem {
