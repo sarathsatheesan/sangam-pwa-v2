@@ -22,7 +22,7 @@ import {
   getBusinessPaymentInfo,
   formatPrice,
   calculateOrderTotal,
-  findOrCreateConversation,
+  // findOrCreateConversation removed — messaging now uses OrderNotes
   subscribeToCateringNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -131,9 +131,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   const isFirstLoadRef = React.useRef(true);
 
   // ── Vendor messaging state (H-04) ──
-  const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
-  const [messageText, setMessageText] = useState('');
-  const [sendingMessage, setSendingMessage] = useState(false);
+  // messaging modal state removed — now using inline OrderMessages component
 
   useEffect(() => {
     const unsub = subscribeToBusinessOrders(businessId, async (incoming) => {
@@ -1275,26 +1273,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                               />
                             )}
 
-                            {/* Message Customer button */}
-                            {!['cancelled', 'delivered'].includes(order.status) && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await findOrCreateConversation(
-                                      order.customerId, user!.uid, `Re: Order #${order.id.slice(0, 8)}`
-                                    );
-                                    setMessagingOrderId(order.id);
-                                  } catch (err) {
-                                    addToast('Could not start conversation', 'error');
-                                  }
-                                }}
-                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border"
-                                style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.04)' }}
-                              >
-                                <MessageSquare size={14} />
-                                Message Customer
-                              </button>
-                            )}
+                            {/* Messaging is handled inline via OrderMessages above */}
 
                             {/* Action buttons */}
                             {order.status === 'pending' && (
@@ -1614,26 +1593,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                               />
                             )}
 
-                            {/* Message Customer button */}
-                            {!['cancelled', 'delivered'].includes(order.status) && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await findOrCreateConversation(
-                                      order.customerId, user!.uid, `Re: Order #${order.id.slice(0, 8)}`
-                                    );
-                                    setMessagingOrderId(order.id);
-                                  } catch (err) {
-                                    addToast('Could not start conversation', 'error');
-                                  }
-                                }}
-                                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border"
-                                style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: 'rgba(99,102,241,0.04)' }}
-                              >
-                                <MessageSquare size={14} />
-                                Message Customer
-                              </button>
-                            )}
+                            {/* Messaging is handled inline via OrderMessages above */}
 
                             {/* Action buttons - Status advancement for active orders */}
                             {order.status === 'confirmed' && (
@@ -2012,61 +1972,7 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
         </div>
       )}
 
-      {/* Inline messaging modal (H-04) */}
-      {messagingOrderId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <div className="w-full max-w-md rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
-            <h3 className="text-lg font-semibold mb-3">Message Customer</h3>
-            <p className="text-sm mb-3" style={{ color: 'var(--aurora-text-muted)' }}>Order #{messagingOrderId.slice(0, 8)}</p>
-            <textarea
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              placeholder="Type your message..."
-              maxLength={500}
-              rows={4}
-              className="w-full rounded-lg border p-3 text-sm resize-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 outline-none" style={{ borderColor: 'var(--aurora-border)' }}
-            />
-            <div className="text-xs text-right mt-1" style={{ color: 'var(--aurora-text-muted)' }}>{messageText.length}/500</div>
-            <div className="flex gap-3 mt-4 justify-end">
-              <button
-                onClick={() => { setMessagingOrderId(null); setMessageText(''); }}
-                className="px-4 py-2 text-sm rounded-lg border hover:bg-gray-50" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  if (!messageText.trim()) return;
-                  setSendingMessage(true);
-                  try {
-                    const order = orders.find(o => o.id === messagingOrderId);
-                    if (!order) throw new Error('Order not found');
-                    const convId = await findOrCreateConversation(order.customerId, user!.uid);
-                    await addDoc(collection(db, 'conversations', convId, 'messages'), {
-                      text: messageText.trim(),
-                      senderId: user!.uid,
-                      createdAt: Timestamp.now(),
-                      encrypted: false,
-                    });
-                    addToast('Message sent!', 'success');
-                    setMessagingOrderId(null);
-                    setMessageText('');
-                  } catch (err) {
-                    addToast('Failed to send message', 'error');
-                  } finally {
-                    setSendingMessage(false);
-                  }
-                }}
-                disabled={sendingMessage || !messageText.trim()}
-                className="px-4 py-2 text-sm rounded-lg text-white disabled:opacity-50"
-                style={{ backgroundColor: '#6366F1' }}
-              >
-                {sendingMessage ? 'Sending...' : 'Send'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Messaging is now handled inline via OrderMessages component on each order card */}
 
       {/* SB-29: Batch Decline Confirmation Dialog */}
       {showBatchDeclineConfirm && (

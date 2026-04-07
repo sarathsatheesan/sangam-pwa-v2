@@ -81,6 +81,21 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     return unsub;
   }, [quoteRequest.id]);
 
+  // ── Check if orders already exist for this quote (survives page refresh) ──
+  useEffect(() => {
+    if (ordersCreated) return; // already know
+    import('firebase/firestore').then(({ collection, query, where, getDocs }) =>
+      getDocs(query(
+        collection(db, 'cateringOrders'),
+        where('quoteRequestId', '==', quoteRequest.id),
+      )).then((snap) => {
+        if (snap.size > 0) {
+          setOrdersCreated(true);
+        }
+      })
+    ).catch(() => {});
+  }, [quoteRequest.id, ordersCreated]);
+
   // ── Compute assigned items from the quote request's itemAssignments ──
   // Falls back to deriving assignments from accepted/partially_accepted responses
   // when itemAssignments is missing (e.g., orders accepted via the old full-accept flow).

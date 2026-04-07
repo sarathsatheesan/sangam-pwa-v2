@@ -14,7 +14,7 @@ import {
   MessageSquare, AlertTriangle,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
-import { subscribeToCustomerOrders, formatPrice, batchHasReviewedOrders, cancelOrder, getBusinessPaymentInfo, findOrCreateConversation, notifyVendorModificationRejected, updateOrderPaymentStatus } from '@/services/cateringService';
+import { subscribeToCustomerOrders, formatPrice, batchHasReviewedOrders, cancelOrder, getBusinessPaymentInfo, notifyVendorModificationRejected, updateOrderPaymentStatus } from '@/services/cateringService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
@@ -101,7 +101,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
   const [cancelReason, setCancelReason] = useState('');
   const [cancelOtherText, setCancelOtherText] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
-  const [messagingOrderId, setMessagingOrderId] = useState<string | null>(null);
+  // messagingOrderId removed — messaging is now inline via OrderMessages component
   const [respondingToModification, setRespondingToModification] = useState<string | null>(null);
 
   const cancelDialogClose = useCallback(() => {
@@ -603,23 +603,13 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         />
                       )}
 
-                      {/* ── In-order messages ── */}
+                      {/* ── In-order messages (OrderNotes subcollection — works for both customer & vendor) ── */}
                       {!['cancelled'].includes(order.status) && user && (
                         <OrderMessages
                           orderId={order.id}
                           currentUserId={user.uid}
                           currentUserName={user.displayName || 'Customer'}
                           currentUserRole="customer"
-                        />
-                      )}
-
-                      {/* ── Message Vendor (#14) ── */}
-                      {!['cancelled', 'delivered'].includes(order.status) && (
-                        <MessageVendorButton
-                          businessId={order.businessId}
-                          businessName={order.businessName}
-                          orderId={order.id}
-                          onOpenMessaging={() => setMessagingOrderId(order.id)}
                         />
                       )}
 
@@ -708,14 +698,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
         />
       )}
 
-      {/* Inline messaging modal */}
-      {messagingOrderId && (
-        <InlineMessagingModal
-          orderId={messagingOrderId}
-          onClose={() => setMessagingOrderId(null)}
-          orders={orders}
-        />
-      )}
+      {/* Messaging is now handled inline via OrderMessages component on each order card */}
 
       {/* Cancel order dialog */}
       {cancellingOrderId && (

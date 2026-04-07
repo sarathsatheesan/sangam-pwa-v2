@@ -469,6 +469,16 @@ export async function createOrdersFromQuote(
   const customerEmail = acceptedResponse?.customerEmail || '';
   const customerPhone = acceptedResponse?.customerPhone || '';
 
+  // ── Duplicate prevention: check if orders already exist for this quote ──
+  const existingOrdersSnap = await getDocs(query(
+    collection(db, ORDERS_COL),
+    where('quoteRequestId', '==', quoteRequest.id),
+  ));
+  if (existingOrdersSnap.size > 0) {
+    console.log('[createOrdersFromQuote] Orders already exist for quote', quoteRequest.id, '— returning existing IDs');
+    return existingOrdersSnap.docs.map((d) => d.id);
+  }
+
   const orderIds: string[] = [];
 
   for (const [businessId, vendorAssignments] of vendorGroups) {
