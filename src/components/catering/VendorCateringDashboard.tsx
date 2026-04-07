@@ -280,7 +280,9 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
 
         // Pending orders sitting > 30 min
         if (reminderSettings.pendingAlert && order.status === 'pending' && createdMs && (now - createdMs) > 30 * 60 * 1000) {
-          reminders.push({ id: `pending_${order.id}`, type: 'pending', message: `Order from ${order.customerName} has been waiting ${Math.round((now - createdMs) / 60000)} min`, orderId: order.id });
+          const elapsedMin = Math.round((now - createdMs) / 60000);
+          const waitLabel = elapsedMin < 60 ? `${elapsedMin} min` : elapsedMin < 1440 ? `${(elapsedMin / 60).toFixed(1)} hrs` : `${(elapsedMin / 1440).toFixed(1)} days`;
+          reminders.push({ id: `pending_${order.id}`, type: 'pending', message: `Order from ${order.customerName} has been waiting ${waitLabel}`, orderId: order.id });
         }
         // Preparing > 2 hours
         if (reminderSettings.preparingReminder && order.status === 'preparing') {

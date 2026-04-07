@@ -149,3 +149,29 @@ export {
   markAllNotificationsRead,
   getUnreadNotificationCount,
 } from './cateringNotifications';
+
+// Notification types & preferences (Phase 1–4)
+export type {
+  NotificationUrgency,
+  NotificationCategory,
+  NotificationEventType,
+  NotificationEventConfig,
+  NotificationPreferences,
+  NotificationDocument,
+  EmailTemplate,
+  SmsTemplate,
+} from './notificationTypes';
+export {
+  URGENCY_CHANNELS,
+  NOTIFICATION_EVENTS,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from './notificationTypes';
+export {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  toggleCategoryChannel,
+  updateQuietHours,
+  resolveChannels,
+  isInQuietHours,
+  getEffectiveChannels,
+} from './notificationPreferences';

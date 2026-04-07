@@ -395,7 +395,9 @@ export default function VendorQuoteResponse({
         for (const req of requests.filter((r) => !hasRespondedTo(r.id))) {
           const createdMs = req.createdAt?.toMillis?.() || (req.createdAt?.seconds ? req.createdAt.seconds * 1000 : 0);
           if (createdMs > 0 && now - createdMs > 30 * 60 * 1000) {
-            reminders.push({ id: `open-${req.id}`, type: 'open', message: `Open request for ${req.cuisineCategory} (${req.headcount} guests) waiting >30 min`, requestId: req.id });
+            const elapsedMin = Math.round((now - createdMs) / 60000);
+            const waitLabel = elapsedMin < 60 ? `${elapsedMin} min` : elapsedMin < 1440 ? `${(elapsedMin / 60).toFixed(1)} hrs` : `${(elapsedMin / 1440).toFixed(1)} days`;
+            reminders.push({ id: `open-${req.id}`, type: 'open', message: `Open request for ${req.cuisineCategory} (${req.headcount} guests) waiting ${waitLabel}`, requestId: req.id });
           }
         }
       }

@@ -7,6 +7,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
 import { CulturalThemeProvider } from './contexts/CulturalThemeContext';
 import { PrivateRoute } from './components/shared/PrivateRoute';
+import { NotificationProviderWrapper } from './components/shared/NotificationProviderWrapper';
 import './index.css';
 
 // Lazy load auth routes
@@ -32,6 +33,9 @@ const SettingsPage = lazy(() => import('./pages/settings'));
 const BusinessRegisterPage = lazy(() => import('./pages/business/register'));
 const CateringPage = lazy(() => import('./pages/catering'));
 const HomePage = lazy(() => import('./pages/main/home'));
+const NotificationCenterPage = lazy(() => import('./components/shared/NotificationCenter'));
+const NotificationSettingsPage = lazy(() => import('./components/shared/NotificationSettings'));
+const NotificationAnalyticsPage = lazy(() => import('./components/shared/NotificationAnalytics'));
 
 // Loading spinner component
 const LoadingSpinner = () => (
@@ -72,6 +76,7 @@ function App() {
           <CulturalThemeProvider>
           <LocationProvider>
             <ToastProvider>
+            <NotificationProviderWrapper>
               <Routes>
                 {/* Public Auth Routes */}
                 <Route path="/auth/login" element={<Suspense fallback={<LoadingSpinner />}><LoginPage /></Suspense>} />
@@ -98,12 +103,16 @@ function App() {
                     <Route path="/settings" element={<Suspense fallback={<LoadingSpinner />}><SettingsPage /></Suspense>} />
                     <Route path="/business/register" element={<Suspense fallback={<LoadingSpinner />}><BusinessRegisterPage /></Suspense>} />
                     <Route path="/catering" element={<Suspense fallback={<LoadingSpinner />}><CateringPage /></Suspense>} />
+                    <Route path="/notifications" element={<Suspense fallback={<LoadingSpinner />}><NotificationCenterPage /></Suspense>} />
+                    <Route path="/notifications/settings" element={<Suspense fallback={<LoadingSpinner />}><NotificationSettingsPage /></Suspense>} />
+                    <Route path="/notifications/analytics" element={<Suspense fallback={<LoadingSpinner />}><NotificationAnalyticsPage /></Suspense>} />
                   </Route>
                 </Route>
 
                 {/* Catch-all redirect */}
                 <Route path="*" element={<Navigate to="/home" replace />} />
               </Routes>
+            </NotificationProviderWrapper>
             </ToastProvider>
           </LocationProvider>
           </CulturalThemeProvider>

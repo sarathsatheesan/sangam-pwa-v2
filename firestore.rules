@@ -422,11 +422,35 @@ service cloud.firestore {
       allow create: if request.auth != null;
     }
 
-    // ─── Notifications (moderation appeals, etc.) ────
+    // ─── Notifications (email/SMS/push queue — written by client, processed by Cloud Functions) ────
     match /notifications/{notifId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update: if request.auth != null && request.auth.uid == resource.data.recipientId;
+    }
+
+    // ─── Catering In-App Notifications ────────────────
+    match /cateringNotifications/{notifId} {
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.recipientId;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && request.auth.uid == resource.data.recipientId;
+      allow delete: if false;
+    }
+
+    // ─── Notification Preferences (per-user settings) ──
+    match /notificationPreferences/{userId} {
+      allow read: if request.auth != null
+        && request.auth.uid == userId;
+      allow write: if request.auth != null
+        && request.auth.uid == userId;
+    }
+
+    // ─── Notification Analytics (admin read-only, Cloud Functions write) ──
+    match /notificationAnalytics/{docId} {
+      allow read: if request.auth != null && isAdminUser();
+      allow write: if false; // Only Cloud Functions write via admin SDK
     }
 
     // ─── User warnings ─────────────────────────────────

@@ -7,6 +7,7 @@ import { useLocation } from '../../contexts/LocationContext';
 import { signOutUser } from '../../services/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import { LocationPicker } from '../shared/LocationPicker';
+import NotificationBell from '../shared/NotificationBell';
 import { copyToClipboard } from '@/utils/clipboard';
 
 // Announcement type
@@ -242,6 +243,9 @@ export const AppHeader: React.FC = () => {
                 </span>
               </button>
             )}
+
+            {/* Notification Bell */}
+            {user && <NotificationBell />}
 
             <button
               onClick={() => setLocationPickerOpen(true)}
