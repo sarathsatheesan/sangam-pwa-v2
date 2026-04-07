@@ -1263,13 +1263,15 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                               </div>
                             )}
 
-                            {/* ── In-order messages ── */}
+                            {/* ── In-order messages (available for 48hrs after delivery) ── */}
                             {!['cancelled'].includes(order.status) && user && (
                               <OrderMessages
                                 orderId={order.id}
                                 currentUserId={user.uid}
                                 currentUserName={businessName || 'Vendor'}
                                 currentUserRole="vendor"
+                                orderStatus={order.status}
+                                deliveredAt={order.statusHistory?.find((s: any) => s.status === 'delivered')?.timestamp}
                               />
                             )}
 
@@ -1583,13 +1585,15 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                               </div>
                             )}
 
-                            {/* ── In-order messages ── */}
+                            {/* ── In-order messages (available for 48hrs after delivery) ── */}
                             {!['cancelled'].includes(order.status) && user && (
                               <OrderMessages
                                 orderId={order.id}
                                 currentUserId={user.uid}
                                 currentUserName={businessName || 'Vendor'}
                                 currentUserRole="vendor"
+                                orderStatus={order.status}
+                                deliveredAt={order.statusHistory?.find((s: any) => s.status === 'delivered')?.timestamp}
                               />
                             )}
 

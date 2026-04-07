@@ -604,12 +604,15 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                       )}
 
                       {/* ── In-order messages (OrderNotes subcollection — works for both customer & vendor) ── */}
+                      {/* Available for all active orders + 48hrs after delivery */}
                       {!['cancelled'].includes(order.status) && user && (
                         <OrderMessages
                           orderId={order.id}
                           currentUserId={user.uid}
                           currentUserName={user.displayName || 'Customer'}
                           currentUserRole="customer"
+                          orderStatus={order.status}
+                          deliveredAt={order.statusHistory?.find((s: any) => s.status === 'delivered')?.timestamp}
                         />
                       )}
 
