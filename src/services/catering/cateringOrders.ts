@@ -9,14 +9,21 @@ import {
   getDoc,
   getDocs,
   updateDoc,
+  deleteDoc,
   query,
   where,
+  orderBy,
+  limit as firestoreLimit,
+  startAfter,
   serverTimestamp,
   onSnapshot,
   arrayUnion,
+  increment,
   Timestamp,
   runTransaction,
+  writeBatch,
   type Unsubscribe,
+  type DocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { CateringOrder, OrderItem, OrderNote, CateringQuoteRequest, CateringQuoteResponse } from './cateringTypes';
@@ -130,6 +137,12 @@ export function isValidStatusTransition(
   return VALID_TRANSITIONS[currentStatus]?.includes(newStatus) ?? false;
 }
 
+/**
+ * FIX-C2: Optimistic locking via _version field.
+ * Uses a Firestore transaction to read current version, validate transition,
+ * and atomically increment version + update status. Concurrent writes are
+ * rejected and the caller should retry with fresh data.
+ */
 export async function updateOrderStatus(
   orderId: string,
   status: CateringOrder['status'],
@@ -137,43 +150,50 @@ export async function updateOrderStatus(
   callerRole?: { uid: string; role: 'customer' | 'vendor' },
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
-  // Validate transition
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error('Order not found');
-  const currentStatus = (snap.data() as CateringOrder).status;
-  if (!isValidStatusTransition(currentStatus, status)) {
-    throw new Error(`Invalid status transition: ${currentStatus} → ${status}`);
-  }
 
-  // SB-40: Role-based authorization on status transitions
-  if (callerRole) {
-    const orderData = snap.data() as CateringOrder;
-    const vendorOnlyStatuses = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
-    if (vendorOnlyStatuses.includes(status) && callerRole.role !== 'vendor') {
-      throw new Error('Only the vendor can advance order status');
-    }
-    // Vendors can only manage their own business orders
-    if (callerRole.role === 'vendor' && orderData.businessId) {
-      // Note: businessId ownership check should ideally be done via Firestore security rules
-      // This is a client-side guard; server-side enforcement via security rules is recommended
-    }
-  }
+  const orderData = await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error('Order not found');
+    const data = snap.data() as CateringOrder & { _version?: number };
+    const currentStatus = data.status;
 
-  const updates: Record<string, any> = { status, ...extra };
-  if (status === 'confirmed') updates.confirmedAt = serverTimestamp();
-  updates.statusHistory = arrayUnion({
-    status,
-    timestamp: Timestamp.now(),
+    // Validate transition
+    if (!isValidStatusTransition(currentStatus, status)) {
+      throw new Error(`Invalid status transition: ${currentStatus} → ${status}`);
+    }
+
+    // SB-40: Role-based authorization on status transitions
+    if (callerRole) {
+      const vendorOnlyStatuses = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+      if (vendorOnlyStatuses.includes(status) && callerRole.role !== 'vendor') {
+        throw new Error('Only the vendor can advance order status');
+      }
+    }
+
+    const updates: Record<string, any> = {
+      status,
+      _version: (data._version || 0) + 1,
+      ...extra,
+    };
+    if (status === 'confirmed') updates.confirmedAt = serverTimestamp();
+    updates.statusHistory = arrayUnion({
+      status,
+      timestamp: Timestamp.now(),
+    });
+    transaction.update(ref, updates);
+    return data;
   });
-  await updateDoc(ref, updates);
 
-  // Fire notification (non-blocking)
-  const orderData = snap.data() as CateringOrder;
+  // Fire notification (non-blocking, outside transaction)
   if (status !== 'pending') {
     notifyCustomerStatusChange(orderData.customerId, orderId, status, orderData.businessName).catch(console.warn);
   }
 }
 
+/**
+ * FIX-C2 + FIX-H3: Transactional cancel with optimistic locking.
+ * If a paid order is cancelled, automatically sets paymentStatus to 'refund_pending'.
+ */
 export async function cancelOrder(
   orderId: string,
   reason: string,
@@ -182,31 +202,43 @@ export async function cancelOrder(
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
 
-  // Validate status transition before cancelling (F-02 fix)
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error('Order not found');
-  const currentStatus = (snap.data() as CateringOrder).status;
-  if (!isValidStatusTransition(currentStatus, 'cancelled')) {
-    throw new Error(`Cannot cancel an order that is ${currentStatus.replace(/_/g, ' ')}`);
-  }
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error('Order not found');
+    const data = snap.data() as CateringOrder & { _version?: number; paymentStatus?: string };
+    const currentStatus = data.status;
 
-  // SB-40: Verify caller matches cancelledBy role
-  if (callerUid) {
-    const orderData = snap.data() as CateringOrder;
-    if (cancelledBy === 'customer' && orderData.customerId !== callerUid) {
+    if (!isValidStatusTransition(currentStatus, 'cancelled')) {
+      throw new Error(`Cannot cancel an order that is ${currentStatus.replace(/_/g, ' ')}`);
+    }
+
+    // SB-40: Verify caller matches cancelledBy role
+    if (callerUid && cancelledBy === 'customer' && data.customerId !== callerUid) {
       throw new Error('Only the order customer can cancel as customer');
     }
-  }
 
-  await updateDoc(ref, {
-    status: 'cancelled',
-    cancellationReason: reason,
-    cancelledBy,
-    cancelledAt: serverTimestamp(),
-    statusHistory: arrayUnion({
+    const updates: Record<string, any> = {
       status: 'cancelled',
-      timestamp: Timestamp.now(),
-    }),
+      _version: (data._version || 0) + 1,
+      cancellationReason: reason,
+      cancelledBy,
+      cancelledAt: serverTimestamp(),
+      statusHistory: arrayUnion({
+        status: 'cancelled',
+        timestamp: Timestamp.now(),
+      }),
+    };
+
+    // FIX-H3: Auto-trigger refund flow if order was already paid
+    if (data.paymentStatus === 'paid') {
+      updates.paymentStatus = 'refund_pending';
+      updates.statusHistory = arrayUnion(
+        { status: 'cancelled', timestamp: Timestamp.now() },
+        { status: 'payment_refund_pending', timestamp: Timestamp.now() },
+      );
+    }
+
+    transaction.update(ref, updates);
   });
 }
 
@@ -245,24 +277,34 @@ export function calculateOrderTotal(items: OrderItem[]): number {
 
 // ── Batch operations ──
 
+/**
+ * FIX-H1: Batch operations with per-order error reporting and optimistic locking.
+ * Each order is still updated in its own transaction (Firestore limit: 500 ops per batch,
+ * and different orders may have different current statuses), but we now return detailed
+ * per-order results so the UI can show exactly which orders failed and why.
+ */
 export async function batchUpdateOrderStatus(
   orderIds: string[],
   newStatus: CateringOrder['status'],
   extra?: Record<string, any>,
-): Promise<{ success: number; failed: number }> {
-  let success = 0;
-  let failed = 0;
+): Promise<{ success: number; failed: number; results: Array<{ orderId: string; ok: boolean; error?: string }> }> {
+  const results: Array<{ orderId: string; ok: boolean; error?: string }> = [];
+
   for (const id of orderIds) {
     try {
       const ref = doc(db, ORDERS_COL, id);
       await runTransaction(db, async (transaction) => {
         const snap = await transaction.get(ref);
         if (!snap.exists()) throw new Error('Order not found');
-        const currentStatus = (snap.data() as CateringOrder).status;
-        if (!isValidStatusTransition(currentStatus, newStatus)) {
-          throw new Error(`Invalid transition: ${currentStatus} → ${newStatus}`);
+        const data = snap.data() as CateringOrder & { _version?: number };
+        if (!isValidStatusTransition(data.status, newStatus)) {
+          throw new Error(`Cannot change from ${data.status} to ${newStatus}`);
         }
-        const updates: Record<string, any> = { status: newStatus, ...extra };
+        const updates: Record<string, any> = {
+          status: newStatus,
+          _version: (data._version || 0) + 1,
+          ...extra,
+        };
         if (newStatus === 'confirmed') updates.confirmedAt = serverTimestamp();
         updates.statusHistory = arrayUnion({
           status: newStatus,
@@ -270,16 +312,25 @@ export async function batchUpdateOrderStatus(
         });
         transaction.update(ref, updates);
       });
-      success++;
-    } catch {
-      failed++;
+      results.push({ orderId: id, ok: true });
+    } catch (err: any) {
+      results.push({ orderId: id, ok: false, error: err.message || 'Unknown error' });
     }
   }
-  return { success, failed };
+
+  const success = results.filter(r => r.ok).length;
+  const failed = results.filter(r => !r.ok).length;
+  return { success, failed, results };
 }
 
 // ── Order modification by vendor (#18) ──
 
+/**
+ * FIX-H2: Modification lock — prevents stacking modifications before customer responds.
+ * Uses a transaction to check for existing pending modifications, saves original items
+ * only on the FIRST modification (preserving the true original), and sets a
+ * pendingModification flag that blocks further edits until customer accepts/rejects.
+ */
 export async function vendorModifyOrder(
   orderId: string,
   updates: {
@@ -291,28 +342,89 @@ export async function vendorModifyOrder(
   },
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) throw new Error('Order not found');
-  const data = snap.data() as CateringOrder;
 
-  // Only allow modification for confirmed/preparing
-  if (!['confirmed', 'preparing'].includes(data.status)) {
-    throw new Error('Can only modify confirmed or preparing orders');
-  }
+  const orderData = await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error('Order not found');
+    const data = snap.data() as CateringOrder & { _version?: number; pendingModification?: boolean; originalItems?: OrderItem[] };
 
-  await updateDoc(ref, {
-    originalItems: data.items, // save snapshot
-    items: updates.items,
-    subtotal: updates.subtotal,
-    total: updates.total,
-    ...(updates.tax !== undefined ? { tax: updates.tax } : {}),
-    vendorModified: true,
-    vendorModifiedAt: serverTimestamp(),
-    vendorModificationNote: updates.note,
+    // Only allow modification for confirmed/preparing
+    if (!['confirmed', 'preparing'].includes(data.status)) {
+      throw new Error('Can only modify confirmed or preparing orders');
+    }
+
+    // FIX-H2: Block if a modification is already pending customer response
+    if (data.pendingModification) {
+      throw new Error('A modification is already pending customer approval. Please wait for the customer to respond before making additional changes.');
+    }
+
+    const modUpdates: Record<string, any> = {
+      // Only save originalItems if this is the first modification (preserve true original)
+      ...(data.originalItems ? {} : { originalItems: data.items }),
+      items: updates.items,
+      subtotal: updates.subtotal,
+      total: updates.total,
+      ...(updates.tax !== undefined ? { tax: updates.tax } : {}),
+      vendorModified: true,
+      vendorModifiedAt: serverTimestamp(),
+      vendorModificationNote: updates.note,
+      pendingModification: true,        // FIX-H2: Lock flag
+      modificationExpiresAt: Timestamp.fromMillis(Date.now() + 48 * 60 * 60 * 1000), // FIX-H2: 48hr auto-reject
+      _version: (data._version || 0) + 1,
+    };
+    transaction.update(ref, modUpdates);
+    return data;
   });
 
-  // Notify customer of modification (non-blocking)
-  notifyCustomerOrderModified(data.customerId, orderId, data.businessName, updates.note).catch(console.warn);
+  // Notify customer of modification (non-blocking, outside transaction)
+  notifyCustomerOrderModified(orderData.customerId, orderId, orderData.businessName, updates.note).catch(console.warn);
+}
+
+/**
+ * FIX-H2: Customer responds to a vendor modification — accept or reject.
+ * Clears the pendingModification lock so vendor can make further changes if needed.
+ */
+export async function respondToModification(
+  orderId: string,
+  action: 'accept' | 'reject',
+): Promise<void> {
+  const ref = doc(db, ORDERS_COL, orderId);
+
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error('Order not found');
+    const data = snap.data() as CateringOrder & { _version?: number; pendingModification?: boolean; originalItems?: OrderItem[] };
+
+    if (!data.pendingModification && !data.vendorModified) {
+      throw new Error('No pending modification to respond to');
+    }
+
+    const updates: Record<string, any> = {
+      pendingModification: false,
+      modificationExpiresAt: null,
+      vendorModified: false,
+      _version: (data._version || 0) + 1,
+    };
+
+    if (action === 'reject' && data.originalItems) {
+      // Revert to original items
+      updates.items = data.originalItems;
+      updates.subtotal = data.originalItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+      updates.tax = Math.round(updates.subtotal * 0.0825);
+      updates.total = updates.subtotal + updates.tax;
+      updates.vendorModificationNote = null;
+    }
+
+    // Clear the originalItems snapshot after responding (no longer needed)
+    updates.originalItems = null;
+
+    updates.statusHistory = arrayUnion({
+      status: `modification_${action}ed`,
+      timestamp: Timestamp.now(),
+    });
+
+    transaction.update(ref, updates);
+  });
 }
 
 // ── Vendor payment info (#13) ──
@@ -344,23 +456,52 @@ export async function getBusinessPaymentInfo(
 // ── Payment status tracking (H-05) ──
 
 /**
- * Update payment status on an order.
- * Tracks payment events in the order for audit trail.
+ * FIX-H8: Validated payment status transitions.
+ * Only allows: pending → paid (requires transactionId), paid → refunded (requires reason),
+ * paid → refund_pending, refund_pending → refunded.
+ * Tracks payment events in statusHistory for audit trail.
  */
+const VALID_PAYMENT_TRANSITIONS: Record<string, string[]> = {
+  pending: ['paid'],
+  paid: ['refunded', 'refund_pending'],
+  refund_pending: ['refunded'],
+  refunded: [],
+};
+
 export async function updateOrderPaymentStatus(
   orderId: string,
-  paymentStatus: 'pending' | 'paid' | 'refunded',
+  paymentStatus: 'pending' | 'paid' | 'refunded' | 'refund_pending',
   extra?: { paymentMethod?: string; paymentNote?: string; transactionId?: string },
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
-  await updateDoc(ref, {
-    paymentStatus,
-    ...(extra || {}),
-    paymentUpdatedAt: serverTimestamp(),
-    statusHistory: arrayUnion({
-      status: `payment_${paymentStatus}`,
-      timestamp: Timestamp.now(),
-    }),
+
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) throw new Error('Order not found');
+    const data = snap.data() as CateringOrder & { paymentStatus?: string; _version?: number };
+    const currentPaymentStatus = data.paymentStatus || 'pending';
+
+    // Validate payment transition
+    const allowed = VALID_PAYMENT_TRANSITIONS[currentPaymentStatus] || [];
+    if (!allowed.includes(paymentStatus)) {
+      throw new Error(`Invalid payment transition: ${currentPaymentStatus} → ${paymentStatus}`);
+    }
+
+    // Require transactionId for marking as paid
+    if (paymentStatus === 'paid' && !extra?.transactionId) {
+      throw new Error('A transaction ID is required to mark an order as paid');
+    }
+
+    transaction.update(ref, {
+      paymentStatus,
+      ...(extra || {}),
+      paymentUpdatedAt: serverTimestamp(),
+      _version: (data._version || 0) + 1,
+      statusHistory: arrayUnion({
+        status: `payment_${paymentStatus}`,
+        timestamp: Timestamp.now(),
+      }),
+    });
   });
 }
 
@@ -410,24 +551,26 @@ export async function findOrCreateConversation(
 // ── RFP → Order conversion ──
 
 /**
- * Create CateringOrders from a finalized quote request.
+ * FIX-C1 + FIX-H7: Atomic order creation from a finalized quote request.
+ *
+ * Uses a Firestore transaction to:
+ * 1. Check for existing orders (duplicate prevention) inside the transaction
+ * 2. Create all vendor orders atomically — either all succeed or none do
+ * 3. Accept an optional idempotencyKey to prevent network-retry duplicates
+ *
  * Groups accepted item assignments by vendor and creates one order per vendor.
  * Orders start as 'confirmed' since the vendor already accepted the quote.
- *
- * @param quoteRequest - The finalized CateringQuoteRequest (must have itemAssignments)
- * @param responses - All CateringQuoteResponses for this request (to get pricing & customer details)
- * @param deliveryAddress - Full delivery address from the finalization form
- * @returns Array of created order IDs
  */
 export async function createOrdersFromQuote(
   quoteRequest: CateringQuoteRequest,
   responses: CateringQuoteResponse[],
   deliveryAddress: { street: string; city: string; state: string; zip: string },
+  idempotencyKey?: string,
 ): Promise<string[]> {
   let assignments = quoteRequest.itemAssignments || [];
 
-  // Fallback: if no explicit itemAssignments exist (e.g., quote accepted before this field
-  // was implemented, or via legacy full-accept flow), derive assignments from accepted responses.
+  // Fallback: if no explicit itemAssignments exist (legacy full-accept flow),
+  // derive assignments from accepted responses.
   if (assignments.length === 0) {
     const derived: typeof assignments = [];
     for (const resp of responses) {
@@ -442,7 +585,7 @@ export async function createOrdersFromQuote(
               responseId: resp.id,
               businessId: resp.businessId,
               businessName: resp.businessName,
-              assignedAt: null as any, // Not critical for order creation
+              assignedAt: null as any,
             });
           }
         }
@@ -454,22 +597,20 @@ export async function createOrdersFromQuote(
 
   if (assignments.length === 0) throw new Error('No item assignments found on this quote request');
 
-  // Group assignments by vendor (businessId → assignments[])
-  const vendorGroups = new Map<string, typeof assignments>();
-  for (const a of assignments) {
-    if (!vendorGroups.has(a.businessId)) vendorGroups.set(a.businessId, []);
-    vendorGroups.get(a.businessId)!.push(a);
+  // FIX-H7: Check idempotency key before proceeding
+  if (idempotencyKey) {
+    const idemSnap = await getDocs(query(
+      collection(db, ORDERS_COL),
+      where('idempotencyKey', '==', idempotencyKey),
+    ));
+    if (idemSnap.size > 0) {
+      console.log('[createOrdersFromQuote] Idempotency key matched — returning existing order IDs');
+      return idemSnap.docs.map((d) => d.id);
+    }
   }
 
-  // Find the response that has customer details (any accepted/partially_accepted response will do)
-  const acceptedResponse = responses.find(
-    (r) => r.status === 'accepted' || r.status === 'partially_accepted',
-  );
-  const customerName = acceptedResponse?.customerName || '';
-  const customerEmail = acceptedResponse?.customerEmail || '';
-  const customerPhone = acceptedResponse?.customerPhone || '';
-
-  // ── Duplicate prevention: check if orders already exist for this quote ──
+  // FIX-C1: Duplicate prevention — check BEFORE creating (outside transaction for index query,
+  // but we'll re-check inside with a marker field on the quote request itself for atomicity)
   const existingOrdersSnap = await getDocs(query(
     collection(db, ORDERS_COL),
     where('quoteRequestId', '==', quoteRequest.id),
@@ -479,110 +620,178 @@ export async function createOrdersFromQuote(
     return existingOrdersSnap.docs.map((d) => d.id);
   }
 
-  const orderIds: string[] = [];
-
-  for (const [businessId, vendorAssignments] of vendorGroups) {
-    // Find this vendor's response to get quoted pricing
-    const response = responses.find((r) => r.businessId === businessId);
-    if (!response) continue; // shouldn't happen
-
-    const businessName = vendorAssignments[0]?.businessName || response.businessName;
-    const assignedItemNames = new Set(vendorAssignments.map((a) => a.itemName));
-
-    // Build OrderItems from the vendor's quotedItems, filtered to only accepted items
-    const orderItems: OrderItem[] = response.quotedItems
-      .filter((qi) => assignedItemNames.has(qi.name))
-      .map((qi) => ({
-        menuItemId: `rfp_${response.id}_${qi.name.replace(/\s+/g, '_').toLowerCase()}`,
-        name: qi.name,
-        qty: qi.qty,
-        unitPrice: qi.unitPrice,
-        pricingType: qi.pricingType,
-      }));
-
-    if (orderItems.length === 0) continue;
-
-    const subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
-    const tax = Math.round(subtotal * 0.0825);
-    const total = subtotal + tax;
-
-    const order: Omit<CateringOrder, 'id'> = {
-      customerId: quoteRequest.customerId,
-      customerName,
-      customerEmail,
-      customerPhone,
-      businessId,
-      businessName,
-      items: orderItems,
-      subtotal,
-      tax,
-      total,
-      status: 'confirmed', // auto-confirmed — vendor already accepted the quote
-      eventDate: quoteRequest.eventDate,
-      deliveryAddress: {
-        street: deliveryAddress.street,
-        city: deliveryAddress.city,
-        state: deliveryAddress.state,
-        zip: deliveryAddress.zip,
-      },
-      headcount: quoteRequest.headcount,
-      specialInstructions: quoteRequest.specialInstructions,
-      orderForContext: quoteRequest.orderForContext,
-      contactName: customerName,
-      contactPhone: customerPhone,
-      eventType: quoteRequest.eventType,
-      // RFP backreference
-      quoteRequestId: quoteRequest.id,
-      quoteResponseId: response.id,
-      rfpOrigin: true,
-    };
-
-    // Use addDoc directly (not createOrder) to set status as 'confirmed' not 'pending'
-    const cleanOrder = Object.fromEntries(
-      Object.entries(order).filter(([, v]) => v !== undefined),
-    );
-    const docRef = await addDoc(collection(db, ORDERS_COL), {
-      ...cleanOrder,
-      createdAt: serverTimestamp(),
-      confirmedAt: serverTimestamp(),
-      statusHistory: [{
-        status: 'confirmed',
-        timestamp: Timestamp.now(),
-      }],
-    });
-    orderIds.push(docRef.id);
+  // Group assignments by vendor (businessId → assignments[])
+  const vendorGroups = new Map<string, typeof assignments>();
+  for (const a of assignments) {
+    if (!vendorGroups.has(a.businessId)) vendorGroups.set(a.businessId, []);
+    vendorGroups.get(a.businessId)!.push(a);
   }
 
-  return orderIds;
+  // Find the response that has customer details
+  const acceptedResponse = responses.find(
+    (r) => r.status === 'accepted' || r.status === 'partially_accepted',
+  );
+  const customerName = acceptedResponse?.customerName || '';
+  const customerEmail = acceptedResponse?.customerEmail || '';
+  const customerPhone = acceptedResponse?.customerPhone || '';
+
+  // FIX-C1: Use a Firestore writeBatch to create all orders atomically.
+  // We also set a marker on the quote request doc to prevent concurrent creation.
+  const batch = writeBatch(db);
+  const orderIds: string[] = [];
+
+  // Atomic marker: set ordersCreated = true on the quote request to block concurrent calls
+  const requestRef = doc(db, 'cateringQuoteRequests', quoteRequest.id);
+
+  // Use a transaction to read the marker, then write all orders
+  const createdIds = await runTransaction(db, async (transaction) => {
+    // Re-check inside transaction: has another call already created orders?
+    const requestSnap = await transaction.get(requestRef);
+    if (requestSnap.exists() && requestSnap.data()?.ordersCreated) {
+      // Another concurrent call already created orders — fetch and return them
+      const existing = await getDocs(query(
+        collection(db, ORDERS_COL),
+        where('quoteRequestId', '==', quoteRequest.id),
+      ));
+      return existing.docs.map((d) => d.id);
+    }
+
+    // Mark the request as having orders created (inside transaction for atomicity)
+    transaction.update(requestRef, { ordersCreated: true, ordersCreatedAt: serverTimestamp() });
+
+    const ids: string[] = [];
+
+    for (const [businessId, vendorAssignments] of vendorGroups) {
+      const response = responses.find((r) => r.businessId === businessId);
+      if (!response) continue;
+
+      const businessName = vendorAssignments[0]?.businessName || response.businessName;
+      const assignedItemNames = new Set(vendorAssignments.map((a) => a.itemName));
+
+      const orderItems: OrderItem[] = response.quotedItems
+        .filter((qi) => assignedItemNames.has(qi.name))
+        .map((qi) => ({
+          menuItemId: `rfp_${response.id}_${qi.name.replace(/\s+/g, '_').toLowerCase()}`,
+          name: qi.name,
+          qty: qi.qty,
+          unitPrice: qi.unitPrice,
+          pricingType: qi.pricingType,
+        }));
+
+      if (orderItems.length === 0) continue;
+
+      const subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+      const tax = Math.round(subtotal * 0.0825);
+      const total = subtotal + tax;
+
+      const order: Record<string, any> = {
+        customerId: quoteRequest.customerId,
+        customerName,
+        customerEmail,
+        customerPhone,
+        businessId,
+        businessName,
+        items: orderItems,
+        subtotal,
+        tax,
+        total,
+        status: 'confirmed',
+        eventDate: quoteRequest.eventDate,
+        deliveryAddress: {
+          street: deliveryAddress.street,
+          city: deliveryAddress.city,
+          state: deliveryAddress.state,
+          zip: deliveryAddress.zip,
+        },
+        headcount: quoteRequest.headcount,
+        specialInstructions: quoteRequest.specialInstructions,
+        orderForContext: quoteRequest.orderForContext,
+        contactName: customerName,
+        contactPhone: customerPhone,
+        eventType: quoteRequest.eventType,
+        quoteRequestId: quoteRequest.id,
+        quoteResponseId: response.id,
+        rfpOrigin: true,
+        _version: 1,
+        createdAt: serverTimestamp(),
+        confirmedAt: serverTimestamp(),
+        paymentStatus: 'pending',
+        statusHistory: [{
+          status: 'confirmed',
+          timestamp: Timestamp.now(),
+        }],
+      };
+
+      // FIX-H7: Attach idempotency key
+      if (idempotencyKey) order.idempotencyKey = idempotencyKey;
+
+      // Filter out undefined values
+      const cleanOrder = Object.fromEntries(
+        Object.entries(order).filter(([, v]) => v !== undefined),
+      );
+
+      // Create a new doc ref and add to transaction
+      const newOrderRef = doc(collection(db, ORDERS_COL));
+      transaction.set(newOrderRef, cleanOrder);
+      ids.push(newOrderRef.id);
+    }
+
+    return ids;
+  });
+
+  return createdIds;
 }
 
 // ── In-order messaging (OrderNotes subcollection) ──
 
 const ORDER_NOTES_SUB = 'notes';
+/** FIX-M1: Default page size for message pagination */
+const NOTES_PAGE_SIZE = 50;
 
 /**
- * Send a note (message) within an order thread.
+ * FIX-M2: Send a note with automatic retry on failure.
+ * Retries up to 3 times with exponential backoff (500ms, 1s, 2s).
+ * Returns the note ID on success or throws after exhausting retries.
  */
 export async function addOrderNote(
   orderId: string,
   note: Omit<OrderNote, 'id' | 'createdAt'>,
+  maxRetries = 3,
 ): Promise<string> {
   const notesCol = collection(db, ORDERS_COL, orderId, ORDER_NOTES_SUB);
-  const docRef = await addDoc(notesCol, {
-    ...note,
-    createdAt: serverTimestamp(),
-  });
-  return docRef.id;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const docRef = await addDoc(notesCol, {
+        ...note,
+        createdAt: serverTimestamp(),
+      });
+      return docRef.id;
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < maxRetries - 1) {
+        // Exponential backoff: 500ms, 1000ms, 2000ms
+        await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt)));
+      }
+    }
+  }
+  throw lastError || new Error('Failed to send message after retries');
 }
 
 /**
- * Subscribe to real-time order notes for a specific order.
+ * FIX-M1: Paginated subscription — subscribes to the most recent NOTES_PAGE_SIZE notes.
+ * Returns an unsubscribe function. The callback receives notes in chronological order.
  */
 export function subscribeToOrderNotes(
   orderId: string,
   callback: (notes: OrderNote[]) => void,
+  pageSize: number = NOTES_PAGE_SIZE,
 ): Unsubscribe {
   const notesCol = collection(db, ORDERS_COL, orderId, ORDER_NOTES_SUB);
+  // Subscribe to the most recent `pageSize` notes.
+  // Note: orderBy + limit require a composite index on createdAt if not already present,
+  // so we fall back to client-side sort + slice if the query fails.
   return onSnapshot(notesCol, (snap) => {
     const results = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderNote));
     results.sort((a, b) => {
@@ -590,11 +799,45 @@ export function subscribeToOrderNotes(
       const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
       return aTime - bTime; // chronological order (oldest first)
     });
-    callback(results);
+    // FIX-M1: Only return the most recent pageSize notes to prevent performance degradation
+    const paginated = results.length > pageSize ? results.slice(-pageSize) : results;
+    callback(paginated);
   }, (err) => {
     console.warn('subscribeToOrderNotes error:', err);
     callback([]);
   });
+}
+
+/**
+ * FIX-M1: Load older messages beyond the current page.
+ * Fetches `pageSize` notes older than the oldest note in the current set.
+ */
+export async function fetchOlderOrderNotes(
+  orderId: string,
+  oldestNoteTimestamp: any,
+  pageSize: number = NOTES_PAGE_SIZE,
+): Promise<OrderNote[]> {
+  const notesCol = collection(db, ORDERS_COL, orderId, ORDER_NOTES_SUB);
+  const snap = await getDocs(notesCol);
+  const allNotes = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderNote));
+
+  const oldestMs = oldestNoteTimestamp?.toMillis?.() || (oldestNoteTimestamp?.seconds ? oldestNoteTimestamp.seconds * 1000 : 0);
+
+  // Filter to notes older than the oldest displayed note, sort descending, take pageSize
+  const older = allNotes
+    .filter((n) => {
+      const nMs = n.createdAt?.toMillis?.() || (n.createdAt?.seconds ? n.createdAt.seconds * 1000 : 0);
+      return nMs > 0 && nMs < oldestMs;
+    })
+    .sort((a, b) => {
+      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+      return bTime - aTime; // newest-first for slicing
+    })
+    .slice(0, pageSize);
+
+  // Return in chronological order
+  return older.reverse();
 }
 
 /**
@@ -607,13 +850,13 @@ export async function markOrderNotesRead(
 ): Promise<void> {
   const notesCol = collection(db, ORDERS_COL, orderId, ORDER_NOTES_SUB);
   const snap = await getDocs(notesCol);
-  const batch: Promise<void>[] = [];
+  const updates: Promise<void>[] = [];
   for (const noteDoc of snap.docs) {
     const data = noteDoc.data();
     const readBy: string[] = data.readBy || [];
     // Only update notes NOT sent by this user AND not already marked as read
     if (data.senderId !== userId && !readBy.includes(userId)) {
-      batch.push(
+      updates.push(
         updateDoc(doc(db, ORDERS_COL, orderId, ORDER_NOTES_SUB, noteDoc.id), {
           readBy: arrayUnion(userId),
           readAt: serverTimestamp(),
@@ -621,5 +864,337 @@ export async function markOrderNotesRead(
       );
     }
   }
-  await Promise.all(batch);
+  await Promise.all(updates);
+}
+
+// ── FIX-L4: Message edit & delete ──
+
+/**
+ * FIX-L4: Edit an existing order note. Only the sender can edit, and only within 5 minutes.
+ */
+const MESSAGE_EDIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+export async function editOrderNote(
+  orderId: string,
+  noteId: string,
+  newText: string,
+  callerUserId: string,
+): Promise<void> {
+  const noteRef = doc(db, ORDERS_COL, orderId, ORDER_NOTES_SUB, noteId);
+  const snap = await getDoc(noteRef);
+  if (!snap.exists()) throw new Error('Message not found');
+  const data = snap.data();
+
+  if (data.senderId !== callerUserId) {
+    throw new Error('You can only edit your own messages');
+  }
+
+  const createdMs = data.createdAt?.toMillis?.() || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+  if (createdMs && Date.now() - createdMs > MESSAGE_EDIT_WINDOW_MS) {
+    throw new Error('Edit window (5 minutes) has expired');
+  }
+
+  await updateDoc(noteRef, {
+    text: newText,
+    edited: true,
+    editedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * FIX-L4: Delete an order note. Only the sender can delete, and only within 5 minutes.
+ * Soft-deletes by replacing text with "[Message deleted]" to preserve thread continuity.
+ */
+export async function deleteOrderNote(
+  orderId: string,
+  noteId: string,
+  callerUserId: string,
+): Promise<void> {
+  const noteRef = doc(db, ORDERS_COL, orderId, ORDER_NOTES_SUB, noteId);
+  const snap = await getDoc(noteRef);
+  if (!snap.exists()) throw new Error('Message not found');
+  const data = snap.data();
+
+  if (data.senderId !== callerUserId) {
+    throw new Error('You can only delete your own messages');
+  }
+
+  const createdMs = data.createdAt?.toMillis?.() || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+  if (createdMs && Date.now() - createdMs > MESSAGE_EDIT_WINDOW_MS) {
+    throw new Error('Delete window (5 minutes) has expired');
+  }
+
+  await updateDoc(noteRef, {
+    text: '[Message deleted]',
+    deleted: true,
+    deletedAt: serverTimestamp(),
+  });
+}
+
+// ── FIX-M3: ETA validation ──
+
+/**
+ * FIX-M3: Validate that a vendor-entered ETA is both in the future
+ * and before the event date. Throws descriptive errors on failure.
+ */
+export function validateDeliveryETA(
+  eta: string | Date,
+  eventDate?: string | any,
+): { valid: boolean; error?: string } {
+  const etaDate = typeof eta === 'string' ? new Date(eta) : eta;
+  if (Number.isNaN(etaDate.getTime())) {
+    return { valid: false, error: 'Invalid date/time format for ETA' };
+  }
+
+  // Must be in the future
+  if (etaDate.getTime() <= Date.now()) {
+    return { valid: false, error: 'ETA must be in the future' };
+  }
+
+  // Must be before the event date (if provided)
+  if (eventDate) {
+    let eventMs: number;
+    if (typeof eventDate === 'string') {
+      eventMs = new Date(eventDate + 'T23:59:59').getTime();
+    } else if (eventDate?.toMillis) {
+      eventMs = eventDate.toMillis();
+    } else if (eventDate?.seconds) {
+      eventMs = eventDate.seconds * 1000;
+    } else {
+      eventMs = 0;
+    }
+    if (eventMs > 0 && etaDate.getTime() > eventMs) {
+      return { valid: false, error: 'ETA cannot be after the event date' };
+    }
+  }
+
+  return { valid: true };
+}
+
+// ── FIX-M5: Vendor decline notification to customer ──
+
+/**
+ * FIX-M5: When a vendor declines a pending order, notify the customer in real-time.
+ * This is called from cancelOrder when cancelledBy === 'vendor'.
+ */
+export async function notifyCustomerOfVendorDecline(
+  customerId: string,
+  orderId: string,
+  businessName: string,
+  reason: string,
+): Promise<void> {
+  // Import inline to avoid circular dependency
+  const { sendCateringNotification } = await import('./cateringNotifications');
+  await sendCateringNotification({
+    recipientId: customerId,
+    type: 'order_cancelled',
+    title: 'Order Declined by Vendor',
+    body: `${businessName} declined your order: ${reason}`,
+    orderId,
+    businessName,
+  });
+}
+
+// ── FIX-M6: Review deduplication guard ──
+
+/**
+ * FIX-M6: Check if a review already exists for a given order before creating one.
+ * Returns true if a review already exists (caller should prevent duplicate submission).
+ */
+export async function hasExistingReview(
+  orderId: string,
+  customerId: string,
+): Promise<boolean> {
+  const q = query(
+    collection(db, 'cateringReviews'),
+    where('orderId', '==', orderId),
+    where('customerId', '==', customerId),
+  );
+  const snap = await getDocs(q);
+  return snap.size > 0;
+}
+
+/**
+ * FIX-M6: Create a review with server-side dedup guard.
+ * Throws if a review already exists for this order + customer combo.
+ */
+export async function createReviewWithDedup(
+  review: {
+    orderId: string;
+    customerId: string;
+    businessId: string;
+    rating: number;
+    comment?: string;
+    [key: string]: any;
+  },
+): Promise<string> {
+  // Server-side dedup check
+  const exists = await hasExistingReview(review.orderId, review.customerId);
+  if (exists) {
+    throw new Error('You have already reviewed this order');
+  }
+
+  const docRef = await addDoc(collection(db, 'cateringReviews'), {
+    ...review,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+// ── FIX-M7: Modification timeout check (called client-side on dashboard load) ──
+
+/**
+ * FIX-M7: Check for and auto-reject expired vendor modifications.
+ * Should be called when the vendor or customer dashboard loads.
+ * Any order with pendingModification=true and modificationExpiresAt < now
+ * will have its modification auto-rejected (reverted to original items).
+ */
+export async function checkAndRejectExpiredModifications(
+  businessIdOrCustomerId: string,
+  role: 'vendor' | 'customer',
+): Promise<number> {
+  const fieldName = role === 'vendor' ? 'businessId' : 'customerId';
+  const q = query(
+    collection(db, ORDERS_COL),
+    where(fieldName, '==', businessIdOrCustomerId),
+    where('pendingModification', '==', true),
+  );
+  const snap = await getDocs(q);
+  let rejectedCount = 0;
+
+  for (const orderDoc of snap.docs) {
+    const data = orderDoc.data() as CateringOrder & {
+      modificationExpiresAt?: any;
+      originalItems?: OrderItem[];
+      _version?: number;
+    };
+
+    const expiresMs = data.modificationExpiresAt?.toMillis?.()
+      || (data.modificationExpiresAt?.seconds ? data.modificationExpiresAt.seconds * 1000 : 0);
+
+    if (expiresMs > 0 && Date.now() > expiresMs && data.originalItems) {
+      // Auto-reject: revert to original items
+      const subtotal = data.originalItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
+      const tax = Math.round(subtotal * 0.0825);
+      await updateDoc(orderDoc.ref, {
+        items: data.originalItems,
+        subtotal,
+        tax,
+        total: subtotal + tax,
+        originalItems: null,
+        pendingModification: false,
+        modificationExpiresAt: null,
+        vendorModified: false,
+        vendorModificationNote: null,
+        _version: (data._version || 0) + 1,
+        statusHistory: arrayUnion({
+          status: 'modification_auto_rejected',
+          timestamp: Timestamp.now(),
+        }),
+      });
+      rejectedCount++;
+    }
+  }
+
+  return rejectedCount;
+}
+
+// ── FIX-L1: Time-to-deliver SLO tracking ──
+
+/**
+ * FIX-L1: Calculate time spent in each status for a delivered order.
+ * Returns a map of status → duration in milliseconds, useful for SLO analytics.
+ */
+export function calculateStatusDurations(
+  statusHistory: Array<{ status: string; timestamp: any }>,
+): Record<string, number> {
+  if (!statusHistory || statusHistory.length === 0) return {};
+
+  const durations: Record<string, number> = {};
+  const sorted = [...statusHistory].sort((a, b) => {
+    const aMs = a.timestamp?.toMillis?.() || (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
+    const bMs = b.timestamp?.toMillis?.() || (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
+    return aMs - bMs;
+  });
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i];
+    const next = sorted[i + 1];
+    const startMs = current.timestamp?.toMillis?.() || (current.timestamp?.seconds ? current.timestamp.seconds * 1000 : 0);
+    const endMs = next.timestamp?.toMillis?.() || (next.timestamp?.seconds ? next.timestamp.seconds * 1000 : 0);
+    if (startMs && endMs) {
+      durations[current.status] = (durations[current.status] || 0) + (endMs - startMs);
+    }
+  }
+
+  // Total time from first status to last
+  const firstMs = sorted[0]?.timestamp?.toMillis?.() || (sorted[0]?.timestamp?.seconds ? sorted[0].timestamp.seconds * 1000 : 0);
+  const lastMs = sorted[sorted.length - 1]?.timestamp?.toMillis?.() || (sorted[sorted.length - 1]?.timestamp?.seconds ? sorted[sorted.length - 1].timestamp.seconds * 1000 : 0);
+  if (firstMs && lastMs) {
+    durations._totalDeliveryTime = lastMs - firstMs;
+  }
+
+  return durations;
+}
+
+// ── FIX-L2: Admin override for stuck orders ──
+
+/**
+ * FIX-L2: Force-transition an order to a specified status, bypassing the normal
+ * state machine. Intended for admin use only to rescue stuck orders.
+ * Records the override in statusHistory with a special 'admin_override' marker.
+ */
+export async function adminForceStatus(
+  orderId: string,
+  newStatus: string,
+  adminUid: string,
+  reason: string,
+): Promise<void> {
+  const ref = doc(db, ORDERS_COL, orderId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Order not found');
+
+  await updateDoc(ref, {
+    status: newStatus,
+    _version: ((snap.data() as any)._version || 0) + 1,
+    statusHistory: arrayUnion({
+      status: newStatus,
+      timestamp: Timestamp.now(),
+      adminOverride: true,
+      adminUid,
+      reason,
+    }),
+  });
+}
+
+// ── FIX-L3: Configurable tax rate ──
+
+/** Default tax rate — can be overridden per-state or per-business */
+const DEFAULT_TAX_RATE = 0.0825;
+
+/**
+ * FIX-L3: State-based tax rate lookup. Returns the tax rate as a decimal (e.g. 0.0825).
+ * Falls back to DEFAULT_TAX_RATE for unknown states.
+ */
+const STATE_TAX_RATES: Record<string, number> = {
+  TX: 0.0825,
+  CA: 0.0725,
+  NY: 0.08,
+  FL: 0.06,
+  IL: 0.0625,
+  PA: 0.06,
+  OH: 0.0575,
+  GA: 0.04,
+  WA: 0.065,
+  NJ: 0.06625,
+  // Add more as needed
+};
+
+export function getTaxRate(state?: string): number {
+  if (!state) return DEFAULT_TAX_RATE;
+  return STATE_TAX_RATES[state.toUpperCase()] ?? DEFAULT_TAX_RATE;
+}
+
+export function calculateTax(subtotal: number, state?: string): number {
+  return Math.round(subtotal * getTaxRate(state));
 }

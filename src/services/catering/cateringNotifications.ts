@@ -23,17 +23,21 @@ export interface CateringNotification {
   id: string;
   recipientId: string;
   type:
-    | 'new_order'           // vendor: new order received
-    | 'order_confirmed'     // customer: vendor confirmed
-    | 'order_preparing'     // customer: order being prepared
-    | 'order_ready'         // customer: order ready
+    | 'new_order'             // vendor: new order received
+    | 'order_confirmed'       // customer: vendor confirmed
+    | 'order_preparing'       // customer: order being prepared
+    | 'order_ready'           // customer: order ready
     | 'order_out_for_delivery' // customer: out for delivery
-    | 'order_delivered'     // customer: delivered
-    | 'order_cancelled'     // both: order cancelled
-    | 'order_modified'      // customer: vendor modified order
+    | 'order_delivered'       // customer: delivered
+    | 'order_cancelled'       // both: order cancelled
+    | 'order_modified'        // customer: vendor modified order
     | 'modification_rejected' // vendor: customer rejected modification
-    | 'quote_received'      // customer: new vendor quote on RFP
-    | 'quote_accepted';     // vendor: customer accepted quote
+    | 'quote_received'        // customer: new vendor quote on RFP
+    | 'quote_accepted'        // vendor: customer accepted quote
+    | 'item_reassigned'       // FIX-C3: vendor: item removed from their quote
+    | 'rfp_edited'            // FIX-H5: vendor: RFP they quoted on was edited
+    | 'rfp_expired'           // FIX-C5: customer: their RFP expired with no orders
+    | 'finalization_expired'; // FIX-H6: customer: pending finalization timed out
   title: string;
   body: string;
   orderId?: string;
@@ -246,4 +250,80 @@ export async function getUnreadNotificationCount(userId: string): Promise<number
   );
   const snap = await getDocs(q);
   return snap.size;
+}
+
+// ── FIX-C3: Notify vendor when items are reassigned away from them ──
+
+/**
+ * FIX-C3: Notify a vendor that items they were previously assigned have been
+ * reassigned to a different vendor by the customer.
+ */
+export async function notifyVendorItemReassigned(
+  vendorOwnerId: string,
+  businessName: string,
+  reassignedItemNames: string[],
+  quoteRequestId: string,
+): Promise<void> {
+  const itemList = reassignedItemNames.join(', ');
+  await sendCateringNotification({
+    recipientId: vendorOwnerId,
+    type: 'item_reassigned',
+    title: 'Items Reassigned',
+    body: `The customer reassigned the following items from ${businessName}: ${itemList}. These items are no longer part of your order.`,
+    quoteRequestId,
+    businessName,
+  });
+}
+
+// ── FIX-H5: Notify vendors when an RFP they quoted on is edited ──
+
+/**
+ * FIX-H5: Notify all vendors who have already submitted quotes on an RFP
+ * that the customer edited the request. Their existing quotes may be stale.
+ */
+export async function notifyVendorsRfpEdited(
+  vendorOwnerIds: string[],
+  quoteRequestId: string,
+  editSummary: string,
+): Promise<void> {
+  for (const vendorId of vendorOwnerIds) {
+    await sendCateringNotification({
+      recipientId: vendorId,
+      type: 'rfp_edited',
+      title: 'Quote Request Updated',
+      body: `A quote request you responded to was edited: ${editSummary}. Your existing quote may need to be updated.`,
+      quoteRequestId,
+    });
+  }
+}
+
+// ── FIX-C5: Notify customer when their RFP expires ──
+
+export async function notifyCustomerRfpExpired(
+  customerId: string,
+  quoteRequestId: string,
+  itemCount: number,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: customerId,
+    type: 'rfp_expired',
+    title: 'Quote Request Expired',
+    body: `Your quote request with ${itemCount} items has expired after 7 days. You can create a new request at any time.`,
+    quoteRequestId,
+  });
+}
+
+// ── FIX-H6: Notify customer when finalization window expires ──
+
+export async function notifyCustomerFinalizationExpired(
+  customerId: string,
+  quoteRequestId: string,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: customerId,
+    type: 'finalization_expired',
+    title: 'Finalization Window Expired',
+    body: 'Your accepted quote items were not finalized within 72 hours. Vendor capacity has been released. You can re-accept items to start a new finalization window.',
+    quoteRequestId,
+  });
 }

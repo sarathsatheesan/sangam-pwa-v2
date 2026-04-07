@@ -24,10 +24,13 @@ import {
   orderBy,
   serverTimestamp,
   onSnapshot,
+  Timestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import type { Unsubscribe } from 'firebase/firestore';
 
 import { db } from '../firebase';
+import { notifyVendorItemReassigned, notifyVendorsRfpEdited } from './cateringNotifications';
 
 const QUOTE_REQUESTS_COL = 'cateringQuoteRequests';
 const QUOTE_RESPONSES_COL = 'cateringQuoteResponses';
@@ -90,6 +93,7 @@ export async function createQuoteRequest(request: Omit<CateringQuoteRequest, 'id
 
 /**
  * Check whether a quote request is still editable.
+ * FIX-H5/M-9: Now also enforces these rules server-side (previously client-only).
  * Rules:
  *  - Status must be 'open' (not accepted/cancelled/expired)
  *  - Within 24 hours of creation
@@ -175,7 +179,15 @@ export async function updateQuoteRequest(
   }
 
   await updateDoc(ref, cleanUpdates);
+
+  // FIX-H5: Notify vendors who have already quoted that the RFP was edited
+  if (data.responseCount > 0) {
+    const editedFields = Object.keys(updates).filter((k) => updates[k as keyof typeof updates] !== undefined);
+    const editSummary = editedFields.join(', ') + ' updated';
+    notifyVendorsOfRfpEdit(requestId, editSummary).catch(console.warn);
+  }
 }
+
 
 export async function fetchQuoteRequestsByCustomer(customerId: string): Promise<CateringQuoteRequest[]> {
   try {
@@ -453,6 +465,11 @@ export function subscribeToQuoteResponses(
   });
 }
 
+/**
+ * FIX-M8: Atomic full-vendor acceptance using a transaction on the request doc.
+ * Reads the request status inside the transaction to prevent two simultaneous
+ * full-accept calls from both succeeding on different vendors.
+ */
 export async function acceptQuoteResponse(
   responseId: string,
   requestId: string,
@@ -470,32 +487,46 @@ export async function acceptQuoteResponse(
     }
   }
 
-  // 1. Mark the chosen response as accepted and reveal customer details
-  const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
-  await updateDoc(responseRef, {
-    status: 'accepted',
-    ...customerDetails,
-  });
-
-  // 2. Mark the quote request as accepted + write itemAssignments for all quoted items
-  const updatedSnap = await getDoc(responseRef);
-  const updatedData = updatedSnap.data();
-  const quotedItems: { name: string }[] = updatedData?.quotedItems || [];
+  // FIX-M8: Use a transaction on the request doc to prevent concurrent full-accepts
   const requestRef = doc(db, QUOTE_REQUESTS_COL, requestId);
-  await updateDoc(requestRef, {
-    status: 'accepted',
-    selectedResponseId: responseId,
-    selectedBusinessId: updatedData?.businessId,
-    itemAssignments: quotedItems.map((qi) => ({
-      itemName: qi.name,
-      responseId,
-      businessId: updatedData?.businessId,
-      businessName: updatedData?.businessName,
-      assignedAt: serverTimestamp(),
-    })),
+  await runTransaction(db, async (transaction) => {
+    const reqSnap = await transaction.get(requestRef);
+    if (!reqSnap.exists()) throw new Error('Quote request not found');
+    const reqData = reqSnap.data();
+
+    // If request is already accepted, another concurrent call beat us
+    if (reqData.status === 'accepted') {
+      throw new Error('This quote request has already been fully accepted. Please refresh to see the latest state.');
+    }
+
+    // Mark the chosen response as accepted and reveal customer details
+    const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
+    transaction.update(responseRef, {
+      status: 'accepted',
+      ...customerDetails,
+    });
+
+    // 2. Read the response data to get quoted items (inside transaction for consistency)
+    const respSnap = await transaction.get(responseRef);
+    const respData = respSnap.data() || {};
+    const quotedItems: { name: string }[] = respData.quotedItems || [];
+
+    // 3. Mark the quote request as accepted + write itemAssignments
+    transaction.update(requestRef, {
+      status: 'accepted',
+      selectedResponseId: responseId,
+      selectedBusinessId: respData.businessId,
+      itemAssignments: quotedItems.map((qi) => ({
+        itemName: qi.name,
+        responseId,
+        businessId: respData.businessId,
+        businessName: respData.businessName,
+        assignedAt: Timestamp.now(),
+      })),
+    });
   });
 
-  // 3. Decline all other responses for this request
+  // 4. Decline all other responses for this request (outside transaction — non-critical)
   const allResponses = await fetchQuoteResponsesByRequest(requestId);
   for (const resp of allResponses) {
     if (resp.id !== responseId && resp.status === 'submitted') {
@@ -557,6 +588,12 @@ export async function acceptQuoteResponseItems(
   const requestData = requestSnap.data();
 
   const existingAssignments: ItemAssignment[] = requestData.itemAssignments || [];
+
+  // FIX-C3: Identify items being reassigned away from other vendors
+  const reassignedItems = existingAssignments.filter(
+    (a) => selectedItemNames.includes(a.itemName) && a.businessId !== responseData.businessId,
+  );
+
   // Remove any previous assignments for these items (in case of re-assignment)
   const filteredAssignments = existingAssignments.filter(
     (a) => !selectedItemNames.includes(a.itemName)
@@ -570,6 +607,29 @@ export async function acceptQuoteResponseItems(
     assignedAt: serverTimestamp(),
   }));
   const allAssignments = [...filteredAssignments, ...newAssignments];
+
+  // FIX-C3: Notify vendors who lost items due to reassignment (non-blocking)
+  if (reassignedItems.length > 0) {
+    // Group reassigned items by the vendor who lost them
+    const lostByVendor = new Map<string, string[]>();
+    for (const item of reassignedItems) {
+      if (!lostByVendor.has(item.businessId)) lostByVendor.set(item.businessId, []);
+      lostByVendor.get(item.businessId)!.push(item.itemName);
+    }
+    for (const [lostBusinessId, itemNames] of lostByVendor) {
+      // Find the vendor's response to get their owner ID for notification
+      const allResponses = await fetchQuoteResponsesByRequest(requestId);
+      const lostResponse = allResponses.find((r: any) => r.businessId === lostBusinessId);
+      if (lostResponse?.vendorOwnerId) {
+        notifyVendorItemReassigned(
+          lostResponse.vendorOwnerId,
+          lostResponse.businessName,
+          itemNames,
+          requestId,
+        ).catch(console.warn);
+      }
+    }
+  }
 
   // 5. Check if all request items are now assigned
   const requestItemNames = (requestData.items || []).map((i: any) => i.name);
@@ -660,6 +720,146 @@ export function subscribeToBusinessQuoteResponses(
     console.warn('subscribeToBusinessQuoteResponses error:', err);
     callback([]);
   });
+}
+
+// ── FIX-C4: Close RFP and Proceed-with-partial escape hatches ──
+
+/**
+ * FIX-C4: Close an RFP entirely — cancels the request and auto-declines all vendors.
+ * Used when the customer wants to abandon a partially-accepted or open RFP.
+ */
+export async function closeQuoteRequest(requestId: string): Promise<void> {
+  const requestRef = doc(db, QUOTE_REQUESTS_COL, requestId);
+  const requestSnap = await getDoc(requestRef);
+  if (!requestSnap.exists()) throw new Error('Quote request not found');
+  const data = requestSnap.data();
+
+  if (data.status === 'cancelled') throw new Error('Quote request is already cancelled');
+  if (data.ordersCreated) throw new Error('Orders have already been created from this quote request');
+
+  await updateDoc(requestRef, {
+    status: 'cancelled',
+    cancelledAt: serverTimestamp(),
+  });
+
+  // Auto-decline all submitted responses
+  const allResponses = await fetchQuoteResponsesByRequest(requestId);
+  for (const resp of allResponses) {
+    if (resp.status === 'submitted' || resp.status === 'partially_accepted') {
+      await updateDoc(doc(db, QUOTE_RESPONSES_COL, resp.id), { status: 'declined' });
+    }
+  }
+}
+
+/**
+ * FIX-C4: Proceed with only the items that have been assigned so far.
+ * Marks unassigned items as "dropped" and triggers finalization with whatever is assigned.
+ * Returns the list of unassigned item names that were dropped.
+ */
+export async function proceedWithPartialAssignment(requestId: string): Promise<{ droppedItems: string[] }> {
+  const requestRef = doc(db, QUOTE_REQUESTS_COL, requestId);
+  const requestSnap = await getDoc(requestRef);
+  if (!requestSnap.exists()) throw new Error('Quote request not found');
+  const data = requestSnap.data();
+
+  const allItemNames: string[] = (data.items || []).map((i: any) => i.name);
+  const assignedItemNames = new Set((data.itemAssignments || []).map((a: any) => a.itemName));
+
+  const droppedItems = allItemNames.filter((name) => !assignedItemNames.has(name));
+
+  if (assignedItemNames.size === 0) {
+    throw new Error('No items have been assigned yet. Use "Close RFP" instead.');
+  }
+
+  // Mark request as accepted (with partial note) and record dropped items
+  await updateDoc(requestRef, {
+    status: 'accepted',
+    droppedItems,
+    partialProceed: true,
+    partialProceedAt: serverTimestamp(),
+  });
+
+  // Auto-decline remaining submitted responses
+  const allResponses = await fetchQuoteResponsesByRequest(requestId);
+  for (const resp of allResponses) {
+    if (resp.status === 'submitted') {
+      await updateDoc(doc(db, QUOTE_RESPONSES_COL, resp.id), { status: 'declined' });
+    }
+  }
+
+  return { droppedItems };
+}
+
+// ── FIX-C5: Expire stale RFPs (to be called by Cloud Function or periodic client-side check) ──
+
+/**
+ * FIX-C5: Find and expire all open RFPs older than 7 days.
+ * Returns the count of expired requests. Intended to be called by a scheduled
+ * Cloud Function (daily) or as a client-side check on dashboard load.
+ */
+export async function expireStaleQuoteRequests(): Promise<number> {
+  const sevenDaysAgo = Timestamp.fromMillis(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const q = query(
+    collection(db, QUOTE_REQUESTS_COL),
+    where('status', '==', 'open'),
+  );
+  const snap = await getDocs(q);
+  let expiredCount = 0;
+
+  for (const requestDoc of snap.docs) {
+    const data = requestDoc.data();
+    const createdMs = data.createdAt?.toMillis?.() || data.createdAt?.seconds * 1000 || 0;
+
+    if (createdMs > 0 && createdMs < sevenDaysAgo.toMillis()) {
+      await updateDoc(requestDoc.ref, {
+        status: 'expired',
+        expiredAt: serverTimestamp(),
+      });
+
+      // Decline any submitted responses
+      const responses = await fetchQuoteResponsesByRequest(requestDoc.id);
+      for (const resp of responses) {
+        if (resp.status === 'submitted') {
+          await updateDoc(doc(db, QUOTE_RESPONSES_COL, resp.id), { status: 'expired' });
+        }
+      }
+
+      expiredCount++;
+    }
+  }
+
+  return expiredCount;
+}
+
+// ── FIX-H5: Notify vendors when an RFP is edited (called from updateQuoteRequest) ──
+
+/**
+ * FIX-H5: After editing an RFP, notify all vendors who have already submitted quotes.
+ * Should be called after a successful updateQuoteRequest that changes items/details.
+ */
+export async function notifyVendorsOfRfpEdit(
+  requestId: string,
+  editSummary: string,
+): Promise<void> {
+  const responses = await fetchQuoteResponsesByRequest(requestId);
+  const vendorOwnerIds = responses
+    .filter((r) => r.status === 'submitted' && r.vendorOwnerId)
+    .map((r) => r.vendorOwnerId!);
+
+  if (vendorOwnerIds.length > 0) {
+    await notifyVendorsRfpEdited(vendorOwnerIds, requestId, editSummary);
+  }
+
+  // Mark existing quotes as potentially stale
+  for (const resp of responses) {
+    if (resp.status === 'submitted') {
+      await updateDoc(doc(db, QUOTE_RESPONSES_COL, resp.id), {
+        staleWarning: true,
+        staleReason: `RFP edited: ${editSummary}`,
+        staleAt: serverTimestamp(),
+      });
+    }
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════════

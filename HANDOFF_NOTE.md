@@ -1611,6 +1611,78 @@ This gives vendors clear visibility into whether an accepted quote has been conv
 
 ---
 
+### Session 29 (April 7, 2026) — Fix Duplicate Orders + Messaging Fix + Read Receipts + 48hr Window + Cross-Browser Audit
+
+**Context:** Continuation from Session 28c. Multiple bugs reported by user during live testing, plus new feature requests for messaging UX. Then a full cross-browser compatibility audit and patch.
+
+**Bug 1 — Duplicate order creation:**
+`ordersCreated` was React local state only — reset on page refresh, allowing the customer to click "Finalize & Create Orders" multiple times and generate duplicate orders for the vendor.
+
+**Fix:** Added a server-side guard in `createOrdersFromQuote()` (cateringOrders.ts) — queries Firestore for existing orders with the same `quoteRequestId` BEFORE creating new ones. If found, returns existing order IDs instead. Also added a `useEffect` on mount in `QuoteComparison.tsx` that checks for existing orders and sets `ordersCreated = true` to disable the button at the UI layer too.
+
+**Bug 2 — Customer messages not seen by vendor:**
+The old `MessageVendorButton` component called `findOrCreateConversation(user.uid, businessId)`, creating a conversation with participants `[customer_uid, businessId]`. But `businessId` is NOT a user UID — it's a Firestore document ID from the `businesses` collection. The vendor's UID is different. Result: vendor could never find this conversation.
+
+**Bug 3 — Vendor "could not start a conversation" error:**
+The vendor's "Message Customer" button called `findOrCreateConversation(order.customerId, user.uid)`, creating a DIFFERENT conversation than what the customer created. They were messaging into parallel, non-overlapping conversations.
+
+**Fix for Bugs 2 & 3:** Removed ALL `findOrCreateConversation`-based messaging from both `CateringOrderStatus.tsx` and `VendorCateringDashboard.tsx`. The inline `OrderMessages` component (which uses the `cateringOrders/{orderId}/notes` subcollection) was already present and working correctly — it just needed the broken alternative buttons removed. Both customer and vendor now use the same OrderMessages panel, reading/writing the same Firestore subcollection.
+
+**Files modified:**
+- `src/components/catering/CateringOrderStatus.tsx` — Removed broken `MessageVendorButton`, `InlineMessagingModal`, `findOrCreateConversation` import, `messagingOrderId` state. Updated `formatTimestamp()` for cross-browser safety (handles Firestore Timestamps, `{seconds}` objects, numbers, strings, with `Number.isNaN` guard). Added `orderStatus` and `deliveredAt` props to OrderMessages.
+- `src/components/catering/VendorCateringDashboard.tsx` — Removed BOTH "Message Customer" buttons (active ~line 1278, completed ~line 1598), removed inline messaging modal, removed `findOrCreateConversation` import, removed `messagingOrderId`/`messageText`/`sendingMessage` state variables. Added `orderStatus` and `deliveredAt` props to OrderMessages in pending and active sections. **Added OrderMessages to Completed Orders section** (was entirely missing — delivered orders had no messaging at all).
+- `src/components/catering/OrderMessages.tsx` — Full rewrite with: read receipts (single gray ✓ = sent, double blue ✓✓ = read), red unread count badge, auto-mark-as-read on panel expand, 48hr post-delivery messaging window with countdown banner and locked state. Full cross-browser overhaul (see below).
+- `src/services/catering/cateringOrders.ts` — Added `markOrderNotesRead()` function, duplicate order prevention query in `createOrdersFromQuote()`, fixed all 5 sort comparisons that mixed milliseconds/seconds.
+- `src/services/catering/cateringTypes.ts` — Added `readBy?: string[]` and `readAt?: any` to `OrderNote` interface.
+- `src/services/catering/index.ts` — Added `markOrderNotesRead` to exports.
+- `firestore.rules` — Changed notes subcollection `allow update` from `false` to allow authenticated users (non-sender) to update notes (needed for read receipts `readBy` array).
+
+**Feature: Read receipts:**
+- Single gray check (✓) = message sent
+- Double blue check (✓✓) = message read by the other party
+- Implemented via `readBy` array field on each OrderNote document in Firestore
+- Auto-mark-as-read when the panel is expanded via `useEffect` calling `markOrderNotesRead()`
+- Red unread count badge on collapsed Messages header
+
+**Feature: 48hr post-delivery messaging window:**
+- Calculated from `statusHistory` entry where `status === 'delivered'`
+- Shows countdown banner: "Messaging available for Xh Ym after delivery"
+- After 48 hours: input replaced with lock icon + "Messaging closed — 48-hour window after delivery has passed"
+- Existing messages remain visible (read-only) after expiry
+
+**Cross-browser compatibility audit (11 fixes):**
+1. **Safari 14 flexbox `gap`** — Replaced Tailwind `gap-*` and `space-y-*` classes with inline `style={{ gap }}` and `marginTop`. CSS `gap` in flex containers requires Safari 14.1+; build target is Safari 14.
+2. **iOS Safari scroll inertia** — Added `WebkitOverflowScrolling: 'touch'` on message scroll container for smooth momentum scrolling on older iOS.
+3. **Overscroll containment** — Added `overscrollBehavior: 'contain'` to prevent parent page scrolling when scrolling within the messages area.
+4. **iOS Safari input styling** — Added `WebkitAppearance: 'none'` and `appearance: 'none'` on text input to remove default rounded corners and inner shadow.
+5. **Touch targets** — Increased send button from 40×40px to 44×44px to meet Apple Human Interface Guidelines minimum.
+6. **iOS tap flash** — Added `WebkitTapHighlightColor: 'transparent'` on send button.
+7. **Long-word overflow** — Added `wordBreak: 'break-word'` and `overflowWrap: 'break-word'` on message bubbles to prevent horizontal overflow.
+8. **Timestamp parsing** — Extracted `toEpochMs()` helper that safely handles Firestore Timestamps (`toMillis()`), `{seconds}` objects, epoch numbers, `Date` instances, and ISO-8601 strings (Android WebView edge case).
+9. **Date comparison** — Replaced `toDateString()` (locale-dependent) with `isSameDay()` that compares year/month/day numerically.
+10. **Auto-scroll consistency** — Wrapped `scrollTop = scrollHeight` in `requestAnimationFrame()` to ensure DOM has painted before scrolling (fixes Firefox/Safari race).
+11. **Timestamp sort bug** — Fixed all 5 sort comparisons in `cateringOrders.ts` that mixed `toMillis()` (milliseconds) with `.seconds` (raw seconds). Now consistently normalizes to milliseconds with `seconds * 1000`.
+
+**Live testing confirmed:**
+- Vendor sent "Hi, this is a test message from the vendor" via inline Messages panel on live site → message appeared in Sai Kumar's customer account ✅
+- Read receipt (single check) visible on vendor side ✅
+- New code deployed and verified (inline Messages accordion present, old "Message Customer" button gone) ✅
+
+**Decisions & rationale:**
+- **Why remove findOrCreateConversation entirely?** It was fundamentally broken — it used `businessId` (a document ID) as a participant, not the vendor's user UID. Even if fixed, having two separate messaging systems (conversations collection vs order notes subcollection) would create confusion. OrderMessages using the `notes` subcollection is the correct approach: messages are scoped to a specific order, both parties share the same data path.
+- **Why 48 hours?** Balances customer need to give post-delivery feedback/reviews with vendor desire to not receive messages indefinitely. Standard in food delivery apps.
+- **Why inline styles instead of Tailwind for gap?** Tailwind compiles `gap-*` to the `gap` CSS property, which Safari 14.0 doesn't support in flex containers. Inline `style={{ gap }}` with margin fallbacks ensures graceful degradation.
+- **Why `requestAnimationFrame` for scroll?** Direct `scrollTop = scrollHeight` assignment can fire before the browser has painted new DOM nodes, causing the scroll to stop one message short. `rAF` guarantees the paint has completed.
+
+**Commits:**
+- `74a8d4d` — fix(catering): cross-browser compat for messaging + add Messages to delivered orders
+- `73d9b1f` — feat(catering): read receipts, 48hr post-delivery messaging, dedup orders, fix messaging
+- `566cfa0` — fix(catering): prevent duplicate orders, fix messaging with read receipts, finalize bug fix
+- `c64dde5` — fix(catering): prevent duplicate orders, fix messaging to use OrderNotes, finalize bug fix
+- `a2acae3` — fix(catering): finalize bug fix — fallback assignments, auto-finalize, vendor indicator, Canadian ZIP
+
+---
+
 <!-- ================================================================
      SECTION 4: IN PROGRESS / HALF-DONE
      These items have partial work done. Don't start from scratch —
@@ -1766,9 +1838,10 @@ This gives vendors clear visibility into whether an accepted quote has been conv
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — All Committed, Pushed, and Deployed
-- **All Session 28/28b changes are committed and pushed** — 3 commits (quote-to-order conversion, Finalize button fix, TypeScript fixes + RFP badge). Site is deployed and live at `https://mithr-1e5f4.web.app`.
-- **RFP-to-Order flow fully tested and working** — confirmed end-to-end on live site: quote acceptance → order creation → vendor status progression through all 5 states → delivered.
+### Immediate — Push and Deploy Session 29
+- **Session 29 committed locally** (`74a8d4d`) — needs `git push && npx firebase deploy --only hosting` to go live.
+- **All Session 28/28b/28c changes are committed and pushed** — site is deployed and live at `https://mithr-1e5f4.web.app`.
+- **Messaging end-to-end verified on live site** — vendor sent message → customer saw it ✅. Read receipts working ✅.
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions deployed** — `transcribeVoiceMessage`, `sendNewMessageNotification`, and `processRecurringCateringOrders` (daily 6 AM PT) are on Cloud Run.
 
@@ -2028,8 +2101,13 @@ git add <files> && git commit -m "message" && git push origin main
 
 ### Recent Commit History
 ```
-(uncommitted) fix(catering): finalize bug fix, auto-finalize, vendor pending indicator (Session 28c)
-(latest) fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders (Session 28b)
+74a8d4d fix(catering): cross-browser compat for messaging + add Messages to delivered orders (Session 29)
+73d9b1f feat(catering): read receipts, 48hr post-delivery messaging, dedup orders, fix messaging (Session 29)
+566cfa0 fix(catering): prevent duplicate orders, fix messaging with read receipts, finalize bug fix (Session 29)
+c64dde5 fix(catering): prevent duplicate orders, fix messaging to use OrderNotes, finalize bug fix (Session 29)
+a2acae3 fix(catering): finalize bug fix — fallback assignments, auto-finalize, vendor indicator, Canadian ZIP (Session 28c)
+5e50754 fix(catering): finalize bug fix, auto-finalize, vendor pending indicator, Canadian ZIP support (Session 28c)
+(prior) fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders (Session 28b)
 1feda2a fix(catering): Finalize button now uses assignedCount instead of request status (Session 28)
 bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules (Session 28)
 222be4a fix(catering): cart drawer items not scrollable on mobile (Session 27)
@@ -2106,4 +2184,4 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   4. Update the session list in the header comment and the "Session history" field
 -->
 
-*Updated April 6, 2026 (Session 28c) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). Catering UI Phases 1-3 (20 items) + QA Audit (21 bugs found) + All Bug Fixes Verified + Cart Scroll Fix ALL COMPLETE (Session 27). RFP-to-Order Conversion + In-Order Messaging + Firestore rules fix ALL COMPLETE (Session 28). Live testing of quote-to-order pipeline VERIFIED end-to-end + 19 TypeScript errors fixed + RFP badge added ALL COMPLETE (Session 28b). Finalize bug fix (stale closure → re-fetch from Firestore) + auto-finalize on all-items-assigned + vendor "Awaiting Finalization"/"Order Created" indicators + Canadian postal code support ALL COMPLETE (Session 28c). Session 28c UNCOMMITTED — needs commit, push, deploy. Site live at https://mithr-1e5f4.web.app. Next: (1) commit + deploy Session 28c, (2) test full end-to-end finalize flow on live site, (3) Phase 7 improvements from UX audit (loading skeletons, cart persistence, order cancellation), (4) sort/filter controls on item list, (5) RFQ expiration dates. Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*
+*Updated April 7, 2026 (Session 29) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). Catering UI Phases 1-3 (20 items) + QA Audit (21 bugs found) + All Bug Fixes Verified + Cart Scroll Fix ALL COMPLETE (Session 27). RFP-to-Order Conversion + In-Order Messaging + Firestore rules fix ALL COMPLETE (Session 28). Live testing of quote-to-order pipeline VERIFIED end-to-end + 19 TypeScript errors fixed + RFP badge added ALL COMPLETE (Session 28b). Finalize bug fix + auto-finalize + vendor indicators + Canadian ZIP ALL COMPLETE (Session 28c). Duplicate order prevention + messaging fix (removed broken findOrCreateConversation) + read receipts + 48hr post-delivery messaging window + full cross-browser compatibility audit (11 fixes for Safari 14, iOS Safari, Android Chrome, Firefox) + Messages added to delivered orders on vendor side ALL COMPLETE (Session 29). Session 29 committed locally (74a8d4d) — needs git push + firebase deploy. Messaging verified end-to-end on live site. Site live at https://mithr-1e5f4.web.app. Next: (1) push + deploy Session 29, (2) Phase 7 improvements from UX audit (loading skeletons, cart persistence, order cancellation), (3) sort/filter controls on item list, (4) RFQ expiration dates. Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*
