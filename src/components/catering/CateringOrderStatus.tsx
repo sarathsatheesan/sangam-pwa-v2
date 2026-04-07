@@ -64,7 +64,13 @@ function getStepIndex(status: string): number {
 
 function formatTimestamp(ts: any): string {
   if (!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  let d: Date;
+  if (typeof ts.toDate === 'function') d = ts.toDate();
+  else if (typeof ts.seconds === 'number') d = new Date(ts.seconds * 1000);
+  else if (typeof ts === 'number') d = new Date(ts);
+  else if (typeof ts === 'string') d = new Date(ts);
+  else d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleString('en-US', {
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
     timeZoneName: 'short',

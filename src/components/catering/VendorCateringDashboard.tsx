@@ -1904,6 +1904,18 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                                 <span style={{ color: '#DC2626' }}>{order.cancellationReason || order.declinedReason}</span>
                               </div>
                             )}
+
+                            {/* ── In-order messages (available for 48hrs after delivery) ── */}
+                            {!['cancelled'].includes(order.status) && user && (
+                              <OrderMessages
+                                orderId={order.id}
+                                currentUserId={user.uid}
+                                currentUserName={businessName || 'Vendor'}
+                                currentUserRole="vendor"
+                                orderStatus={order.status}
+                                deliveredAt={order.statusHistory?.find((s: any) => s.status === 'delivered')?.timestamp}
+                              />
+                            )}
                           </div>
                         )}
                       </div>

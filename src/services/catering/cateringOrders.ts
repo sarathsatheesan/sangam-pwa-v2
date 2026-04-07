@@ -47,8 +47,8 @@ export async function fetchOrdersByCustomer(customerId: string): Promise<Caterin
   const snap = await getDocs(q);
   const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
   return results.sort((a, b) => {
-    const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
-    const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+    const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+    const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
     return bTime - aTime;
   });
 }
@@ -61,8 +61,8 @@ export async function fetchOrdersByBusiness(businessId: string): Promise<Caterin
   const snap = await getDocs(q);
   const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
   return results.sort((a, b) => {
-    const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
-    const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+    const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+    const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
     return bTime - aTime;
   });
 }
@@ -78,8 +78,8 @@ export function subscribeToCustomerOrders(
   return onSnapshot(q, (snap) => {
     const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
     results.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
-      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
       return bTime - aTime;
     });
     callback(results);
@@ -101,8 +101,8 @@ export function subscribeToBusinessOrders(
   return onSnapshot(q, (snap) => {
     const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
     results.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
-      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
       return bTime - aTime;
     });
     callback(results);
@@ -586,8 +586,8 @@ export function subscribeToOrderNotes(
   return onSnapshot(notesCol, (snap) => {
     const results = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderNote));
     results.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
-      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
       return aTime - bTime; // chronological order (oldest first)
     });
     callback(results);
