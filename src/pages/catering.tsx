@@ -15,7 +15,7 @@ import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store, Search,
   Send, FileText, ClipboardList, Star, Heart, Repeat, Share2, Pencil, Package, CheckCircle,
-  MoreHorizontal,
+  MoreHorizontal, UtensilsCrossed,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -62,6 +62,7 @@ const CateringReviews = React.lazy(() => import('@/components/catering/CateringR
 const FavoriteOrders = React.lazy(() => import('@/components/catering/FavoriteOrders'));
 const RecurringOrderManager = React.lazy(() => import('@/components/catering/RecurringOrderManager'));
 const VendorInventoryManager = React.lazy(() => import('@/components/catering/VendorInventoryManager'));
+const VendorMenuEditor = React.lazy(() => import('@/components/catering/VendorMenuEditor'));
 const OrderTemplates = React.lazy(() => import('@/components/catering/OrderTemplates'));
 
 function LazyFallback() {
@@ -80,7 +81,7 @@ export default function CateringPage() {
   const [allCateringBusinesses, setAllCateringBusinesses] = useState<any[]>([]);
   const [userOwnedBusiness, setUserOwnedBusiness] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory'>('quotes');
+  const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory' | 'menu'>('quotes');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
   const [editingQuoteRequestId, setEditingQuoteRequestId] = useState<string | null>(null);
   const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
@@ -1281,6 +1282,7 @@ export default function CateringPage() {
                 { key: 'analytics' as const, label: 'Analytics' },
                 { key: 'reviews' as const, label: 'Reviews', icon: <Star size={13} /> },
                 { key: 'inventory' as const, label: 'Inventory', icon: <Package size={13} /> },
+                { key: 'menu' as const, label: 'Menu', icon: <UtensilsCrossed size={13} /> },
               ]).map((tab) => (
                 <button
                   key={tab.key}
@@ -1331,6 +1333,13 @@ export default function CateringPage() {
             )}
             {vendorTab === 'inventory' && (
                 <VendorInventoryManager
+                  businessId={ownedBusiness.id}
+                  businessName={ownedBusiness.name}
+                  onBack={() => setVendorTab('orders')}
+                />
+            )}
+            {vendorTab === 'menu' && (
+                <VendorMenuEditor
                   businessId={ownedBusiness.id}
                   businessName={ownedBusiness.name}
                   onBack={() => setVendorTab('orders')}

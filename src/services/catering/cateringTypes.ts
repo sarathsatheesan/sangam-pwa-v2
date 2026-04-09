@@ -23,7 +23,62 @@ export interface CateringMenuItem {
   availableUntil?: string;
   prepTimeMinutes?: number;   // UI-07: estimated prep time in minutes
   popularityScore?: number;   // UI-07: 0-100 popularity index (based on order volume)
+  sortOrder?: number;         // Vendor-defined display order within category
+  archived?: boolean;         // Soft-delete — hidden from customers, visible in vendor editor
   createdAt?: any;
+}
+
+// ── Menu Template Types (Vendor Storefront Builder) ──────────────────────────
+
+export type MenuCategory = CateringMenuItem['category'];
+
+/** A single item within a menu template — price intentionally omitted */
+export interface MenuTemplateItem {
+  name: string;
+  description: string;
+  category: MenuCategory;
+  pricingType: 'per_person' | 'per_tray' | 'flat_rate';
+  servesCount?: number;
+  dietaryTags?: string[];
+}
+
+/** A cuisine-specific starter template */
+export interface MenuTemplate {
+  id: string;
+  name: string;
+  cuisine: string;
+  description: string;
+  items: MenuTemplateItem[];
+  version: number;
+}
+
+/** Parsed item from Smart Paste / Photo-to-Menu with confidence scores */
+export interface ParsedMenuItem {
+  name: string;
+  price: number | null;                // cents, null if unparseable
+  description: string;
+  category: MenuCategory | null;
+  pricingType: 'per_person' | 'per_tray' | 'flat_rate';
+  dietaryTags: string[];
+  servesCount?: number;
+  confidence: {
+    name: number;    // 0–1
+    price: number;
+    category: number;
+    dietaryTags: number;
+  };
+}
+
+/** Audit entry for vendor image uploads (liability framework) */
+export interface VendorImageAuditEntry {
+  businessId: string;
+  itemId: string;
+  uploadedBy: string;       // uid
+  originalFilename: string;
+  compressedHash: string;
+  storageUrl: string;
+  timestamp: any;           // serverTimestamp
+  liabilityAcknowledged: boolean;
 }
 
 export interface OrderItem {

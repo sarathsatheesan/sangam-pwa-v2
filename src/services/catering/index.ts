@@ -6,6 +6,11 @@
 // Types
 export type {
   CateringMenuItem,
+  MenuCategory,
+  MenuTemplateItem,
+  MenuTemplate,
+  ParsedMenuItem,
+  VendorImageAuditEntry,
   OrderItem,
   DeliveryAddress,
   OrderForContext,
@@ -33,6 +38,13 @@ export {
   updateMenuItem,
   deleteMenuItem,
   updateMenuItemStock,
+  // Vendor Storefront Builder
+  fetchAllMenuItemsByBusiness,
+  subscribeToMenuItems,
+  batchCreateMenuItems,
+  archiveMenuItem,
+  restoreMenuItem,
+  logImageUpload,
 } from './cateringMenu';
 
 // Orders, payments, messaging

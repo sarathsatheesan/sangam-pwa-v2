@@ -12,6 +12,9 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  onSnapshot,
+  orderBy,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { CateringMenuItem } from './cateringTypes';
@@ -98,4 +101,102 @@ export async function updateMenuItemStock(
     if (v !== undefined) cleanUpdates[k] = v;
   }
   await updateDoc(doc(db, MENU_ITEMS_COL, itemId), cleanUpdates);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// VENDOR STOREFRONT BUILDER — New functions (existing functions above untouched)
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Fetch ALL menu items for a business (including unavailable/archived) — vendor editor view.
+ * Unlike fetchMenuItemsByBusiness, this does NOT filter by available === true.
+ */
+export async function fetchAllMenuItemsByBusiness(businessId: string): Promise<CateringMenuItem[]> {
+  const q = query(
+    collection(db, MENU_ITEMS_COL),
+    where('businessId', '==', businessId),
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as CateringMenuItem))
+    .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || (a.category || '').localeCompare(b.category || ''));
+}
+
+/**
+ * Real-time subscription to all menu items for a business (vendor editor).
+ * Returns an unsubscribe function.
+ */
+export function subscribeToMenuItems(
+  businessId: string,
+  onData: (items: CateringMenuItem[]) => void,
+  onError?: (err: Error) => void,
+): () => void {
+  const q = query(
+    collection(db, MENU_ITEMS_COL),
+    where('businessId', '==', businessId),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      const items = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as CateringMenuItem))
+        .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || (a.category || '').localeCompare(b.category || ''));
+      onData(items);
+    },
+    (err) => onError?.(err as Error),
+  );
+}
+
+/**
+ * Batch-create multiple menu items at once (for templates / smart paste).
+ * Returns array of created document IDs.
+ */
+export async function batchCreateMenuItems(
+  items: Omit<CateringMenuItem, 'id'>[],
+): Promise<string[]> {
+  const batch = writeBatch(db);
+  const ids: string[] = [];
+
+  for (const item of items) {
+    const cleanItem = Object.fromEntries(
+      Object.entries(item).filter(([, v]) => v !== undefined),
+    );
+    const ref = doc(collection(db, MENU_ITEMS_COL));
+    batch.set(ref, { ...cleanItem, createdAt: serverTimestamp() });
+    ids.push(ref.id);
+  }
+
+  await batch.commit();
+  return ids;
+}
+
+/**
+ * Soft-delete: archive a menu item (hidden from customers, visible in vendor editor).
+ */
+export async function archiveMenuItem(itemId: string): Promise<void> {
+  await updateDoc(doc(db, MENU_ITEMS_COL, itemId), {
+    archived: true,
+    available: false,
+  });
+}
+
+/**
+ * Restore an archived menu item.
+ */
+export async function restoreMenuItem(itemId: string): Promise<void> {
+  await updateDoc(doc(db, MENU_ITEMS_COL, itemId), {
+    archived: false,
+    available: true,
+    stockStatus: 'in_stock',
+  });
+}
+
+/**
+ * Log a vendor image upload for liability audit trail.
+ */
+export async function logImageUpload(entry: Omit<import('./cateringTypes').VendorImageAuditEntry, 'timestamp'>): Promise<void> {
+  await addDoc(collection(db, 'vendorImageAuditLog'), {
+    ...entry,
+    timestamp: serverTimestamp(),
+  });
 }
