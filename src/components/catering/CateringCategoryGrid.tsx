@@ -15,12 +15,12 @@ const CATERING_CATEGORIES = [
   'Other',
 ];
 
-// Soft background colors for category icon containers (Uber Eats style)
-const CATEGORY_BG_COLORS: Record<string, string> = {
-  'Restaurant & Food': '#FEF3E2',
-  'Tiffin': '#E8F5E9',
-  'Grocery & Market': '#E3F2FD',
-  'Other': '#F3E5F5',
+// UI-02: Rich gradient backgrounds per category for glass-morphism cards
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  'Restaurant & Food': 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)',
+  'Tiffin': 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+  'Grocery & Market': 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+  'Other': 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
 };
 
 export default function CateringCategoryGrid({
@@ -47,88 +47,61 @@ export default function CateringCategoryGrid({
           </p>
         </div>
       ) : (
-        <div
-          className="category-scroll flex gap-4 overflow-x-auto pb-2 px-1"
-          style={{
-            scrollBehavior: 'smooth',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {/* All Categories button */}
+        <button
+          onClick={() => onSelectCategory('all')}
+          className="group relative flex flex-col items-center justify-center rounded-xl p-4 shadow-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-md cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-600 focus-visible:outline-none"
+          style={{ backgroundImage: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%)', minHeight: '120px' }}
+          aria-label={`Browse all categories — ${totalAvailable} ${totalAvailable === 1 ? 'caterer' : 'caterers'} available`}
         >
-          {/* Hide scrollbar for WebKit browsers */}
-          <style>{`
-            .category-scroll::-webkit-scrollbar {
-              display: none;
-            }
-          `}</style>
+          <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
+          <div className="absolute -bottom-3 -left-3 w-10 h-10 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
+          <div className="relative z-10 mb-2 text-3xl drop-shadow-md">🔍</div>
+          <div className="relative z-10 rounded-lg px-2.5 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+            <h3 className="text-center text-xs font-semibold text-white line-clamp-2">
+              All Categories
+            </h3>
+          </div>
+          {totalBusinessCount > 0 && (
+            <p className="relative z-10 mt-1.5 text-[10px] font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
+              {totalBusinessCount} {totalBusinessCount === 1 ? 'caterer' : 'caterers'}
+            </p>
+          )}
+        </button>
 
-          {/* All Categories button */}
-          <button
-            onClick={() => onSelectCategory('all')}
-            className="flex flex-col items-center justify-center flex-shrink-0 rounded-2xl p-3 transition-all duration-200 ease-out hover:shadow-md cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            style={{
-              backgroundColor: 'var(--aurora-bg)',
-              borderColor: 'var(--aurora-border)',
-              border: '1px solid var(--aurora-border)',
-              color: 'var(--aurora-text)',
-              width: '80px',
-              minWidth: '80px',
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-            }}
-            aria-label={`Browse all categories — ${totalAvailable} ${totalAvailable === 1 ? 'caterer' : 'caterers'} available`}
-          >
-            <div className="text-2xl mb-2">🔍</div>
-            <div className="text-center">
-              <h3 className="text-xs font-semibold leading-snug line-clamp-2" style={{ color: 'var(--aurora-text)' }}>
-                All
-              </h3>
-            </div>
-            {totalBusinessCount > 0 && (
-              <p className="mt-1 text-[10px] font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>
-                {totalBusinessCount}
-              </p>
-            )}
-          </button>
+        {filteredCategories.map(category => {
+          const emoji = CATEGORY_EMOJI_MAP[category] || '🍽️';
+          const gradient = CATEGORY_GRADIENTS[category] || 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)';
+          const count = businessCounts[category] || 0;
 
-          {/* Category pills */}
-          {filteredCategories.map(category => {
-            const emoji = CATEGORY_EMOJI_MAP[category] || '🍽️';
-            const bgColor = CATEGORY_BG_COLORS[category] || '#F5F5F5';
-            const count = businessCounts[category] || 0;
+          return (
+            <button
+              key={category}
+              onClick={() => onSelectCategory(category)}
+              className="group relative flex flex-col items-center justify-center rounded-xl p-4 shadow-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-md cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:outline-none"
+              style={{ backgroundImage: gradient, minHeight: '120px' }}
+              aria-label={`Browse ${category} — ${count} ${count === 1 ? 'caterer' : 'caterers'} available`}
+            >
+              {/* Decorative circles — scaled down */}
+              <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-20" style={{ backgroundColor: 'white' }} />
+              <div className="absolute -bottom-3 -left-3 w-10 h-10 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
 
-            return (
-              <button
-                key={category}
-                onClick={() => onSelectCategory(category)}
-                className="flex flex-col items-center justify-center flex-shrink-0 rounded-2xl p-3 transition-all duration-200 ease-out hover:shadow-md cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-                style={{
-                  backgroundColor: bgColor,
-                  color: 'var(--aurora-text)',
-                  width: '80px',
-                  minWidth: '80px',
-                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-                }}
-                aria-label={`Browse ${category} — ${count} ${count === 1 ? 'caterer' : 'caterers'} available`}
-              >
-                {/* Icon container */}
-                <div className="text-2xl mb-2">
-                  {emoji}
-                </div>
-
-                {/* Category name */}
-                <h3 className="text-xs font-semibold text-center leading-snug line-clamp-2" style={{ color: 'var(--aurora-text)' }}>
+              <div className="relative z-10 mb-2 text-3xl drop-shadow-md">{emoji}</div>
+              {/* Glass-morphism label */}
+              <div className="relative z-10 rounded-lg px-2.5 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+                <h3 className="text-center text-xs font-semibold text-white line-clamp-2">
                   {category}
                 </h3>
-
-                {/* Business count */}
-                <p className="mt-1 text-[10px] font-medium" style={{ color: count > 0 ? 'var(--aurora-text-secondary)' : 'var(--aurora-text-muted, #9CA3AF)' }}>
-                  {count > 0
-                    ? `${count}`
-                    : '—'}
-                </p>
-              </button>
-            );
-          })}
+              </div>
+              <p className="relative z-10 mt-1.5 text-[10px] font-medium" style={{ color: count > 0 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)' }}>
+                {count > 0
+                  ? `${count} ${count === 1 ? 'caterer' : 'caterers'}`
+                  : 'No caterers yet'}
+              </p>
+            </button>
+          );
+        })}
         </div>
       )}
     </div>
