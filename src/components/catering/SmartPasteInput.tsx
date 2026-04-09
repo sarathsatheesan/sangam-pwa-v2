@@ -28,9 +28,9 @@ const SmartPasteInput: React.FC<SmartPasteInputProps> = ({
    * Handles formats: $12.99, $12, 12.99, etc.
    */
   const extractPrice = (text: string): number | null => {
-    const priceMatch = text.match(/\$?(\d+(?:\.\d{2})?)/);
+    const priceMatch = text.match(/\$?(\d+(?:\.\d{1,2})?)/);
     if (priceMatch) {
-      return parseFloat(priceMatch[1]);
+      return Math.round(parseFloat(priceMatch[1]) * 100); // Convert to cents
     }
     return null;
   };
@@ -60,16 +60,16 @@ const SmartPasteInput: React.FC<SmartPasteInputProps> = ({
    */
   const extractDietaryTags = (text: string): string[] => {
     const dietaryKeywords: { [key: string]: string } = {
-      vegetarian: 'Vegetarian',
-      vegan: 'Vegan',
-      halal: 'Halal',
-      kosher: 'Kosher',
-      'gluten free': 'Gluten Free',
-      'gluten-free': 'Gluten Free',
-      'dairy free': 'Dairy Free',
-      'dairy-free': 'Dairy Free',
-      'nut free': 'Nut Free',
-      'nut-free': 'Nut Free',
+      vegetarian: 'vegetarian',
+      vegan: 'vegan',
+      halal: 'halal',
+      kosher: 'kosher',
+      'gluten free': 'gluten_free',
+      'gluten-free': 'gluten_free',
+      'dairy free': 'dairy_free',
+      'dairy-free': 'dairy_free',
+      'nut free': 'nut_free',
+      'nut-free': 'nut_free',
     };
 
     const tags: string[] = [];

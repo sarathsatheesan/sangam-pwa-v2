@@ -147,9 +147,9 @@ const MenuItemReviewGrid: React.FC<MenuItemReviewGridProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {editingItems.map((item, index) => {
                 const hasLowConfidence =
-                  (item.nameConfidence && item.nameConfidence < 0.7) ||
-                  (item.categoryConfidence && item.categoryConfidence < 0.7) ||
-                  (item.priceConfidence && item.priceConfidence < 0.7);
+                  (item.confidence?.name && item.confidence.name < 0.7) ||
+                  (item.confidence?.category && item.confidence.category < 0.7) ||
+                  (item.confidence?.price && item.confidence.price < 0.7);
 
                 const hasMissingPrice = !item.price || item.price <= 0;
                 const hasMissingName = !item.name;
@@ -250,7 +250,7 @@ const MenuItemReviewGrid: React.FC<MenuItemReviewGridProps> = ({
                         value={item.category || ''}
                         onChange={(e) => updateItem(index, 'category', e.target.value as MenuCategory)}
                         className={`w-full px-3 py-2 border rounded-lg text-sm transition ${
-                          item.categoryConfidence && item.categoryConfidence < 0.7
+                          item.confidence?.category && item.confidence.category < 0.7
                             ? 'bg-amber-50 border-amber-300'
                             : 'bg-white border-gray-300'
                         } focus:ring-2 focus:ring-blue-200 focus:outline-none`}
