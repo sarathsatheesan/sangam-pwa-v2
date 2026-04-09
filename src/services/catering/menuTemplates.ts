@@ -2,7 +2,7 @@
 // MENU TEMPLATES — Cuisine-specific starter templates for Vendor Storefront Builder
 // ═══════════════════════════════════════════════════════════════════════
 
-import { MenuTemplate, MenuTemplateItem, MenuTemplateType } from './cateringTypes';
+import type { MenuTemplate, MenuTemplateItem, MenuTemplateType } from './cateringTypes';
 
 // ── Template 1: South Indian Catering ────────────────────────────────────
 
