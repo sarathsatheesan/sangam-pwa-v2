@@ -246,14 +246,10 @@ export default function VendorMenuEditor({
     if (!file) return;
 
     try {
-      const compressed = await compressImage(file);
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        setPhotoPreview(base64);
-        setFormData((prev) => ({ ...prev, photoUrl: base64 }));
-      };
-      reader.readAsDataURL(compressed);
+      // compressImage already returns a base64 data-URL string
+      const base64 = await compressImage(file);
+      setPhotoPreview(base64);
+      setFormData((prev) => ({ ...prev, photoUrl: base64 }));
     } catch (error) {
       showToast('Failed to process image', 'error');
       console.error('Photo upload error:', error);

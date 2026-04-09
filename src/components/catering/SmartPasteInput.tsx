@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { X, Sparkles, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { X, Sparkles, Loader2, CheckCircle2, AlertCircle, Camera, ImageIcon } from 'lucide-react';
 import type { ParsedMenuItem } from '@/services/cateringService';
 
 interface SmartPasteInputProps {
@@ -22,6 +22,8 @@ const SmartPasteInput: React.FC<SmartPasteInputProps> = ({
   const [menuText, setMenuText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [parseResult, setParseResult] = useState<ParsingResult | null>(null);
+  const [menuPhoto, setMenuPhoto] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   /**
    * Extract price from text
@@ -257,6 +259,16 @@ const SmartPasteInput: React.FC<SmartPasteInputProps> = ({
   /**
    * Handle parse button click
    */
+  const handlePhotoCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setMenuPhoto(event.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
   const handleParse = useCallback(async () => {
     if (!menuText.trim()) return;
 
@@ -317,10 +329,43 @@ const SmartPasteInput: React.FC<SmartPasteInputProps> = ({
             <>
               {/* Info text */}
               <p className="text-gray-600 text-sm leading-relaxed">
-                Paste your menu text below — from your website, a document, or
-                typed from memory. We'll extract item names, prices,
-                descriptions, and dietary info automatically.
+                Paste your menu text below, or snap a photo of your menu to use as reference while typing.
+                We'll extract item names, prices, descriptions, and dietary info automatically.
               </p>
+
+              {/* Photo Capture */}
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoCapture}
+                className="hidden"
+              />
+
+              {menuPhoto ? (
+                <div className="relative rounded-lg overflow-hidden border border-gray-200">
+                  <img src={menuPhoto} alt="Menu photo" className="w-full max-h-64 object-contain bg-gray-50" />
+                  <button
+                    onClick={() => setMenuPhoto(null)}
+                    className="absolute top-2 right-2 p-1.5 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors"
+                    aria-label="Remove photo"
+                  >
+                    <X size={14} />
+                  </button>
+                  <p className="text-xs text-gray-500 p-2 bg-gray-50 text-center">
+                    Reference your photo above while typing the menu items below
+                  </p>
+                </div>
+              ) : (
+                <button
+                  onClick={() => photoInputRef.current?.click()}
+                  className="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center gap-3 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                >
+                  <Camera size={20} />
+                  <span className="text-sm font-medium">Snap a Photo of Your Menu</span>
+                </button>
+              )}
 
               {/* Textarea */}
               <div>
@@ -410,7 +455,7 @@ Halal`}
                       </div>
                       {item.price && (
                         <p className="font-semibold text-gray-900 flex-shrink-0">
-                          ${item.price.toFixed(2)}
+                          ${(item.price / 100).toFixed(2)}
                         </p>
                       )}
                     </div>
