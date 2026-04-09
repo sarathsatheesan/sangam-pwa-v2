@@ -42,20 +42,19 @@ const DIETARY_OPTIONS = [
 function ItemCardSkeleton() {
   return (
     <div
-      className="flex flex-col overflow-hidden rounded-xl border shadow-sm animate-pulse"
+      className="flex flex-col overflow-hidden rounded-lg animate-pulse"
       style={{
-        borderColor: 'var(--aurora-border)',
         backgroundColor: 'var(--aurora-surface)',
       }}
     >
-      <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-40 w-full" />
-      <div className="flex flex-1 flex-col p-4 space-y-3">
+      <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="w-full aspect-video" />
+      <div className="flex flex-1 flex-col p-3 space-y-2.5">
         <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-4 w-3/4 rounded" />
         <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-3 w-full rounded" />
-        <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-3 w-1/2 rounded" />
-        <div className="mt-auto flex items-center justify-between pt-4">
-          <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-5 w-16 rounded" />
-          <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-9 w-20 rounded-lg" />
+        <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-3 w-2/3 rounded" />
+        <div className="mt-auto flex items-center justify-between pt-3">
+          <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-5 w-14 rounded" />
+          <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-8 w-16 rounded-lg" />
         </div>
       </div>
     </div>
@@ -152,32 +151,33 @@ export default function CateringItemList({
     <div className="w-full space-y-6">
       {/* Search and Filter Section — sticky on mobile for easy access while scrolling */}
       <div className="space-y-4 sticky top-0 z-10 -mx-4 px-4 pt-2 pb-3 sm:static sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:z-auto" style={{ backgroundColor: 'var(--aurora-bg)', paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}>
-        {/* Search bar */}
+        {/* Search bar — pill-shaped, Uber Eats style */}
         <div className="relative">
           <Search
-            className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2"
+            className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2"
             style={{ color: 'var(--aurora-text-muted)' }}
           />
           <input
             type="text"
-            placeholder="Search items by name or description..."
+            placeholder="Search items..."
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             aria-label="Search catering items by name or description"
-            className="w-full rounded-lg border py-2.5 pl-10 pr-10 text-sm placeholder-gray-500 transition-colors duration-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            className="w-full rounded-full py-3 pl-12 pr-10 text-base placeholder-gray-400 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
             style={{
-              borderColor: 'var(--aurora-border)',
-              backgroundColor: 'var(--aurora-surface)',
+              backgroundColor: 'var(--aurora-surface, #f3f4f6)',
               color: 'var(--aurora-text)',
-            }}
+              '--tw-ring-color': 'var(--aurora-text-muted, #9CA3AF)',
+              '--tw-ring-offset-color': 'var(--aurora-bg)',
+            } as React.CSSProperties}
           />
           {searchQuery && (
             <button
               onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors hover:opacity-70"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors hover:opacity-70"
               aria-label="Clear search"
             >
-              <X size={14} style={{ color: 'var(--aurora-text-muted)' }} />
+              <X size={16} style={{ color: 'var(--aurora-text-muted)' }} />
             </button>
           )}
         </div>
@@ -196,19 +196,21 @@ export default function CateringItemList({
                 <button
                   key={tag}
                   onClick={() => onDietaryToggle(tag)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
+                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 ${
                     isSelected
                       ? 'text-white'
-                      : 'border hover:opacity-80'
+                      : 'border'
                   }`}
                   style={
                     isSelected
                       ? {
-                          backgroundColor: 'var(--aurora-secondary, #10B981)',
+                          backgroundColor: '#1F2937',
+                          borderColor: '#1F2937',
                         }
                       : {
                           borderColor: 'var(--aurora-border)',
                           color: 'var(--aurora-text-secondary)',
+                          backgroundColor: 'transparent',
                         }
                   }
                   role="checkbox"
@@ -224,7 +226,11 @@ export default function CateringItemList({
             {dietaryFilter.length > 0 && onClearDietaryFilter && (
               <button
                 onClick={onClearDietaryFilter}
-                className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 transition-all duration-200"
+                className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-xs font-medium border transition-all duration-200"
+                style={{
+                  borderColor: 'var(--aurora-border)',
+                  color: 'var(--aurora-text-secondary)',
+                }}
                 aria-label="Clear all dietary filters"
               >
                 Clear
@@ -232,20 +238,20 @@ export default function CateringItemList({
             )}
           </div>
 
-          {/* Sort dropdown */}
+          {/* Sort dropdown — pill style */}
           {onSortChange && (
             <div
-              className="relative flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-colors hover:opacity-80"
-              style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}
+              className="relative flex items-center gap-1.5 rounded-full border px-4 py-2 transition-colors hover:opacity-80"
+              style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'transparent' }}
             >
               <ArrowUpDown
-                className="h-3.5 w-3.5 shrink-0"
+                className="h-4 w-4 shrink-0"
                 style={{ color: 'var(--aurora-text-muted)' }}
               />
               <select
                 value={sortOrder}
                 onChange={(e) => onSortChange(e.target.value as SortOrder)}
-                className="appearance-none bg-transparent text-xs font-medium pr-4 cursor-pointer outline-none transition-colors"
+                className="appearance-none bg-transparent text-xs font-medium pr-2 cursor-pointer outline-none transition-colors"
                 aria-label="Sort items"
                 style={{ color: 'var(--aurora-text-secondary)' }}
               >
@@ -256,7 +262,7 @@ export default function CateringItemList({
                 ))}
               </select>
               <ChevronDown
-                className="h-3 w-3 shrink-0 pointer-events-none absolute right-2"
+                className="h-3 w-3 shrink-0 pointer-events-none"
                 style={{ color: 'var(--aurora-text-muted)' }}
               />
             </div>
@@ -266,13 +272,13 @@ export default function CateringItemList({
 
       {/* Loading skeleton or items grouped by business */}
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
             <ItemCardSkeleton key={i} />
           ))}
         </div>
       ) : hasResults ? (
-        <div className="space-y-8">
+        <div className="space-y-10">
           {Array.from(groupedByBusiness.entries()).map(
             ([businessId, businessItems]) => {
               const business = businessMap[businessId];
@@ -290,89 +296,82 @@ export default function CateringItemList({
                   className="space-y-4"
                   style={{ contentVisibility: 'auto', containIntrinsicBlockSize: 'auto 400px' } as React.CSSProperties}
                 >
-                  {/* Business header — card-style with avatar */}
+                  {/* Business header — cleaner, divider style */}
                   <div
-                    className="flex items-center gap-4 rounded-xl border p-4 shadow-sm"
-                    style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}
+                    className="pb-4 border-b"
+                    style={{ borderColor: 'var(--aurora-border)' }}
                   >
-                    {/* Vendor avatar */}
-                    <div
-                      className="flex items-center justify-center w-12 h-12 rounded-full shrink-0 font-bold text-lg text-white"
-                      style={{
-                        backgroundColor: (() => {
-                          const colors = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
-                          let hash = 0;
-                          for (let i = 0; i < (business.name || '').length; i++) hash = business.name.charCodeAt(i) + ((hash << 5) - hash);
-                          return colors[Math.abs(hash) % colors.length];
-                        })(),
-                      }}
-                      aria-hidden="true"
-                    >
-                      {(business.name || 'V').charAt(0).toUpperCase()}
-                    </div>
+                    <div className="flex items-start gap-4">
+                      {/* Vendor avatar */}
+                      <div
+                        className="flex items-center justify-center w-14 h-14 rounded-full shrink-0 font-bold text-lg text-white"
+                        style={{
+                          backgroundColor: (() => {
+                            const colors = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
+                            let hash = 0;
+                            for (let i = 0; i < (business.name || '').length; i++) hash = business.name.charCodeAt(i) + ((hash << 5) - hash);
+                            return colors[Math.abs(hash) % colors.length];
+                          })(),
+                        }}
+                        aria-hidden="true"
+                      >
+                        {(business.name || 'V').charAt(0).toUpperCase()}
+                      </div>
 
-                    <div className="flex-1 min-w-0">
-                      <h2 className="font-semibold text-base truncate" style={{ color: 'var(--aurora-text)' }}>
-                        {business.name}
-                      </h2>
-                      <div className="mt-1 flex items-center gap-3 flex-wrap">
-                        {/* Rating stars */}
-                        {business.rating && (
-                          <div className="flex items-center gap-1">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`h-3.5 w-3.5 ${
-                                  i < Math.floor(business.rating)
-                                    ? 'fill-amber-400 text-amber-400'
-                                    : ''
-                                }`}
-                                strokeWidth={2}
-                                style={
-                                  i < Math.floor(business.rating)
-                                    ? undefined
-                                    : { color: 'var(--aurora-text-muted)' }
-                                }
-                              />
-                            ))}
-                            <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                              {business.rating?.toFixed(1) ?? 'N/A'}
-                            </span>
-                            {business.reviews > 0 && (
-                              <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
-                                ({business.reviews})
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-lg font-bold truncate" style={{ color: 'var(--aurora-text)' }}>
+                          {business.name}
+                        </h2>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          {/* Rating inline format */}
+                          {business.rating && (
+                            <div className="flex items-center gap-1 text-sm">
+                              <span style={{ color: 'var(--aurora-text-secondary)' }}>
+                                {business.rating?.toFixed(1) ?? 'N/A'}
                               </span>
-                            )}
-                          </div>
-                        )}
+                              <Star
+                                className="h-4 w-4 fill-amber-400 text-amber-400"
+                                strokeWidth={0}
+                              />
+                              {business.reviews > 0 && (
+                                <span style={{ color: 'var(--aurora-text-muted)' }}>
+                                  ({business.reviews})
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-                        {/* Verified badge */}
-                        {business.verified && (
-                          <div className="flex items-center gap-1">
-                            <Badge className="h-3.5 w-3.5 text-green-600" />
-                            <span className="text-xs font-medium text-green-600">
-                              Verified
+                          {/* Verified checkmark */}
+                          {business.verified && (
+                            <div className="flex items-center gap-1" title="Verified">
+                              <Badge className="h-4 w-4 text-green-600" />
+                              <span className="text-xs font-medium text-green-600">
+                                Verified
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Heritage tag — subtle */}
+                          {business.heritage && (
+                            <span className="inline-block rounded-full text-xs font-medium px-2.5 py-0.5" style={{
+                              backgroundColor: 'var(--aurora-surface, #f3f4f6)',
+                              color: 'var(--aurora-text-secondary)',
+                            }}>
+                              {business.heritage}
                             </span>
-                          </div>
-                        )}
+                          )}
 
-                        {/* Heritage tag */}
-                        {business.heritage && (
-                          <span className="inline-block rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
-                            {business.heritage}
+                          {/* Item count */}
+                          <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                            {businessItems.length} {businessItems.length === 1 ? 'item' : 'items'}
                           </span>
-                        )}
-
-                        {/* Item count */}
-                        <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
-                          {businessItems.length} {businessItems.length === 1 ? 'item' : 'items'}
-                        </span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Items grid */}
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {/* Items grid — 2 cols mobile, 3 tablet, 4 large */}
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                     {businessItems.map(item => {
                       const cartItem = cartItems?.find(ci => ci.menuItemId === item.id);
                       return (
@@ -393,20 +392,21 @@ export default function CateringItemList({
           )}
         </div>
       ) : (
-        /* Empty state */
+        /* Empty state — softer Uber Eats feel */
         <div
-          className="flex flex-col items-center justify-center rounded-lg border py-12"
+          className="flex flex-col items-center justify-center rounded-lg py-12"
           style={{
-            borderColor: 'var(--aurora-border)',
-            backgroundColor: 'var(--aurora-bg)',
+            backgroundColor: 'var(--aurora-surface, #f9fafb)',
           }}
         >
-          <UtensilsCrossed
-            className="h-12 w-12"
-            strokeWidth={1.5}
-            style={{ color: 'var(--aurora-text-muted)' }}
-          />
-          <h3 className="mt-4 font-semibold" style={{ color: 'var(--aurora-text)' }}>
+          <div className="mb-4 p-3 rounded-full" style={{ backgroundColor: 'var(--aurora-bg)' }}>
+            <UtensilsCrossed
+              className="h-8 w-8"
+              strokeWidth={1.5}
+              style={{ color: 'var(--aurora-text-muted)' }}
+            />
+          </div>
+          <h3 className="font-semibold text-base" style={{ color: 'var(--aurora-text)' }}>
             No items found
           </h3>
           <p className="mt-1 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
