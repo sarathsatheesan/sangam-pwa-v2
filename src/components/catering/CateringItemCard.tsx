@@ -86,7 +86,7 @@ export default function CateringItemCard({
   return (
     <div className={`flex flex-col overflow-hidden rounded-xl border shadow-sm transition-shadow duration-200 ${isDisabled ? 'opacity-50 pointer-events-none' : 'hover:shadow-md'}`} style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }} role="article" aria-label={`${item.name} — ${formatPrice(item.price)} ${pricingLabel}${isOutOfStock ? ' — out of stock' : isUnavailable ? ' — currently unavailable' : ''}`}>
       {/* Photo area */}
-      <div className="relative w-full" style={{ backgroundColor: 'var(--aurora-surface-variant)', aspectRatio: '5/3' }}>
+      <div className="relative w-full h-36" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
         {item.photoUrl ? (
           <img
             src={item.photoUrl}

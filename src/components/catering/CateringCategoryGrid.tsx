@@ -47,24 +47,24 @@ export default function CateringCategoryGrid({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* All Categories button */}
         <button
           onClick={() => onSelectCategory('all')}
-          className="group relative flex flex-col items-center justify-center rounded-2xl p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-lg cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-600 focus-visible:outline-none"
-          style={{ backgroundImage: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%)', minHeight: '160px' }}
+          className="group relative flex flex-col items-center justify-center rounded-xl p-4 shadow-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-md cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-600 focus-visible:outline-none"
+          style={{ backgroundImage: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%)', minHeight: '120px' }}
           aria-label={`Browse all categories — ${totalAvailable} ${totalAvailable === 1 ? 'caterer' : 'caterers'} available`}
         >
-          <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
-          <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
-          <div className="relative z-10 mb-3 text-5xl drop-shadow-md">🔍</div>
-          <div className="relative z-10 rounded-xl px-3 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-            <h3 className="text-center text-sm font-semibold text-white line-clamp-2">
+          <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
+          <div className="absolute -bottom-3 -left-3 w-10 h-10 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
+          <div className="relative z-10 mb-2 text-3xl drop-shadow-md">🔍</div>
+          <div className="relative z-10 rounded-lg px-2.5 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+            <h3 className="text-center text-xs font-semibold text-white line-clamp-2">
               All Categories
             </h3>
           </div>
           {totalBusinessCount > 0 && (
-            <p className="relative z-10 mt-2 text-xs font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
+            <p className="relative z-10 mt-1.5 text-[10px] font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
               {totalBusinessCount} {totalBusinessCount === 1 ? 'caterer' : 'caterers'}
             </p>
           )}
@@ -79,22 +79,22 @@ export default function CateringCategoryGrid({
             <button
               key={category}
               onClick={() => onSelectCategory(category)}
-              className="group relative flex flex-col items-center justify-center rounded-2xl p-6 shadow-md transition-all duration-300 ease-out hover:scale-[1.03] hover:shadow-lg cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:outline-none"
-              style={{ backgroundImage: gradient, minHeight: '160px' }}
+              className="group relative flex flex-col items-center justify-center rounded-xl p-4 shadow-sm transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-md cursor-pointer overflow-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:outline-none"
+              style={{ backgroundImage: gradient, minHeight: '120px' }}
               aria-label={`Browse ${category} — ${count} ${count === 1 ? 'caterer' : 'caterers'} available`}
             >
-              {/* Decorative circles */}
-              <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20" style={{ backgroundColor: 'white' }} />
-              <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
+              {/* Decorative circles — scaled down */}
+              <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-20" style={{ backgroundColor: 'white' }} />
+              <div className="absolute -bottom-3 -left-3 w-10 h-10 rounded-full opacity-10" style={{ backgroundColor: 'white' }} />
 
-              <div className="relative z-10 mb-3 text-5xl drop-shadow-md">{emoji}</div>
+              <div className="relative z-10 mb-2 text-3xl drop-shadow-md">{emoji}</div>
               {/* Glass-morphism label */}
-              <div className="relative z-10 rounded-xl px-3 py-1.5" style={{ backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-                <h3 className="text-center text-sm font-semibold text-white line-clamp-2">
+              <div className="relative z-10 rounded-lg px-2.5 py-1" style={{ backgroundColor: 'rgba(255,255,255,0.2)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+                <h3 className="text-center text-xs font-semibold text-white line-clamp-2">
                   {category}
                 </h3>
               </div>
-              <p className="relative z-10 mt-2 text-xs font-medium" style={{ color: count > 0 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)' }}>
+              <p className="relative z-10 mt-1.5 text-[10px] font-medium" style={{ color: count > 0 ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.5)' }}>
                 {count > 0
                   ? `${count} ${count === 1 ? 'caterer' : 'caterers'}`
                   : 'No caterers yet'}
