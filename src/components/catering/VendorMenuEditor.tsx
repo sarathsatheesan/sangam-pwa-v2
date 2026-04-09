@@ -38,7 +38,7 @@ interface VendorMenuEditorProps {
 
 type FilterTab = 'all' | 'active' | 'archived';
 type PricingType = 'per_person' | 'per_tray' | 'flat_rate';
-type Category = 'appetizer' | 'entree' | 'side' | 'dessert' | 'beverage' | 'package';
+type Category = 'Appetizer' | 'Entree' | 'Side' | 'Dessert' | 'Beverage' | 'Package';
 type DietaryTag = 'vegetarian' | 'vegan' | 'halal' | 'kosher' | 'gluten_free' | 'dairy_free' | 'nut_free';
 
 interface ItemFormData {
@@ -57,15 +57,15 @@ interface ItemFormData {
 }
 
 const CATEGORY_LABELS: Record<Category, string> = {
-  appetizer: 'Appetizer',
-  entree: 'Entree',
-  side: 'Side',
-  dessert: 'Dessert',
-  beverage: 'Beverage',
-  package: 'Package',
+  Appetizer: 'Appetizer',
+  Entree: 'Entree',
+  Side: 'Side',
+  Dessert: 'Dessert',
+  Beverage: 'Beverage',
+  Package: 'Package',
 };
 
-const CATEGORY_ORDER: Category[] = ['appetizer', 'entree', 'side', 'dessert', 'beverage', 'package'];
+const CATEGORY_ORDER: Category[] = ['Appetizer', 'Entree', 'Side', 'Dessert', 'Beverage', 'Package'];
 
 const DIETARY_LABELS: Record<DietaryTag, string> = {
   vegetarian: 'Vegetarian',
@@ -96,7 +96,7 @@ const STOCK_CONFIG = {
 const EMPTY_FORM_DATA: ItemFormData = {
   name: '',
   price: '',
-  category: 'appetizer',
+  category: 'Appetizer',
   pricingType: 'per_person',
   description: '',
   dietaryTags: [],
@@ -153,9 +153,9 @@ export default function VendorMenuEditor({
 
     // Apply filter tab
     if (filterTab === 'active') {
-      items = items.filter((item) => !item.isArchived);
+      items = items.filter((item) => !item.archived);
     } else if (filterTab === 'archived') {
-      items = items.filter((item) => item.isArchived);
+      items = items.filter((item) => item.archived);
     }
 
     // Apply search
@@ -173,17 +173,20 @@ export default function VendorMenuEditor({
 
   // Group items by category
   const groupedItems = useMemo(() => {
-    const grouped: Record<Category, CateringMenuItem[]> = {
-      appetizer: [],
-      entree: [],
-      side: [],
-      dessert: [],
-      beverage: [],
-      package: [],
+    const grouped: Record<string, CateringMenuItem[]> = {
+      Appetizer: [],
+      Entree: [],
+      Side: [],
+      Dessert: [],
+      Beverage: [],
+      Package: [],
     };
 
     filteredItems.forEach((item) => {
-      const category = (item.category as Category) || 'appetizer';
+      const category = (item.category as Category) || 'Appetizer';
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
       grouped[category].push(item);
     });
 
@@ -203,7 +206,7 @@ export default function VendorMenuEditor({
       id: item.id,
       name: item.name,
       price: (item.price / 100).toFixed(2),
-      category: (item.category as Category) || 'appetizer',
+      category: (item.category as Category) || 'Appetizer',
       pricingType: (item.pricingType as PricingType) || 'per_person',
       description: item.description || '',
       dietaryTags: (item.dietaryTags as DietaryTag[]) || [],
@@ -375,8 +378,8 @@ export default function VendorMenuEditor({
     });
   }, []);
 
-  const activeCount = menuItems.filter((item) => !item.isArchived).length;
-  const archivedCount = menuItems.filter((item) => item.isArchived).length;
+  const activeCount = menuItems.filter((item) => !item.archived).length;
+  const archivedCount = menuItems.filter((item) => item.archived).length;
 
   const hasAnyItems = menuItems.length > 0;
 
@@ -603,7 +606,7 @@ export default function VendorMenuEditor({
                           onEdit={() => openEditItemDrawer(item)}
                           onDuplicate={() => handleDuplicateItem(item)}
                           onArchive={() =>
-                            handleArchiveItem(item.id, item.isArchived || false)
+                            handleArchiveItem(item.id, item.archived || false)
                           }
                           onDelete={() => handleDeleteItem(item.id)}
                           isDeletingId={deletingId}
@@ -1121,7 +1124,7 @@ function MenuItem({
             <h3 className="font-bold" style={{ color: 'var(--aurora-text)' }}>
               {item.name}
             </h3>
-            {item.isArchived && (
+            {item.archived && (
               <span
                 className="text-xs font-semibold px-2 py-1 rounded"
                 style={{
@@ -1182,10 +1185,10 @@ function MenuItem({
           <button
             onClick={onArchive}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title={item.isArchived ? 'Restore item' : 'Archive item'}
-            aria-label={item.isArchived ? `Restore ${item.name}` : `Archive ${item.name}`}
+            title={item.archived ? 'Restore item' : 'Archive item'}
+            aria-label={item.archived ? `Restore ${item.name}` : `Archive ${item.name}`}
           >
-            {item.isArchived ? (
+            {item.archived ? (
               <ArchiveRestore size={18} style={{ color: 'var(--aurora-text-secondary)' }} />
             ) : (
               <Archive size={18} style={{ color: 'var(--aurora-text-secondary)' }} />
