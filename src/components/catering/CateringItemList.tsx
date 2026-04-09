@@ -39,24 +39,36 @@ const DIETARY_OPTIONS = [
   'gluten_free',
 ];
 
+/* ── Skeleton matching the horizontal card layout ── */
 function ItemCardSkeleton() {
   return (
     <div
-      className="flex flex-col overflow-hidden rounded-lg animate-pulse"
+      className="flex flex-row items-stretch overflow-hidden rounded-xl border animate-pulse"
       style={{
-        backgroundColor: 'var(--aurora-surface)',
+        backgroundColor: 'var(--aurora-surface, #FFFFFF)',
+        borderColor: 'var(--aurora-border, #E5E7EB)',
+        minHeight: '148px',
       }}
     >
-      <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="w-full aspect-video" />
-      <div className="flex flex-1 flex-col p-3 space-y-2.5">
-        <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-4 w-3/4 rounded" />
-        <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-3 w-full rounded" />
-        <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-3 w-2/3 rounded" />
-        <div className="mt-auto flex items-center justify-between pt-3">
-          <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-5 w-14 rounded" />
-          <div style={{ backgroundColor: 'var(--aurora-surface-variant)' }} className="h-8 w-16 rounded-lg" />
+      {/* Text skeleton */}
+      <div className="flex flex-1 flex-col justify-between p-3 sm:p-4 gap-2">
+        <div style={{ backgroundColor: 'var(--aurora-surface-variant, #E5E7EB)' }} className="h-4 w-3/4 rounded" />
+        <div style={{ backgroundColor: 'var(--aurora-surface-variant, #E5E7EB)' }} className="h-3 w-1/3 rounded" />
+        <div style={{ backgroundColor: 'var(--aurora-surface-variant, #E5E7EB)' }} className="h-3 w-full rounded" />
+        <div style={{ backgroundColor: 'var(--aurora-surface-variant, #E5E7EB)' }} className="h-3 w-2/3 rounded" />
+        <div className="flex gap-1.5 mt-auto">
+          <div style={{ backgroundColor: 'var(--aurora-surface-variant, #E5E7EB)' }} className="h-4 w-14 rounded-full" />
+          <div style={{ backgroundColor: 'var(--aurora-surface-variant, #E5E7EB)' }} className="h-4 w-12 rounded-full" />
         </div>
       </div>
+      {/* Image skeleton */}
+      <div
+        className="flex-shrink-0"
+        style={{
+          width: '128px',
+          backgroundColor: 'var(--aurora-surface-variant, #E5E7EB)',
+        }}
+      />
     </div>
   );
 }
@@ -77,7 +89,6 @@ export default function CateringItemList({
   onSortChange,
   loading = false,
 }: CateringItemListProps): ReturnType<FC> {
-  // Create a map for quick business lookup
   const businessMap = useMemo(
     () =>
       businesses.reduce(
@@ -90,10 +101,8 @@ export default function CateringItemList({
     [businesses]
   );
 
-  // Filter items based on search and dietary preferences
   const filteredItems = useMemo(() => {
     return items.filter(item => {
-      // Search filter
       const searchLower = searchQuery.toLowerCase();
       const bizName = businessMap[item.businessId]?.name?.toLowerCase() || '';
       const matchesSearch =
@@ -102,7 +111,6 @@ export default function CateringItemList({
         (item.description?.toLowerCase().includes(searchLower) ?? false) ||
         bizName.includes(searchLower);
 
-      // Dietary filter (OR logic — item matches if it has ANY of the selected tags)
       const matchesDietary =
         dietaryFilter.length === 0 ||
         dietaryFilter.some(tag =>
@@ -113,7 +121,6 @@ export default function CateringItemList({
     });
   }, [items, searchQuery, dietaryFilter, businessMap]);
 
-  // Sort items within groups
   const sortedItems = useMemo(() => {
     if (sortOrder === 'default') return filteredItems;
     return [...filteredItems].sort((a, b) => {
@@ -131,17 +138,14 @@ export default function CateringItemList({
     });
   }, [filteredItems, sortOrder, businessMap]);
 
-  // Group items by business
   const groupedByBusiness = useMemo(() => {
     const grouped = new Map<string, CateringMenuItem[]>();
-
     sortedItems.forEach(item => {
       if (!grouped.has(item.businessId)) {
         grouped.set(item.businessId, []);
       }
       grouped.get(item.businessId)!.push(item);
     });
-
     return grouped;
   }, [sortedItems]);
 
@@ -149,13 +153,19 @@ export default function CateringItemList({
 
   return (
     <div className="w-full space-y-6">
-      {/* Search and Filter Section — sticky on mobile for easy access while scrolling */}
-      <div className="space-y-4 sticky top-0 z-10 -mx-4 px-4 pt-2 pb-3 sm:static sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:z-auto" style={{ backgroundColor: 'var(--aurora-bg)', paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}>
-        {/* Search bar — pill-shaped, Uber Eats style */}
+      {/* ── Search & Filter — sticky on mobile ── */}
+      <div
+        className="space-y-3 sticky top-0 z-10 -mx-4 px-4 pt-2 pb-3 sm:static sm:mx-0 sm:px-0 sm:pt-0 sm:pb-0 sm:z-auto"
+        style={{
+          backgroundColor: 'var(--aurora-bg)',
+          paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))',
+        }}
+      >
+        {/* Search bar — pill */}
         <div className="relative">
           <Search
             className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2"
-            style={{ color: 'var(--aurora-text-muted)' }}
+            style={{ color: 'var(--aurora-text-muted, #9CA3AF)' }}
           />
           <input
             type="text"
@@ -163,7 +173,7 @@ export default function CateringItemList({
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             aria-label="Search catering items by name or description"
-            className="w-full rounded-full py-3 pl-12 pr-10 text-base placeholder-gray-400 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+            className="w-full rounded-full py-3 pl-12 pr-10 text-sm sm:text-base transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
             style={{
               backgroundColor: 'var(--aurora-surface, #f3f4f6)',
               color: 'var(--aurora-text)',
@@ -182,7 +192,7 @@ export default function CateringItemList({
           )}
         </div>
 
-        {/* Dietary filter pills + Sort dropdown row */}
+        {/* Dietary filter pills + Sort */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
             {DIETARY_OPTIONS.map(tag => {
@@ -196,17 +206,12 @@ export default function CateringItemList({
                 <button
                   key={tag}
                   onClick={() => onDietaryToggle(tag)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 ${
-                    isSelected
-                      ? 'text-white'
-                      : 'border'
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200 ${
+                    isSelected ? 'text-white' : 'border'
                   }`}
                   style={
                     isSelected
-                      ? {
-                          backgroundColor: '#1F2937',
-                          borderColor: '#1F2937',
-                        }
+                      ? { backgroundColor: '#1F2937' }
                       : {
                           borderColor: 'var(--aurora-border)',
                           color: 'var(--aurora-text-secondary)',
@@ -222,15 +227,11 @@ export default function CateringItemList({
               );
             })}
 
-            {/* Clear all filters */}
             {dietaryFilter.length > 0 && onClearDietaryFilter && (
               <button
                 onClick={onClearDietaryFilter}
-                className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-xs font-medium border transition-all duration-200"
-                style={{
-                  borderColor: 'var(--aurora-border)',
-                  color: 'var(--aurora-text-secondary)',
-                }}
+                className="inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-medium border transition-all duration-200"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
                 aria-label="Clear all dietary filters"
               >
                 Clear
@@ -238,42 +239,34 @@ export default function CateringItemList({
             )}
           </div>
 
-          {/* Sort dropdown — pill style */}
           {onSortChange && (
             <div
-              className="relative flex items-center gap-1.5 rounded-full border px-4 py-2 transition-colors hover:opacity-80"
+              className="relative flex items-center gap-1.5 rounded-full border px-3 py-1.5 transition-colors hover:opacity-80"
               style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'transparent' }}
             >
-              <ArrowUpDown
-                className="h-4 w-4 shrink-0"
-                style={{ color: 'var(--aurora-text-muted)' }}
-              />
+              <ArrowUpDown className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--aurora-text-muted)' }} />
               <select
                 value={sortOrder}
                 onChange={(e) => onSortChange(e.target.value as SortOrder)}
-                className="appearance-none bg-transparent text-xs font-medium pr-2 cursor-pointer outline-none transition-colors"
+                className="appearance-none bg-transparent text-xs font-medium pr-2 cursor-pointer outline-none"
                 aria-label="Sort items"
                 style={{ color: 'var(--aurora-text-secondary)' }}
               >
                 {SORT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
-              <ChevronDown
-                className="h-3 w-3 shrink-0 pointer-events-none"
-                style={{ color: 'var(--aurora-text-muted)' }}
-              />
+              <ChevronDown className="h-3 w-3 shrink-0 pointer-events-none" style={{ color: 'var(--aurora-text-muted)' }} />
             </div>
           )}
         </div>
       </div>
 
-      {/* Loading skeleton or items grouped by business */}
+      {/* ── Content: skeleton / grouped items / empty ── */}
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
+        /* Skeleton — 1 col mobile, 2 col desktop like Uber Eats */
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {Array.from({ length: 6 }).map((_, i) => (
             <ItemCardSkeleton key={i} />
           ))}
         </div>
@@ -296,15 +289,15 @@ export default function CateringItemList({
                   className="space-y-4"
                   style={{ contentVisibility: 'auto', containIntrinsicBlockSize: 'auto 400px' } as React.CSSProperties}
                 >
-                  {/* Business header — cleaner, divider style */}
+                  {/* ── Business header — clean divider style ── */}
                   <div
-                    className="pb-4 border-b"
-                    style={{ borderColor: 'var(--aurora-border)' }}
+                    className="pb-3 border-b"
+                    style={{ borderColor: 'var(--aurora-border, #E5E7EB)' }}
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-center gap-3">
                       {/* Vendor avatar */}
                       <div
-                        className="flex items-center justify-center w-14 h-14 rounded-full shrink-0 font-bold text-lg text-white"
+                        className="flex items-center justify-center w-11 h-11 rounded-full shrink-0 font-bold text-base text-white"
                         style={{
                           backgroundColor: (() => {
                             const colors = ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#3B82F6'];
@@ -319,50 +312,45 @@ export default function CateringItemList({
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <h2 className="text-lg font-bold truncate" style={{ color: 'var(--aurora-text)' }}>
+                        <h2 className="text-base sm:text-lg font-bold truncate" style={{ color: 'var(--aurora-text)' }}>
                           {business.name}
                         </h2>
-                        <div className="mt-2 flex items-center gap-2 flex-wrap">
-                          {/* Rating inline format */}
+                        <div className="mt-0.5 flex items-center gap-2 flex-wrap text-xs">
+                          {/* Rating — inline "4.5 ★ (120)" */}
                           {business.rating && (
-                            <div className="flex items-center gap-1 text-sm">
-                              <span style={{ color: 'var(--aurora-text-secondary)' }}>
-                                {business.rating?.toFixed(1) ?? 'N/A'}
-                              </span>
-                              <Star
-                                className="h-4 w-4 fill-amber-400 text-amber-400"
-                                strokeWidth={0}
-                              />
+                            <span className="flex items-center gap-0.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+                              {business.rating?.toFixed(1)}
+                              <Star className="h-3 w-3 fill-amber-400 text-amber-400" strokeWidth={0} />
                               {business.reviews > 0 && (
-                                <span style={{ color: 'var(--aurora-text-muted)' }}>
-                                  ({business.reviews})
-                                </span>
+                                <span style={{ color: 'var(--aurora-text-muted)' }}>({business.reviews})</span>
                               )}
-                            </div>
+                            </span>
                           )}
 
-                          {/* Verified checkmark */}
+                          {/* Verified */}
                           {business.verified && (
-                            <div className="flex items-center gap-1" title="Verified">
-                              <Badge className="h-4 w-4 text-green-600" />
-                              <span className="text-xs font-medium text-green-600">
-                                Verified
-                              </span>
-                            </div>
+                            <span className="flex items-center gap-0.5 text-green-600 font-medium">
+                              <Badge className="h-3 w-3" />
+                              Verified
+                            </span>
                           )}
 
-                          {/* Heritage tag — subtle */}
+                          {/* Heritage tag */}
                           {business.heritage && (
-                            <span className="inline-block rounded-full text-xs font-medium px-2.5 py-0.5" style={{
-                              backgroundColor: 'var(--aurora-surface, #f3f4f6)',
-                              color: 'var(--aurora-text-secondary)',
-                            }}>
+                            <span
+                              className="inline-block rounded-full px-2 py-0.5 font-medium"
+                              style={{
+                                backgroundColor: 'var(--aurora-surface, #f3f4f6)',
+                                color: 'var(--aurora-text-secondary)',
+                                fontSize: '11px',
+                              }}
+                            >
                               {business.heritage}
                             </span>
                           )}
 
                           {/* Item count */}
-                          <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                          <span style={{ color: 'var(--aurora-text-muted)' }}>
                             {businessItems.length} {businessItems.length === 1 ? 'item' : 'items'}
                           </span>
                         </div>
@@ -370,8 +358,8 @@ export default function CateringItemList({
                     </div>
                   </div>
 
-                  {/* Items grid — 2 cols mobile, 3 tablet, 4 large */}
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                  {/* ── Items grid: 1 col mobile → 2 col desktop (Uber Eats) ── */}
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
                     {businessItems.map(item => {
                       const cartItem = cartItems?.find(ci => ci.menuItemId === item.id);
                       return (
@@ -392,14 +380,15 @@ export default function CateringItemList({
           )}
         </div>
       ) : (
-        /* Empty state — softer Uber Eats feel */
+        /* Empty state */
         <div
-          className="flex flex-col items-center justify-center rounded-lg py-12"
-          style={{
-            backgroundColor: 'var(--aurora-surface, #f9fafb)',
-          }}
+          className="flex flex-col items-center justify-center rounded-xl py-16"
+          style={{ backgroundColor: 'var(--aurora-surface, #f9fafb)' }}
         >
-          <div className="mb-4 p-3 rounded-full" style={{ backgroundColor: 'var(--aurora-bg)' }}>
+          <div
+            className="mb-4 p-4 rounded-full"
+            style={{ backgroundColor: 'var(--aurora-bg)' }}
+          >
             <UtensilsCrossed
               className="h-8 w-8"
               strokeWidth={1.5}
