@@ -634,7 +634,7 @@ export default function VendorMenuEditor({
 
           {/* Drawer */}
           <div
-            className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl z-50 overflow-y-auto transform transition-transform duration-300 flex flex-col"
+            className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl z-50 transform transition-transform duration-300 flex flex-col"
             style={{
               backgroundColor: 'var(--aurora-bg)',
               transform: drawerOpen ? 'translateX(0)' : 'translateX(100%)',
@@ -645,7 +645,7 @@ export default function VendorMenuEditor({
           >
             {/* Drawer Header */}
             <div
-              className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10"
+              className="flex items-center justify-between p-6 border-b shrink-0 bg-white z-10"
               style={{
                 borderColor: 'var(--aurora-border)',
                 backgroundColor: 'var(--aurora-bg)',
@@ -664,7 +664,7 @@ export default function VendorMenuEditor({
             </div>
 
             {/* Drawer Content */}
-            <div className="flex-1 p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Photo Upload */}
               <div>
                 <label className="block text-sm font-medium mb-3" style={{ color: 'var(--aurora-text)' }}>
@@ -1016,7 +1016,7 @@ export default function VendorMenuEditor({
 
             {/* Drawer Footer */}
             <div
-              className="border-t p-6 space-y-3 sticky bottom-0 bg-white"
+              className="border-t p-6 space-y-3 shrink-0 bg-white"
               style={{
                 borderColor: 'var(--aurora-border)',
                 backgroundColor: 'var(--aurora-bg)',
