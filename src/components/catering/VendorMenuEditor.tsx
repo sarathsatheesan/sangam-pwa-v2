@@ -82,7 +82,7 @@ const DIETARY_LABELS: Record<DietaryTag, string> = {
 };
 
 const DIETARY_COLORS: Record<DietaryTag, string> = {
-  vegetarian: 'var(--aurora-green)',
+  vegetarian: '#22c55e',
   vegan: '#10b981',
   halal: '#f59e0b',
   kosher: '#8b5cf6',
@@ -92,7 +92,7 @@ const DIETARY_COLORS: Record<DietaryTag, string> = {
 };
 
 const STOCK_CONFIG = {
-  in_stock: { label: 'In Stock', color: 'var(--aurora-green)' },
+  in_stock: { label: 'In Stock', color: '#22c55e' },
   low_stock: { label: 'Low Stock', color: '#f59e0b' },
   out_of_stock: { label: 'Out of Stock', color: '#ef4444' },
 };
@@ -466,7 +466,7 @@ export default function VendorMenuEditor({
           </div>
           <div
             className="px-4 py-2 rounded-lg"
-            style={{ backgroundColor: 'var(--aurora-bg-secondary)' }}
+            style={{ backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)' }}
           >
             <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
               {menuItems.length} item{menuItems.length !== 1 ? 's' : ''}
@@ -493,7 +493,7 @@ export default function VendorMenuEditor({
               onClick={() => setSubView('smartPaste')}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90"
               style={{
-                backgroundColor: 'var(--aurora-bg-secondary)',
+                backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                 color: 'var(--aurora-text)',
               }}
               aria-label="Paste menu items"
@@ -505,7 +505,7 @@ export default function VendorMenuEditor({
               onClick={() => setSubView('templateSelector')}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90"
               style={{
-                backgroundColor: 'var(--aurora-bg-secondary)',
+                backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                 color: 'var(--aurora-text)',
               }}
               aria-label="Start from template"
@@ -527,8 +527,8 @@ export default function VendorMenuEditor({
                   : 'border-b-2 border-transparent'
               }`}
               style={{
-                color: filterTab === 'all' ? 'var(--aurora-primary)' : 'var(--aurora-text-secondary)',
-                borderColor: filterTab === 'all' ? 'var(--aurora-primary)' : 'transparent',
+                color: filterTab === 'all' ? '#6366F1' : 'var(--aurora-text-secondary)',
+                borderColor: filterTab === 'all' ? '#6366F1' : 'transparent',
               }}
               aria-label="Show all items"
               aria-pressed={filterTab === 'all'}
@@ -543,8 +543,8 @@ export default function VendorMenuEditor({
                   : 'border-b-2 border-transparent'
               }`}
               style={{
-                color: filterTab === 'active' ? 'var(--aurora-primary)' : 'var(--aurora-text-secondary)',
-                borderColor: filterTab === 'active' ? 'var(--aurora-primary)' : 'transparent',
+                color: filterTab === 'active' ? '#6366F1' : 'var(--aurora-text-secondary)',
+                borderColor: filterTab === 'active' ? '#6366F1' : 'transparent',
               }}
               aria-label="Show active items"
               aria-pressed={filterTab === 'active'}
@@ -559,8 +559,8 @@ export default function VendorMenuEditor({
                   : 'border-b-2 border-transparent'
               }`}
               style={{
-                color: filterTab === 'archived' ? 'var(--aurora-primary)' : 'var(--aurora-text-secondary)',
-                borderColor: filterTab === 'archived' ? 'var(--aurora-primary)' : 'transparent',
+                color: filterTab === 'archived' ? '#6366F1' : 'var(--aurora-text-secondary)',
+                borderColor: filterTab === 'archived' ? '#6366F1' : 'transparent',
               }}
               aria-label="Show archived items"
               aria-pressed={filterTab === 'archived'}
@@ -599,7 +599,7 @@ export default function VendorMenuEditor({
         )}
         {subView === 'list' && (loading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 size={32} className="animate-spin" style={{ color: 'var(--aurora-primary)' }} />
+            <Loader2 size={32} className="animate-spin" style={{ color: '#6366F1' }} />
           </div>
         ) : !hasAnyItems ? (
           <EmptyState onAddItem={openAddItemDrawer} onPasteMenu={() => setSubView('smartPaste')} onStartTemplate={() => setSubView('templateSelector')} />
@@ -627,12 +627,11 @@ export default function VendorMenuEditor({
                 placeholder="Search items by name or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 style={{
                   borderColor: 'var(--aurora-border)',
-                  backgroundColor: 'var(--aurora-bg-secondary)',
+                  backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                   color: 'var(--aurora-text)',
-                  focusRingColor: 'var(--aurora-primary)',
                 }}
                 aria-label="Search menu items"
               />
@@ -652,7 +651,7 @@ export default function VendorMenuEditor({
                     onClick={() => toggleCategory(category)}
                     className="w-full flex items-center justify-between mb-3 px-4 py-3 rounded-lg hover:opacity-80 transition-opacity"
                     style={{
-                      backgroundColor: 'var(--aurora-bg-secondary)',
+                      backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                       color: 'var(--aurora-text)',
                     }}
                     aria-expanded={isExpanded}
@@ -755,7 +754,7 @@ export default function VendorMenuEditor({
                   className="relative w-full h-40 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
                   style={{
                     borderColor: 'var(--aurora-border)',
-                    backgroundColor: 'var(--aurora-bg-secondary)',
+                    backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                   }}
                 >
                   <input
@@ -801,7 +800,7 @@ export default function VendorMenuEditor({
                     className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                     style={{
                       borderColor: 'var(--aurora-border)',
-                      backgroundColor: 'var(--aurora-bg-secondary)',
+                      backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                       color: 'var(--aurora-text)',
                     }}
                     aria-label="Item name"
@@ -823,7 +822,7 @@ export default function VendorMenuEditor({
                     className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                     style={{
                       borderColor: 'var(--aurora-border)',
-                      backgroundColor: 'var(--aurora-bg-secondary)',
+                      backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                       color: 'var(--aurora-text)',
                     }}
                     aria-label="Item price in dollars"
@@ -846,7 +845,7 @@ export default function VendorMenuEditor({
                     className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                     style={{
                       borderColor: 'var(--aurora-border)',
-                      backgroundColor: 'var(--aurora-bg-secondary)',
+                      backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                       color: 'var(--aurora-text)',
                     }}
                     aria-label="Item category"
@@ -882,12 +881,12 @@ export default function VendorMenuEditor({
                         style={{
                           borderColor:
                             formData.pricingType === type
-                              ? 'var(--aurora-primary)'
+                              ? '#6366F1'
                               : 'var(--aurora-border)',
                           backgroundColor:
                             formData.pricingType === type
-                              ? 'var(--aurora-primary)'
-                              : 'var(--aurora-bg-secondary)',
+                              ? '#6366F1'
+                              : 'var(--aurora-surface-variant, #EDF0F7)',
                           color:
                             formData.pricingType === type
                               ? 'white'
@@ -913,7 +912,7 @@ export default function VendorMenuEditor({
                   onClick={() => setExpandedDetails(!expandedDetails)}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:opacity-80 transition-opacity"
                   style={{
-                    backgroundColor: 'var(--aurora-bg-secondary)',
+                    backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                     color: 'var(--aurora-text)',
                   }}
                   aria-expanded={expandedDetails}
@@ -947,7 +946,7 @@ export default function VendorMenuEditor({
                         className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2 resize-none"
                         style={{
                           borderColor: 'var(--aurora-border)',
-                          backgroundColor: 'var(--aurora-bg-secondary)',
+                          backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                           color: 'var(--aurora-text)',
                         }}
                         aria-label="Item description"
@@ -1006,7 +1005,7 @@ export default function VendorMenuEditor({
                         className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                         style={{
                           borderColor: 'var(--aurora-border)',
-                          backgroundColor: 'var(--aurora-bg-secondary)',
+                          backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                           color: 'var(--aurora-text)',
                         }}
                         aria-label="Number of people this item serves"
@@ -1032,7 +1031,7 @@ export default function VendorMenuEditor({
                         className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                         style={{
                           borderColor: 'var(--aurora-border)',
-                          backgroundColor: 'var(--aurora-bg-secondary)',
+                          backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                           color: 'var(--aurora-text)',
                         }}
                         aria-label="Preparation time in minutes"
@@ -1058,7 +1057,7 @@ export default function VendorMenuEditor({
                         className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                         style={{
                           borderColor: 'var(--aurora-border)',
-                          backgroundColor: 'var(--aurora-bg-secondary)',
+                          backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                           color: 'var(--aurora-text)',
                         }}
                         aria-label="Minimum order quantity"
@@ -1084,7 +1083,7 @@ export default function VendorMenuEditor({
                         className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                         style={{
                           borderColor: 'var(--aurora-border)',
-                          backgroundColor: 'var(--aurora-bg-secondary)',
+                          backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                           color: 'var(--aurora-text)',
                         }}
                         aria-label="Maximum order quantity"
@@ -1108,7 +1107,7 @@ export default function VendorMenuEditor({
                 disabled={saving || !formData.name.trim() || !formData.price}
                 className="w-full py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: 'var(--aurora-primary)',
+                  backgroundColor: '#6366F1',
                   color: 'white',
                 }}
                 aria-label={isEditingMode ? 'Save changes' : 'Add item'}
@@ -1129,7 +1128,7 @@ export default function VendorMenuEditor({
                 disabled={saving}
                 className="w-full py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
                 style={{
-                  backgroundColor: 'var(--aurora-bg-secondary)',
+                  backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                   color: 'var(--aurora-text)',
                 }}
                 aria-label="Cancel"
@@ -1177,7 +1176,7 @@ function MenuItem({
       <div
         className="p-4 rounded-lg border flex items-start gap-4 hover:shadow-md transition-shadow"
         style={{
-          backgroundColor: 'var(--aurora-bg-secondary)',
+          backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
           borderColor: 'var(--aurora-border)',
         }}
       >
@@ -1320,7 +1319,7 @@ function MenuItem({
                   onClick={() => setDeletingId(null)}
                   className="px-4 py-2 rounded-lg font-medium transition-colors"
                   style={{
-                    backgroundColor: 'var(--aurora-bg-secondary)',
+                    backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                     color: 'var(--aurora-text)',
                   }}
                   aria-label="Cancel deletion"
@@ -1355,7 +1354,7 @@ function EmptyState({ onAddItem, onPasteMenu, onStartTemplate }: { onAddItem: ()
     <div className="flex flex-col items-center justify-center h-full px-6 py-12">
       <Utensils
         size={64}
-        style={{ color: 'var(--aurora-primary)' }}
+        style={{ color: '#6366F1' }}
         className="mb-6 opacity-20"
       />
       <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--aurora-text)' }}>
@@ -1370,12 +1369,12 @@ function EmptyState({ onAddItem, onPasteMenu, onStartTemplate }: { onAddItem: ()
           onClick={onAddItem}
           className="p-6 rounded-lg text-center hover:shadow-md transition-shadow border-2"
           style={{
-            backgroundColor: 'var(--aurora-bg-secondary)',
-            borderColor: 'var(--aurora-primary)',
+            backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
+            borderColor: '#6366F1',
             color: 'var(--aurora-text)',
           }}
         >
-          <Plus size={32} style={{ color: 'var(--aurora-primary)' }} className="mx-auto mb-2" />
+          <Plus size={32} style={{ color: '#6366F1' }} className="mx-auto mb-2" />
           <h3 className="font-semibold mb-1">Add Item</h3>
           <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
             Create items one at a time
@@ -1386,12 +1385,12 @@ function EmptyState({ onAddItem, onPasteMenu, onStartTemplate }: { onAddItem: ()
           onClick={onPasteMenu}
           className="p-6 rounded-lg text-center hover:shadow-md transition-shadow border-2 cursor-pointer"
           style={{
-            backgroundColor: 'var(--aurora-bg-secondary)',
+            backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
             borderColor: 'var(--aurora-border)',
             color: 'var(--aurora-text)',
           }}
         >
-          <Sparkles size={32} style={{ color: 'var(--aurora-primary)' }} className="mx-auto mb-2" />
+          <Sparkles size={32} style={{ color: '#6366F1' }} className="mx-auto mb-2" />
           <h3 className="font-semibold mb-1">Paste Menu</h3>
           <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
             Paste text from an existing menu
@@ -1402,12 +1401,12 @@ function EmptyState({ onAddItem, onPasteMenu, onStartTemplate }: { onAddItem: ()
           onClick={onStartTemplate}
           className="p-6 rounded-lg text-center hover:shadow-md transition-shadow border-2 cursor-pointer"
           style={{
-            backgroundColor: 'var(--aurora-bg-secondary)',
+            backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
             borderColor: 'var(--aurora-border)',
             color: 'var(--aurora-text)',
           }}
         >
-          <FileText size={32} style={{ color: 'var(--aurora-primary)' }} className="mx-auto mb-2" />
+          <FileText size={32} style={{ color: '#6366F1' }} className="mx-auto mb-2" />
           <h3 className="font-semibold mb-1">Start from Template</h3>
           <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
             Pick a cuisine template to get started

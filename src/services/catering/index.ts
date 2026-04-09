@@ -9,6 +9,7 @@ export type {
   MenuCategory,
   MenuTemplateItem,
   MenuTemplate,
+  MenuTemplateType,
   ParsedMenuItem,
   VendorImageAuditEntry,
   OrderItem,

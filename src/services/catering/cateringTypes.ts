@@ -43,10 +43,13 @@ export interface MenuTemplateItem {
 }
 
 /** A cuisine-specific starter template */
+export type MenuTemplateType = 'catering' | 'grocery';
+
 export interface MenuTemplate {
   id: string;
   name: string;
   cuisine: string;
+  type: MenuTemplateType;
   description: string;
   items: MenuTemplateItem[];
   version: number;
