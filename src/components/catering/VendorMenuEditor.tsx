@@ -17,7 +17,7 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import type { CateringMenuItem } from '@/services/cateringService';
+import type { CateringMenuItem, ParsedMenuItem, MenuTemplateItem } from '@/services/cateringService';
 import {
   subscribeToMenuItems,
   createMenuItem,
@@ -25,10 +25,14 @@ import {
   deleteMenuItem,
   archiveMenuItem,
   restoreMenuItem,
+  batchCreateMenuItems,
   formatPrice,
 } from '@/services/cateringService';
 import { compressImage } from '@/components/business/imageUtils';
 import { useToast } from '@/contexts/ToastContext';
+import SmartPasteInput from './SmartPasteInput';
+import TemplateSelector from './TemplateSelector';
+import MenuItemReviewGrid from './MenuItemReviewGrid';
 
 interface VendorMenuEditorProps {
   businessId: string;
@@ -127,6 +131,11 @@ export default function VendorMenuEditor({
   const [expandedCategories, setExpandedCategories] = useState<Set<Category>>(
     new Set(CATEGORY_ORDER)
   );
+  // Smart Paste / Template sub-views
+  type SubView = 'list' | 'smartPaste' | 'templateSelector' | 'reviewGrid';
+  const [subView, setSubView] = useState<SubView>('list');
+  const [parsedItems, setParsedItems] = useState<ParsedMenuItem[]>([]);
+  const [publishing, setPublishing] = useState(false);
 
   // Subscribe to menu items
   useEffect(() => {
@@ -383,6 +392,60 @@ export default function VendorMenuEditor({
 
   const hasAnyItems = menuItems.length > 0;
 
+  // ── Smart Paste handlers ─────────────────────────────
+  const handleSmartPasteParsed = useCallback((items: ParsedMenuItem[]) => {
+    setParsedItems(items);
+    setSubView('reviewGrid');
+  }, []);
+
+  // ── Template handler ─────────────────────────────────
+  const handleTemplateSelected = useCallback((templateItems: MenuTemplateItem[]) => {
+    // Convert MenuTemplateItems → ParsedMenuItems for the review grid
+    const parsed: ParsedMenuItem[] = templateItems.map((t) => ({
+      name: t.name,
+      price: null, // vendors must set prices
+      description: t.description,
+      category: t.category,
+      pricingType: t.pricingType,
+      dietaryTags: t.dietaryTags || [],
+      servesCount: t.servesCount,
+      confidence: { name: 1, price: 0.3, category: 1, dietaryTags: 1 },
+    }));
+    setParsedItems(parsed);
+    setSubView('reviewGrid');
+  }, []);
+
+  // ── Publish reviewed items → Firestore ────────────────
+  const handlePublishItems = useCallback(
+    async (items: ParsedMenuItem[]) => {
+      setPublishing(true);
+      try {
+        const menuItemsToCreate: Omit<CateringMenuItem, 'id'>[] = items.map((item, i) => ({
+          businessId,
+          name: item.name,
+          price: item.price || 0,
+          description: item.description || '',
+          category: (item.category || 'Entree') as CateringMenuItem['category'],
+          pricingType: item.pricingType || 'per_person',
+          dietaryTags: item.dietaryTags || [],
+          servesCount: item.servesCount,
+          available: true,
+          sortOrder: menuItems.length + i,
+        }));
+        await batchCreateMenuItems(menuItemsToCreate);
+        showToast(`${items.length} item${items.length > 1 ? 's' : ''} added to menu!`, 'success');
+        setParsedItems([]);
+        setSubView('list');
+      } catch (error) {
+        showToast('Failed to publish items', 'error');
+        console.error('Publish items error:', error);
+      } finally {
+        setPublishing(false);
+      }
+    },
+    [businessId, menuItems.length, showToast]
+  );
+
   return (
     <div className="flex flex-col h-full bg-white" style={{ backgroundColor: 'var(--aurora-bg)' }}>
       {/* Header */}
@@ -422,8 +485,8 @@ export default function VendorMenuEditor({
               onClick={openAddItemDrawer}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90"
               style={{
-                backgroundColor: 'var(--aurora-primary)',
-                color: 'white',
+                backgroundColor: '#6366F1',
+                color: '#FFFFFF',
               }}
               aria-label="Add new menu item"
             >
@@ -431,27 +494,25 @@ export default function VendorMenuEditor({
               Add Item
             </button>
             <button
-              disabled
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium opacity-50 cursor-not-allowed"
+              onClick={() => setSubView('smartPaste')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90"
               style={{
                 backgroundColor: 'var(--aurora-bg-secondary)',
                 color: 'var(--aurora-text)',
               }}
-              aria-label="Paste menu items (coming soon)"
-              title="Coming soon"
+              aria-label="Paste menu items"
             >
               <Sparkles size={18} />
               Paste Menu
             </button>
             <button
-              disabled
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium opacity-50 cursor-not-allowed"
+              onClick={() => setSubView('templateSelector')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors hover:opacity-90"
               style={{
                 backgroundColor: 'var(--aurora-bg-secondary)',
                 color: 'var(--aurora-text)',
               }}
-              aria-label="Start from template (coming soon)"
-              title="Coming soon"
+              aria-label="Start from template"
             >
               <FileText size={18} />
               Start from Template
@@ -516,12 +577,36 @@ export default function VendorMenuEditor({
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        {loading ? (
+        {/* Sub-views: Smart Paste, Template Selector, Review Grid */}
+        {subView === 'smartPaste' && (
+          <SmartPasteInput
+            businessId={businessId}
+            onItemsParsed={handleSmartPasteParsed}
+            onClose={() => setSubView('list')}
+          />
+        )}
+        {subView === 'templateSelector' && (
+          <TemplateSelector
+            businessId={businessId}
+            onSelectTemplate={handleTemplateSelected}
+            onClose={() => setSubView('list')}
+          />
+        )}
+        {subView === 'reviewGrid' && (
+          <MenuItemReviewGrid
+            items={parsedItems}
+            onItemsChange={setParsedItems}
+            onPublish={handlePublishItems}
+            onCancel={() => { setParsedItems([]); setSubView('list'); }}
+            publishing={publishing}
+          />
+        )}
+        {subView === 'list' && (loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={32} className="animate-spin" style={{ color: 'var(--aurora-primary)' }} />
           </div>
         ) : !hasAnyItems ? (
-          <EmptyState onAddItem={openAddItemDrawer} />
+          <EmptyState onAddItem={openAddItemDrawer} onPasteMenu={() => setSubView('smartPaste')} onStartTemplate={() => setSubView('templateSelector')} />
         ) : filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-6 py-12">
             <Search size={48} style={{ color: 'var(--aurora-text-secondary)' }} className="mb-4 opacity-50" />
@@ -619,7 +704,7 @@ export default function VendorMenuEditor({
               );
             })}
           </div>
-        )}
+        ))}
       </div>
 
       {/* Add/Edit Drawer */}
@@ -1269,7 +1354,7 @@ function MenuItem({
 /**
  * EmptyState Component
  */
-function EmptyState({ onAddItem }: { onAddItem: () => void }) {
+function EmptyState({ onAddItem, onPasteMenu, onStartTemplate }: { onAddItem: () => void; onPasteMenu: () => void; onStartTemplate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 py-12">
       <Utensils
@@ -1302,36 +1387,34 @@ function EmptyState({ onAddItem }: { onAddItem: () => void }) {
         </button>
 
         <button
-          disabled
-          className="p-6 rounded-lg text-center opacity-50 cursor-not-allowed border-2"
+          onClick={onPasteMenu}
+          className="p-6 rounded-lg text-center hover:shadow-md transition-shadow border-2 cursor-pointer"
           style={{
             backgroundColor: 'var(--aurora-bg-secondary)',
             borderColor: 'var(--aurora-border)',
             color: 'var(--aurora-text)',
           }}
-          title="Coming soon"
         >
-          <Sparkles size={32} style={{ color: 'var(--aurora-text-secondary)' }} className="mx-auto mb-2" />
+          <Sparkles size={32} style={{ color: 'var(--aurora-primary)' }} className="mx-auto mb-2" />
           <h3 className="font-semibold mb-1">Paste Menu</h3>
           <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
-            Coming soon
+            Paste text from an existing menu
           </p>
         </button>
 
         <button
-          disabled
-          className="p-6 rounded-lg text-center opacity-50 cursor-not-allowed border-2"
+          onClick={onStartTemplate}
+          className="p-6 rounded-lg text-center hover:shadow-md transition-shadow border-2 cursor-pointer"
           style={{
             backgroundColor: 'var(--aurora-bg-secondary)',
             borderColor: 'var(--aurora-border)',
             color: 'var(--aurora-text)',
           }}
-          title="Coming soon"
         >
-          <FileText size={32} style={{ color: 'var(--aurora-text-secondary)' }} className="mx-auto mb-2" />
+          <FileText size={32} style={{ color: 'var(--aurora-primary)' }} className="mx-auto mb-2" />
           <h3 className="font-semibold mb-1">Start from Template</h3>
           <p className="text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
-            Coming soon
+            Pick a cuisine template to get started
           </p>
         </button>
       </div>
