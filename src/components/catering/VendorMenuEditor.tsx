@@ -396,6 +396,19 @@ export default function VendorMenuEditor({
 
   // ── Template handler ─────────────────────────────────
   const handleTemplateSelected = useCallback((templateItems: MenuTemplateItem[]) => {
+    // Blank template → go straight to the list view and open the Add Item drawer
+    if (templateItems.length === 0) {
+      setSubView('list');
+      // Small delay so the list view mounts before we open the drawer
+      setTimeout(() => {
+        setFormData(EMPTY_FORM_DATA);
+        setPhotoPreview('');
+        setIsEditingMode(false);
+        setExpandedDetails(false);
+        setDrawerOpen(true);
+      }, 50);
+      return;
+    }
     // Convert MenuTemplateItems → ParsedMenuItems for the review grid
     const parsed: ParsedMenuItem[] = templateItems.map((t) => ({
       name: t.name,
