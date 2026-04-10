@@ -10,15 +10,15 @@ interface MenuItemReviewGridProps {
   publishing?: boolean;
 }
 
-const DIETARY_TAGS = [
-  'Vegetarian',
-  'Vegan',
-  'Gluten-Free',
-  'Dairy-Free',
-  'Nut-Free',
-  'Halal',
-  'Kosher',
-] as const;
+const DIETARY_TAGS: { value: string; label: string }[] = [
+  { value: 'vegetarian', label: 'Vegetarian' },
+  { value: 'vegan', label: 'Vegan' },
+  { value: 'gluten_free', label: 'Gluten-Free' },
+  { value: 'dairy_free', label: 'Dairy-Free' },
+  { value: 'nut_free', label: 'Nut-Free' },
+  { value: 'halal', label: 'Halal' },
+  { value: 'kosher', label: 'Kosher' },
+];
 
 const CATEGORIES: MenuCategory[] = [
   'Appetizer',
@@ -270,17 +270,21 @@ const MenuItemReviewGrid: React.FC<MenuItemReviewGridProps> = ({
                         Pricing Type
                       </label>
                       <div className="flex gap-2">
-                        {['Person', 'Tray', 'Flat'].map((type) => (
+                        {([
+                          { value: 'per_person', label: 'Person' },
+                          { value: 'per_tray', label: 'Tray' },
+                          { value: 'flat_rate', label: 'Flat' },
+                        ] as const).map((type) => (
                           <button
-                            key={type}
-                            onClick={() => updateItem(index, 'pricingType', type as any)}
+                            key={type.value}
+                            onClick={() => updateItem(index, 'pricingType', type.value)}
                             className={`flex-1 px-3 py-1.5 text-xs font-medium rounded transition ${
-                              item.pricingType === type
+                              item.pricingType === type.value
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                           >
-                            {type}
+                            {type.label}
                           </button>
                         ))}
                       </div>
@@ -307,18 +311,18 @@ const MenuItemReviewGrid: React.FC<MenuItemReviewGridProps> = ({
                       </label>
                       <div className="flex flex-wrap gap-2">
                         {DIETARY_TAGS.map((tag) => {
-                          const isSelected = (item.dietaryTags || []).includes(tag);
+                          const isSelected = (item.dietaryTags || []).includes(tag.value);
                           return (
                             <button
-                              key={tag}
-                              onClick={() => toggleDietaryTag(index, tag)}
+                              key={tag.value}
+                              onClick={() => toggleDietaryTag(index, tag.value)}
                               className={`px-3 py-1 text-xs font-medium rounded-full transition ${
                                 isSelected
                                   ? 'bg-gray-900 text-white'
                                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                               }`}
                             >
-                              {tag}
+                              {tag.label}
                             </button>
                           );
                         })}

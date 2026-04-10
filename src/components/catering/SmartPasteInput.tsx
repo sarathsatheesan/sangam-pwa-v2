@@ -300,9 +300,11 @@ const SmartPasteInput: React.FC<SmartPasteInputProps> = ({
   const handleSubmit = useCallback(() => {
     if (parseResult && parseResult.items.length > 0) {
       onItemsParsed(parseResult.items);
-      onClose();
+      // Do NOT call onClose() here — the parent's onItemsParsed handler
+      // transitions to the review grid. Calling onClose would reset subView
+      // back to 'list', discarding the parsed items.
     }
-  }, [parseResult, onItemsParsed, onClose]);
+  }, [parseResult, onItemsParsed]);
 
   const isParseDisabled =
     !menuText.trim() || isLoading || parseResult !== null;
