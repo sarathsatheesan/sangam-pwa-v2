@@ -56,6 +56,10 @@ export default function BusinessPage() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [showCSVImport, setShowCSVImport] = useState(false);
 
+  // ── Deep-link "add mode": suppress page content flash while waiting for modal ──
+  // Initialized synchronously from URL so the overlay renders on the very first paint.
+  const [addModeActive, setAddModeActive] = useState(() => searchParams.get('action') === 'add');
+
   // ── #42: Autocomplete state ──
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const autocompleteRef = useRef<HTMLDivElement>(null);
@@ -402,6 +406,15 @@ export default function BusinessPage() {
     }
   }, [searchParams, state.showCreateModal, state.loading, handleOpenCreateModal, setSearchParams]);
 
+  // ── Clear the add-mode overlay once the create modal is visible (or if the gate rejected it) ──
+  useEffect(() => {
+    if (!addModeActive) return;
+    // Modal opened successfully → dismiss overlay
+    if (state.showCreateModal) { setAddModeActive(false); return; }
+    // Loading finished but modal didn't open (gate rejected, e.g. TIN modal shown) → dismiss overlay
+    if (!state.loading && !searchParams.get('action')) { setAddModeActive(false); }
+  }, [addModeActive, state.loading, state.showCreateModal, searchParams]);
+
   // ── Derived values ──
   const isOwnerOrAdmin = useCallback((b: Business) => b.ownerId === user?.uid || userRole === 'admin', [user?.uid, userRole]);
   const ownedBusinesses = state.businesses.filter((b) => b.ownerId === user?.uid || userRole === 'admin');
@@ -424,6 +437,15 @@ export default function BusinessPage() {
 
   return (
     <div className="bg-aurora-bg">
+      {/* ─── Add-mode overlay: hides business listing flash while modal loads ─── */}
+      {addModeActive && !state.showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-aurora-bg flex items-center justify-center" aria-live="polite">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#6366F1' }} />
+            <p className="text-sm font-medium text-aurora-text-secondary">Preparing your new business…</p>
+          </div>
+        </div>
+      )}
       {/* ─── Sticky Header: Search + Category ─── */}
       <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
       {/* ── Search & Filter Bar ── */}
