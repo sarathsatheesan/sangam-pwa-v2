@@ -19,9 +19,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { useBusinessSwitcher } from '@/contexts/BusinessSwitcherContext';
+import { useParams, useNavigate } from 'react-router-dom';
 import { cateringReducer, createInitialState } from '@/reducers/cateringReducer';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '@/services/firebase';
+import { Timestamp } from 'firebase/firestore';
 import type { CateringMenuItem, OrderItem, QuoteRequestItem, CateringQuoteRequest, FavoriteOrder, OrderTemplate } from '@/services/cateringService';
 import {
   fetchCateringBusinesses,
@@ -76,10 +77,36 @@ function LazyFallback() {
 export default function CateringPage() {
   const { user, userProfile } = useAuth();
   const { addToast } = useToast();
+  const { businesses: ownedBusinesses, selectedBusiness: ctxBusiness, selectBusiness, loading: bizLoading } = useBusinessSwitcher();
+  const { businessId: routeBusinessId } = useParams<{ businessId?: string }>();
+  const navigate = useNavigate();
   const [state, dispatch] = useReducer(cateringReducer, undefined, createInitialState);
   const [businessCounts, setBusinessCounts] = useState<Record<string, number>>({});
   const [allCateringBusinesses, setAllCateringBusinesses] = useState<any[]>([]);
-  const [userOwnedBusiness, setUserOwnedBusiness] = useState<any>(null);
+
+  // ── Multi-business: resolve owned business from URL param or context ──
+  const userOwnedBusiness = useMemo(() => {
+    // If URL has a businessId, find it in the user's owned list
+    if (routeBusinessId) {
+      return ownedBusinesses.find((b) => b.id === routeBusinessId) || null;
+    }
+    // Otherwise use the context-selected business
+    return ctxBusiness;
+  }, [routeBusinessId, ownedBusinesses, ctxBusiness]);
+
+  // Sync URL businessId → context when entering via direct link
+  useEffect(() => {
+    if (routeBusinessId && ctxBusiness?.id !== routeBusinessId && ownedBusinesses.some((b) => b.id === routeBusinessId)) {
+      selectBusiness(routeBusinessId);
+    }
+  }, [routeBusinessId, ctxBusiness?.id, ownedBusinesses, selectBusiness]);
+
+  // Auto-switch to vendor view when navigating to /vendor/:businessId/*
+  useEffect(() => {
+    if (routeBusinessId && userOwnedBusiness && state.view !== 'vendor') {
+      dispatch({ type: 'SET_VIEW', payload: 'vendor' });
+    }
+  }, [routeBusinessId, userOwnedBusiness, state.view]);
   const [submitting, setSubmitting] = useState(false);
   const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory' | 'menu'>('quotes');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
@@ -125,28 +152,8 @@ export default function CateringPage() {
       .catch((err) => console.warn('Failed to load catering business counts:', err));
   }, []);
 
-  // ── Detect if current user owns ANY approved business (for vendor pill visibility) ──
-  useEffect(() => {
-    if (!user?.uid) { setUserOwnedBusiness(null); return; }
-    // First check if they own a catering-enabled business
-    const cateringBiz = allCateringBusinesses.find((b: any) => b.ownerId === user.uid);
-    if (cateringBiz) {
-      setUserOwnedBusiness(cateringBiz);
-      return;
-    }
-    // Otherwise check all approved businesses (broader query)
-    const q = query(
-      collection(db, 'businesses'),
-      where('ownerId', '==', user.uid),
-      where('registrationStatus', '==', 'approved'),
-    );
-    getDocs(q).then((snap) => {
-      if (!snap.empty) {
-        const biz = { id: snap.docs[0].id, ...snap.docs[0].data() };
-        setUserOwnedBusiness(biz);
-      }
-    }).catch(() => {});
-  }, [user?.uid, allCateringBusinesses]);
+  // ── Business detection now handled by BusinessSwitcherContext ──
+  // (Removed old single-business Firestore query — context provides real-time list)
 
   // ── Cart persistence: hydrate from localStorage on mount ──
   const CART_STORAGE_KEY = 'ethniCity_catering_cart';
@@ -648,8 +655,12 @@ export default function CateringPage() {
               onClick={() => {
                 if (state.view === 'vendor') {
                   dispatch({ type: 'SET_VIEW', payload: 'categories' });
+                  // Navigate back to /catering when leaving vendor view
+                  if (routeBusinessId) navigate('/catering');
                 } else {
                   dispatch({ type: 'SET_VIEW', payload: 'vendor' });
+                  // Navigate to vendor-scoped URL
+                  navigate(`/vendor/${ownedBusiness.id}/dashboard`);
                 }
               }}
               className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
@@ -660,7 +671,7 @@ export default function CateringPage() {
               }}
             >
               <Store size={15} className="shrink-0" />
-              Vendor
+              {ownedBusinesses.length > 1 ? ownedBusiness.name : 'Vendor'}
             </button>
           )}
 

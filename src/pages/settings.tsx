@@ -27,8 +27,11 @@ import {
   Check,
   Ban,
   UserX,
+  Store,
+  Plus,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useBusinessSwitcher } from '../contexts/BusinessSwitcherContext';
 import { auth } from '../services/firebase';
 import { db } from '../services/firebase';
 import { doc, getDoc, updateDoc, arrayRemove, collection, query, where, getDocs } from 'firebase/firestore';
@@ -52,7 +55,7 @@ const LANGUAGES = [
   { code: 'es', label: 'Spanish' },
 ];
 
-type Section = 'main' | 'notifications' | 'privacy' | 'language' | 'appearance' | 'help' | 'account' | 'blocked';
+type Section = 'main' | 'notifications' | 'privacy' | 'language' | 'appearance' | 'help' | 'account' | 'blocked' | 'businesses';
 
 // ─── Toggle Component ────────────────────────────────────────────────────
 const Toggle: React.FC<{ enabled: boolean; onChange: (val: boolean) => void; disabled?: boolean }> = ({
@@ -113,6 +116,7 @@ const SectionHeader: React.FC<{ title: string; onBack: () => void }> = ({ title,
 const SettingsPage: React.FC = () => {
   const { user, userProfile } = useAuth();
   const { settings, updateSetting } = useUserSettings();
+  const { businesses: ownedBusinesses, selectedBusiness, selectBusiness } = useBusinessSwitcher();
   const navigate = useNavigate();
   const [section, setSection] = useState<Section>('main');
   const [saved, setSaved] = useState(false);
@@ -924,6 +928,112 @@ const SettingsPage: React.FC = () => {
   );
 
   // ─── Main Menu ─────────────────────────────────────────────────────
+  // ─── My Businesses Section ──────────────────────────────────────────────
+  const renderBusinesses = () => (
+    <div>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-5">
+        <button onClick={() => setSection('main')} className="p-2 rounded-xl bg-aurora-surface-variant">
+          <ChevronLeft size={20} className="text-aurora-text" />
+        </button>
+        <div>
+          <h2 className="text-xl font-bold text-aurora-text">My Businesses</h2>
+          <p className="text-sm text-aurora-text-muted">Manage your business profiles &amp; catalogs</p>
+        </div>
+      </div>
+
+      {/* Business cards */}
+      <div className="px-4 space-y-3 pb-4">
+        {ownedBusinesses.map((biz) => {
+          const isSelected = biz.id === selectedBusiness?.id;
+          return (
+            <div
+              key={biz.id}
+              className="rounded-xl border overflow-hidden"
+              style={{
+                borderColor: isSelected ? '#6366F1' : 'var(--aurora-border, #e5e7eb)',
+                backgroundColor: 'var(--aurora-surface, #fff)',
+                boxShadow: isSelected ? '0 0 0 2px rgba(99, 102, 241, 0.2)' : 'none',
+              }}
+            >
+              <div className="flex items-center gap-3 p-4">
+                <span
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                  style={{ backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)' }}
+                >
+                  {biz.emoji || '🏪'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>
+                    {biz.name}
+                  </div>
+                  <div className="text-xs" style={{ color: 'var(--aurora-text-secondary, #6b7280)' }}>
+                    {biz.category}
+                    {biz.heritage && typeof biz.heritage === 'string' ? ` · ${biz.heritage}` : ''}
+                  </div>
+                </div>
+                {isSelected && (
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                    style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}
+                  >
+                    Active
+                  </span>
+                )}
+              </div>
+              {/* Action buttons */}
+              <div
+                className="flex gap-2 px-4 py-3"
+                style={{ borderTop: '1px solid var(--aurora-border, #e5e7eb)' }}
+              >
+                {!isSelected && (
+                  <button
+                    type="button"
+                    onClick={() => selectBusiness(biz.id)}
+                    className="flex-1 text-xs font-medium py-2 rounded-lg transition-colors"
+                    style={{ backgroundColor: 'rgba(99, 102, 241, 0.08)', color: '#6366F1', minHeight: '36px' }}
+                  >
+                    Switch to this Business
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => navigate(`/vendor/${biz.id}/dashboard`)}
+                  className="flex-1 text-xs font-medium py-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: isSelected ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                    color: isSelected ? '#fff' : 'var(--aurora-text-secondary, #6b7280)',
+                    minHeight: '36px',
+                  }}
+                >
+                  Open Dashboard
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add Business */}
+      <div className="px-4 pb-8">
+        <button
+          type="button"
+          onClick={() => navigate('/business/register')}
+          className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium rounded-xl border border-dashed transition-colors"
+          style={{
+            borderColor: '#6366F1',
+            color: '#6366F1',
+            backgroundColor: 'rgba(99, 102, 241, 0.04)',
+            minHeight: '44px',
+          }}
+        >
+          <Plus size={16} />
+          Add Another Business
+        </button>
+      </div>
+    </div>
+  );
+
   const renderMain = () => {
     const sections = [
       { key: 'notifications' as Section, icon: <Bell size={20} />, label: 'Notifications', description: 'Push, email, and in-app alerts', color: 'text-aurora-indigo bg-aurora-indigo/10' },
@@ -933,6 +1043,17 @@ const SettingsPage: React.FC = () => {
       { key: 'account' as Section, icon: <Lock size={20} />, label: 'Account & Data', description: 'Password, data export, delete account', color: 'text-aurora-danger bg-aurora-danger/10' },
       { key: 'help' as Section, icon: <HelpCircle size={20} />, label: 'Help & Support', description: 'FAQs, contact us, report issues', color: 'text-aurora-text-secondary bg-aurora-surface-variant' },
     ];
+
+    // Add "My Businesses" for business owners (at position 0 — most prominent)
+    if (ownedBusinesses.length > 0) {
+      sections.unshift({
+        key: 'businesses' as Section,
+        icon: <Store size={20} />,
+        label: 'My Businesses',
+        description: `${ownedBusinesses.length} business${ownedBusinesses.length > 1 ? 'es' : ''} · manage catalogs`,
+        color: 'text-aurora-indigo bg-aurora-indigo/10',
+      });
+    }
 
     return (
       <div>
@@ -991,6 +1112,7 @@ const SettingsPage: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto bg-aurora-surface-variant">
       {section === 'main' && renderMain()}
+      {section === 'businesses' && renderBusinesses()}
       {section === 'notifications' && renderNotifications()}
       {section === 'privacy' && renderPrivacy()}
       {section === 'language' && renderLanguage()}

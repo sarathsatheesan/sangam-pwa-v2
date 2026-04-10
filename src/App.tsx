@@ -6,6 +6,7 @@ import { LocationProvider } from './contexts/LocationContext';
 import { ToastProvider } from './contexts/ToastContext';
 import { UserSettingsProvider } from './contexts/UserSettingsContext';
 import { CulturalThemeProvider } from './contexts/CulturalThemeContext';
+import { BusinessSwitcherProvider } from './contexts/BusinessSwitcherContext';
 import { PrivateRoute } from './components/shared/PrivateRoute';
 import { NotificationProviderWrapper } from './components/shared/NotificationProviderWrapper';
 import './index.css';
@@ -71,6 +72,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <BusinessSwitcherProvider>
         <UserSettingsProvider>
         <FeatureSettingsProvider>
           <CulturalThemeProvider>
@@ -103,6 +105,7 @@ function App() {
                     <Route path="/settings" element={<Suspense fallback={<LoadingSpinner />}><SettingsPage /></Suspense>} />
                     <Route path="/business/register" element={<Suspense fallback={<LoadingSpinner />}><BusinessRegisterPage /></Suspense>} />
                     <Route path="/catering" element={<Suspense fallback={<LoadingSpinner />}><CateringPage /></Suspense>} />
+                    <Route path="/vendor/:businessId/*" element={<Suspense fallback={<LoadingSpinner />}><CateringPage /></Suspense>} />
                     <Route path="/notifications" element={<Suspense fallback={<LoadingSpinner />}><NotificationCenterPage /></Suspense>} />
                     <Route path="/notifications/settings" element={<Suspense fallback={<LoadingSpinner />}><NotificationSettingsPage /></Suspense>} />
                     <Route path="/notifications/analytics" element={<Suspense fallback={<LoadingSpinner />}><NotificationAnalyticsPage /></Suspense>} />
@@ -118,6 +121,7 @@ function App() {
           </CulturalThemeProvider>
         </FeatureSettingsProvider>
         </UserSettingsProvider>
+        </BusinessSwitcherProvider>
       </AuthProvider>
     </BrowserRouter>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, MapPin, User, LogOut, Shield, Settings, Mail, Phone, Share2, Tag, Megaphone, X } from 'lucide-react';
+import { Menu, MapPin, User, LogOut, Shield, Settings, Mail, Phone, Share2, Tag, Megaphone, X, Store } from 'lucide-react';
+import { BusinessSwitcher } from './BusinessSwitcher';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -206,6 +207,9 @@ export const AppHeader: React.FC = () => {
               </>
             )}
           </div>
+
+          {/* Business Switcher — visible when user owns businesses */}
+          {user && <BusinessSwitcher />}
 
           {/* Center: Announcement Marquee (Desktop only, sm+) */}
           {hasAnnouncements && !announcementDismissed && (
