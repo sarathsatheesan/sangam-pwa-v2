@@ -390,6 +390,19 @@ export default function BusinessPage() {
     }
   }, [searchParams, state.businesses, setSearchParams, dispatch]);
 
+  // ── Deep-link: auto-open create modal from Settings "Add Another Business" ──
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'add' && !state.showCreateModal) {
+      // Slight delay to ensure business data is loaded for permission checks
+      const timer = setTimeout(() => {
+        handleOpenCreateModal();
+        setSearchParams({}, { replace: true });
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams, state.showCreateModal, handleOpenCreateModal, setSearchParams]);
+
   // ── Derived values ──
   const canAddBusiness = userRole === 'admin' || userRole === 'business_owner' || userProfile?.accountType === 'business';
   const isOwnerOrAdmin = useCallback((b: Business) => b.ownerId === user?.uid || userRole === 'admin', [user?.uid, userRole]);

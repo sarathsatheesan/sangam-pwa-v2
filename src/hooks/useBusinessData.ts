@@ -268,6 +268,9 @@ export function useBusinessData(
         } : {
           verified: false,
         }),
+        // Registration status — auto-approve for quick-add flow
+        registrationStatus: 'approved',
+        kycStatus: userProfile?.tinValidationStatus === 'valid' || userRole === 'admin' ? 'approved' : 'pending',
         // Followers
         followers: [],
         followerCount: 0,

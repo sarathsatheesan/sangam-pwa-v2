@@ -56,10 +56,12 @@ export const BusinessSwitcherProvider: React.FC<{ children: React.ReactNode }> =
     }
 
     setLoading(true);
+    // Fetch ALL businesses owned by the user (not just approved) so legacy
+    // businesses without registrationStatus still appear in the switcher.
+    // The UI can badge non-approved ones if needed.
     const q = query(
       collection(db, 'businesses'),
       where('ownerId', '==', user.uid),
-      where('registrationStatus', '==', 'approved'),
     );
 
     const unsubscribe = onSnapshot(

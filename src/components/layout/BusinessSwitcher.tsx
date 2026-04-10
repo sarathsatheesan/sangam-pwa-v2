@@ -73,7 +73,7 @@ export const BusinessSwitcher: React.FC = () => {
 
   const handleAddBusiness = useCallback(() => {
     setOpen(false);
-    navigate('/business/register');
+    navigate('/business?action=add');
   }, [navigate]);
 
   // Don't render if user has no businesses or still loading

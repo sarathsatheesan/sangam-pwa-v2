@@ -1018,7 +1018,7 @@ const SettingsPage: React.FC = () => {
       <div className="px-4 pb-8">
         <button
           type="button"
-          onClick={() => navigate('/business/register')}
+          onClick={() => navigate('/business?action=add')}
           className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium rounded-xl border border-dashed transition-colors"
           style={{
             borderColor: '#6366F1',
