@@ -116,7 +116,7 @@ export default function VendorMenuEditor({
   businessName,
   onBack,
 }: VendorMenuEditorProps) {
-  const { showToast } = useToast();
+  const { addToast } = useToast();
   const [menuItems, setMenuItems] = useState<CateringMenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterTab, setFilterTab] = useState<FilterTab>('all');
@@ -148,14 +148,14 @@ export default function VendorMenuEditor({
         setLoading(false);
       },
       (error: Error) => {
-        showToast('Failed to load menu items', 'error');
+        addToast('Failed to load menu items', 'error');
         console.error('Menu items subscription error:', error);
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [businessId, showToast]);
+  }, [businessId, addToast]);
 
   // Filter items
   const filteredItems = useMemo(() => {
@@ -254,10 +254,10 @@ export default function VendorMenuEditor({
       setPhotoPreview(base64);
       setFormData((prev) => ({ ...prev, photoUrl: base64 }));
     } catch (error) {
-      showToast('Failed to process image', 'error');
+      addToast('Failed to process image', 'error');
       console.error('Photo upload error:', error);
     }
-  }, [showToast]);
+  }, [addToast]);
 
   const handleSaveItem = useCallback(async () => {
     setSubmitAttempted(true);
@@ -267,7 +267,7 @@ export default function VendorMenuEditor({
     if (!formData.price || parseFloat(formData.price) < 0) missingFields.push('Price');
 
     if (missingFields.length > 0) {
-      showToast(`Please fill in: ${missingFields.join(', ')}`, 'error');
+      addToast(`Please fill in: ${missingFields.join(', ')}`, 'error');
       return;
     }
 
@@ -293,20 +293,20 @@ export default function VendorMenuEditor({
 
       if (isEditingMode && formData.id) {
         await updateMenuItem(formData.id, itemData);
-        showToast('Item updated successfully', 'success');
+        addToast('Item updated successfully', 'success');
       } else {
         await createMenuItem(itemData);
-        showToast('Item added successfully', 'success');
+        addToast('Item added successfully', 'success');
       }
 
       closeDrawer();
     } catch (error) {
-      showToast('Failed to save item', 'error');
+      addToast('Failed to save item', 'error');
       console.error('Save item error:', error);
     } finally {
       setSaving(false);
     }
-  }, [formData, businessId, isEditingMode, showToast, closeDrawer]);
+  }, [formData, businessId, isEditingMode, addToast, closeDrawer]);
 
   const handleDuplicateItem = useCallback(
     async (item: CateringMenuItem) => {
@@ -327,13 +327,13 @@ export default function VendorMenuEditor({
 
       try {
         await createMenuItem(newItem);
-        showToast('Item duplicated successfully', 'success');
+        addToast('Item duplicated successfully', 'success');
       } catch (error) {
-        showToast('Failed to duplicate item', 'error');
+        addToast('Failed to duplicate item', 'error');
         console.error('Duplicate item error:', error);
       }
     },
-    [businessId, showToast]
+    [businessId, addToast]
   );
 
   const handleArchiveItem = useCallback(
@@ -341,17 +341,17 @@ export default function VendorMenuEditor({
       try {
         if (isArchived) {
           await restoreMenuItem(itemId);
-          showToast('Item restored', 'success');
+          addToast('Item restored', 'success');
         } else {
           await archiveMenuItem(itemId);
-          showToast('Item archived — customers can no longer see it', 'success');
+          addToast('Item archived — customers can no longer see it', 'success');
         }
       } catch (error) {
-        showToast(`Failed to ${isArchived ? 'restore' : 'archive'} item`, 'error');
+        addToast(`Failed to ${isArchived ? 'restore' : 'archive'} item`, 'error');
         console.error('Archive item error:', error);
       }
     },
-    [showToast]
+    [addToast]
   );
 
   const handleDeleteItem = useCallback(
@@ -365,14 +365,14 @@ export default function VendorMenuEditor({
     async (itemId: string) => {
       try {
         await deleteMenuItem(itemId);
-        showToast('Item deleted', 'success');
+        addToast('Item deleted', 'success');
         setDeletingId(null);
       } catch (error) {
-        showToast('Failed to delete item', 'error');
+        addToast('Failed to delete item', 'error');
         console.error('Delete item error:', error);
       }
     },
-    [showToast]
+    [addToast]
   );
 
   const toggleCategory = useCallback((category: Category) => {
@@ -446,17 +446,17 @@ export default function VendorMenuEditor({
           sortOrder: menuItems.length + i,
         }));
         await batchCreateMenuItems(menuItemsToCreate);
-        showToast(`${items.length} item${items.length > 1 ? 's' : ''} added to menu!`, 'success');
+        addToast(`${items.length} item${items.length > 1 ? 's' : ''} added to menu!`, 'success');
         setParsedItems([]);
         setSubView('list');
       } catch (error) {
-        showToast('Failed to publish items', 'error');
+        addToast('Failed to publish items', 'error');
         console.error('Publish items error:', error);
       } finally {
         setPublishing(false);
       }
     },
-    [businessId, menuItems.length, showToast]
+    [businessId, menuItems.length, addToast]
   );
 
   return (
