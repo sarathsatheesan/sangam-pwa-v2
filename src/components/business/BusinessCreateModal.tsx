@@ -222,11 +222,13 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
           <label className="block text-sm font-medium text-aurora-text mb-1.5">Category <span className="text-red-500">*</span></label>
           <select
             value={formData.category}
-            onChange={(e) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'category', value: e.target.value })}
+            onChange={(e) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'category', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'category' }); }}
             className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo"
           >
+            <option value="" disabled>Select a category…</option>
             {CATEGORIES.map((cat) => <option key={cat} value={cat}>{CATEGORY_EMOJI_MAP[cat]} {cat}</option>)}
           </select>
+          {formErrors.category && <p className="mt-1 text-xs text-red-500">{formErrors.category}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-aurora-text mb-1.5">
@@ -255,8 +257,8 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
         <FormInput label="Location / Address" required error={formErrors.location} type="text" value={formData.location} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'location', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'location' }); }} placeholder="123 Main St, City, State" />
         {/* Map coordinates (optional — for map pin placement) */}
         <div className="grid grid-cols-2 gap-3">
-          <FormInput label="Latitude" type="number" value={formData.latitude} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'latitude', value: e.target.value === '' ? '' : parseFloat(e.target.value) })} placeholder="40.7608" />
-          <FormInput label="Longitude" type="number" value={formData.longitude} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'longitude', value: e.target.value === '' ? '' : parseFloat(e.target.value) })} placeholder="-111.891" />
+          <FormInput label="Latitude" error={formErrors.latitude} type="number" value={formData.latitude} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'latitude', value: e.target.value === '' ? '' : parseFloat(e.target.value) }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'latitude' }); }} placeholder="40.7608" />
+          <FormInput label="Longitude" error={formErrors.longitude} type="number" value={formData.longitude} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'longitude', value: e.target.value === '' ? '' : parseFloat(e.target.value) }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'longitude' }); }} placeholder="-111.891" />
         </div>
         <p className="text-[10px] text-aurora-text-muted -mt-2">Optional — enables your business on the map view. Find coordinates on Google Maps.</p>
         <FormInput label="Phone" required error={formErrors.phone} type="tel" value={formData.phone} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'phone', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'phone' }); }} placeholder="(555) 123-4567" />
@@ -264,7 +266,7 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
         <FormInput label="Website" error={formErrors.website} type="url" value={formData.website} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'website', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'website' }); }} placeholder="https://www.mybusiness.com" />
         <FormInput label="Booking / Reservation URL" type="url" value={formData.bookingUrl} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'bookingUrl', value: e.target.value })} placeholder="https://www.opentable.com/mybusiness" />
         <FormTextarea label="Business Hours" value={formData.hours} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'hours', value: e.target.value })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
-        <FormInput label="Year Established" type="number" value={formData.yearEstablished} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'yearEstablished', value: parseInt(e.target.value) })} />
+        <FormInput label="Year Established" type="number" value={formData.yearEstablished} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'yearEstablished', value: e.target.value === '' ? '' : parseInt(e.target.value) || '' })} placeholder="e.g. 2020" />
         <FormInput label="Price Range" type="text" value={formData.priceRange} placeholder="$$-$$$" onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'priceRange', value: e.target.value })} />
         <FormTextarea label="Services" value={formData.services} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'services', value: e.target.value })} rows={3} placeholder="List your services..." />
         <FormTextarea label={formData.category === 'Restaurant & Food' ? 'Menu' : 'Products / Merchandise'} value={formData.menu} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'menu', value: e.target.value })} rows={4} placeholder="List your menu items or products..." />

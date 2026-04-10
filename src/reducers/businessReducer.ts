@@ -327,7 +327,7 @@ export function createInitialState(): BusinessState {
 
     formData: {
       name: '',
-      category: CATEGORIES[0],
+      category: '',
       desc: '',
       location: '',
       phone: '',
@@ -337,7 +337,7 @@ export function createInitialState(): BusinessState {
       menu: '',
       services: '',
       priceRange: '',
-      yearEstablished: new Date().getFullYear(),
+      yearEstablished: '' as any,
       paymentMethods: [],
       deliveryOptions: [],
       specialtyTags: [],
@@ -511,7 +511,14 @@ export function businessReducer(state: BusinessState, action: BusinessAction): B
     case 'SET_ACTIVE_TAB':
       return { ...state, activeTab: action.payload };
     case 'OPEN_CREATE_MODAL':
-      return { ...state, showCreateModal: true };
+      return {
+        ...state,
+        showCreateModal: true,
+        formData: createInitialState().formData,
+        formPhotos: [],
+        coverPhotoIndex: 0,
+        formErrors: {},
+      };
     case 'CLOSE_CREATE_MODAL':
       return { ...state, showCreateModal: false, formPhotos: [], coverPhotoIndex: 0, formErrors: {} };
     case 'SET_SHOW_TIN_MODAL':

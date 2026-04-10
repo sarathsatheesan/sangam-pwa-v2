@@ -53,6 +53,15 @@ export function validateBusinessForm(formData: BusinessFormData): Record<string,
     errors.website = 'Please enter a valid URL (e.g., https://example.com)';
   }
 
+  // Partial lat/lng: both must be provided or both empty
+  const hasLat = (formData as any).latitude !== '' && (formData as any).latitude !== undefined;
+  const hasLng = (formData as any).longitude !== '' && (formData as any).longitude !== undefined;
+  if (hasLat && !hasLng) {
+    errors.longitude = 'Longitude is required when latitude is provided';
+  } else if (!hasLat && hasLng) {
+    errors.latitude = 'Latitude is required when longitude is provided';
+  }
+
   return errors;
 }
 
