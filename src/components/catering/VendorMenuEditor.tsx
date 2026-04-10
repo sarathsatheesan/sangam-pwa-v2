@@ -282,6 +282,7 @@ export default function VendorMenuEditor({
         pricingType: formData.pricingType,
         description: formData.description.trim(),
         dietaryTags: formData.dietaryTags,
+        available: true,
         servesCount: formData.servesCount ? parseInt(formData.servesCount) : undefined,
         prepTimeMinutes: formData.prepTimeMinutes
           ? parseInt(formData.prepTimeMinutes)
@@ -1357,7 +1358,6 @@ function MenuItem({
                 </button>
                 <button
                   onClick={() => {
-                    setDeletingId(null);
                     onConfirmDelete(item.id);
                   }}
                   className="px-4 py-2 rounded-lg font-medium text-white transition-colors"
