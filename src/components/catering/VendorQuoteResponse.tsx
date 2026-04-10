@@ -3,6 +3,7 @@ import {
   Package, Clock, Users, MapPin, Send, Loader2,
   ChevronDown, ChevronUp, ShieldCheck, Plus, Trash2, DollarSign,
   Bell, CheckCircle2, XCircle, Check, Edit, BellRing, Timer,
+  BellOff, ChevronRight,
 } from 'lucide-react';
 import { notifyVendorQuoteReceived } from '@/services/notificationService';
 
@@ -121,6 +122,15 @@ export default function VendorQuoteResponse({
   });
   const [showReminderSettings, setShowReminderSettings] = useState(false);
   const [activeReminders, setActiveReminders] = useState<Array<{ id: string; type: string; message: string; requestId: string }>>([]);
+  // Snoozed reminders: map of reminder ID → snooze expiry timestamp
+  const [snoozedReminders, setSnoozedReminders] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem(`vendor-snoozed-reminders-${businessId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+  // Ref for scrolling to a specific request card
+  const requestCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Track previous response statuses to detect real-time changes
   const prevResponseStatusRef = useRef<Record<string, string>>({});
@@ -385,6 +395,35 @@ export default function VendorQuoteResponse({
   const pendingResponses = sortResponses(myResponses.filter((r) => r.status === 'submitted'), sortDir.pending);
   const declinedResponses = sortResponses(myResponses.filter((r) => r.status === 'declined'), sortDir.declined);
 
+  // ── Snooze handler — snoozes a reminder for a given duration ──
+  const handleSnooze = useCallback((reminderId: string, durationMs: number) => {
+    const expiresAt = Date.now() + durationMs;
+    setSnoozedReminders((prev) => {
+      const next = { ...prev, [reminderId]: expiresAt };
+      try { localStorage.setItem(`vendor-snoozed-reminders-${businessId}`, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    addToast('Reminder snoozed', 'info');
+  }, [businessId, addToast]);
+
+  // ── Click-to-navigate: expand Open Requests section, expand the card, scroll to it ──
+  const handleReminderClick = useCallback((requestId: string) => {
+    // Ensure the Open Requests section is expanded
+    setSectionExpanded((prev) => ({ ...prev, open: true }));
+    // Expand the specific request card
+    setExpandedId(requestId);
+    // Scroll to the card after a brief delay for DOM update
+    setTimeout(() => {
+      const el = requestCardRefs.current[requestId];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Brief highlight flash
+        el.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.4)';
+        setTimeout(() => { el.style.boxShadow = ''; }, 1500);
+      }
+    }, 150);
+  }, []);
+
   // ── Reminder engine ──
   useEffect(() => {
     const check = () => {
@@ -397,7 +436,7 @@ export default function VendorQuoteResponse({
           if (createdMs > 0 && now - createdMs > 30 * 60 * 1000) {
             const elapsedMin = Math.round((now - createdMs) / 60000);
             const waitLabel = elapsedMin < 60 ? `${elapsedMin} min` : elapsedMin < 1440 ? `${(elapsedMin / 60).toFixed(1)} hrs` : `${(elapsedMin / 1440).toFixed(1)} days`;
-            reminders.push({ id: `open-${req.id}`, type: 'open', message: `Open request for ${req.cuisineCategory} (${req.headcount} guests) waiting ${waitLabel}`, requestId: req.id });
+            reminders.push({ id: `open-${req.id}`, type: 'open', message: `${formatEventDate(req.eventDate)} · ${req.headcount} guests · waiting ${waitLabel}`, requestId: req.id });
           }
         }
       }
@@ -406,17 +445,22 @@ export default function VendorQuoteResponse({
         for (const req of requests) {
           const eventMs = getRequestEventMs(req);
           if (eventMs > 0 && eventMs - now > 0 && eventMs - now < leadMs) {
-            reminders.push({ id: `event-${req.id}`, type: 'event', message: `Event for ${req.cuisineCategory} is within ${reminderSettings.reminderLeadHours}h — ${formatEventDate(req.eventDate)}`, requestId: req.id });
+            reminders.push({ id: `event-${req.id}`, type: 'event', message: `${formatEventDate(req.eventDate)} · event within ${reminderSettings.reminderLeadHours}h`, requestId: req.id });
           }
         }
       }
-      setActiveReminders(reminders);
+      // Filter out snoozed reminders (check expiry vs now)
+      const filtered = reminders.filter((r) => {
+        const expiresAt = snoozedReminders[r.id];
+        return !expiresAt || expiresAt <= now;
+      });
+      setActiveReminders(filtered);
     };
     check();
     const interval = setInterval(check, 60_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requests, myResponses, reminderSettings]);
+  }, [requests, myResponses, reminderSettings, snoozedReminders]);
 
   if (loading) {
     return (
@@ -440,20 +484,44 @@ export default function VendorQuoteResponse({
         </p>
       </div>
 
-      {/* ── Active Reminders Banner ── */}
+      {/* ── Active Reminders Banner — clickable pills with snooze ── */}
       {activeReminders.length > 0 && (
         <div className="space-y-2">
           {activeReminders.map((r) => (
             <div
               key={r.id}
-              className="flex items-center gap-2 p-3 rounded-xl text-xs font-medium"
+              className="flex items-center gap-2 rounded-xl text-xs font-medium overflow-hidden"
               style={{
                 backgroundColor: r.type === 'open' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(99, 102, 241, 0.08)',
                 color: r.type === 'open' ? '#D97706' : '#6366F1',
               }}
             >
-              {r.type === 'open' ? <Timer size={14} /> : <BellRing size={14} />}
-              {r.message}
+              {/* Clickable pill — navigates to the request card */}
+              <button
+                type="button"
+                onClick={() => handleReminderClick(r.requestId)}
+                className="flex items-center gap-2 flex-1 p-3 text-left"
+                style={{ color: 'inherit', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {r.type === 'open' ? <Timer size={14} className="flex-shrink-0" /> : <BellRing size={14} className="flex-shrink-0" />}
+                <span className="flex-1">{r.message}</span>
+                <ChevronRight size={14} className="flex-shrink-0 opacity-50" />
+              </button>
+              {/* Snooze button */}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleSnooze(r.id, 2 * 60 * 60 * 1000); }}
+                className="flex items-center gap-1 px-3 py-2 mr-1 rounded-lg text-[10px] font-semibold"
+                style={{
+                  color: r.type === 'open' ? '#D97706' : '#6366F1',
+                  backgroundColor: r.type === 'open' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(99, 102, 241, 0.12)',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+                title="Snooze for 2 hours"
+              >
+                <BellOff size={12} />
+                <span className="hidden sm:inline">Snooze</span>
+              </button>
             </div>
           ))}
         </div>
@@ -561,8 +629,9 @@ export default function VendorQuoteResponse({
               return (
                 <div
                   key={request.id}
+                  ref={(el) => { requestCardRefs.current[request.id] = el; }}
                   className="rounded-2xl border overflow-hidden"
-                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)' }}
+                  style={{ backgroundColor: 'var(--aurora-surface)', borderColor: 'var(--aurora-border)', transition: 'box-shadow 0.3s ease' }}
                 >
                   <button
                     onClick={() => setExpandedId(isExpanded ? null : request.id)}
