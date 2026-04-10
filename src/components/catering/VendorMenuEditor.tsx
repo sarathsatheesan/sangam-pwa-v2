@@ -301,8 +301,9 @@ export default function VendorMenuEditor({
       }
 
       closeDrawer();
-    } catch (error) {
-      addToast('Failed to save item', 'error');
+    } catch (error: any) {
+      const msg = error?.message || 'Unknown error';
+      addToast(`Failed to save item: ${msg}`, 'error');
       console.error('Save item error:', error);
     } finally {
       setSaving(false);

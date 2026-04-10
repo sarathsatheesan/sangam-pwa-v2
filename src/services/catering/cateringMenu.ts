@@ -79,7 +79,11 @@ export async function createMenuItem(item: Omit<CateringMenuItem, 'id'>): Promis
 
 export async function updateMenuItem(itemId: string, updates: Partial<CateringMenuItem>): Promise<void> {
   const ref = doc(db, MENU_ITEMS_COL, itemId);
-  await updateDoc(ref, updates);
+  // Strip undefined values — Firestore rejects them
+  const cleanUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([, v]) => v !== undefined),
+  );
+  await updateDoc(ref, cleanUpdates);
 }
 
 export async function deleteMenuItem(itemId: string): Promise<void> {
