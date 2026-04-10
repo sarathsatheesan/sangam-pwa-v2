@@ -128,6 +128,7 @@ export default function VendorMenuEditor({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>('');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<Category>>(
     new Set(CATEGORY_ORDER)
   );
@@ -207,6 +208,7 @@ export default function VendorMenuEditor({
     setPhotoPreview('');
     setIsEditingMode(false);
     setExpandedDetails(false);
+    setSubmitAttempted(false);
     setDrawerOpen(true);
   }, []);
 
@@ -228,6 +230,7 @@ export default function VendorMenuEditor({
     setPhotoPreview(item.photoUrl || '');
     setIsEditingMode(true);
     setExpandedDetails(false);
+    setSubmitAttempted(false);
     setDrawerOpen(true);
   }, []);
 
@@ -257,13 +260,14 @@ export default function VendorMenuEditor({
   }, [showToast]);
 
   const handleSaveItem = useCallback(async () => {
-    if (!formData.name.trim()) {
-      showToast('Item name is required', 'error');
-      return;
-    }
+    setSubmitAttempted(true);
 
-    if (!formData.price || parseFloat(formData.price) < 0) {
-      showToast('Valid price is required', 'error');
+    const missingFields: string[] = [];
+    if (!formData.name.trim()) missingFields.push('Name');
+    if (!formData.price || parseFloat(formData.price) < 0) missingFields.push('Price');
+
+    if (missingFields.length > 0) {
+      showToast(`Please fill in: ${missingFields.join(', ')}`, 'error');
       return;
     }
 
@@ -812,12 +816,18 @@ export default function VendorMenuEditor({
                     placeholder="Item name"
                     className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                     style={{
-                      borderColor: 'var(--aurora-border)',
+                      borderColor: submitAttempted && !formData.name.trim() ? '#EF4444' : 'var(--aurora-border)',
                       backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                       color: 'var(--aurora-text)',
                     }}
                     aria-label="Item name"
+                    aria-invalid={submitAttempted && !formData.name.trim()}
                   />
+                  {submitAttempted && !formData.name.trim() && (
+                    <p style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                      Item name is required
+                    </p>
+                  )}
                 </div>
 
                 {/* Price */}
@@ -834,12 +844,18 @@ export default function VendorMenuEditor({
                     placeholder="0.00"
                     className="w-full px-4 py-2 rounded-lg border focus:outline-none focus:ring-2"
                     style={{
-                      borderColor: 'var(--aurora-border)',
+                      borderColor: submitAttempted && (!formData.price || parseFloat(formData.price) < 0) ? '#EF4444' : 'var(--aurora-border)',
                       backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
                       color: 'var(--aurora-text)',
                     }}
                     aria-label="Item price in dollars"
+                    aria-invalid={submitAttempted && (!formData.price || parseFloat(formData.price) < 0)}
                   />
+                  {submitAttempted && (!formData.price || parseFloat(formData.price) < 0) && (
+                    <p style={{ color: '#EF4444', fontSize: '0.75rem', marginTop: '4px' }}>
+                      A valid price is required
+                    </p>
+                  )}
                 </div>
 
                 {/* Category */}
@@ -1117,7 +1133,7 @@ export default function VendorMenuEditor({
             >
               <button
                 onClick={handleSaveItem}
-                disabled={saving || !formData.name.trim() || !formData.price}
+                disabled={saving}
                 className="w-full py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: '#6366F1',
