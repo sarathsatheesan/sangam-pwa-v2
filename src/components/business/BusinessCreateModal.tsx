@@ -228,7 +228,22 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
             {CATEGORIES.map((cat) => <option key={cat} value={cat}>{CATEGORY_EMOJI_MAP[cat]} {cat}</option>)}
           </select>
         </div>
-        <FormTextarea label="Description" value={formData.desc} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'desc', value: e.target.value })} rows={3} placeholder="Tell customers about your business..." />
+        <div>
+          <label className="block text-sm font-medium text-aurora-text mb-1.5">
+            Description <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            value={formData.desc}
+            onChange={(e) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'desc', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'desc' }); }}
+            rows={3}
+            placeholder="Tell customers about your business..."
+            className={`w-full px-4 py-2.5 bg-aurora-surface border rounded-xl
+                       text-sm text-aurora-text placeholder:text-aurora-text-muted resize-none
+                       focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo transition-all
+                       ${formErrors.desc ? 'border-red-400 ring-1 ring-red-400/30' : 'border-aurora-border'}`}
+          />
+          {formErrors.desc && <p className="mt-1 text-xs text-red-500">{formErrors.desc}</p>}
+        </div>
         {photosEnabled && (
           <BusinessPhotoUploader
             photos={formPhotos}

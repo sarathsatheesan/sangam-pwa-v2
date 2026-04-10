@@ -194,21 +194,27 @@ export function useBusinessData(
   }, [user?.uid, dispatch]);
 
   // ── Open create modal (with business account / TIN checks) ──
+  // Permission logic: allow if user is admin, OR has a business account,
+  // OR already owns at least one business (multi-business flow).
+  const userOwnsBusinesses = state.businesses.some((b) => b.ownerId === user?.uid);
   const handleOpenCreateModal = useCallback(() => {
-    if (userProfile?.accountType !== 'business' && userRole !== 'admin') {
-      dispatch({ type: 'SET_TOAST', payload: 'Only business accounts can add listings. Please switch to a business account in your Profile settings.' });
+    // Gate 1: Must be a business account, admin, or already own a business
+    if (userProfile?.accountType !== 'business' && userRole !== 'admin' && !userOwnsBusinesses) {
+      dispatch({ type: 'SET_TOAST', payload: 'To add a business listing, please register as a business account first.' });
       return;
     }
+    // Gate 2: Registered businesses need TIN validation (skip for admins)
     if (userProfile?.isRegistered === true && userProfile?.tinValidationStatus !== 'valid' && userRole !== 'admin') {
       dispatch({ type: 'SET_SHOW_TIN_MODAL', payload: true });
       return;
     }
+    // Gate 3: Unregistered accounts need admin approval (skip for admins)
     if (userProfile?.isRegistered === false && !userProfile?.adminApproved && userRole !== 'admin') {
       dispatch({ type: 'SET_TOAST', payload: 'Your unregistered business account is pending admin approval.' });
       return;
     }
     dispatch({ type: 'OPEN_CREATE_MODAL' });
-  }, [userProfile, userRole, dispatch]);
+  }, [userProfile, userRole, userOwnsBusinesses, dispatch]);
 
   // ── Add business ──
   const handleAddBusiness = useCallback(async () => {
@@ -275,6 +281,7 @@ export function useBusinessData(
         followers: [],
         followerCount: 0,
       });
+      dispatch({ type: 'SET_TOAST', payload: '🎉 Business added successfully!' });
       dispatch({ type: 'RESET_CREATE_FORM' });
       // onSnapshot will automatically pick up the new business — no manual refetch needed
     } catch (error) {

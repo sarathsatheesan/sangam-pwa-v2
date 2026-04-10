@@ -62,12 +62,23 @@ function useModalA11y(
 
 export interface TinVerificationModalProps {
   dispatch: React.Dispatch<any>;
+  onNavigate?: (path: string) => void;
 }
 
-export const TinVerificationModal: React.FC<TinVerificationModalProps> = ({ dispatch }) => {
+export const TinVerificationModal: React.FC<TinVerificationModalProps> = ({ dispatch, onNavigate }) => {
   const ref = useRef<HTMLDivElement>(null);
   const close = () => dispatch({ type: 'SET_SHOW_TIN_MODAL', payload: false });
   useModalA11y(ref, close);
+
+  const handleGoToProfile = () => {
+    close();
+    // Use React Router navigation if available, fall back to window.location
+    if (onNavigate) {
+      onNavigate('/profile');
+    } else {
+      window.location.href = '/profile';
+    }
+  };
 
   return (
     <div
@@ -91,18 +102,21 @@ export const TinVerificationModal: React.FC<TinVerificationModalProps> = ({ disp
           <h2 id="tin-modal-title" className="text-xl font-bold text-aurora-text">TIN Verification Required</h2>
           <p id="tin-modal-desc" className="text-sm text-aurora-text-secondary mt-2">
             Your registered business TIN/EIN must be verified before you can create listings.
+            Verify your TIN in your Profile, then come back here to add your business.
           </p>
         </div>
         <div className="space-y-2.5">
           <button
-            onClick={() => { close(); window.location.href = '/profile'; }}
+            onClick={handleGoToProfile}
             className="w-full bg-aurora-indigo text-white py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-indigo/90 transition-colors focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:ring-offset-2 focus-visible:outline-none"
+            style={{ minHeight: '44px' }}
           >
-            Go to Profile
+            Verify TIN in Profile
           </button>
           <button
             onClick={close}
             className="w-full bg-aurora-surface-variant text-aurora-text-secondary py-2.5 rounded-xl font-medium text-sm hover:bg-aurora-border/30 transition-colors focus-visible:ring-2 focus-visible:ring-aurora-indigo focus-visible:ring-offset-2 focus-visible:outline-none"
+            style={{ minHeight: '44px' }}
           >
             Cancel
           </button>

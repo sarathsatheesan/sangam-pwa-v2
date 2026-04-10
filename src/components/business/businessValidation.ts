@@ -34,6 +34,7 @@ export function validateBusinessForm(formData: BusinessFormData): Record<string,
 
   if (!formData.name.trim()) errors.name = 'Business name is required';
   if (!formData.category) errors.category = 'Category is required';
+  if (!formData.desc?.trim()) errors.desc = 'A brief description helps customers find you';
   if (!formData.location.trim()) errors.location = 'Location is required';
 
   if (!formData.phone.trim()) {

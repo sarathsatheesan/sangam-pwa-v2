@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useReducer, useMemo, lazy, Suspense } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '@/services/firebase';
@@ -46,6 +46,7 @@ const VirtualizedBusinessGrid = lazy(() => import('@/components/business/Virtual
 
 export default function BusinessPage() {
   const { user, userRole, userProfile } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, dispatch] = useReducer(businessReducer, undefined, createInitialState);
   const categoryScrollRef = useRef<HTMLDivElement>(null);
@@ -391,22 +392,20 @@ export default function BusinessPage() {
   }, [searchParams, state.businesses, setSearchParams, dispatch]);
 
   // ── Deep-link: auto-open create modal from Settings "Add Another Business" ──
+  // Waits until businesses are loaded (!state.loading) so the permission check
+  // in handleOpenCreateModal can see existing ownedBusinesses.
   useEffect(() => {
     const action = searchParams.get('action');
-    if (action === 'add' && !state.showCreateModal) {
-      // Slight delay to ensure business data is loaded for permission checks
-      const timer = setTimeout(() => {
-        handleOpenCreateModal();
-        setSearchParams({}, { replace: true });
-      }, 300);
-      return () => clearTimeout(timer);
+    if (action === 'add' && !state.showCreateModal && !state.loading) {
+      handleOpenCreateModal();
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams, state.showCreateModal, handleOpenCreateModal, setSearchParams]);
+  }, [searchParams, state.showCreateModal, state.loading, handleOpenCreateModal, setSearchParams]);
 
   // ── Derived values ──
-  const canAddBusiness = userRole === 'admin' || userRole === 'business_owner' || userProfile?.accountType === 'business';
   const isOwnerOrAdmin = useCallback((b: Business) => b.ownerId === user?.uid || userRole === 'admin', [user?.uid, userRole]);
   const ownedBusinesses = state.businesses.filter((b) => b.ownerId === user?.uid || userRole === 'admin');
+  const canAddBusiness = userRole === 'admin' || userRole === 'business_owner' || userProfile?.accountType === 'business' || ownedBusinesses.length > 0;
 
   // Skeleton card
   const SkeletonCard = () => (
@@ -1158,7 +1157,7 @@ export default function BusinessPage() {
 
       {/* TIN Verification Modal */}
       {state.showTinVerificationModal && (
-        <TinVerificationModal dispatch={dispatch} />
+        <TinVerificationModal dispatch={dispatch} onNavigate={navigate} />
       )}
 
       {/* Delete Business Confirmation Modal */}
