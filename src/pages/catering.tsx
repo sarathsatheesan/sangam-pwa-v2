@@ -1329,6 +1329,7 @@ export default function CateringPage() {
               <VendorCateringDashboard
                 businessId={ownedBusiness.id}
                 businessName={ownedBusiness.name}
+                onSwitchVendorTab={setVendorTab}
               />
             )}
             {vendorTab === 'quotes' && (

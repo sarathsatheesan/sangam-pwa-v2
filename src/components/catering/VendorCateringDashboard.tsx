@@ -49,6 +49,14 @@ const VENDOR_CANCEL_REASONS = [
 interface VendorCateringDashboardProps {
   businessId: string;
   businessName: string;
+  /**
+   * Optional callback invoked when the user clicks an onboarding pill whose
+   * action belongs to a sibling tab (e.g. "Add menu items" → 'menu').
+   * The parent (catering.tsx) owns the vendor tab state, so we emit the
+   * requested tab key and let the parent switch. Kept optional so the
+   * component stays usable in isolation (tests, storybook).
+   */
+  onSwitchVendorTab?: (tab: 'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory' | 'menu') => void;
 }
 
 // SB-10: Derive vendor STATUS_CONFIG from shared STATUS_THEME + add icons
@@ -80,7 +88,7 @@ function formatEtaValue(value: string, mode: string): string {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
-export default function VendorCateringDashboard({ businessId, businessName }: VendorCateringDashboardProps) {
+export default function VendorCateringDashboard({ businessId, businessName, onSwitchVendorTab }: VendorCateringDashboardProps) {
   const { user } = useAuth();
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1180,28 +1188,95 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
               <p className="text-sm mb-6" style={{ color: 'var(--aurora-text-secondary)' }}>
                 You&apos;re all set to receive catering orders. Here&apos;s how to get started:
               </p>
+              {/* Interactive onboarding pills — pill 1 opens payment settings,
+                  pill 2 switches to the Menu tab via parent callback, pill 3 is
+                  informational (no action yet — will animate when first order arrives).
+                  Using <button> (not <div>) gives us native keyboard focus, Enter/Space
+                  activation, and screen-reader role in every browser we target
+                  (Chrome/Safari/Firefox desktop + iOS Safari + Android Chrome). */}
               <div className="text-left space-y-3 mb-5">
-                <div className="flex items-start gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentSettings(true)}
+                  aria-label="Set up payment info (optional)"
+                  className="group w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer hover:shadow-sm focus-visible:outline-none focus-visible:ring-2"
+                  style={{
+                    borderColor: 'var(--aurora-border, #e5e7eb)',
+                    backgroundColor: 'var(--aurora-bg, #fafafa)',
+                    WebkitTapHighlightColor: 'transparent',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                    minHeight: 44,
+                    // @ts-expect-error CSS custom prop for focus ring color
+                    '--tw-ring-color': '#6366F1',
+                  } as React.CSSProperties}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#6366F1'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--aurora-border, #e5e7eb)'; }}
+                >
                   <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>1</span>
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>
-                      Set up payment info <span className="text-[10px] font-normal" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>(optional)</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium flex items-center justify-between gap-2" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>
+                      <span>
+                        Set up payment info <span className="text-[10px] font-normal" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>(optional)</span>
+                      </span>
+                      <span className="text-[11px] font-semibold shrink-0" style={{ color: '#6366F1' }} aria-hidden="true">Open →</span>
                     </p>
                     <p className="text-xs" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>Add your payment link so customers can pay you — you can skip and add this later</p>
                   </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onSwitchVendorTab) onSwitchVendorTab('menu');
+                    else addToast('Open the Menu tab to add items', 'info');
+                  }}
+                  aria-label="Add menu items — opens the Menu tab"
+                  className="group w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer hover:shadow-sm focus-visible:outline-none focus-visible:ring-2"
+                  style={{
+                    borderColor: 'var(--aurora-border, #e5e7eb)',
+                    backgroundColor: 'var(--aurora-bg, #fafafa)',
+                    WebkitTapHighlightColor: 'transparent',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                    minHeight: 44,
+                    // @ts-expect-error CSS custom prop for focus ring color
+                    '--tw-ring-color': '#6366F1',
+                  } as React.CSSProperties}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#6366F1'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--aurora-border, #e5e7eb)'; }}
+                >
                   <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>2</span>
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Add menu items</p>
-                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>Create your catering menu so customers can browse</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium flex items-center justify-between gap-2" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>
+                      <span>Add menu items</span>
+                      <span className="text-[11px] font-semibold shrink-0" style={{ color: '#6366F1' }} aria-hidden="true">Open →</span>
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>Create your catering menu so customers can browse</p>
                   </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
-                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>3</span>
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Your first order will appear here</p>
-                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>You&apos;ll get an alert with a chime when a new order comes in</p>
+                </button>
+
+                {/* Pill 3 — informational; no navigation target yet. Rendered as
+                    a plain div with the same rounded-xl shape to keep visual
+                    parity with the actionable pills above. */}
+                <div
+                  className="flex items-start gap-3 p-3 rounded-xl border"
+                  style={{
+                    borderColor: 'var(--aurora-border, #e5e7eb)',
+                    backgroundColor: 'var(--aurora-bg, #fafafa)',
+                    opacity: 0.85,
+                  }}
+                  aria-label="Your first order will appear here — informational"
+                >
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    style={{ backgroundColor: 'var(--aurora-text-muted, #9ca3af)' }}
+                  >
+                    3
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>Your first order will appear here</p>
+                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>You&apos;ll get an alert with a chime when a new order comes in</p>
                   </div>
                 </div>
               </div>
