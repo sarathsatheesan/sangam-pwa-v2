@@ -48,6 +48,7 @@ import {
 import CateringCategoryGrid from '@/components/catering/CateringCategoryGrid';
 import CateringItemList from '@/components/catering/CateringItemList';
 import CateringCart from '@/components/catering/CateringCart';
+import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
 
 // ── Components (lazy: heavy, only loaded when navigated to) ──
 const CateringCheckout = React.lazy(() => import('@/components/catering/CateringCheckout'));
@@ -1282,6 +1283,16 @@ export default function CateringPage() {
         {/* Vendor dashboard with tabs */}
         {state.view === 'vendor' && ownedBusiness && (
           <div className="space-y-4">
+            {/* Business Switcher — scoped to vendor dashboard (replaces old global header switcher) */}
+            <div className="flex items-center justify-between flex-wrap gap-2 pb-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs font-medium uppercase tracking-wide shrink-0" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>
+                  Managing
+                </span>
+                <BusinessSwitcher />
+              </div>
+            </div>
+
             {/* SB-08: Simplified vendor tab bar — primary tabs + bottom border indicator */}
             <div
               className="flex gap-1 overflow-x-auto scrollbar-hide border-b pb-0"

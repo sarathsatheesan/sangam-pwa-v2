@@ -17,14 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** April 6, 2026 (Last updated: Session 28c)
+**Date:** April 10, 2026 (Last updated: Session 30)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** (Session 28b) — fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders
-**Uncommitted:** Session 28c changes — finalize bug fix, auto-finalize, vendor finalize indicator, ZIP validation
+**Latest Commit:** `b2f66f7` (Session 30) — fix(add-business): eliminate UI flickering on Add Another Business transition
+**Uncommitted:** None — all changes committed. Needs `git push origin main` + `firebase deploy --only hosting` from macOS.
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
 **Live bundle:** Deployed and live at `https://mithr-1e5f4.web.app`
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix), Session 28 (RFP-to-Order conversion + in-order messaging + Firestore rules fix), Session 28b (Live testing of quote-to-order pipeline + 19 TypeScript error fixes + RFP badge on active/pending orders)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix), Session 28 (RFP-to-Order conversion + in-order messaging + Firestore rules fix), Session 28b (Live testing of quote-to-order pipeline + 19 TypeScript error fixes + RFP badge on active/pending orders), Session 29 (Vendor Storefront Builder: grocery templates + TemplateSelector rebuild + 10 critical bug fixes across Add Item / Delete / Smart Paste / Edit flows), Session 30 (Multi-Business Architecture: global business switcher + vendor dashboard per-business routing + business registration fixes + Add Another Business flow from Settings + 6 UX bug fixes + QA Test Execution Report (48 tests) + 4 additional QA bug fixes + UI flicker elimination)
 
 ---
 
@@ -1567,119 +1567,196 @@ src/
 **Commits (Session 28 + 28b):**
 ```
 bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules
+```
+
+### Session 29 (April 10, 2026) — Vendor Storefront Builder: Grocery Templates + Template Selector Rebuild + 10 Critical Bug Fixes
+
+**Context:** This session continued building the Vendor Storefront Builder (Menu tab). Previous sessions had built the VendorMenuEditor with Add Item, Smart Paste, and Template flows, but extensive bugs prevented any of the three workflows from functioning correctly. This session focused on: (1) completing the grocery template feature, (2) rebuilding the TemplateSelector with filter pills, and (3) systematically diagnosing and fixing 10 critical bugs across all three menu creation workflows.
+
+**What was built/completed:**
+
+**1. Grocery Templates + TemplateSelector Rebuild:**
+- Added `MenuTemplateType = 'catering' | 'grocery'` to `cateringTypes.ts`
+- Added `type: MenuTemplateType` field to `MenuTemplate` interface
+- Created 5 grocery template item arrays (35 items total) in `menuTemplates.ts`:
+  - `grocerySouthAsianItems` (8 items) — rice, lentils, flour, oils, ghee
+  - `grocerySpicesItems` (8 items) — turmeric, chili, garam masala, cumin, coriander
+  - `grocerySnacksItems` (6 items) — bhujia, biscuits, instant mixes, papad, pickles
+  - `groceryFreshItems` (7 items) — paneer, yogurt, curry leaves, cilantro, ginger-garlic paste
+  - `groceryBeveragesItems` (6 items) — chai, CTC tea, mango pulp, rose syrup, coconut water
+- Completely rebuilt `TemplateSelector.tsx` with:
+  - Filter pills (All / Catering / Grocery) with active state highlighting (indigo fill when selected)
+  - `useMemo`-based filtering using `template.type` field
+  - Type badges on each card: "CATERING" (indigo) / "GROCERY" (amber)
+  - Grocery template icons: 🌾 (essentials), 🧂 (spices), 🍜 (snacks), 🥬 (fresh), ☕ (beverages)
+  - All inline styles with hardcoded colors — NO aurora CSS variables (cross-browser safe)
+  - Responsive grid: `auto-fill, minmax(260px, 1fr)` — 1 col mobile, 2 tablet, 3 desktop
+
+**2. Ten Critical Bugs Found and Fixed:**
+
+| # | Bug | Root Cause | Fix | Commit |
+|---|-----|-----------|-----|--------|
+| 1 | `import type` error on Vite 7 | `menuTemplates.ts` used value import for types | Changed to `import type` | `4b30959` |
+| 2 | All toast notifications silently failed | VendorMenuEditor destructured `showToast` but ToastContext exposes `addToast` — `showToast` was `undefined` | Renamed all 20+ occurrences to `addToast` | `401d5f3` |
+| 3 | Delete item didn't work | Confirm dialog called `setDeletingId(null)` BEFORE `onConfirmDelete()` — async lost context | Removed premature `setDeletingId(null)`, let `confirmDelete` handle cleanup after Firestore delete | `eea37e8` |
+| 4 | Add Item silently failed | `createMenuItem` missing required `available: true` field — Firestore could reject write | Added `available: true` to `itemData` | `eea37e8` |
+| 5 | Toasts hidden behind drawer on mobile | ToastContainer z-index was `z-50`, same as drawer | Raised to `z-index: 9999` in `Toast.tsx` | `eea37e8` |
+| 6 | Smart Paste "Import Items" didn't transition to Review Grid | `handleSubmit` called `onItemsParsed()` then `onClose()` — `onClose` reset `subView` from `'reviewGrid'` back to `'list'` | Removed `onClose()` from `handleSubmit` — parent's `onItemsParsed` already transitions view | `6290db6` |
+| 7 | Review Grid pricing type toggles never highlighted | Compared `item.pricingType` (`'per_person'`) against display labels (`'Person'`) — never matched | Fixed with `{value, label}` mapping objects | `6290db6` |
+| 8 | Review Grid dietary tags never showed as selected | `DIETARY_TAGS` used display names (`'Gluten-Free'`) but items use system tags (`'gluten_free'`) | Fixed with `{value, label}` mapping objects | `6290db6` |
+| 9 | "Failed to save item" on Edit | `updateMenuItem` passed `undefined` values to Firestore (e.g. `servesCount: undefined`) — Firestore rejects `undefined` | Added `Object.fromEntries` filter to strip `undefined` values (same as `createMenuItem` already had) | `9647265` |
+| 10 | Cross-browser: undefined CSS variables | VendorMenuEditor used `--aurora-primary`, `--aurora-green`, `--aurora-bg-secondary` which don't exist | Replaced with hardcoded colors: `#6366F1`, `#22c55e`, `var(--aurora-surface-variant, #EDF0F7)` | `3ca460c` |
+
+**3. Validation UX Improvements:**
+- Add Item button is always clickable (not silently disabled)
+- On submit with missing fields: red toast "Please fill in: Name, Price" + red border on empty fields + inline hint text
+- `submitAttempted` state resets when drawer opens/closes
+- Error toasts now include the actual error message for faster debugging
+
+**Decisions made and why:**
+- **Hardcoded colors in TemplateSelector instead of aurora CSS variables** — The aurora theme system only defines a subset of variables (`--aurora-bg`, `--aurora-text`, `--aurora-surface`, `--aurora-border`). The old TemplateSelector used non-existent variables like `--aurora-text-primary`, `--aurora-bg-primary` which rendered as transparent/invisible. Hardcoding ensures cross-browser safety.
+- **`z-index: 9999` for toasts** — The drawer, backdrop, and delete confirmation modal all use z-40/z-50. Using 9999 ensures toasts always float above everything, including dynamically stacked modals.
+- **Removed `onClose()` from SmartPasteInput.handleSubmit** — The parent component's `onItemsParsed` handler already transitions `subView` to `'reviewGrid'`. Calling `onClose()` (which sets `subView` to `'list'`) immediately after caused a race condition where the last state update wins.
+- **`import type` for Vite 7 compatibility** — Vite 7 uses stricter Rollup module resolution. Type-only imports must be explicitly marked with `import type` or the build emits warnings/errors.
+
+**Files modified in Session 29:**
+- `src/services/catering/cateringTypes.ts` — Added `MenuTemplateType`, `type` field to `MenuTemplate`
+- `src/services/catering/menuTemplates.ts` — 5 grocery template arrays + 5 entries in MENU_TEMPLATES + `import type`
+- `src/services/catering/index.ts` — Added `MenuTemplateType` to type exports
+- `src/services/catering/cateringMenu.ts` — Fixed `updateMenuItem` to strip `undefined` values
+- `src/components/catering/TemplateSelector.tsx` — **Complete rewrite** with filter pills, active state, cross-browser safe
+- `src/components/catering/VendorMenuEditor.tsx` — `showToast` → `addToast`, validation UX, delete fix, `available: true`, CSS variable fixes
+- `src/components/catering/SmartPasteInput.tsx` — Removed `onClose()` from `handleSubmit`
+- `src/components/catering/MenuItemReviewGrid.tsx` — Fixed pricing type and dietary tag value/label mismatches
+- `src/components/shared/Toast.tsx` — Raised z-index to 9999
+
+**Commits (Session 29):**
+```
+9647265 fix(menu-editor): fix "Failed to save item" on edit — strip undefined values
+6290db6 fix(smart-paste): fix 3 bugs breaking Parse Menu → Review → Publish flow
+eea37e8 fix(menu-editor): fix delete flow, add available field, raise toast z-index
+401d5f3 fix(menu-editor): fix broken toast notifications — showToast → addToast
+c160211 fix(menu-editor): add validation toast and inline errors for Add Item form
+4b30959 fix(catering): use import type for Vite 7 compatibility
+3ca460c feat(catering): add grocery templates, filter pills, and cross-browser fixes
+```
+
+**What's still in progress / not yet done:**
+- **Firebase deployment** — All code is committed and pushed to `main`. User needs to `git pull && npx vite build && firebase deploy --only hosting` from macOS terminal (Firebase auth not available in Cowork VM).
+- **Photo upload in Add Item** — Was reported broken in earlier context. The `compressImage()` → `base64` flow was fixed (removed redundant FileReader), but the upload-to-Firestore-Storage step may still need testing.
+- **Start from Template flow** — The TemplateSelector + filter pills are built and the Template → Review Grid → Publish pipeline uses the same code path as Smart Paste. Needs live testing on deployed site.
+- **Cross-browser testing** — CSS audit done and fixes applied, but no live testing on Safari/Firefox yet.
+
+**Important technical context for future sessions:**
+- **Aurora CSS variable inventory** — Only these are defined: `--aurora-bg`, `--aurora-surface`, `--aurora-surface-variant`, `--aurora-text`, `--aurora-text-secondary`, `--aurora-text-muted`, `--aurora-border`, `--aurora-border-glass`, `--aurora-success`, `--aurora-card-bg`, `--aurora-shadow-1` through `--aurora-shadow-4`, `--aurora-glass-*`. Do NOT use `--aurora-primary`, `--aurora-green`, `--aurora-bg-secondary`, `--aurora-text-primary`, `--aurora-accent` — they don't exist.
+- **ToastContext API** — The hook is `useToast()` which exposes `{ addToast, removeToast, toasts }`. Do NOT destructure `showToast` — it doesn't exist. Every other component in the codebase uses `addToast`.
+- **Firestore rejects `undefined`** — Always strip `undefined` values before passing to `addDoc()` or `updateDoc()`. Use `Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined))`.
+- **Vite 7 strict imports** — Type-only imports MUST use `import type { ... }` syntax or the build emits errors.
+- **ParsedMenuItem.price is in cents** — `3499` = $34.99. Display with `(price / 100).toFixed(2)`. SmartPasteInput parses with `Math.round(parseFloat * 100)`.
+- **Dietary tags use snake_case** — `'gluten_free'`, `'dairy_free'`, `'nut_free'` — NOT display names like `'Gluten-Free'`.
+- **Category uses Title Case** — `'Appetizer'`, `'Entree'`, `'Side'`, `'Dessert'`, `'Beverage'`, `'Package'` — NOT lowercase.
+- **CateringMenuItem.archived** — Field name is `archived`, NOT `isArchived`.
+
+<!-- END Session 29 -->
+
+### Session 30 (April 10, 2026) — Multi-Business Architecture + Add Business Flow Fixes + QA Audit + UI Flicker Fix
+
+**Context:** User wanted to support multi-business owners with a global navigation component, fix the business registration page (invisible button, non-responsive wizard), add "Add Another Business" from Settings, and then conduct a full Senior QA Analyst audit of the entire flow.
+
+**What was built / worked on:**
+
+1. **Multi-Business Switcher Architecture**
+   - Created `BusinessSwitcherContext.tsx` — real-time Firestore `onSnapshot` listener for all businesses where `ownerId === user.uid`. Uses `localStorage` persistence for selected business. Exports `useBusinessSwitcher()` with `{ businesses, selectedBusiness, selectBusiness, loading, isMultiBusiness }`.
+   - Created `BusinessSwitcher.tsx` — dropdown component in `AppHeader.tsx`. Compact pill for single-business owners, expandable dropdown for multi-business. "Add Business" button navigates to `/business?action=add`.
+   - Added `BusinessSwitcherProvider` wrapper in `App.tsx` inside `AuthProvider`.
+   - Added route `/vendor/:businessId/*` in `App.tsx` pointing to `CateringPage`.
+   - Modified `catering.tsx` to resolve business from context via `useMemo` instead of direct Firestore query.
+
+2. **Business Registration Page Fixes**
+   - Fixed invisible "Browse Businesses" button — `var(--aurora-accent)` doesn't exist, background was transparent with white text. Fixed with hardcoded `#6366F1`.
+   - Fixed `var(--aurora-text-primary)` → `var(--aurora-text, #1a1a2e)` fallback.
+   - Registration wizard is gated on `business_signup_enabled` feature flag (default: `false`) — not a bug. Added better messaging and alternative paths for existing vendors.
+
+3. **Add Another Business Flow (Settings Entry Point)**
+   - Added "My Businesses" section to `settings.tsx` with business cards, Switch/Dashboard buttons, and "Add Another Business" CTA navigating to `/business?action=add`.
+   - Added deep-link handler in `business.tsx` — `?action=add` waits for `!state.loading`, then calls `handleOpenCreateModal()`.
+   - Fixed variable ordering bug: `canAddBusiness` referenced `ownedBusinesses` before it was defined.
+
+4. **UX Audit — 6 Bugs Found and Fixed**
+   - **Permission gate too restrictive** — `handleOpenCreateModal` required `accountType === 'business'` but existing owners could have `accountType: 'user'`. Added `userOwnsBusinesses` check.
+   - **Missing success toast** — Modal closed silently after addDoc. Added toast before RESET_CREATE_FORM.
+   - **TIN modal dead-end** — `window.location.href = '/profile'` caused full SPA reload. Fixed with React Router `navigate` via `onNavigate` prop.
+   - **Description not validated** — Added to required fields in `businessValidation.ts`.
+   - **canAddBusiness too restrictive** — FAB hidden for existing owners. Added `ownedBusinesses.length > 0`.
+   - **Deep-link race condition** — 300ms `setTimeout` was fragile. Fixed by waiting for `!state.loading`.
+
+5. **QA Test Execution (48 Test Cases)**
+   - Conducted comprehensive Senior QA Analyst audit of the "Add Second Business" flow.
+   - 48 test cases across 10 categories: Entry Points (3 sources), Form Validation, State Management, Submission/Feedback, Photo Upload, Accessibility, Cross-Browser, Edge Cases.
+   - Generated professional QA Test Execution Report as `.docx` (validated).
+   - **4 additional bugs found and fixed during QA:**
+     - **BUG-001 (High):** `OPEN_CREATE_MODAL` didn't reset `formData` — stale data persisted on reopen. Fixed by resetting formData, formPhotos, coverPhotoIndex, formErrors in the reducer.
+     - **BUG-002 (Medium):** Category silently defaulted to `CATEGORIES[0]` ('Arts & Entertainment'). Changed default to `''`, added `<option value="" disabled>Select a category…</option>` placeholder, added error display + clear-on-change.
+     - **BUG-003 (Medium):** `yearEstablished` — `parseInt('')` returns NaN, written to Firestore. Added empty-string guard + `|| ''` fallback, changed initial state from `new Date().getFullYear()` to `''`.
+     - **BUG-004 (Low):** Partial lat/lng silently dropped. Added cross-field validation: warns if only one coordinate provided. Wired error display to lat/lng FormInputs.
+
+6. **UI Flicker Elimination**
+   - **Root cause:** Navigating to `/business?action=add` rendered the full business listing (search bar, category filters, skeleton cards → business cards) while Firestore loaded, THEN the useEffect opened the create modal — causing a visible flash.
+   - **Fix:** Added `addModeActive` state initialized synchronously from URL param on first render. When active, a full-screen overlay (indigo spinner + "Preparing your new business…") covers the page at `z-50`. Overlay dismisses seamlessly when the create modal opens, or gracefully if a permission gate rejects.
+   - Responsive: `fixed inset-0` + `flex items-center justify-center` works on all viewports.
+
+**Decisions made and why:**
+- **Top bar dropdown (not sidebar or bottom nav)** — chosen for business switcher because it's always accessible, doesn't steal vertical space on mobile, and matches common multi-account patterns (Gmail, Slack).
+- **Route-based vendor dashboard** — `/vendor/:businessId/*` rather than query params, enabling deep-linking and browser history integration.
+- **Removed `registrationStatus === 'approved'` filter from BusinessSwitcherContext** — legacy businesses lack this field. Simpler to show all businesses owned by the user.
+- **Added `registrationStatus: 'approved'` to quick-add** — new businesses created via the create modal get this field so they're fully functional immediately (unlike wizard businesses that go through admin review).
+- **URL-based add mode overlay** — chosen over pre-opening modal or rendering modal before data loads because `handleOpenCreateModal` has permission gates that depend on `state.businesses` being loaded. The overlay provides a smooth visual bridge without bypassing security checks.
+- **Color palette unchanged** — primary accent `#6366F1` (indigo-500), all inline styles use hardcoded hex to avoid non-existent CSS variable failures.
+
+**Files created in Session 30:**
+- `src/contexts/BusinessSwitcherContext.tsx` — multi-business real-time context
+- `src/components/layout/BusinessSwitcher.tsx` — dropdown switcher component
+- `QA_Test_Execution_Report_Add_Business.docx` — professional QA report (48 tests, 6 bugs)
+
+**Files modified in Session 30:**
+- `src/App.tsx` — BusinessSwitcherProvider wrapper + `/vendor/:businessId/*` route
+- `src/components/layout/AppHeader.tsx` — BusinessSwitcher component added
+- `src/pages/catering.tsx` — context-driven business resolution replacing direct Firestore query
+- `src/pages/business.tsx` — `?action=add` deep-link, canAddBusiness fix, variable ordering, add-mode overlay for flicker elimination
+- `src/pages/settings.tsx` — My Businesses section with Switch/Dashboard/Add Another Business
+- `src/pages/business/register.tsx` — invisible button fix, CSS var fixes, existing vendor messaging
+- `src/hooks/useBusinessData.ts` — permission gate fix (userOwnsBusinesses), success toast, registrationStatus on addDoc
+- `src/reducers/businessReducer.ts` — OPEN_CREATE_MODAL full reset, category default `''`, yearEstablished default `''`
+- `src/components/business/BusinessCreateModal.tsx` — category placeholder, category error display, lat/lng error display, yearEstablished NaN guard + placeholder
+- `src/components/business/businessValidation.ts` — description required, cross-field lat/lng validation
+- `src/components/business/BusinessModals.tsx` — TIN modal `onNavigate` prop (React Router instead of `window.location.href`)
+
+**Commits (Session 30):**
+```
+b2f66f7 fix(add-business): eliminate UI flickering on Add Another Business transition
+2218b12 fix(add-business): fix 4 QA bugs in create business modal
+d5172c5 fix(add-business): fix 6 UX bugs in the add-business flow
+47b9a6f fix(registration): fix invisible Browse Businesses button, wire up Add Business flow
+3a89b69 feat(multi-business): add business switcher for multi-business owners
+ae638f7 feat(quotes): clickable reminder pills, snooze, date-based titles
+```
+
+**Important technical context added in Session 30:**
+- **`useBusinessSwitcher()` API** — `{ businesses, selectedBusiness, selectBusiness, loading, isMultiBusiness }`. The `selectBusiness(id)` updates localStorage + context. `onSnapshot` auto-syncs new businesses.
+- **Business form initial state** — category defaults to `''` (not `CATEGORIES[0]`), yearEstablished defaults to `''` (not `new Date().getFullYear()`). Both were changed to prevent silent bad data.
+- **`OPEN_CREATE_MODAL` resets everything** — formData, formPhotos, coverPhotoIndex, formErrors all reset to initial state. No more stale data on reopen.
+- **Add-mode overlay pattern** — `useState(() => searchParams.get('action') === 'add')` initializes synchronously. Second useEffect clears when `state.showCreateModal` becomes true or when the gate rejects.
+- **`handleOpenCreateModal` permission gates (3 gates)**: (1) must be business account, admin, or already own a business; (2) registered businesses need TIN validation; (3) unregistered accounts need admin approval. All skip for admins.
+- **2 open low-priority bugs** — no duplicate business name detection (BUG-005), no network error retry mechanism (BUG-006). Recommended for future sprint.
+
+<!-- END Session 30 -->
+
+**Commits (Session 28 + 28b):**
+```
+bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules
 1feda2a fix(catering): Finalize button now uses assignedCount instead of request status
 (hash) fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders
 ```
-
-### Session 28c (April 6, 2026) — Fix Finalize Bug + Auto-Finalize + Vendor Finalize Pending Indicator
-
-**Context:** Continuation of Session 28b. The "Finalize & Create Orders" button was silently failing — no orders were being created when the customer submitted the address form. Three approved feature requests were implemented.
-
-**Root cause of finalize bug:**
-The address form submit handler in `QuoteComparison.tsx` captured the `quoteRequest` prop via closure at render time. When `finalizeQuoteRequest()` was called first (changing the quote status to 'accepted'), the Firestore real-time subscription fired and the parent re-rendered the component with new props. However, the `createOrdersFromQuote()` call used the OLD closure's `quoteRequest` — which may have had stale or incomplete `itemAssignments` data depending on timing. The function was either silently returning empty results or throwing without visible error feedback.
-
-**Fix implemented:**
-1. **Re-fetch fresh data from Firestore** — Before calling `createOrdersFromQuote()`, the handler now does `getDoc(doc(db, 'cateringQuoteRequests', quoteRequest.id))` to get the latest `itemAssignments` directly from the server, bypassing the stale closure issue.
-2. **Console logging added** — `console.log` for itemAssignments count, responses count, and created order IDs; `console.error` for any failures. This makes future debugging much easier.
-3. **ZIP code validation expanded** — Now accepts both US ZIP codes (`12345` or `12345-6789`) and Canadian postal codes (`A1A 1A1`). Previously rejected Canadian postal codes with "Invalid ZIP".
-
-**Auto-finalize feature:**
-When a customer accepts items and all items in the quote request become assigned (i.e., `allItemsAssigned` returns true from `acceptQuoteResponseItems`), the system now automatically:
-1. Calls `finalizeQuoteRequest()` to mark the quote as 'accepted'
-2. Opens the delivery address form immediately
-3. Customer fills address → orders are created in one step (no intermediate yellow "Finalize & Create Orders" banner)
-
-This eliminates the confusing two-step finalization gap where vendors saw "Accepted" quotes but no corresponding orders.
-
-**"Finalize Pending" / "Order Created" indicator on vendor's accepted quotes:**
-Added two conditional badges to the vendor's Accepted Quotes section in `VendorQuoteResponse.tsx`:
-- **"Awaiting Finalization"** (amber badge with Timer icon) — Shows when the quote request has NO `deliveryAddress` set (customer hasn't completed the address step yet)
-- **"Order Created"** (purple badge with Package icon) — Shows when the quote request HAS a `deliveryAddress` set (orders should exist)
-
-This gives vendors clear visibility into whether an accepted quote has been converted to an order.
-
-**Files modified in Session 28c:**
-- `src/components/catering/QuoteComparison.tsx` — Re-fetch fresh quoteRequest before creating orders; added console logging; fixed ZIP validation for Canadian postal codes; auto-finalize on all-items-assigned; imported `doc`, `getDoc` from firebase/firestore and `db` from services
-- `src/components/catering/VendorQuoteResponse.tsx` — Added "Awaiting Finalization" (amber) and "Order Created" (purple) badges to accepted quotes based on `deliveryAddress` presence
-- `src/services/catering/cateringTypes.ts` — Added `deliveryAddress?: DeliveryAddress` to `CateringQuoteRequest` interface
-
-**Decisions & rationale:**
-- **Why re-fetch from Firestore?** The closure-captured `quoteRequest` prop can be stale by the time `createOrdersFromQuote` runs (race between async handler and real-time subscription). Direct `getDoc` guarantees fresh data.
-- **Why auto-finalize?** The two-step flow (accept items → manually finalize) was confusing. Vendors saw "Accepted" quotes with no orders. Auto-finalization closes the gap when all items are assigned.
-- **Why `deliveryAddress` as the indicator?** It's the most reliable signal that the customer completed finalization. The `deliveryAddress` is written by `finalizeQuoteRequest()` only during the finalization step.
-- **Canadian postal codes:** The app targets diaspora communities including Canadian users. The previous US-only ZIP validation was a friction point during testing.
-
----
-
-### Session 29 (April 7, 2026) — Fix Duplicate Orders + Messaging Fix + Read Receipts + 48hr Window + Cross-Browser Audit
-
-**Context:** Continuation from Session 28c. Multiple bugs reported by user during live testing, plus new feature requests for messaging UX. Then a full cross-browser compatibility audit and patch.
-
-**Bug 1 — Duplicate order creation:**
-`ordersCreated` was React local state only — reset on page refresh, allowing the customer to click "Finalize & Create Orders" multiple times and generate duplicate orders for the vendor.
-
-**Fix:** Added a server-side guard in `createOrdersFromQuote()` (cateringOrders.ts) — queries Firestore for existing orders with the same `quoteRequestId` BEFORE creating new ones. If found, returns existing order IDs instead. Also added a `useEffect` on mount in `QuoteComparison.tsx` that checks for existing orders and sets `ordersCreated = true` to disable the button at the UI layer too.
-
-**Bug 2 — Customer messages not seen by vendor:**
-The old `MessageVendorButton` component called `findOrCreateConversation(user.uid, businessId)`, creating a conversation with participants `[customer_uid, businessId]`. But `businessId` is NOT a user UID — it's a Firestore document ID from the `businesses` collection. The vendor's UID is different. Result: vendor could never find this conversation.
-
-**Bug 3 — Vendor "could not start a conversation" error:**
-The vendor's "Message Customer" button called `findOrCreateConversation(order.customerId, user.uid)`, creating a DIFFERENT conversation than what the customer created. They were messaging into parallel, non-overlapping conversations.
-
-**Fix for Bugs 2 & 3:** Removed ALL `findOrCreateConversation`-based messaging from both `CateringOrderStatus.tsx` and `VendorCateringDashboard.tsx`. The inline `OrderMessages` component (which uses the `cateringOrders/{orderId}/notes` subcollection) was already present and working correctly — it just needed the broken alternative buttons removed. Both customer and vendor now use the same OrderMessages panel, reading/writing the same Firestore subcollection.
-
-**Files modified:**
-- `src/components/catering/CateringOrderStatus.tsx` — Removed broken `MessageVendorButton`, `InlineMessagingModal`, `findOrCreateConversation` import, `messagingOrderId` state. Updated `formatTimestamp()` for cross-browser safety (handles Firestore Timestamps, `{seconds}` objects, numbers, strings, with `Number.isNaN` guard). Added `orderStatus` and `deliveredAt` props to OrderMessages.
-- `src/components/catering/VendorCateringDashboard.tsx` — Removed BOTH "Message Customer" buttons (active ~line 1278, completed ~line 1598), removed inline messaging modal, removed `findOrCreateConversation` import, removed `messagingOrderId`/`messageText`/`sendingMessage` state variables. Added `orderStatus` and `deliveredAt` props to OrderMessages in pending and active sections. **Added OrderMessages to Completed Orders section** (was entirely missing — delivered orders had no messaging at all).
-- `src/components/catering/OrderMessages.tsx` — Full rewrite with: read receipts (single gray ✓ = sent, double blue ✓✓ = read), red unread count badge, auto-mark-as-read on panel expand, 48hr post-delivery messaging window with countdown banner and locked state. Full cross-browser overhaul (see below).
-- `src/services/catering/cateringOrders.ts` — Added `markOrderNotesRead()` function, duplicate order prevention query in `createOrdersFromQuote()`, fixed all 5 sort comparisons that mixed milliseconds/seconds.
-- `src/services/catering/cateringTypes.ts` — Added `readBy?: string[]` and `readAt?: any` to `OrderNote` interface.
-- `src/services/catering/index.ts` — Added `markOrderNotesRead` to exports.
-- `firestore.rules` — Changed notes subcollection `allow update` from `false` to allow authenticated users (non-sender) to update notes (needed for read receipts `readBy` array).
-
-**Feature: Read receipts:**
-- Single gray check (✓) = message sent
-- Double blue check (✓✓) = message read by the other party
-- Implemented via `readBy` array field on each OrderNote document in Firestore
-- Auto-mark-as-read when the panel is expanded via `useEffect` calling `markOrderNotesRead()`
-- Red unread count badge on collapsed Messages header
-
-**Feature: 48hr post-delivery messaging window:**
-- Calculated from `statusHistory` entry where `status === 'delivered'`
-- Shows countdown banner: "Messaging available for Xh Ym after delivery"
-- After 48 hours: input replaced with lock icon + "Messaging closed — 48-hour window after delivery has passed"
-- Existing messages remain visible (read-only) after expiry
-
-**Cross-browser compatibility audit (11 fixes):**
-1. **Safari 14 flexbox `gap`** — Replaced Tailwind `gap-*` and `space-y-*` classes with inline `style={{ gap }}` and `marginTop`. CSS `gap` in flex containers requires Safari 14.1+; build target is Safari 14.
-2. **iOS Safari scroll inertia** — Added `WebkitOverflowScrolling: 'touch'` on message scroll container for smooth momentum scrolling on older iOS.
-3. **Overscroll containment** — Added `overscrollBehavior: 'contain'` to prevent parent page scrolling when scrolling within the messages area.
-4. **iOS Safari input styling** — Added `WebkitAppearance: 'none'` and `appearance: 'none'` on text input to remove default rounded corners and inner shadow.
-5. **Touch targets** — Increased send button from 40×40px to 44×44px to meet Apple Human Interface Guidelines minimum.
-6. **iOS tap flash** — Added `WebkitTapHighlightColor: 'transparent'` on send button.
-7. **Long-word overflow** — Added `wordBreak: 'break-word'` and `overflowWrap: 'break-word'` on message bubbles to prevent horizontal overflow.
-8. **Timestamp parsing** — Extracted `toEpochMs()` helper that safely handles Firestore Timestamps (`toMillis()`), `{seconds}` objects, epoch numbers, `Date` instances, and ISO-8601 strings (Android WebView edge case).
-9. **Date comparison** — Replaced `toDateString()` (locale-dependent) with `isSameDay()` that compares year/month/day numerically.
-10. **Auto-scroll consistency** — Wrapped `scrollTop = scrollHeight` in `requestAnimationFrame()` to ensure DOM has painted before scrolling (fixes Firefox/Safari race).
-11. **Timestamp sort bug** — Fixed all 5 sort comparisons in `cateringOrders.ts` that mixed `toMillis()` (milliseconds) with `.seconds` (raw seconds). Now consistently normalizes to milliseconds with `seconds * 1000`.
-
-**Live testing confirmed:**
-- Vendor sent "Hi, this is a test message from the vendor" via inline Messages panel on live site → message appeared in Sai Kumar's customer account ✅
-- Read receipt (single check) visible on vendor side ✅
-- New code deployed and verified (inline Messages accordion present, old "Message Customer" button gone) ✅
-
-**Decisions & rationale:**
-- **Why remove findOrCreateConversation entirely?** It was fundamentally broken — it used `businessId` (a document ID) as a participant, not the vendor's user UID. Even if fixed, having two separate messaging systems (conversations collection vs order notes subcollection) would create confusion. OrderMessages using the `notes` subcollection is the correct approach: messages are scoped to a specific order, both parties share the same data path.
-- **Why 48 hours?** Balances customer need to give post-delivery feedback/reviews with vendor desire to not receive messages indefinitely. Standard in food delivery apps.
-- **Why inline styles instead of Tailwind for gap?** Tailwind compiles `gap-*` to the `gap` CSS property, which Safari 14.0 doesn't support in flex containers. Inline `style={{ gap }}` with margin fallbacks ensures graceful degradation.
-- **Why `requestAnimationFrame` for scroll?** Direct `scrollTop = scrollHeight` assignment can fire before the browser has painted new DOM nodes, causing the scroll to stop one message short. `rAF` guarantees the paint has completed.
-
-**Commits:**
-- `74a8d4d` — fix(catering): cross-browser compat for messaging + add Messages to delivered orders
-- `73d9b1f` — feat(catering): read receipts, 48hr post-delivery messaging, dedup orders, fix messaging
-- `566cfa0` — fix(catering): prevent duplicate orders, fix messaging with read receipts, finalize bug fix
-- `c64dde5` — fix(catering): prevent duplicate orders, fix messaging to use OrderNotes, finalize bug fix
-- `a2acae3` — fix(catering): finalize bug fix — fallback assignments, auto-finalize, vendor indicator, Canadian ZIP
 
 ---
 
@@ -1780,10 +1857,15 @@ The vendor's "Message Customer" button called `findOrCreateConversation(order.cu
 - **Live Testing Quote-to-Order Pipeline:** ✅ COMPLETE (Session 28b) — full end-to-end test on deployed site: Confirmed→Preparing→Ready→Out for Delivery→Delivered all working for rfpOrigin orders
 - **19 Pre-existing TypeScript Errors Fixed:** ✅ COMPLETE (Session 28b) — Vite env var, missing type fields, wrong field names, missing imports, loose string types
 - **RFP Badge on Active/Pending Orders:** ✅ COMPLETE (Session 28b) — purple RFP tag now shows on all vendor order sections (was missing from active/pending)
-- **Finalize Bug Fix:** ✅ COMPLETE (Session 28c) — re-fetch fresh quoteRequest from Firestore before order creation, added console logging, expanded ZIP validation for Canadian postal codes
-- **Auto-Finalize on All Items Assigned:** ✅ COMPLETE (Session 28c) — when customer accepts all items, quote is auto-finalized and address form opens immediately (no intermediate yellow banner)
-- **Vendor Finalize Pending Indicator:** ✅ COMPLETE (Session 28c) — "Awaiting Finalization" amber badge + "Order Created" purple badge on vendor's accepted quotes
-- **Session 28c changes uncommitted** — need to commit, push, and deploy
+- **Vendor Storefront Builder — Grocery Templates:** ✅ COMPLETE (Session 29) — 5 grocery templates (35 items), `MenuTemplateType` type system, filter pills (All/Catering/Grocery) in TemplateSelector
+- **Vendor Storefront Builder — TemplateSelector Rebuild:** ✅ COMPLETE (Session 29) — complete rewrite with active state highlighting, type badges, grocery icons, responsive grid, cross-browser safe inline styles
+- **Vendor Storefront Builder — 10 Critical Bug Fixes:** ✅ COMPLETE (Session 29) — toast system (`showToast` → `addToast`), delete flow, `available: true`, z-index, Smart Paste `onClose` race condition, Review Grid pricing type/dietary tag mismatches, `updateMenuItem` undefined stripping, CSS variable fixes, Vite 7 import type, validation UX
+- **Multi-Business Switcher Architecture:** ✅ COMPLETE (Session 30) — BusinessSwitcherContext with real-time onSnapshot, BusinessSwitcher dropdown in AppHeader, /vendor/:businessId/* routing, context-driven business resolution in catering page
+- **Business Registration Page Fixes:** ✅ COMPLETE (Session 30) — invisible Browse Businesses button (hardcoded #6366F1), CSS var fallbacks, existing vendor messaging
+- **Add Another Business Flow:** ✅ COMPLETE (Session 30) — Settings entry point (My Businesses section), BusinessSwitcher entry point, deep-link handler (?action=add), 6 UX bugs fixed (permission gate, success toast, TIN modal routing, description validation, canAddBusiness, race condition)
+- **QA Audit — Add Second Business (48 tests):** ✅ COMPLETE (Session 30) — professional QA Test Execution Report generated, 4 additional bugs found and fixed (stale form, category default, yearEstablished NaN, partial lat/lng)
+- **UI Flicker Elimination:** ✅ COMPLETE (Session 30) — add-mode overlay with synchronous URL detection, smooth transition from all 3 entry points (FAB, Settings, Switcher)
+- **All changes committed** — 6 commits on `main`. Needs `git push origin main` + `firebase deploy --only hosting` from macOS
 
 **New files created in Sessions 23-24:**
 - `src/components/catering/CateringOrderStatus.tsx` — Customer order tracking with visual timeline
@@ -1838,10 +1920,10 @@ The vendor's "Message Customer" button called `findOrCreateConversation(order.cu
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — Push and Deploy Session 29
-- **Session 29 committed locally** (`74a8d4d`) — needs `git push && npx firebase deploy --only hosting` to go live.
-- **All Session 28/28b/28c changes are committed and pushed** — site is deployed and live at `https://mithr-1e5f4.web.app`.
-- **Messaging end-to-end verified on live site** — vendor sent message → customer saw it ✅. Read receipts working ✅.
+### Immediate — Committed, Needs Push + Deploy
+- **Session 30 changes committed (6 commits)** — multi-business architecture, registration fixes, add-business UX fixes, QA bug fixes, UI flicker fix. Run from macOS: `git push origin main && firebase deploy --only hosting`.
+- **2 open low-priority QA bugs** — (1) no duplicate business name detection, (2) no network error retry on addDoc failure. Recommended for next sprint.
+- **RFP-to-Order flow fully tested and working** — confirmed end-to-end on live site (Session 28b).
 - **Replace `PENDING_VAPID_KEY`** in push notification useEffect (`src/pages/main/messages.tsx` line ~2580) with real VAPID key from Firebase Console > Project Settings > Cloud Messaging — this is the ONLY remaining blocker for push notifications.
 - **Cloud Functions deployed** — `transcribeVoiceMessage`, `sendNewMessageNotification`, and `processRecurringCateringOrders` (daily 6 AM PT) are on Cloud Run.
 
@@ -2101,13 +2183,20 @@ git add <files> && git commit -m "message" && git push origin main
 
 ### Recent Commit History
 ```
-74a8d4d fix(catering): cross-browser compat for messaging + add Messages to delivered orders (Session 29)
-73d9b1f feat(catering): read receipts, 48hr post-delivery messaging, dedup orders, fix messaging (Session 29)
-566cfa0 fix(catering): prevent duplicate orders, fix messaging with read receipts, finalize bug fix (Session 29)
-c64dde5 fix(catering): prevent duplicate orders, fix messaging to use OrderNotes, finalize bug fix (Session 29)
-a2acae3 fix(catering): finalize bug fix — fallback assignments, auto-finalize, vendor indicator, Canadian ZIP (Session 28c)
-5e50754 fix(catering): finalize bug fix, auto-finalize, vendor pending indicator, Canadian ZIP support (Session 28c)
-(prior) fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders (Session 28b)
+(latest) b2f66f7 fix(add-business): eliminate UI flickering on Add Another Business transition (Session 30)
+2218b12 fix(add-business): fix 4 QA bugs in create business modal (Session 30)
+d5172c5 fix(add-business): fix 6 UX bugs in the add-business flow (Session 30)
+47b9a6f fix(registration): fix invisible Browse Businesses button, wire up Add Business flow (Session 30)
+3a89b69 feat(multi-business): add business switcher for multi-business owners (Session 30)
+ae638f7 feat(quotes): clickable reminder pills, snooze, date-based titles (Session 30)
+9647265 fix(menu-editor): fix "Failed to save item" on edit — strip undefined values (Session 29)
+6290db6 fix(smart-paste): fix 3 bugs breaking Parse Menu → Review → Publish flow (Session 29)
+eea37e8 fix(menu-editor): fix delete flow, add available field, raise toast z-index (Session 29)
+401d5f3 fix(menu-editor): fix broken toast notifications — showToast → addToast (Session 29)
+c160211 fix(menu-editor): add validation toast and inline errors for Add Item form (Session 29)
+4b30959 fix(catering): use import type for Vite 7 compatibility (Session 29)
+3ca460c feat(catering): add grocery templates, filter pills, and cross-browser fixes (Session 29)
+fix(catering): resolve 19 TypeScript errors and add RFP badge to active orders (Session 28b)
 1feda2a fix(catering): Finalize button now uses assignedCount instead of request status (Session 28)
 bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules (Session 28)
 222be4a fix(catering): cart drawer items not scrollable on mobile (Session 27)
@@ -2182,6 +2271,7 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   2. At the end of the session, update this file AND create a new docs/handoff/SESSION_XX.md
   3. The session file should include inline comments explaining WHY, not just WHAT
   4. Update the session list in the header comment and the "Session history" field
+  Last updated: Session 30 (April 10, 2026)
 -->
 
-*Updated April 7, 2026 (Session 29) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). Catering UI Phases 1-3 (20 items) + QA Audit (21 bugs found) + All Bug Fixes Verified + Cart Scroll Fix ALL COMPLETE (Session 27). RFP-to-Order Conversion + In-Order Messaging + Firestore rules fix ALL COMPLETE (Session 28). Live testing of quote-to-order pipeline VERIFIED end-to-end + 19 TypeScript errors fixed + RFP badge added ALL COMPLETE (Session 28b). Finalize bug fix + auto-finalize + vendor indicators + Canadian ZIP ALL COMPLETE (Session 28c). Duplicate order prevention + messaging fix (removed broken findOrCreateConversation) + read receipts + 48hr post-delivery messaging window + full cross-browser compatibility audit (11 fixes for Safari 14, iOS Safari, Android Chrome, Firefox) + Messages added to delivered orders on vendor side ALL COMPLETE (Session 29). Session 29 committed locally (74a8d4d) — needs git push + firebase deploy. Messaging verified end-to-end on live site. Site live at https://mithr-1e5f4.web.app. Next: (1) push + deploy Session 29, (2) Phase 7 improvements from UX audit (loading skeletons, cart persistence, order cancellation), (3) sort/filter controls on item list, (4) RFQ expiration dates. Long-term roadmap: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine, expand RFP/quote system to other business types, server-side analytics aggregation for high-volume vendors.*
+*Updated April 10, 2026 (Session 30) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phase 1 (Place Order) + Phase 2 (RFP) COMPLETE (Session 22). Catering Phase 3 (Vendor Dashboard) + Phase 4 (Order Tracking) + Phase 5 (Reviews) + Phase 6 (Favorites, Recurring, Templates) COMPLETE (Session 23). UX Audit + 4 Critical Fixes COMPLETE (Session 24). Catering Medium Effort (#13-14, #17-22) + Architecture Refactor (#27-28: domain module split + optimistic updates) + Large Effort Features (#29-36: template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention) + Templates nav fix ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit: ALL 30 findings (SB-18 through SB-47) implemented across 4 priority tiers with 4 commits ALL COMPLETE (Session 26). Catering UI Phases 1-3 (20 items) + QA Audit (21 bugs found) + All Bug Fixes Verified + Cart Scroll Fix ALL COMPLETE (Session 27). RFP-to-Order Conversion + In-Order Messaging + Firestore rules fix ALL COMPLETE (Session 28). Live testing of quote-to-order pipeline VERIFIED end-to-end + 19 TypeScript errors fixed + RFP badge ALL COMPLETE (Session 28b). Vendor Storefront Builder: grocery templates (5 templates, 35 items) + TemplateSelector rebuild with filter pills + 10 critical bug fixes ALL COMPLETE (Session 29). Multi-Business Architecture: BusinessSwitcherContext (real-time onSnapshot) + BusinessSwitcher dropdown + /vendor/:businessId/* routing + Business Registration page fixes + Add Another Business from Settings + 6 UX bugs fixed + Senior QA Audit (48 tests, professional report) + 4 additional QA bugs fixed (stale form, category default, yearEstablished NaN, partial lat/lng) + UI flicker elimination on Add Another Business transition ALL COMPLETE (Session 30). ALL COMMITTED — needs `git push origin main` + `firebase deploy --only hosting` from macOS. Critical context for future sessions: ToastContext exposes `addToast` NOT `showToast`; Firestore rejects `undefined` values — always strip them; aurora CSS vars that DON'T exist: --aurora-primary, --aurora-green, --aurora-bg-secondary, --aurora-text-primary, --aurora-accent; useBusinessSwitcher() API: { businesses, selectedBusiness, selectBusiness, loading, isMultiBusiness }; OPEN_CREATE_MODAL now fully resets form (formData, photos, errors); business form category defaults to '' (not CATEGORIES[0]), yearEstablished defaults to '' (not current year); handleOpenCreateModal has 3 permission gates (business account/admin/owner, TIN validation, admin approval); dietary tags use snake_case ('gluten_free' not 'Gluten-Free'); categories use Title Case ('Appetizer' not 'appetizer'); field is `archived` not `isArchived`; ParsedMenuItem.price is in cents. Design tokens: primary accent #6366F1 (indigo-500), grocery badge amber #FEF3C7/#92400E, error red #EF4444, success green #22c55e. 2 open low-priority bugs: no duplicate business name detection, no network error retry. Next: (1) push + deploy to Firebase, (2) live test multi-business switcher + add business flow, (3) Phase 7 UX improvements (loading skeletons, cart persistence, order cancellation), (4) sort/filter controls on item list. Long-term: payment integration (Stripe/Square), multi-vendor cart, driver tracking, recommendation engine.*
