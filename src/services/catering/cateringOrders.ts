@@ -428,6 +428,10 @@ export async function respondToModification(
 }
 
 // ── Vendor payment info (#13) ──
+// NOTE: Payment setup is OPTIONAL. Vendors can accept and manage orders without
+// payment info configured — the system never hard-locks acceptance. Customers
+// simply won't see a "Pay" button if no payment info exists (see PaymentInfoSection
+// in CateringOrderStatus.tsx, which returns null when all fields are empty).
 
 export async function updateBusinessPaymentInfo(
   businessId: string,
@@ -437,20 +441,58 @@ export async function updateBusinessPaymentInfo(
     paymentUrl: payment.paymentUrl || '',
     paymentMethod: payment.paymentMethod || '',
     paymentNote: payment.paymentNote || '',
+    // Saving payment info implicitly clears any "remind me later" deferral.
+    paymentSetupSkippedUntil: null,
   });
 }
 
 export async function getBusinessPaymentInfo(
   businessId: string,
-): Promise<{ paymentUrl?: string; paymentMethod?: string; paymentNote?: string }> {
+): Promise<{
+  paymentUrl?: string;
+  paymentMethod?: string;
+  paymentNote?: string;
+  paymentSetupSkippedUntil?: number | null;
+}> {
   const snap = await getDoc(doc(db, 'businesses', businessId));
   if (!snap.exists()) return {};
   const data = snap.data();
+  // paymentSetupSkippedUntil is stored as a Firestore Timestamp. Convert to
+  // epoch millis so cross-browser Date comparisons work without Firestore types
+  // leaking into UI code. Chrome/Safari/Firefox/iOS/Android all handle number OK.
+  let skippedUntil: number | null = null;
+  const raw = data.paymentSetupSkippedUntil;
+  if (raw) {
+    if (typeof raw?.toMillis === 'function') skippedUntil = raw.toMillis();
+    else if (typeof raw === 'number') skippedUntil = raw;
+    else if (raw instanceof Date) skippedUntil = raw.getTime();
+  }
   return {
     paymentUrl: data.paymentUrl,
     paymentMethod: data.paymentMethod,
     paymentNote: data.paymentNote,
+    paymentSetupSkippedUntil: skippedUntil,
   };
+}
+
+/**
+ * Defer payment setup. Stores a future timestamp on the business doc; the
+ * dashboard reminder banner stays hidden until that timestamp passes.
+ * Pass `null` to clear the deferral immediately.
+ */
+export async function deferPaymentSetup(
+  businessId: string,
+  days: number | null,
+): Promise<void> {
+  let until: Timestamp | null = null;
+  if (days !== null && days > 0) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    until = Timestamp.fromDate(d);
+  }
+  await updateDoc(doc(db, 'businesses', businessId), {
+    paymentSetupSkippedUntil: until,
+  });
 }
 
 // ── Payment status tracking (H-05) ──

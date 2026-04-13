@@ -66,6 +66,7 @@ export {
   vendorModifyOrder,
   updateBusinessPaymentInfo,
   getBusinessPaymentInfo,
+  deferPaymentSetup,
   updateOrderPaymentStatus,
   findOrCreateConversation,
   createOrdersFromQuote,

@@ -9,7 +9,7 @@ import {
   Package, Clock, CheckCircle2, XCircle, ChevronDown, ChevronUp,
   User, MapPin, Phone, Calendar, Users, Loader2, AlertCircle, Truck, Ban,
   Square, CheckSquare, Pencil, CreditCard, ExternalLink, Save, X, Bell,
-  MessageSquare, Volume2, VolumeX, BellRing, Timer,
+  MessageSquare, Volume2, VolumeX, BellRing, Timer, Clock3,
 } from 'lucide-react';
 import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import {
@@ -20,6 +20,7 @@ import {
   vendorModifyOrder,
   updateBusinessPaymentInfo,
   getBusinessPaymentInfo,
+  deferPaymentSetup,
   formatPrice,
   calculateOrderTotal,
   // findOrCreateConversation removed — messaging now uses OrderNotes
@@ -381,30 +382,72 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
   };
 
   // ── Payment settings state (#13) ──
+  // Payment setup is OPTIONAL. Vendors can accept & manage orders without it.
+  // A vendor who isn't ready can defer with "Remind me later" — the banner hides
+  // until the deferral expires. Saving valid payment info clears the deferral.
   const [showPaymentSettings, setShowPaymentSettings] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentSkippedUntil, setPaymentSkippedUntil] = useState<number | null>(null);
+  const [paymentDeferring, setPaymentDeferring] = useState(false);
 
   useEffect(() => {
     getBusinessPaymentInfo(businessId).then(info => {
       setPaymentUrl(info.paymentUrl || '');
       setPaymentMethod(info.paymentMethod || '');
       setPaymentNote(info.paymentNote || '');
+      setPaymentSkippedUntil(info.paymentSetupSkippedUntil ?? null);
     }).catch(() => {});
   }, [businessId]);
+
+  // Derived: does the vendor have any payment info configured at all?
+  const hasPaymentInfo = !!(paymentUrl?.trim() || paymentMethod?.trim() || paymentNote?.trim());
+
+  // Derived: should we show the "set up payment" reminder banner? Hide when
+  // info is already saved OR when the vendor deferred and the deadline hasn't
+  // passed yet. Uses epoch millis → works identically on every browser.
+  const now = Date.now();
+  const paymentReminderHidden = paymentSkippedUntil !== null && paymentSkippedUntil > now;
+  const showPaymentReminder = !hasPaymentInfo && !paymentReminderHidden && !showPaymentSettings;
 
   const handleSavePayment = async () => {
     setPaymentSaving(true);
     try {
       await updateBusinessPaymentInfo(businessId, { paymentUrl, paymentMethod, paymentNote });
+      setPaymentSkippedUntil(null); // saving implicitly clears deferral
       addToast('Payment info saved', 'success');
       setShowPaymentSettings(false);
     } catch (err: any) {
       addToast(err.message || 'Failed to save', 'error');
     } finally {
       setPaymentSaving(false);
+    }
+  };
+
+  const handleDeferPayment = async (days: number) => {
+    setPaymentDeferring(true);
+    try {
+      await deferPaymentSetup(businessId, days);
+      const until = Date.now() + days * 24 * 60 * 60 * 1000;
+      setPaymentSkippedUntil(until);
+      addToast(`Reminder set — we'll nudge you in ${days} day${days === 1 ? '' : 's'}.`, 'info');
+      setShowPaymentSettings(false);
+    } catch (err: any) {
+      addToast(err.message || 'Failed to set reminder', 'error');
+    } finally {
+      setPaymentDeferring(false);
+    }
+  };
+
+  // Format a skipped-until timestamp into a human-readable snooze date.
+  // Uses the browser's locale via Intl.DateTimeFormat (supported on all targets).
+  const formatSnoozeDate = (ms: number): string => {
+    try {
+      return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(ms));
+    } catch {
+      return new Date(ms).toDateString();
     }
   };
 
@@ -777,40 +820,235 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
         </button>
       </div>
 
+      {/* ── Payment setup reminder banner ─────────────────────────────── */}
+      {/* Shown when no payment info is saved AND the vendor hasn't deferred
+          past "now". Non-blocking — orders still come through regardless. */}
+      {showPaymentReminder && (
+        <div
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-xl border mb-4"
+          style={{
+            borderColor: '#FCD34D',
+            backgroundColor: '#FFFBEB',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <CreditCard size={18} style={{ color: '#B45309', flexShrink: 0, marginTop: 2 }} />
+            <div className="min-w-0">
+              <p className="text-sm font-medium" style={{ color: '#78350F' }}>
+                Add a payment link (optional)
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: '#92400E' }}>
+                Orders will still come through without it — set it up whenever you're ready.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 sm:flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowPaymentSettings(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-xs font-medium text-white transition-colors"
+              style={{
+                backgroundColor: '#6366F1',
+                minHeight: 40,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Set up now
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDeferPayment(7)}
+              disabled={paymentDeferring}
+              className="inline-flex items-center justify-center px-3 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50"
+              style={{
+                borderColor: '#FCD34D',
+                color: '#78350F',
+                backgroundColor: 'rgba(255,255,255,0.7)',
+                minHeight: 40,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {paymentDeferring ? <Loader2 size={12} className="animate-spin" /> : 'Remind me later'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Deferred state info — shown when vendor has snoozed the reminder. */}
+      {!hasPaymentInfo && paymentReminderHidden && !showPaymentSettings && paymentSkippedUntil !== null && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg mb-4 text-xs"
+          style={{
+            backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
+            color: 'var(--aurora-text-secondary, #6b7280)',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Clock3 size={12} />
+            Payment setup reminder snoozed until {formatSnoozeDate(paymentSkippedUntil)}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowPaymentSettings(true)}
+            className="font-medium underline"
+            style={{ color: '#6366F1', WebkitTapHighlightColor: 'transparent' }}
+          >
+            Set up now
+          </button>
+        </div>
+      )}
+
       {/* ── Payment settings panel (#13) ── */}
+      {/* Payment setup is OPTIONAL — vendors can save now, skip with a reminder,
+          or close entirely. None of these paths block order acceptance. */}
       {showPaymentSettings && (
-        <div className="p-4 rounded-xl border space-y-3" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.03)' }}>
+        <div
+          className="p-4 rounded-xl border space-y-3"
+          style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.03)' }}
+        >
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>Payment Settings</p>
-            <button onClick={() => setShowPaymentSettings(false)} className="p-1"><X size={14} style={{ color: 'var(--aurora-text-muted)' }} /></button>
+            <button
+              type="button"
+              onClick={() => setShowPaymentSettings(false)}
+              aria-label="Close payment settings"
+              className="inline-flex items-center justify-center rounded-md"
+              style={{ minWidth: 32, minHeight: 32, WebkitTapHighlightColor: 'transparent' }}
+            >
+              <X size={16} style={{ color: 'var(--aurora-text-muted, #6b7280)' }} />
+            </button>
           </div>
-          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-            Customers will see this info so they can pay you directly.
+          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary, #6b7280)' }}>
+            Add your payment link so customers can pay you directly. You can skip this for now —
+            orders will still come through.
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted)' }}>Payment Method</label>
-              <input type="text" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="e.g. Venmo, PayPal, Zelle"
-                className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }} />
+              <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>
+                Payment Method
+              </label>
+              <input
+                type="text"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                placeholder="e.g. Venmo, PayPal, Zelle"
+                autoComplete="off"
+                autoCapitalize="words"
+                spellCheck={false}
+                className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none"
+                style={{
+                  borderColor: 'var(--aurora-border, #e5e7eb)',
+                  color: 'var(--aurora-text, #1a1a2e)',
+                  backgroundColor: 'var(--aurora-surface, #fff)',
+                  fontSize: '16px', // prevents iOS Safari zoom-on-focus
+                  WebkitAppearance: 'none',
+                  minHeight: 44,
+                }}
+              />
             </div>
             <div>
-              <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted)' }}>Payment URL</label>
-              <input type="url" value={paymentUrl} onChange={(e) => setPaymentUrl(e.target.value)} placeholder="https://venmo.com/your-handle"
-                className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }} />
+              <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>
+                Payment URL
+              </label>
+              <input
+                type="url"
+                inputMode="url"
+                value={paymentUrl}
+                onChange={(e) => setPaymentUrl(e.target.value)}
+                placeholder="https://venmo.com/your-handle"
+                autoComplete="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none"
+                style={{
+                  borderColor: 'var(--aurora-border, #e5e7eb)',
+                  color: 'var(--aurora-text, #1a1a2e)',
+                  backgroundColor: 'var(--aurora-surface, #fff)',
+                  fontSize: '16px',
+                  WebkitAppearance: 'none',
+                  minHeight: 44,
+                }}
+              />
             </div>
           </div>
           <div>
-            <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted)' }}>Payment Instructions</label>
-            <textarea value={paymentNote} onChange={(e) => setPaymentNote(e.target.value)} placeholder="e.g. Please include order # in the memo"
-              rows={2} className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none resize-none" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }} />
+            <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>
+              Payment Instructions
+            </label>
+            <textarea
+              value={paymentNote}
+              onChange={(e) => setPaymentNote(e.target.value)}
+              placeholder="e.g. Please include order # in the memo"
+              rows={2}
+              className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none resize-none"
+              style={{
+                borderColor: 'var(--aurora-border, #e5e7eb)',
+                color: 'var(--aurora-text, #1a1a2e)',
+                backgroundColor: 'var(--aurora-surface, #fff)',
+                fontSize: '16px',
+                WebkitAppearance: 'none',
+              }}
+            />
           </div>
-          <button onClick={handleSavePayment} disabled={paymentSaving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
-            style={{ backgroundColor: '#6366F1' }}
-          >
-            {paymentSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            Save Payment Info
-          </button>
+
+          {/* Action row — Save, Remind me later, Dismiss */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleSavePayment}
+              disabled={paymentSaving || paymentDeferring}
+              className="inline-flex items-center justify-center gap-1.5 px-4 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors"
+              style={{
+                backgroundColor: '#6366F1',
+                minHeight: 44,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {paymentSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              Save Payment Info
+            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleDeferPayment(7)}
+                disabled={paymentSaving || paymentDeferring}
+                className="inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-sm font-medium border disabled:opacity-50 transition-colors"
+                style={{
+                  borderColor: 'var(--aurora-border, #e5e7eb)',
+                  color: 'var(--aurora-text-secondary, #6b7280)',
+                  backgroundColor: 'var(--aurora-surface, #fff)',
+                  minHeight: 44,
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                {paymentDeferring ? <Loader2 size={14} className="animate-spin" /> : <Clock3 size={14} />}
+                Remind me in 7 days
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeferPayment(30)}
+                disabled={paymentSaving || paymentDeferring}
+                className="inline-flex items-center justify-center px-3 rounded-lg text-sm font-medium border disabled:opacity-50 transition-colors"
+                style={{
+                  borderColor: 'var(--aurora-border, #e5e7eb)',
+                  color: 'var(--aurora-text-secondary, #6b7280)',
+                  backgroundColor: 'var(--aurora-surface, #fff)',
+                  minHeight: 44,
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Remind me in 30 days
+              </button>
+            </div>
+          </div>
+          <p className="text-[11px] pt-1" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>
+            You can set up payment any time from this dashboard — customers can still place orders in the meantime.
+          </p>
         </div>
       )}
 
@@ -946,8 +1184,10 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                 <div className="flex items-start gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
                   <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>1</span>
                   <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Set up payment info</p>
-                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>Add your payment link so customers can pay you</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>
+                      Set up payment info <span className="text-[10px] font-normal" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>(optional)</span>
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>Add your payment link so customers can pay you — you can skip and add this later</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3 p-3 rounded-xl border" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-bg)' }}>
@@ -965,14 +1205,40 @@ export default function VendorCateringDashboard({ businessId, businessName }: Ve
                   </div>
                 </div>
               </div>
-              <button
-                onClick={() => setShowPaymentSettings(true)}
-                className="px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
-                style={{ backgroundColor: '#6366F1' }}
-              >
-                <CreditCard size={14} className="inline mr-1.5 -mt-0.5" />
-                Set Up Payment Info
-              </button>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentSettings(true)}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 rounded-xl text-sm font-medium text-white transition-colors"
+                  style={{
+                    backgroundColor: '#6366F1',
+                    minHeight: 44,
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <CreditCard size={14} />
+                  Set Up Payment Info
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeferPayment(7)}
+                  disabled={paymentDeferring}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50"
+                  style={{
+                    borderColor: 'var(--aurora-border, #e5e7eb)',
+                    color: 'var(--aurora-text-secondary, #6b7280)',
+                    backgroundColor: 'var(--aurora-surface, #fff)',
+                    minHeight: 44,
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {paymentDeferring ? <Loader2 size={14} className="animate-spin" /> : <Clock3 size={14} />}
+                  Skip for now
+                </button>
+              </div>
+              <p className="text-[11px] mt-3" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>
+                Payment setup is optional — you can still receive and accept orders without it.
+              </p>
             </div>
           )}
         </div>
