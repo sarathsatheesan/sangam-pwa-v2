@@ -554,14 +554,6 @@ export default function CateringPage() {
                     return shortNames[title || ''] || title;
                   })()}
                 </h1>
-                {/* BusinessSwitcher — inline with the Vendor Dashboard title.
-                    Only renders on the vendor view so it doesn't clutter other screens.
-                    Kept inside the left cluster so it sits to the right of the title (per UX review). */}
-                {state.view === 'vendor' && ownedBusiness && (
-                  <div className="min-w-0 shrink" style={{ WebkitTapHighlightColor: 'transparent' }}>
-                    <BusinessSwitcher />
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -710,7 +702,7 @@ export default function CateringPage() {
       <div className="px-4 py-4">
         {/* Breadcrumb navigation */}
         {state.view !== 'categories' && (
-          <nav className="flex items-center gap-1.5 text-sm mb-4" aria-label="Breadcrumb">
+          <nav className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm mb-4 min-w-0" aria-label="Breadcrumb">
             <button
               onClick={() => dispatch({ type: 'SET_VIEW', payload: 'categories' })}
               className="text-indigo-600 hover:text-indigo-800 font-medium"
@@ -771,6 +763,20 @@ export default function CateringPage() {
               <>
                 <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
                 <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Vendor Dashboard</span>
+                {/* BusinessSwitcher — placed in the breadcrumb trail per UX review.
+                    Keeps the sticky header uncluttered while still giving vendors a
+                    one-click way to switch the active business from the top of the page.
+                    The dropdown itself uses position:fixed + visualViewport math so it
+                    renders correctly regardless of horizontal position on Chrome, Safari,
+                    Firefox, iOS Safari, and Android Chrome. */}
+                {ownedBusiness && (
+                  <>
+                    <span style={{ color: 'var(--aurora-text-muted)' }}>/</span>
+                    <div className="min-w-0 shrink" style={{ WebkitTapHighlightColor: 'transparent' }}>
+                      <BusinessSwitcher />
+                    </div>
+                  </>
+                )}
               </>
             )}
           </nav>
