@@ -1396,7 +1396,7 @@ export default function CateringPage() {
               <VendorQuoteResponse
                 businessId={ownedBusiness.id}
                 businessName={ownedBusiness.name}
-                businessHeritage={ownedBusiness.heritage}
+                businessHeritage={Array.isArray(ownedBusiness.heritage) ? ownedBusiness.heritage[0] : ownedBusiness.heritage}
                 businessRating={ownedBusiness.rating}
               />
             )}

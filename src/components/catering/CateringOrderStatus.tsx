@@ -14,7 +14,7 @@ import {
   MessageSquare, AlertTriangle,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
-import { subscribeToCustomerOrders, formatPrice, batchHasReviewedOrders, cancelOrder, getBusinessPaymentInfo, notifyVendorModificationRejected, updateOrderPaymentStatus } from '@/services/cateringService';
+import { subscribeToCustomerOrders, formatPrice, batchHasReviewedOrders, cancelOrder, getBusinessPaymentInfo, notifyVendorModificationRejected, updateOrderPaymentStatus, findOrCreateConversation } from '@/services/cateringService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';

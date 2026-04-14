@@ -325,6 +325,7 @@ export default function VendorMenuEditor({
         minOrderQty: item.minOrderQty,
         maxOrderQty: item.maxOrderQty,
         photoUrl: item.photoUrl,
+        available: true,
       };
 
       try {
@@ -710,6 +711,7 @@ export default function VendorMenuEditor({
                           onDelete={() => handleDeleteItem(item.id)}
                           isDeletingId={deletingId}
                           onConfirmDelete={confirmDelete}
+                          onCancelDelete={() => setDeletingId(null)}
                         />
                       ))}
                     </div>
@@ -1185,6 +1187,7 @@ function MenuItem({
   onDelete,
   isDeletingId,
   onConfirmDelete,
+  onCancelDelete,
 }: {
   item: CateringMenuItem;
   onEdit: () => void;
@@ -1193,6 +1196,7 @@ function MenuItem({
   onDelete: () => void;
   isDeletingId: string | null;
   onConfirmDelete: (id: string) => void;
+  onCancelDelete: () => void;
 }) {
   const pricingTypeLabels: Record<string, string> = {
     per_person: '/ person',
@@ -1321,7 +1325,7 @@ function MenuItem({
         <>
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={() => setDeletingId(null)}
+            onClick={() => onCancelDelete()}
             aria-hidden="true"
           />
           <div
@@ -1347,7 +1351,7 @@ function MenuItem({
               </div>
               <div className="flex gap-3 justify-end">
                 <button
-                  onClick={() => setDeletingId(null)}
+                  onClick={() => onCancelDelete()}
                   className="px-4 py-2 rounded-lg font-medium transition-colors"
                   style={{
                     backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
@@ -1459,6 +1463,7 @@ function MenuItemWrapper({
   onDelete,
   isDeletingId,
   onConfirmDelete,
+  onCancelDelete,
 }: {
   item: CateringMenuItem;
   onEdit: () => void;
@@ -1467,9 +1472,8 @@ function MenuItemWrapper({
   onDelete: () => void;
   isDeletingId: string | null;
   onConfirmDelete: (id: string) => void;
+  onCancelDelete: () => void;
 }) {
-  const [localDeleting, setLocalDeleting] = useState(false);
-
   return (
     <MenuItem
       item={item}
@@ -1477,11 +1481,11 @@ function MenuItemWrapper({
       onDuplicate={onDuplicate}
       onArchive={onArchive}
       onDelete={() => {
-        setLocalDeleting(true);
         onDelete();
       }}
       isDeletingId={isDeletingId === item.id ? item.id : null}
       onConfirmDelete={onConfirmDelete}
+      onCancelDelete={onCancelDelete}
     />
   );
 }

@@ -1298,7 +1298,6 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                     WebkitAppearance: 'none',
                     appearance: 'none',
                     minHeight: 44,
-                    // @ts-expect-error CSS custom prop for focus ring color
                     '--tw-ring-color': '#6366F1',
                   } as React.CSSProperties}
                   onMouseEnter={(e) => {
@@ -1342,7 +1341,6 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                     WebkitAppearance: 'none',
                     appearance: 'none',
                     minHeight: 44,
-                    // @ts-expect-error CSS custom prop for focus ring color
                     '--tw-ring-color': '#8B5CF6',
                   } as React.CSSProperties}
                   onMouseEnter={(e) => {

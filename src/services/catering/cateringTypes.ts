@@ -223,6 +223,7 @@ export interface CateringQuoteResponse {
   businessName: string;
   businessRating?: number;
   businessHeritage?: string;
+  vendorOwnerId?: string;         // User ID of the vendor owner — used for notifications
   // Quote details
   quotedItems: QuotedItem[];
   subtotal: number;               // cents
