@@ -15,7 +15,7 @@ import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store, Search,
   Send, FileText, ClipboardList, Star, Heart, Repeat, Share2, Pencil, Package, CheckCircle,
-  MoreHorizontal, UtensilsCrossed,
+  MoreHorizontal, UtensilsCrossed, LayoutDashboard,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -458,7 +458,8 @@ export default function CateringPage() {
 
   const cartItemCount = state.cart.items.reduce((sum, item) => sum + item.qty, 0);
 
-  // View title
+  // View title — 'vendor' returns empty string so only the Chef-cap icon renders
+  // in the sticky header (the Dashboard CTA + breadcrumb already identify the route).
   const getTitle = () => {
     switch (state.view) {
       case 'categories': return '';
@@ -468,7 +469,7 @@ export default function CateringPage() {
       case 'quotes': return selectedQuoteRequest ? 'Quote Responses' : 'My Quotes';
       case 'orders': return 'My Orders';
       case 'order_confirmation': return 'Order Confirmed';
-      case 'vendor': return 'Vendor Dashboard';
+      case 'vendor': return '';
       case 'favorites': return 'My Favorites';
       case 'recurring': return 'Recurring Orders';
       case 'templates': return 'Order Templates';
@@ -527,7 +528,10 @@ export default function CateringPage() {
                 <ArrowLeft size={20} style={{ color: 'var(--aurora-text)' }} />
               </button>
             )}
-            {getTitle() && (
+            {/* On the vendor view the title text is intentionally empty so only the
+                Chef-cap icon shows (the Dashboard CTA + breadcrumb identify the route).
+                On every other view the icon + title text render together as before. */}
+            {(getTitle() || state.view === 'vendor') && (
               <div className="flex items-center gap-2 min-w-0">
                 <ChefHat size={22} className="shrink-0" style={{ color: 'var(--aurora-primary, #6366F1)' }} />
                 <h1 className="text-lg font-bold truncate hidden sm:block" style={{ color: 'var(--aurora-text, #1E2132)' }}>
@@ -650,7 +654,10 @@ export default function CateringPage() {
             </div>
           )}
 
-          {/* Vendor pill — always visible when user owns a catering business */}
+          {/* Dashboard CTA — always visible when user owns a catering business.
+              Replaces the old business-name pill; keeps the nav concise and
+              routes directly to the Vendor Dashboard. Business switching lives
+              in the breadcrumb BusinessSwitcher on the dashboard itself. */}
           {ownedBusiness && (
             <button
               onClick={() => {
@@ -664,15 +671,19 @@ export default function CateringPage() {
                   navigate(`/vendor/${ownedBusiness.id}/dashboard`);
                 }
               }}
+              aria-label="Open Vendor Dashboard"
               className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: state.view === 'vendor' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'vendor' ? '#fff' : 'var(--aurora-text-secondary)',
                 minHeight: '36px',
-              }}
+                WebkitTapHighlightColor: 'transparent',
+                WebkitAppearance: 'none',
+                appearance: 'none',
+              } as React.CSSProperties}
             >
-              <Store size={15} className="shrink-0" />
-              {ownedBusinesses.length > 1 ? ownedBusiness.name : 'Vendor'}
+              <LayoutDashboard size={15} className="shrink-0" />
+              Dashboard
             </button>
           )}
 
