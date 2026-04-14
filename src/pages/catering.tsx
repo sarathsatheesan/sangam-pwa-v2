@@ -102,9 +102,19 @@ export default function CateringPage() {
     }
   }, [routeBusinessId, ctxBusiness?.id, ownedBusinesses, selectBusiness]);
 
-  // Auto-switch to vendor view when navigating to /vendor/:businessId/*
+  // Auto-switch to vendor view on a FRESH entry into /vendor/:id/* — i.e. the
+  // reducer is still at its initial 'categories' state.
+  //
+  // Prior guard (state.view !== 'vendor') caused a race when users clicked a
+  // personal pill from the Vendor Dashboard: navigate('/catering') and the
+  // SET_VIEW dispatch are propagated in separate render ticks (React-Router's
+  // context update vs. useReducer's update). In the intermediate render,
+  // routeBusinessId was still the old id while state.view was already the
+  // personal view, so this effect re-dispatched SET_VIEW: 'vendor' and undid
+  // the personal nav. Tightening the guard to 'categories' means any explicit
+  // user-chosen view (orders/quotes/favorites/templates) is never clobbered.
   useEffect(() => {
-    if (routeBusinessId && userOwnedBusiness && state.view !== 'vendor') {
+    if (routeBusinessId && userOwnedBusiness && state.view === 'categories') {
       dispatch({ type: 'SET_VIEW', payload: 'vendor' });
     }
   }, [routeBusinessId, userOwnedBusiness, state.view]);
