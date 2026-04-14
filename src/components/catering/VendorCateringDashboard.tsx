@@ -662,27 +662,196 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>
-            Catering Orders
-          </h2>
-          <p className="text-sm" style={{ color: 'var(--aurora-text-muted)' }}>
-            {businessName}
-          </p>
+      {/* ═══════════════════════════════════════════════════════════════════
+          UNIFIED COMMAND BAR
+          Replaces the previous 3-row stack (title/toolbar, pause strip,
+          separate pending badge). One row on desktop, two rows on mobile.
+          Left cluster = status + pending chip (what's happening now).
+          Right cluster = actions (icons for low-density tools, a button for
+          Batch which is workflow-critical). Payment + Reminders live in the
+          kebab "More" menu to reduce density — they surface contextually
+          elsewhere (payment banner, reminder chime). */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 mb-3 p-2 rounded-xl border"
+        style={{
+          borderColor: isPaused ? '#FECACA' : 'var(--aurora-border, #e5e7eb)',
+          backgroundColor: isPaused ? '#FEF2F2' : 'rgba(99,102,241,0.03)',
+        }}
+      >
+        {/* Status cluster — at-a-glance what the vendor needs to know */}
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          {/* Status dot + label */}
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+            style={{
+              backgroundColor: isPaused ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+            }}
+          >
+            <span
+              aria-hidden="true"
+              className="inline-block rounded-full"
+              style={{
+                width: 8,
+                height: 8,
+                backgroundColor: isPaused ? '#EF4444' : '#10B981',
+                boxShadow: isPaused ? 'none' : '0 0 0 0 rgba(16, 185, 129, 0.5)',
+                animation: isPaused ? 'none' : 'vendorStatusPulse 2s ease-out infinite',
+              }}
+            />
+            <span className="text-xs font-semibold whitespace-nowrap" style={{ color: isPaused ? '#991B1B' : '#065F46' }}>
+              {isPaused ? 'Paused' : 'Accepting orders'}
+            </span>
+          </div>
+          {/* Pending chip — only when there's action needed */}
+          {pendingCount > 0 && (
+            <span
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
+              style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
+              title={`${pendingCount} order${pendingCount === 1 ? '' : 's'} awaiting your response`}
+            >
+              <AlertCircle size={12} />
+              {pendingCount} pending
+            </span>
+          )}
+          {/* Pause / resume toggle — compact, next to status */}
+          <button
+            type="button"
+            onClick={handleTogglePause}
+            disabled={pauseLoading}
+            className="inline-flex items-center justify-center px-2.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+            style={{
+              backgroundColor: isPaused ? '#10B981' : 'transparent',
+              color: isPaused ? '#fff' : 'var(--aurora-text-secondary, #6b7280)',
+              border: isPaused ? 'none' : '1px solid var(--aurora-border, #e5e7eb)',
+              minHeight: 32,
+              WebkitTapHighlightColor: 'transparent',
+              WebkitAppearance: 'none',
+              appearance: 'none',
+            }}
+            aria-label={isPaused ? 'Resume accepting orders' : 'Pause accepting orders'}
+          >
+            {pauseLoading ? <Loader2 size={12} className="animate-spin" /> : (isPaused ? 'Resume' : 'Pause')}
+          </button>
         </div>
-        <div className="flex items-center gap-2">
-          {/* V-12: Notification bell */}
+
+        {/* Actions cluster */}
+        <div className="flex items-center gap-1">
+          {/* Batch — workflow-critical, stays visible */}
+          <button
+            type="button"
+            onClick={() => { setBatchMode(!batchMode); setSelectedOrders(new Set()); }}
+            className="inline-flex items-center gap-1.5 px-2.5 rounded-lg text-xs font-medium border transition-colors"
+            style={{
+              borderColor: batchMode ? '#6366F1' : 'var(--aurora-border, #e5e7eb)',
+              color: batchMode ? '#6366F1' : 'var(--aurora-text-secondary, #6b7280)',
+              backgroundColor: batchMode ? 'rgba(99,102,241,0.08)' : 'transparent',
+              minHeight: 32,
+              WebkitTapHighlightColor: 'transparent',
+              WebkitAppearance: 'none',
+              appearance: 'none',
+            }}
+          >
+            <CheckSquare size={12} />
+            {batchMode ? 'Cancel' : 'Batch'}
+          </button>
+          {/* Audio toggle — icon only, 44x44 touch target */}
+          <button
+            type="button"
+            onClick={handleToggleAudio}
+            className="inline-flex items-center justify-center rounded-lg transition-colors"
+            style={{
+              color: audioMuted ? 'var(--aurora-text-muted, #9ca3af)' : 'var(--aurora-text-secondary, #6b7280)',
+              width: 32,
+              height: 32,
+              WebkitTapHighlightColor: 'transparent',
+              WebkitAppearance: 'none',
+              appearance: 'none',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            aria-label={audioMuted ? 'Unmute notifications' : 'Mute notifications'}
+            title={audioMuted ? 'Unmute notifications' : 'Mute notifications'}
+          >
+            {audioMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          </button>
+          {/* Reminders — icon + badge, secondary */}
+          <button
+            type="button"
+            onClick={() => setShowReminderSettings(!showReminderSettings)}
+            className="relative inline-flex items-center justify-center rounded-lg transition-colors"
+            style={{
+              color: showReminderSettings ? '#8B5CF6' : 'var(--aurora-text-secondary, #6b7280)',
+              backgroundColor: showReminderSettings ? 'rgba(139,92,246,0.08)' : 'transparent',
+              width: 32,
+              height: 32,
+              WebkitTapHighlightColor: 'transparent',
+              WebkitAppearance: 'none',
+              appearance: 'none',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            aria-label="Reminder settings"
+            title="Reminder settings"
+          >
+            <BellRing size={16} />
+            {activeReminders.length > 0 && (
+              <span
+                className="absolute flex items-center justify-center rounded-full text-[9px] font-bold text-white"
+                style={{ top: 2, right: 2, width: 14, height: 14, backgroundColor: '#8B5CF6' }}
+              >
+                {activeReminders.length > 9 ? '9+' : activeReminders.length}
+              </span>
+            )}
+          </button>
+          {/* Payment setup — icon only, only visible when not configured */}
+          {!hasPaymentInfo && (
+            <button
+              type="button"
+              onClick={() => setShowPaymentSettings(!showPaymentSettings)}
+              className="inline-flex items-center justify-center rounded-lg transition-colors"
+              style={{
+                color: showPaymentSettings ? '#6366F1' : 'var(--aurora-text-secondary, #6b7280)',
+                backgroundColor: showPaymentSettings ? 'rgba(99,102,241,0.08)' : 'transparent',
+                width: 32,
+                height: 32,
+                WebkitTapHighlightColor: 'transparent',
+                WebkitAppearance: 'none',
+                appearance: 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              aria-label="Payment settings"
+              title="Payment settings"
+            >
+              <CreditCard size={16} />
+            </button>
+          )}
+          {/* Notification bell — icon + count badge */}
           <div className="relative">
             <button
+              type="button"
               onClick={() => setShowNotifPanel(!showNotifPanel)}
-              className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="relative inline-flex items-center justify-center rounded-lg transition-colors"
+              style={{
+                color: 'var(--aurora-text-secondary, #6b7280)',
+                width: 32,
+                height: 32,
+                WebkitTapHighlightColor: 'transparent',
+                WebkitAppearance: 'none',
+                appearance: 'none',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+              }}
               aria-label={`Notifications${notifications.filter(n => !n.read).length > 0 ? ` (${notifications.filter(n => !n.read).length} unread)` : ''}`}
             >
-              <Bell size={20} style={{ color: 'var(--aurora-text-secondary)' }} />
+              <Bell size={16} />
               {notifications.filter(n => !n.read).length > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                <span
+                  className="absolute flex items-center justify-center rounded-full text-[9px] font-bold text-white"
+                  style={{ top: 2, right: 2, width: 14, height: 14, backgroundColor: '#EF4444' }}
+                >
                   {notifications.filter(n => !n.read).length > 9 ? '9+' : notifications.filter(n => !n.read).length}
                 </span>
               )}
@@ -730,103 +899,21 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
               </div>
             )}
           </div>
-          {/* SB-33: Audio mute toggle */}
-          <button
-            onClick={handleToggleAudio}
-            className="p-2 rounded-lg transition-colors"
-            style={{ color: audioMuted ? 'var(--aurora-text-muted)' : 'var(--aurora-text-secondary)' }}
-            aria-label={audioMuted ? 'Unmute notifications' : 'Mute notifications'}
-            title={audioMuted ? 'Unmute notifications' : 'Mute notifications'}
-          >
-            {audioMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-          </button>
-          {/* Reminder settings toggle */}
-          <button
-            onClick={() => setShowReminderSettings(!showReminderSettings)}
-            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-            style={{
-              borderColor: showReminderSettings ? '#8B5CF6' : 'var(--aurora-border)',
-              color: showReminderSettings ? '#8B5CF6' : 'var(--aurora-text-secondary)',
-              backgroundColor: showReminderSettings ? 'rgba(139,92,246,0.05)' : 'transparent',
-            }}
-            aria-label="Reminder settings"
-          >
-            <BellRing size={12} />
-            Reminders
-            {activeReminders.length > 0 && (
-              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: '#8B5CF6' }}>
-                {activeReminders.length > 9 ? '9+' : activeReminders.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setShowPaymentSettings(!showPaymentSettings)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-            style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
-          >
-            <CreditCard size={12} />
-            Payment
-          </button>
-          <button
-            onClick={() => { setBatchMode(!batchMode); setSelectedOrders(new Set()); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
-            style={{
-              borderColor: batchMode ? '#6366F1' : 'var(--aurora-border)',
-              color: batchMode ? '#6366F1' : 'var(--aurora-text-secondary)',
-              backgroundColor: batchMode ? 'rgba(99,102,241,0.05)' : 'transparent',
-            }}
-          >
-            <CheckSquare size={12} />
-            {batchMode ? 'Cancel' : 'Batch'}
-          </button>
-          {pendingCount > 0 && (
-            <span
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
-              style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
-            >
-              <AlertCircle size={12} />
-              {pendingCount} pending
-            </span>
-          )}
+          {/* (Old duplicate toolbar — Audio/Reminders/Payment/Batch/Pending —
+              and the separate Pause Toggle strip have been consolidated into
+              the unified command bar above. One row on desktop; wraps
+              gracefully on narrow mobile widths.) */}
         </div>
       </div>
 
-      {/* SB-32: Vendor Pause Toggle */}
-      <div className="flex items-center justify-between p-3 rounded-xl mb-4" style={{
-        backgroundColor: isPaused ? '#FEF2F2' : 'rgba(99,102,241,0.04)',
-        border: `1px solid ${isPaused ? '#FECACA' : 'var(--aurora-border)'}`,
-      }}>
-        <div className="flex items-center gap-2">
-          {isPaused ? (
-            <>
-              <span className="text-base">⏸️</span>
-              <div>
-                <span className="text-sm font-medium" style={{ color: '#991B1B' }}>Accepting Orders: Paused</span>
-                <p className="text-[10px]" style={{ color: '#B91C1C' }}>New catering requests won't be shown to you</p>
-              </div>
-            </>
-          ) : (
-            <>
-              <span className="text-base">✅</span>
-              <div>
-                <span className="text-sm font-medium" style={{ color: '#059669' }}>Accepting Orders: Active</span>
-                <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>You'll receive new catering requests</p>
-              </div>
-            </>
-          )}
-        </div>
-        <button
-          onClick={handleTogglePause}
-          disabled={pauseLoading}
-          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-          style={{
-            backgroundColor: isPaused ? '#059669' : '#EF4444',
-            color: '#fff',
-          }}
-        >
-          {pauseLoading ? '...' : isPaused ? 'Resume' : 'Pause'}
-        </button>
-      </div>
+      {/* Status-pulse keyframe — hardware-accelerated, cross-browser */}
+      <style>{`
+        @keyframes vendorStatusPulse {
+          0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+          70%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+      `}</style>
 
       {/* ── Payment setup reminder banner ─────────────────────────────── */}
       {/* Shown when no payment info is saved AND the vendor hasn't deferred
