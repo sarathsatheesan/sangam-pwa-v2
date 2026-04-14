@@ -102,19 +102,21 @@ export default function CateringPage() {
     }
   }, [routeBusinessId, ctxBusiness?.id, ownedBusinesses, selectBusiness]);
 
-  // Auto-switch to vendor view on a FRESH entry into /vendor/:id/* — i.e. the
-  // reducer is still at its initial 'categories' state.
-  //
-  // Prior guard (state.view !== 'vendor') caused a race when users clicked a
-  // personal pill from the Vendor Dashboard: navigate('/catering') and the
-  // SET_VIEW dispatch are propagated in separate render ticks (React-Router's
-  // context update vs. useReducer's update). In the intermediate render,
-  // routeBusinessId was still the old id while state.view was already the
-  // personal view, so this effect re-dispatched SET_VIEW: 'vendor' and undid
-  // the personal nav. Tightening the guard to 'categories' means any explicit
-  // user-chosen view (orders/quotes/favorites/templates) is never clobbered.
+  // Auto-switch to vendor view whenever a user lands on /vendor/:id/* with a
+  // non-vendor view — whether by direct URL, deep link, or browser back from a
+  // personal-scope route. The earlier race (navigate('/catering') + SET_VIEW
+  // dispatching on separate render ticks caused this effect to clobber the
+  // personal view during the intermediate tick) is prevented via the
+  // suppressVendorAutoSwitchRef below: switchToPersonalView sets it so the
+  // first post-click render skips this effect, and it clears on the next tick
+  // once React-Router has propagated the new (empty) routeBusinessId.
+  const suppressVendorAutoSwitchRef = useRef(false);
   useEffect(() => {
-    if (routeBusinessId && userOwnedBusiness && state.view === 'categories') {
+    if (suppressVendorAutoSwitchRef.current) {
+      suppressVendorAutoSwitchRef.current = false;
+      return;
+    }
+    if (routeBusinessId && userOwnedBusiness && state.view !== 'vendor') {
       dispatch({ type: 'SET_VIEW', payload: 'vendor' });
     }
   }, [routeBusinessId, userOwnedBusiness, state.view]);
@@ -128,6 +130,9 @@ export default function CateringPage() {
   const switchToPersonalView = useCallback(
     (view: 'orders' | 'quotes' | 'favorites' | 'templates' | 'categories') => {
       if (routeBusinessId) {
+        // Arm the auto-switch suppressor for the in-between render where
+        // React-Router hasn't yet published the new (empty) businessId.
+        suppressVendorAutoSwitchRef.current = true;
         navigate('/catering');
       }
       dispatch({ type: 'SET_VIEW', payload: view });
