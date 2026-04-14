@@ -590,10 +590,13 @@ export default function CateringPage() {
 
           {/* Pills row — scrollable on mobile, flex-wrap on larger screens */}
           <div className="flex items-center gap-2 shrink-0 ml-2">
-          {/* My Orders pill — always visible when logged in.
-              Routes through switchToPersonalView so a Vendor-context user
-              (on /vendor/:id/dashboard) drops the vendor route and lands on
-              their personal orders, not a vendor-scoped view. */}
+          {/* "My Orders" pill — always visible when logged in.
+              Labeled "My Orders" (not just "Orders") so vendors can clearly
+              distinguish their personal buyer orders from the vendor orders
+              managed inside the Vendor Dashboard. Routes through
+              switchToPersonalView so a vendor-context user (on
+              /vendor/:id/dashboard) drops the vendor route and lands on their
+              personal orders, not a vendor-scoped view. */}
           {user && (
             <button
               onClick={() => {
@@ -603,15 +606,19 @@ export default function CateringPage() {
                   switchToPersonalView('orders');
                 }
               }}
+              aria-label="Open my personal orders"
               className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
                 backgroundColor: state.view === 'orders' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'orders' ? '#fff' : 'var(--aurora-text-secondary)',
                 minHeight: '36px',
-              }}
+                WebkitTapHighlightColor: 'transparent',
+                WebkitAppearance: 'none',
+                appearance: 'none',
+              } as React.CSSProperties}
             >
               <ClipboardList size={15} className="shrink-0" />
-              Orders
+              My Orders
             </button>
           )}
 
