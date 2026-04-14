@@ -554,6 +554,14 @@ export default function CateringPage() {
                     return shortNames[title || ''] || title;
                   })()}
                 </h1>
+                {/* BusinessSwitcher — inline with the Vendor Dashboard title.
+                    Only renders on the vendor view so it doesn't clutter other screens.
+                    Kept inside the left cluster so it sits to the right of the title (per UX review). */}
+                {state.view === 'vendor' && ownedBusiness && (
+                  <div className="min-w-0 shrink" style={{ WebkitTapHighlightColor: 'transparent' }}>
+                    <BusinessSwitcher />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1283,15 +1291,9 @@ export default function CateringPage() {
         {/* Vendor dashboard with tabs */}
         {state.view === 'vendor' && ownedBusiness && (
           <div className="space-y-4">
-            {/* Business Switcher — scoped to vendor dashboard (replaces old global header switcher) */}
-            <div className="flex items-center justify-between flex-wrap gap-2 pb-1">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-medium uppercase tracking-wide shrink-0" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>
-                  Managing
-                </span>
-                <BusinessSwitcher />
-              </div>
-            </div>
+            {/* BusinessSwitcher moved to the sticky header (inline with "Vendor Dashboard" title).
+                The old "MANAGING" strip here was redundant now that the dropdown sits right
+                next to the page title. */}
 
             {/* SB-08: Simplified vendor tab bar — primary tabs + bottom border indicator */}
             <div

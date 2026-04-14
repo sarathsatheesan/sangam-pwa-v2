@@ -1262,14 +1262,9 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
         <div className="text-center py-12">
           {true && (
             <div className="max-w-sm mx-auto">
-              {/* Illustrated header with gradient */}
-              <div className="relative mx-auto mb-6 w-20 h-20 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', boxShadow: '0 8px 24px rgba(99, 102, 241, 0.3)' }}>
-                <Package size={36} className="text-white" />
-                <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-green-400 flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">!</span>
-                </div>
-              </div>
-              <h3 className="text-lg font-bold mb-2" style={{ color: 'var(--aurora-text)' }}>
+              {/* Decorative illustration removed per UX review —
+                  keeps the empty state focused on the actionable onboarding pills below. */}
+              <h3 className="text-lg font-bold mb-2 mt-2" style={{ color: 'var(--aurora-text)' }}>
                 Welcome to Your Dashboard!
               </h3>
               <p className="text-sm mb-6" style={{ color: 'var(--aurora-text-secondary)' }}>
