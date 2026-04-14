@@ -108,6 +108,22 @@ export default function CateringPage() {
       dispatch({ type: 'SET_VIEW', payload: 'vendor' });
     }
   }, [routeBusinessId, userOwnedBusiness, state.view]);
+
+  // Switch from Vendor context into a Personal-scope view (My Orders, My Quotes,
+  // Saved Orders, Templates). If we're currently on the /vendor/:id/dashboard
+  // route, navigate to /catering first so the auto-switch effect above doesn't
+  // immediately force state.view back to 'vendor'. Works identically on Chrome,
+  // Safari, Firefox desktop + iOS Safari + Android Chrome because it uses
+  // react-router-dom navigate() (pushState under the hood with popstate fallback).
+  const switchToPersonalView = useCallback(
+    (view: 'orders' | 'quotes' | 'favorites' | 'templates' | 'categories') => {
+      if (routeBusinessId) {
+        navigate('/catering');
+      }
+      dispatch({ type: 'SET_VIEW', payload: view });
+    },
+    [routeBusinessId, navigate],
+  );
   const [submitting, setSubmitting] = useState(false);
   const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory' | 'menu'>('quotes');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
@@ -564,14 +580,17 @@ export default function CateringPage() {
 
           {/* Pills row — scrollable on mobile, flex-wrap on larger screens */}
           <div className="flex items-center gap-2 shrink-0 ml-2">
-          {/* My Orders pill — always visible when logged in */}
+          {/* My Orders pill — always visible when logged in.
+              Routes through switchToPersonalView so a Vendor-context user
+              (on /vendor/:id/dashboard) drops the vendor route and lands on
+              their personal orders, not a vendor-scoped view. */}
           {user && (
             <button
               onClick={() => {
                 if (state.view === 'orders') {
-                  dispatch({ type: 'SET_VIEW', payload: 'categories' });
+                  switchToPersonalView('categories');
                 } else {
-                  dispatch({ type: 'SET_VIEW', payload: 'orders' });
+                  switchToPersonalView('orders');
                 }
               }}
               className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
@@ -615,9 +634,9 @@ export default function CateringPage() {
                   >
                     <button
                       onClick={() => {
-                        dispatch({ type: 'SET_VIEW', payload: 'quotes' });
                         setSelectedQuoteRequest(null);
                         setShowMoreMenu(false);
+                        switchToPersonalView('quotes');
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
                       style={{ color: state.view === 'quotes' ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
@@ -627,8 +646,8 @@ export default function CateringPage() {
                     </button>
                     <button
                       onClick={() => {
-                        dispatch({ type: 'SET_VIEW', payload: 'favorites' });
                         setShowMoreMenu(false);
+                        switchToPersonalView('favorites');
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
                       style={{ color: ['favorites', 'recurring'].includes(state.view) ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
@@ -639,8 +658,8 @@ export default function CateringPage() {
                     <button
                       onClick={() => {
                         setSelectedFavoriteForTemplate(null);
-                        dispatch({ type: 'SET_VIEW', payload: 'templates' });
                         setShowMoreMenu(false);
+                        switchToPersonalView('templates');
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
                       style={{ color: state.view === 'templates' ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
