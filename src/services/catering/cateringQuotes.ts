@@ -604,7 +604,7 @@ export async function acceptQuoteResponseItems(
     responseId,
     businessId: responseData.businessId,
     businessName: responseData.businessName,
-    assignedAt: serverTimestamp(),
+    assignedAt: Timestamp.now(),          // Timestamp.now() — not serverTimestamp() which Firestore forbids inside arrays
   }));
   const allAssignments = [...filteredAssignments, ...newAssignments];
 
