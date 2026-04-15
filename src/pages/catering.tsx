@@ -22,7 +22,8 @@ import { useToast } from '@/contexts/ToastContext';
 import { useBusinessSwitcher } from '@/contexts/BusinessSwitcherContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { cateringReducer, createInitialState } from '@/reducers/cateringReducer';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp, doc, getDoc } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 import type { CateringMenuItem, OrderItem, QuoteRequestItem, CateringQuoteRequest, FavoriteOrder, OrderTemplate } from '@/services/cateringService';
 import {
   fetchCateringBusinesses,
@@ -42,7 +43,9 @@ import {
 import {
   notifyQuoteRequestSubmitted,
   notifyQuoteRequestEdited,
+  notifyVendorsNewRFQ,
 } from '@/services/notificationService';
+import { notifyVendorsNewQuoteRequest } from '@/services/catering/cateringNotifications';
 
 // ── Components (eager: lightweight, needed on first render) ──
 import CateringCategoryGrid from '@/components/catering/CateringCategoryGrid';
@@ -460,10 +463,36 @@ export default function CateringPage() {
         });
 
         addToast('Quote request sent! You can edit it within 24 hours (if the event is more than 2 days away).', 'success', 7000);
-        // Fire-and-forget notification
+        // Fire-and-forget: notify customer (email/SMS/push)
         notifyQuoteRequestSubmitted(
           user.uid, '', state.selectedCategory || '', rfpForm.eventDate, rfpForm.headcount,
         ).catch(() => {});
+
+        // Fire-and-forget: notify vendors (in-app + email/SMS/push)
+        // For targeted RFPs, notify only those businesses. For broadcast, skip (vendors discover via dashboard).
+        if (rfpForm.targetBusinessIds.length > 0) {
+          (async () => {
+            try {
+              const ownerIds: string[] = [];
+              for (const bizId of rfpForm.targetBusinessIds) {
+                const bizSnap = await getDoc(doc(db, 'businesses', bizId));
+                const ownerId = bizSnap.data()?.ownerId;
+                if (ownerId) ownerIds.push(ownerId);
+              }
+              if (ownerIds.length > 0) {
+                // In-app bell notifications
+                notifyVendorsNewQuoteRequest(
+                  ownerIds, '', state.selectedCategory || '', rfpForm.deliveryCity,
+                  rfpForm.headcount, rfpForm.eventDate,
+                ).catch(() => {});
+                // Multi-channel (email/SMS/push)
+                notifyVendorsNewRFQ(
+                  ownerIds, '', state.selectedCategory || '', rfpForm.deliveryCity, rfpForm.headcount,
+                ).catch(() => {});
+              }
+            } catch { /* non-blocking */ }
+          })();
+        }
       }
       dispatch({ type: 'CLEAR_RFP_FORM' });
       dispatch({ type: 'SET_VIEW', payload: 'quotes' });

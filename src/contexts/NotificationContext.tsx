@@ -145,7 +145,12 @@ export function NotificationProvider({ userId, children }: NotificationProviderP
 
   const requestPushPermission = useCallback(async (): Promise<boolean> => {
     try {
+      // Cross-browser: guard both Notification API and service worker support
+      // iOS Safari < 16.4 has neither; Firefox/Chrome have both
       if (!('Notification' in window)) return false;
+      if (!('serviceWorker' in navigator)) return false;
+
+      // Safari may return the old callback-based API; wrap for compat
       const permission = await Notification.requestPermission();
       return permission === 'granted';
     } catch {

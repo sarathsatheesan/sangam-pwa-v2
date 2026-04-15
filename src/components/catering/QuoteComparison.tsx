@@ -5,7 +5,8 @@ import {
   MessageSquare, Package, Square, CheckSquare, AlertCircle,
   HelpCircle, X, MapPin,
 } from 'lucide-react';
-import { notifyQuoteAccepted } from '@/services/notificationService';
+import { notifyQuoteAccepted, notifyVendorQuoteDeclinedMultiChannel } from '@/services/notificationService';
+import { notifyVendorQuoteDeclined, notifyVendorQuoteAccepted } from '@/services/catering/cateringNotifications';
 import type { CateringQuoteRequest, CateringQuoteResponse, ItemAssignment } from '@/services/cateringService';
 import {
   subscribeToQuoteResponses,
@@ -284,16 +285,18 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       }
 
       // Notify vendor their quote was accepted (fire-and-forget, look up owner via businessId)
-      import('@/services/firebase').then(({ db: fireDb }) =>
-        import('firebase/firestore').then(({ doc, getDoc }) =>
-          getDoc(doc(fireDb, 'businesses', response.businessId)).then((bizSnap) => {
-            const ownerId = bizSnap.data()?.ownerId;
-            if (ownerId) {
-              notifyQuoteAccepted(ownerId, quoteRequest.id, userProfile?.name || '', response.total);
-            }
-          })
-        )
-      ).catch(() => {});
+      getDoc(doc(db, 'businesses', response.businessId)).then((bizSnap) => {
+        const ownerId = bizSnap.data()?.ownerId;
+        if (ownerId) {
+          // Multi-channel (email/SMS/push)
+          notifyQuoteAccepted(ownerId, quoteRequest.id, userProfile?.name || '', response.total);
+          // In-app bell notification
+          notifyVendorQuoteAccepted(
+            ownerId, quoteRequest.id, response.businessName,
+            userProfile?.name || '', itemNames.length,
+          );
+        }
+      }).catch(() => {});
 
       // Clear selection for this response
       setSelectedItems((prev) => ({ ...prev, [response.id]: new Set() }));
@@ -345,6 +348,15 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     try {
       await declineQuoteResponse(response.id);
       addToast('Quote declined', 'info');
+
+      // Fire-and-forget: notify vendor their quote was declined
+      getDoc(doc(db, 'businesses', response.businessId)).then((bizSnap) => {
+        const ownerId = bizSnap.data()?.ownerId;
+        if (ownerId) {
+          notifyVendorQuoteDeclined(ownerId, quoteRequest.id, response.businessName);
+          notifyVendorQuoteDeclinedMultiChannel(ownerId, quoteRequest.id, response.businessName);
+        }
+      }).catch(() => {});
     } catch (err: any) {
       addToast(err.message || 'Failed to decline quote', 'error');
     } finally {

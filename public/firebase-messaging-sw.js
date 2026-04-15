@@ -20,16 +20,36 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // Handle background messages (when app is not in focus)
+// Routes catering notifications to /catering, messages to /messages
 messaging.onBackgroundMessage((payload) => {
-  const notificationTitle = payload.notification?.title || 'New Message';
+  const notificationTitle = payload.notification?.title || 'New Notification';
+  const template = payload.data?.template || '';
+  const isCatering = template.startsWith('order_') || template.startsWith('quote_')
+    || template.startsWith('vendor_') || template.startsWith('rfp_')
+    || template === 'review_flagged';
+
+  // Determine click destination based on notification type
+  const defaultUrl = isCatering ? '/catering' : '/messages';
+  const clickUrl = payload.data?.click_action || defaultUrl;
+
+  // Use more specific tags to avoid collapsing unrelated notifications
+  let tag = 'notification';
+  if (payload.data?.conversationId) {
+    tag = 'msg-' + payload.data.conversationId;
+  } else if (payload.data?.orderId) {
+    tag = 'order-' + payload.data.orderId;
+  } else if (payload.data?.requestId) {
+    tag = 'rfp-' + payload.data.requestId;
+  }
+
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a new message',
+    body: payload.notification?.body || 'You have a new notification',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: payload.data?.conversationId ? `msg-${payload.data.conversationId}` : 'new-message',
+    tag: tag,
     renotify: true,
     data: {
-      url: payload.data?.click_action || '/messages',
+      url: clickUrl,
       conversationId: payload.data?.conversationId,
     },
   };

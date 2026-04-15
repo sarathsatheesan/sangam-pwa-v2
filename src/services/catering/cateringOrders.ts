@@ -27,7 +27,8 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { CateringOrder, OrderItem, OrderNote, CateringQuoteRequest, CateringQuoteResponse } from './cateringTypes';
-import { notifyCustomerStatusChange, notifyCustomerOrderModified } from './cateringNotifications';
+import { notifyCustomerStatusChange, notifyCustomerOrderModified, notifyOrderCancelled } from './cateringNotifications';
+import { notifyOrderCancelledMultiChannel } from '../notificationService';
 
 const ORDERS_COL = 'cateringOrders';
 
@@ -202,7 +203,7 @@ export async function cancelOrder(
 ): Promise<void> {
   const ref = doc(db, ORDERS_COL, orderId);
 
-  await runTransaction(db, async (transaction) => {
+  const orderData = await runTransaction(db, async (transaction) => {
     const snap = await transaction.get(ref);
     if (!snap.exists()) throw new Error('Order not found');
     const data = snap.data() as CateringOrder & { _version?: number; paymentStatus?: string };
@@ -239,7 +240,24 @@ export async function cancelOrder(
     }
 
     transaction.update(ref, updates);
+    return data;
   });
+
+  // Notify the OTHER party about the cancellation (non-blocking, outside transaction)
+  if (cancelledBy === 'customer' && orderData.businessId) {
+    // Customer cancelled → notify vendor
+    getDoc(doc(db, 'businesses', orderData.businessId)).then((bizSnap) => {
+      const ownerId = bizSnap.data()?.ownerId;
+      if (ownerId) {
+        notifyOrderCancelled(ownerId, orderId, orderData.businessName, cancelledBy, reason);
+        notifyOrderCancelledMultiChannel(ownerId, orderId, orderData.businessName, cancelledBy, reason);
+      }
+    }).catch(console.warn);
+  } else if (cancelledBy === 'vendor') {
+    // Vendor cancelled → notify customer
+    notifyOrderCancelled(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason);
+    notifyOrderCancelledMultiChannel(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason);
+  }
 }
 
 // ── Catering-enabled businesses ──
@@ -293,7 +311,7 @@ export async function batchUpdateOrderStatus(
   for (const id of orderIds) {
     try {
       const ref = doc(db, ORDERS_COL, id);
-      await runTransaction(db, async (transaction) => {
+      const orderData = await runTransaction(db, async (transaction) => {
         const snap = await transaction.get(ref);
         if (!snap.exists()) throw new Error('Order not found');
         const data = snap.data() as CateringOrder & { _version?: number };
@@ -311,8 +329,14 @@ export async function batchUpdateOrderStatus(
           timestamp: Timestamp.now(),
         });
         transaction.update(ref, updates);
+        return data;
       });
       results.push({ orderId: id, ok: true });
+
+      // Fire notification for this order (non-blocking)
+      if (newStatus !== 'pending') {
+        notifyCustomerStatusChange(orderData.customerId, id, newStatus, orderData.businessName).catch(console.warn);
+      }
     } catch (err: any) {
       results.push({ orderId: id, ok: false, error: err.message || 'Unknown error' });
     }

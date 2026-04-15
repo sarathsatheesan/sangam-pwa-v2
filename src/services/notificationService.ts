@@ -35,11 +35,14 @@ export type CateringNotificationType =
   | 'quote_request_edited'
   | 'vendor_quote_received'
   | 'quote_accepted'
+  | 'quote_declined'
   | 'quote_expired'
   | 'order_confirmed'
   | 'order_status_changed'
+  | 'order_cancelled'
   | 'vendor_new_rfq'
   | 'vendor_rfq_edited'
+  | 'vendor_rfq_cancelled'
   | 'vendor_new_review'
   | 'review_flagged';
 
@@ -242,4 +245,44 @@ export async function notifyOrderConfirmed(
       role: 'vendor',
     }),
   ]);
+}
+
+/** Order cancelled — notify the other party (email/SMS/push) */
+export async function notifyOrderCancelledMultiChannel(
+  recipientId: string,
+  orderId: string,
+  businessName: string,
+  cancelledBy: 'customer' | 'vendor',
+  reason: string,
+): Promise<void> {
+  await notifyAllChannels(recipientId, 'order_cancelled', {
+    orderId,
+    businessName,
+    cancelledBy,
+    reason,
+  });
+}
+
+/** Vendor's quote was declined — notify vendor (email/SMS/push) */
+export async function notifyVendorQuoteDeclinedMultiChannel(
+  vendorOwnerId: string,
+  requestId: string,
+  businessName: string,
+): Promise<void> {
+  await notifyAllChannels(vendorOwnerId, 'quote_declined', {
+    requestId,
+    businessName,
+  });
+}
+
+/** RFP cancelled — notify vendors who had responded (email/SMS/push) */
+export async function notifyVendorsRfpCancelledMultiChannel(
+  vendorOwnerIds: string[],
+  requestId: string,
+): Promise<void> {
+  for (const ownerId of vendorOwnerIds) {
+    await notifyAllChannels(ownerId, 'vendor_rfq_cancelled', {
+      requestId,
+    });
+  }
 }

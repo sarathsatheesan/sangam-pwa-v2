@@ -6,6 +6,7 @@ import {
   BellOff, ChevronRight,
 } from 'lucide-react';
 import { notifyVendorQuoteReceived } from '@/services/notificationService';
+import { notifyCustomerQuoteReceived } from '@/services/catering/cateringNotifications';
 
 // ── PriceInput: local-state input that avoids cursor-jump on controlled value ──
 // Manages its own string state; only pushes cents to parent on blur/Enter.
@@ -265,6 +266,8 @@ export default function VendorQuoteResponse({
       addToast('Quote submitted successfully!', 'success');
       // Notify customer about the new quote (fire-and-forget)
       notifyVendorQuoteReceived(request.customerId, request.id, businessName, total).catch(() => {});
+      // In-app bell notification for customer
+      notifyCustomerQuoteReceived(request.customerId, request.id, businessName, total).catch(() => {});
       // Reload requests to update the open/responded lists
       fetchQuoteRequestsForBusiness(businessId).then(setRequests).catch(() => {});
     } catch (err: any) {

@@ -327,3 +327,138 @@ export async function notifyCustomerFinalizationExpired(
     quoteRequestId,
   });
 }
+
+// ── NEW: Notify vendors about a new quote request (RFP broadcast) ──
+
+/**
+ * Notify vendor(s) that a customer submitted a new quote request
+ * relevant to their cuisine category.
+ */
+export async function notifyVendorsNewQuoteRequest(
+  vendorOwnerIds: string[],
+  quoteRequestId: string,
+  cuisineCategory: string,
+  deliveryCity: string,
+  headcount: number,
+  eventDate: string,
+): Promise<void> {
+  for (const vendorId of vendorOwnerIds) {
+    await sendCateringNotification({
+      recipientId: vendorId,
+      type: 'quote_received',    // reuse existing type — vendor sees "new quote request"
+      title: 'New Quote Request',
+      body: `New ${cuisineCategory} catering request for ${headcount} guests in ${deliveryCity} on ${eventDate}. Submit your quote now!`,
+      quoteRequestId,
+    });
+  }
+}
+
+// ── NEW: Notify customer that a vendor submitted a quote response ──
+
+/**
+ * In-app bell notification when a vendor responds to a customer's RFP.
+ * (The email/SMS/push path already exists via notifyVendorQuoteReceived in notificationService.ts.)
+ */
+export async function notifyCustomerQuoteReceived(
+  customerId: string,
+  quoteRequestId: string,
+  businessName: string,
+  total: number,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: customerId,
+    type: 'quote_received',
+    title: 'New Vendor Quote',
+    body: `${businessName} submitted a quote for $${(total / 100).toFixed(2)}. Compare quotes and accept items to proceed.`,
+    quoteRequestId,
+    businessName,
+  });
+}
+
+// ── NEW: Notify vendor that their quote was declined ──
+
+export async function notifyVendorQuoteDeclined(
+  vendorOwnerId: string,
+  quoteRequestId: string,
+  businessName: string,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: vendorOwnerId,
+    type: 'quote_accepted',      // closest existing type; semantically "quote decision"
+    title: 'Quote Not Selected',
+    body: `The customer did not select your quote for ${businessName}. You'll receive future requests matching your profile.`,
+    quoteRequestId,
+    businessName,
+  });
+}
+
+// ── NEW: Notify the other party when an order is cancelled ──
+
+export async function notifyOrderCancelled(
+  recipientId: string,
+  orderId: string,
+  businessName: string,
+  cancelledBy: 'customer' | 'vendor',
+  reason: string,
+): Promise<void> {
+  const who = cancelledBy === 'customer' ? 'The customer' : businessName;
+  await sendCateringNotification({
+    recipientId,
+    type: 'order_cancelled',
+    title: 'Order Cancelled',
+    body: `${who} cancelled the order${reason ? `: ${reason}` : '.'}`,
+    orderId,
+    businessName,
+  });
+}
+
+// ── NEW: Notify vendors when a quote request (RFP) is cancelled ──
+
+export async function notifyVendorRfpCancelled(
+  vendorOwnerId: string,
+  quoteRequestId: string,
+  businessName: string,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: vendorOwnerId,
+    type: 'rfp_edited',          // reuse closest type
+    title: 'Quote Request Cancelled',
+    body: `A quote request you responded to for ${businessName} has been cancelled by the customer.`,
+    quoteRequestId,
+    businessName,
+  });
+}
+
+// ── NEW: Notify customer when their RFP is cancelled (confirmation) ──
+
+export async function notifyCustomerRfpCancelled(
+  customerId: string,
+  quoteRequestId: string,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: customerId,
+    type: 'rfp_expired',         // reuse closest type
+    title: 'Quote Request Cancelled',
+    body: 'Your quote request has been cancelled. Any submitted vendor quotes have been declined.',
+    quoteRequestId,
+  });
+}
+
+// ── NEW: Notify vendor their quote was accepted (in-app bell) ──
+
+export async function notifyVendorQuoteAccepted(
+  vendorOwnerId: string,
+  quoteRequestId: string,
+  businessName: string,
+  customerName: string,
+  itemCount: number,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: vendorOwnerId,
+    type: 'quote_accepted',
+    title: 'Quote Accepted!',
+    body: `${customerName} accepted ${itemCount} item${itemCount !== 1 ? 's' : ''} from ${businessName}. Customer contact details are now visible.`,
+    quoteRequestId,
+    businessName,
+  });
+}

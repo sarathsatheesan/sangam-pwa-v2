@@ -30,7 +30,13 @@ import {
 import type { Unsubscribe } from 'firebase/firestore';
 
 import { db } from '../firebase';
-import { notifyVendorItemReassigned, notifyVendorsRfpEdited } from './cateringNotifications';
+import {
+  notifyVendorItemReassigned,
+  notifyVendorsRfpEdited,
+  notifyCustomerRfpCancelled,
+  notifyVendorRfpCancelled,
+  notifyCustomerRfpExpired,
+} from './cateringNotifications';
 
 const QUOTE_REQUESTS_COL = 'cateringQuoteRequests';
 const QUOTE_RESPONSES_COL = 'cateringQuoteResponses';
@@ -742,12 +748,25 @@ export async function closeQuoteRequest(requestId: string): Promise<void> {
     cancelledAt: serverTimestamp(),
   });
 
-  // Auto-decline all submitted responses
+  // Auto-decline all submitted responses + collect vendor owner IDs for notifications
   const allResponses = await fetchQuoteResponsesByRequest(requestId);
+  const vendorOwnerIdsToNotify: Array<{ ownerId: string; businessName: string }> = [];
   for (const resp of allResponses) {
     if (resp.status === 'submitted' || resp.status === 'partially_accepted') {
       await updateDoc(doc(db, QUOTE_RESPONSES_COL, resp.id), { status: 'declined' });
     }
+    // Collect vendor owners to notify (all who had responded, regardless of status)
+    if (resp.vendorOwnerId) {
+      vendorOwnerIdsToNotify.push({ ownerId: resp.vendorOwnerId, businessName: resp.businessName });
+    }
+  }
+
+  // Notify customer their RFP was cancelled (in-app, fire-and-forget)
+  notifyCustomerRfpCancelled(data.customerId, requestId).catch(console.warn);
+
+  // Notify all vendors who had responded (in-app, fire-and-forget)
+  for (const { ownerId, businessName } of vendorOwnerIdsToNotify) {
+    notifyVendorRfpCancelled(ownerId, requestId, businessName).catch(console.warn);
   }
 }
 
@@ -823,6 +842,10 @@ export async function expireStaleQuoteRequests(): Promise<number> {
           await updateDoc(doc(db, QUOTE_RESPONSES_COL, resp.id), { status: 'expired' });
         }
       }
+
+      // Notify customer their RFP expired (in-app, fire-and-forget)
+      const itemCount = (data.items || []).length;
+      notifyCustomerRfpExpired(data.customerId, requestDoc.id, itemCount).catch(console.warn);
 
       expiredCount++;
     }
