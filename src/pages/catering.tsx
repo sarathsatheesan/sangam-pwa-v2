@@ -447,7 +447,7 @@ export default function CateringPage() {
         // ── Create new quote request ──
         const expiresAt = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
-        await createQuoteRequest({
+        const newRequestId = await createQuoteRequest({
           customerId: user.uid,
           deliveryCity: rfpForm.deliveryCity,
           cuisineCategory: state.selectedCategory || '',
@@ -465,7 +465,7 @@ export default function CateringPage() {
         addToast('Quote request sent! You can edit it within 24 hours (if the event is more than 2 days away).', 'success', 7000);
         // Fire-and-forget: notify customer (email/SMS/push)
         notifyQuoteRequestSubmitted(
-          user.uid, '', state.selectedCategory || '', rfpForm.eventDate, rfpForm.headcount,
+          user.uid, newRequestId, state.selectedCategory || '', rfpForm.eventDate, rfpForm.headcount,
         ).catch(() => {});
 
         // Fire-and-forget: notify vendors (in-app + email/SMS/push)
@@ -482,12 +482,12 @@ export default function CateringPage() {
               if (ownerIds.length > 0) {
                 // In-app bell notifications
                 notifyVendorsNewQuoteRequest(
-                  ownerIds, '', state.selectedCategory || '', rfpForm.deliveryCity,
+                  ownerIds, newRequestId, state.selectedCategory || '', rfpForm.deliveryCity,
                   rfpForm.headcount, rfpForm.eventDate,
                 ).catch(() => {});
                 // Multi-channel (email/SMS/push)
                 notifyVendorsNewRFQ(
-                  ownerIds, '', state.selectedCategory || '', rfpForm.deliveryCity, rfpForm.headcount,
+                  ownerIds, newRequestId, state.selectedCategory || '', rfpForm.deliveryCity, rfpForm.headcount,
                 ).catch(() => {});
               }
             } catch { /* non-blocking */ }

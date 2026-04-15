@@ -255,8 +255,8 @@ export async function cancelOrder(
     }).catch(console.warn);
   } else if (cancelledBy === 'vendor') {
     // Vendor cancelled → notify customer
-    notifyOrderCancelled(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason);
-    notifyOrderCancelledMultiChannel(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason);
+    notifyOrderCancelled(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason).catch(console.warn);
+    notifyOrderCancelledMultiChannel(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason).catch(console.warn);
   }
 }
 

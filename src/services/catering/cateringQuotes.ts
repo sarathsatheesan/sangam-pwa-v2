@@ -37,6 +37,7 @@ import {
   notifyVendorRfpCancelled,
   notifyCustomerRfpExpired,
 } from './cateringNotifications';
+import { notifyVendorsRfpCancelledMultiChannel } from '../notificationService';
 
 const QUOTE_REQUESTS_COL = 'cateringQuoteRequests';
 const QUOTE_RESPONSES_COL = 'cateringQuoteResponses';
@@ -764,9 +765,13 @@ export async function closeQuoteRequest(requestId: string): Promise<void> {
   // Notify customer their RFP was cancelled (in-app, fire-and-forget)
   notifyCustomerRfpCancelled(data.customerId, requestId).catch(console.warn);
 
-  // Notify all vendors who had responded (in-app, fire-and-forget)
+  // Notify all vendors who had responded (in-app + multi-channel, fire-and-forget)
+  const vendorOwnerIdsList = vendorOwnerIdsToNotify.map(v => v.ownerId);
   for (const { ownerId, businessName } of vendorOwnerIdsToNotify) {
     notifyVendorRfpCancelled(ownerId, requestId, businessName).catch(console.warn);
+  }
+  if (vendorOwnerIdsList.length > 0) {
+    notifyVendorsRfpCancelledMultiChannel(vendorOwnerIdsList, requestId).catch(console.warn);
   }
 }
 
