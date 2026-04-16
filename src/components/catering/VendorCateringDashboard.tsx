@@ -23,7 +23,6 @@ import {
   deferPaymentSetup,
   formatPrice,
   calculateOrderTotal,
-  // findOrCreateConversation removed — messaging now uses OrderNotes
   subscribeToCateringNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -37,14 +36,17 @@ import ReviewModerationPanel from './ReviewModerationPanel';
 import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { STATUS_THEME } from '@/constants/cateringStatusTheme';
-
-const VENDOR_CANCEL_REASONS = [
-  'Item unavailable',
-  'Cannot fulfill timeline',
-  'Customer no-show',
-  'Kitchen issue',
-  'Other',
-];
+import {
+  NewOrderBanner,
+  ReminderAlerts,
+  VendorNotificationPanel,
+  PaymentSetupBanner,
+  ReminderSettingsModal,
+  CancelOrderModal,
+  BatchActionBar,
+  OnboardingPills,
+  OrderCard,
+} from './vendor';
 
 interface VendorCateringDashboardProps {
   businessId: string;
@@ -630,47 +632,15 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
   return (
     <div className="space-y-4">
       {/* SB-14: New order persistent banner */}
-      {newOrderBanner && (
-        <div
-          className="flex items-center justify-between p-3 rounded-xl border animate-pulse"
-          style={{ backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F59E0B' }}>
-              <Bell size={16} className="text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: '#92400E' }}>
-                New order from {newOrderBanner.customerName}
-              </p>
-              <p className="text-xs" style={{ color: '#A16207' }}>
-                {formatPrice(newOrderBanner.total)}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setExpandedOrder(newOrderBanner.orderId);
-                setFilter('pending');
-                setNewOrderBanner(null);
-              }}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white"
-              style={{ backgroundColor: '#F59E0B' }}
-            >
-              View Order
-            </button>
-            <button
-              onClick={() => setNewOrderBanner(null)}
-              className="p-2.5 rounded hover:bg-amber-200 transition-colors"
-              style={{ minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              aria-label="Dismiss"
-            >
-              <X size={16} style={{ color: '#92400E' }} />
-            </button>
-          </div>
-        </div>
-      )}
+      <NewOrderBanner
+        banner={newOrderBanner}
+        onDismiss={() => setNewOrderBanner(null)}
+        onView={(orderId) => {
+          setExpandedOrder(orderId);
+          setFilter('pending');
+          setNewOrderBanner(null);
+        }}
+      />
 
       {/* ═══════════════════════════════════════════════════════════════════
           UNIFIED COMMAND BAR
@@ -838,81 +808,19 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
             </button>
           )}
           {/* Notification bell — icon + count badge */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowNotifPanel(!showNotifPanel)}
-              className="relative inline-flex items-center justify-center rounded-lg transition-colors"
-              style={{
-                color: 'var(--aurora-text-secondary, #6b7280)',
-                width: 32,
-                height: 32,
-                WebkitTapHighlightColor: 'transparent',
-                WebkitAppearance: 'none',
-                appearance: 'none',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-              aria-label={`Notifications${notifications.filter(n => !n.read).length > 0 ? ` (${notifications.filter(n => !n.read).length} unread)` : ''}`}
-            >
-              <Bell size={16} />
-              {notifications.filter(n => !n.read).length > 0 && (
-                <span
-                  className="absolute flex items-center justify-center rounded-full text-[9px] font-bold text-white"
-                  style={{ top: 2, right: 2, width: 14, height: 14, backgroundColor: '#EF4444' }}
-                >
-                  {notifications.filter(n => !n.read).length > 9 ? '9+' : notifications.filter(n => !n.read).length}
-                </span>
-              )}
-            </button>
-            {showNotifPanel && (
-              <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto rounded-xl border shadow-lg z-50" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
-                <div className="p-3 border-b flex items-center justify-between sticky top-0" style={{ borderColor: 'var(--aurora-border)', backgroundColor: 'var(--aurora-surface)' }}>
-                  <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Notifications</span>
-                  {notifications.filter(n => !n.read).length > 0 && (
-                    <button
-                      onClick={() => {
-                        if (!user?.uid) return;
-                        markAllNotificationsRead(user.uid).catch(console.warn);
-                      }}
-                      className="text-xs text-indigo-600 hover:text-indigo-800"
-                    >
-                      Mark all read
-                    </button>
-                  )}
-                </div>
-                {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-sm" style={{ color: 'var(--aurora-text-muted)' }}>No notifications yet</div>
-                ) : (
-                  notifications.slice(0, 20).map((n) => (
-                    <div
-                      key={n.id}
-                      onClick={() => {
-                        // Mark this notification as read
-                        if (!n.read) {
-                          markNotificationRead(n.id).catch(console.warn);
-                        }
-                        setShowNotifPanel(false);
-                        // Route to the correct tab based on notification content
-                        if (n.orderId) {
-                          // Order-related notification → stay on orders tab, expand order
-                          setExpandedOrder(n.orderId);
-                        } else if (n.quoteRequestId) {
-                          // Quote-related notification → switch to quotes tab
-                          onSwitchVendorTab?.('quotes');
-                        }
-                      }}
-                      className={`p-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!n.read ? 'bg-indigo-50/50' : ''}`}
-                    >
-                      <div className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>{n.title}</div>
-                      <div className="text-xs mt-0.5" style={{ color: 'var(--aurora-text-secondary)' }}>{n.body}</div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
+          <VendorNotificationPanel
+            notifications={notifications}
+            showPanel={showNotifPanel}
+            onToggle={setShowNotifPanel}
+            onNotificationClick={(n) => {
+              if (n.orderId) {
+                setExpandedOrder(n.orderId);
+              } else if (n.quoteRequestId) {
+                onSwitchVendorTab?.('quotes');
+              }
+            }}
+            userId={user?.uid}
+          />
           {/* (Old duplicate toolbar — Audio/Reminders/Payment/Batch/Pending —
               and the separate Pause Toggle strip have been consolidated into
               the unified command bar above. One row on desktop; wraps
@@ -930,342 +838,52 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
       `}</style>
 
       {/* ── Payment setup reminder banner ─────────────────────────────── */}
-      {/* Shown when no payment info is saved AND the vendor hasn't deferred
-          past "now". Non-blocking — orders still come through regardless. */}
-      {showPaymentReminder && (
-        <div
-          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-xl border mb-4"
-          style={{
-            borderColor: '#FCD34D',
-            backgroundColor: '#FFFBEB',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          role="status"
-          aria-live="polite"
-        >
-          <div className="flex items-start gap-2 min-w-0">
-            <CreditCard size={18} style={{ color: '#B45309', flexShrink: 0, marginTop: 2 }} />
-            <div className="min-w-0">
-              <p className="text-sm font-medium" style={{ color: '#78350F' }}>
-                Add a payment link (optional)
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: '#92400E' }}>
-                Orders will still come through without it — set it up whenever you're ready.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 sm:flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setShowPaymentSettings(true)}
-              className="inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-xs font-medium text-white transition-colors"
-              style={{
-                backgroundColor: 'var(--aurora-accent)',
-                minHeight: 40,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Set up now
-            </button>
-            <button
-              type="button"
-              onClick={() => handleDeferPayment(7)}
-              disabled={paymentDeferring}
-              className="inline-flex items-center justify-center px-3 rounded-lg text-xs font-medium border transition-colors disabled:opacity-50"
-              style={{
-                borderColor: '#FCD34D',
-                color: '#78350F',
-                backgroundColor: 'rgba(255,255,255,0.7)',
-                minHeight: 40,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {paymentDeferring ? <Loader2 size={12} className="animate-spin" /> : 'Remind me later'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Deferred state info — shown when vendor has snoozed the reminder. */}
-      {!hasPaymentInfo && paymentReminderHidden && !showPaymentSettings && paymentSkippedUntil !== null && (
-        <div
-          className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg mb-4 text-xs"
-          style={{
-            backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)',
-            color: 'var(--aurora-text-secondary, #6b7280)',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <span className="inline-flex items-center gap-1.5">
-            <Clock3 size={12} />
-            Payment setup reminder snoozed until {formatSnoozeDate(paymentSkippedUntil)}
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowPaymentSettings(true)}
-            className="font-medium underline"
-            style={{ color: 'var(--aurora-accent)', WebkitTapHighlightColor: 'transparent' }}
-          >
-            Set up now
-          </button>
-        </div>
-      )}
-
-      {/* ── Payment settings panel (#13) ── */}
-      {/* Payment setup is OPTIONAL — vendors can save now, skip with a reminder,
-          or close entirely. None of these paths block order acceptance. */}
-      {showPaymentSettings && (
-        <div
-          className="p-4 rounded-xl border space-y-3"
-          style={{ borderColor: 'var(--aurora-accent)', backgroundColor: 'rgba(99,102,241,0.03)' }}
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold" style={{ color: 'var(--aurora-accent)' }}>Payment Settings</p>
-            <button
-              type="button"
-              onClick={() => setShowPaymentSettings(false)}
-              aria-label="Close payment settings"
-              className="inline-flex items-center justify-center rounded-md"
-              style={{ minWidth: 32, minHeight: 32, WebkitTapHighlightColor: 'transparent' }}
-            >
-              <X size={16} style={{ color: 'var(--aurora-text-muted, #6b7280)' }} />
-            </button>
-          </div>
-          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary, #6b7280)' }}>
-            Add your payment link so customers can pay you directly. You can skip this for now —
-            orders will still come through.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>
-                Payment Method
-              </label>
-              <input
-                type="text"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                placeholder="e.g. Venmo, PayPal, Zelle"
-                autoComplete="off"
-                autoCapitalize="words"
-                spellCheck={false}
-                className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none"
-                style={{
-                  borderColor: 'var(--aurora-border, #e5e7eb)',
-                  color: 'var(--aurora-text, #1a1a2e)',
-                  backgroundColor: 'var(--aurora-surface, #fff)',
-                  fontSize: '16px', // prevents iOS Safari zoom-on-focus
-                  WebkitAppearance: 'none',
-                  minHeight: 44,
-                }}
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>
-                Payment URL
-              </label>
-              <input
-                type="url"
-                inputMode="url"
-                value={paymentUrl}
-                onChange={(e) => setPaymentUrl(e.target.value)}
-                placeholder="https://venmo.com/your-handle"
-                autoComplete="url"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none"
-                style={{
-                  borderColor: 'var(--aurora-border, #e5e7eb)',
-                  color: 'var(--aurora-text, #1a1a2e)',
-                  backgroundColor: 'var(--aurora-surface, #fff)',
-                  fontSize: '16px',
-                  WebkitAppearance: 'none',
-                  minHeight: 44,
-                }}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] font-medium" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>
-              Payment Instructions
-            </label>
-            <textarea
-              value={paymentNote}
-              onChange={(e) => setPaymentNote(e.target.value)}
-              placeholder="e.g. Please include order # in the memo"
-              rows={2}
-              className="w-full mt-1 rounded-lg border px-3 py-2 text-sm outline-none resize-none"
-              style={{
-                borderColor: 'var(--aurora-border, #e5e7eb)',
-                color: 'var(--aurora-text, #1a1a2e)',
-                backgroundColor: 'var(--aurora-surface, #fff)',
-                fontSize: '16px',
-                WebkitAppearance: 'none',
-              }}
-            />
-          </div>
-
-          {/* Action row — Save, Remind me later, Dismiss */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleSavePayment}
-              disabled={paymentSaving || paymentDeferring}
-              className="inline-flex items-center justify-center gap-1.5 px-4 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors"
-              style={{
-                backgroundColor: 'var(--aurora-accent)',
-                minHeight: 44,
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {paymentSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              Save Payment Info
-            </button>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleDeferPayment(7)}
-                disabled={paymentSaving || paymentDeferring}
-                className="inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-sm font-medium border disabled:opacity-50 transition-colors"
-                style={{
-                  borderColor: 'var(--aurora-border, #e5e7eb)',
-                  color: 'var(--aurora-text-secondary, #6b7280)',
-                  backgroundColor: 'var(--aurora-surface, #fff)',
-                  minHeight: 44,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {paymentDeferring ? <Loader2 size={14} className="animate-spin" /> : <Clock3 size={14} />}
-                Remind me in 7 days
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDeferPayment(30)}
-                disabled={paymentSaving || paymentDeferring}
-                className="inline-flex items-center justify-center px-3 rounded-lg text-sm font-medium border disabled:opacity-50 transition-colors"
-                style={{
-                  borderColor: 'var(--aurora-border, #e5e7eb)',
-                  color: 'var(--aurora-text-secondary, #6b7280)',
-                  backgroundColor: 'var(--aurora-surface, #fff)',
-                  minHeight: 44,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                Remind me in 30 days
-              </button>
-            </div>
-          </div>
-          <p className="text-[11px] pt-1" style={{ color: 'var(--aurora-text-muted, #9ca3af)' }}>
-            You can set up payment any time from this dashboard — customers can still place orders in the meantime.
-          </p>
-        </div>
-      )}
+      <PaymentSetupBanner
+        visible
+        showPaymentReminder={showPaymentReminder}
+        paymentUrl={paymentUrl}
+        paymentMethod={paymentMethod}
+        paymentNote={paymentNote}
+        paymentSkippedUntil={!paymentReminderHidden ? null : paymentSkippedUntil}
+        hasPaymentInfo={hasPaymentInfo}
+        showPaymentSettings={showPaymentSettings}
+        setShowPaymentSettings={setShowPaymentSettings}
+        onSave={handleSavePayment}
+        onDefer={handleDeferPayment}
+        onDeferPayment={handleDeferPayment}
+        paymentSaving={paymentSaving}
+        paymentDeferring={paymentDeferring}
+        onPaymentMethodChange={setPaymentMethod}
+        onPaymentUrlChange={setPaymentUrl}
+        onPaymentNoteChange={setPaymentNote}
+        formatSnoozeDate={formatSnoozeDate}
+      />
 
       {/* ── Reminder Settings Panel ── */}
-      {showReminderSettings && (
-        <div className="p-4 rounded-xl border space-y-3" style={{ borderColor: '#8B5CF6', backgroundColor: 'rgba(139,92,246,0.03)' }}>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold" style={{ color: '#8B5CF6' }}>Reminder Settings</p>
-            <button onClick={() => setShowReminderSettings(false)} className="p-1"><X size={14} style={{ color: 'var(--aurora-text-muted)' }} /></button>
-          </div>
-          <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-            Configure when you receive order reminders and alerts.
-          </p>
-          <label className="flex items-center justify-between gap-3 py-2">
-            <div>
-              <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Pending order alerts</span>
-              <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>Alert when an order sits pending for 30+ minutes</p>
-            </div>
-            <input type="checkbox" checked={reminderSettings.pendingAlert}
-              onChange={(e) => saveReminderSettings({ ...reminderSettings, pendingAlert: e.target.checked })}
-              className="accent-purple-600 w-4 h-4" />
-          </label>
-          <label className="flex items-center justify-between gap-3 py-2">
-            <div>
-              <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Preparing too long</span>
-              <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>Remind when an order has been preparing for 2+ hours</p>
-            </div>
-            <input type="checkbox" checked={reminderSettings.preparingReminder}
-              onChange={(e) => saveReminderSettings({ ...reminderSettings, preparingReminder: e.target.checked })}
-              className="accent-purple-600 w-4 h-4" />
-          </label>
-          <label className="flex items-center justify-between gap-3 py-2">
-            <div>
-              <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>Event day reminder</span>
-              <p className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>Remind when an event date is approaching</p>
-            </div>
-            <input type="checkbox" checked={reminderSettings.eventDayReminder}
-              onChange={(e) => saveReminderSettings({ ...reminderSettings, eventDayReminder: e.target.checked })}
-              className="accent-purple-600 w-4 h-4" />
-          </label>
-          {reminderSettings.eventDayReminder && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Remind</label>
-              <select
-                value={reminderSettings.reminderLeadHours}
-                onChange={(e) => saveReminderSettings({ ...reminderSettings, reminderLeadHours: Number(e.target.value) })}
-                className="rounded-lg border px-2 py-1.5 text-xs outline-none"
-                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-              >
-                <option value={6}>6 hours</option>
-                <option value={12}>12 hours</option>
-                <option value={24}>24 hours</option>
-                <option value={48}>48 hours</option>
-              </select>
-              <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>before the event</span>
-            </div>
-          )}
-        </div>
-      )}
+      <ReminderSettingsModal
+        isOpen={showReminderSettings}
+        reminderSettings={reminderSettings}
+        onSaveSettings={saveReminderSettings}
+        onClose={() => setShowReminderSettings(false)}
+      />
 
       {/* ── Active Reminders Banner ── */}
-      {activeReminders.length > 0 && (
-        <div className="space-y-1.5">
-          {activeReminders.slice(0, 3).map((r) => (
-            <button
-              key={r.id}
-              onClick={() => { setExpandedOrder(r.orderId); setSectionExpanded(prev => ({ ...prev, [r.type === 'event' ? 'active' : r.type]: true })); }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs transition-colors hover:opacity-80"
-              style={{
-                backgroundColor: r.type === 'pending' ? '#FEF3C7' : r.type === 'preparing' ? '#DBEAFE' : '#F3E8FF',
-                color: r.type === 'pending' ? '#92400E' : r.type === 'preparing' ? '#1E40AF' : '#6B21A8',
-              }}
-            >
-              {r.type === 'pending' ? <Timer size={14} /> : r.type === 'preparing' ? <Clock size={14} /> : <BellRing size={14} />}
-              <span className="font-medium flex-1">{r.message}</span>
-              <ChevronDown size={12} />
-            </button>
-          ))}
-          {activeReminders.length > 3 && (
-            <p className="text-[10px] text-center" style={{ color: 'var(--aurora-text-muted)' }}>+{activeReminders.length - 3} more reminders</p>
-          )}
-        </div>
-      )}
+      <ReminderAlerts
+        reminders={activeReminders}
+        onExpand={(orderId, sectionKey) => {
+          setExpandedOrder(orderId);
+          setSectionExpanded((prev) => ({ ...prev, [sectionKey]: true }));
+        }}
+      />
 
       {/* ── Batch action bar (#17) ── */}
-      {batchMode && selectedOrders.size > 0 && (
-        <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: 'rgba(99,102,241,0.06)' }}>
-          <span className="text-sm font-medium" style={{ color: 'var(--aurora-accent)' }}>
-            {selectedOrders.size} order(s) selected
-          </span>
-          <div className="flex gap-2">
-            <button onClick={() => handleBatchAction('confirmed')} disabled={batchLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-              style={{ backgroundColor: '#10B981' }}
-            >
-              {batchLoading ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-              Accept All
-            </button>
-            <button onClick={() => setShowBatchDeclineConfirm(true)} disabled={batchLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50"
-              style={{ backgroundColor: '#EF4444' }}
-            >
-              {batchLoading ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
-              Decline All
-            </button>
-          </div>
-        </div>
-      )}
+      <BatchActionBar
+        batchMode={batchMode}
+        selectedOrders={selectedOrders}
+        onConfirmAll={() => handleBatchAction('confirmed')}
+        onDeclineAll={() => setShowBatchDeclineConfirm(true)}
+        loading={batchLoading}
+      />
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* ACCORDION SECTIONS: Pending → Active → Completed               */}
@@ -1284,131 +902,12 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
               <p className="text-sm mb-6" style={{ color: 'var(--aurora-text-secondary)' }}>
                 You&apos;re all set to receive catering orders. Here&apos;s how to get started:
               </p>
-              {/* Interactive onboarding pills — glassy (frosted) look.
-                  Pill 1 opens payment settings, Pill 2 switches to Menu tab,
-                  Pill 3 is informational with a distinct emerald palette.
-
-                  Glassy look implementation:
-                  • Semi-transparent white background (rgba 0.55)
-                  • backdrop-filter: blur() with -webkit- prefix (Safari/iOS)
-                  • Tinted border-color rgba
-                  • Subtle inset highlight via boxShadow
-                  Firefox ≥103 supports backdrop-filter natively; earlier Firefox
-                  falls back to the translucent background alone (still looks fine).
-                  iOS Safari 9+ and Android Chrome 76+ both support -webkit-backdrop-filter. */}
-              <div className="text-left space-y-3 mb-5">
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentSettings(true)}
-                  aria-label="Set up payment info (optional)"
-                  className="group w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2"
-                  style={{
-                    borderColor: 'rgba(99, 102, 241, 0.22)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.55)',
-                    backdropFilter: 'blur(10px) saturate(140%)',
-                    WebkitBackdropFilter: 'blur(10px) saturate(140%)',
-                    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                    WebkitTapHighlightColor: 'transparent',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                    minHeight: 44,
-                    '--tw-ring-color': 'var(--aurora-accent)',
-                  } as React.CSSProperties}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.borderColor = 'rgba(99, 102, 241, 0.55)';
-                    el.style.backgroundColor = 'rgba(255, 255, 255, 0.72)';
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.borderColor = 'rgba(99, 102, 241, 0.22)';
-                    el.style.backgroundColor = 'rgba(255, 255, 255, 0.55)';
-                  }}
-                >
-                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: 'var(--aurora-accent)', boxShadow: '0 2px 6px rgba(99, 102, 241, 0.35)' }}>1</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium flex items-center justify-between gap-2" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>
-                      <span>
-                        Set up payment info <span className="text-[10px] font-normal" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>(optional)</span>
-                      </span>
-                      <span className="text-[11px] font-semibold shrink-0" style={{ color: 'var(--aurora-accent)' }} aria-hidden="true">Open →</span>
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>Add your payment link so customers can pay you — you can skip and add this later</p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (onSwitchVendorTab) onSwitchVendorTab('menu');
-                    else addToast('Open the Menu tab to add items', 'info');
-                  }}
-                  aria-label="Add menu items — opens the Menu tab"
-                  className="group w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2"
-                  style={{
-                    borderColor: 'rgba(139, 92, 246, 0.22)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.55)',
-                    backdropFilter: 'blur(10px) saturate(140%)',
-                    WebkitBackdropFilter: 'blur(10px) saturate(140%)',
-                    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                    WebkitTapHighlightColor: 'transparent',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                    minHeight: 44,
-                    '--tw-ring-color': '#8B5CF6',
-                  } as React.CSSProperties}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.borderColor = 'rgba(139, 92, 246, 0.55)';
-                    el.style.backgroundColor = 'rgba(255, 255, 255, 0.72)';
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget as HTMLButtonElement;
-                    el.style.borderColor = 'rgba(139, 92, 246, 0.22)';
-                    el.style.backgroundColor = 'rgba(255, 255, 255, 0.55)';
-                  }}
-                >
-                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#8B5CF6', boxShadow: '0 2px 6px rgba(139, 92, 246, 0.35)' }}>2</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium flex items-center justify-between gap-2" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>
-                      <span>Add menu items</span>
-                      <span className="text-[11px] font-semibold shrink-0" style={{ color: '#8B5CF6' }} aria-hidden="true">Open →</span>
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>Create your catering menu so customers can browse</p>
-                  </div>
-                </button>
-
-                {/* Pill 3 — informational, glassy, emerald palette to read as
-                    "status / awaiting" rather than "todo". Not a button. */}
-                <div
-                  className="flex items-start gap-3 p-3 rounded-xl border"
-                  style={{
-                    borderColor: 'rgba(16, 185, 129, 0.22)',
-                    backgroundColor: 'rgba(236, 253, 245, 0.55)',
-                    backdropFilter: 'blur(10px) saturate(140%)',
-                    WebkitBackdropFilter: 'blur(10px) saturate(140%)',
-                    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                  }}
-                  aria-label="Your first order will appear here — informational"
-                >
-                  <span
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                    style={{ backgroundColor: '#10B981', boxShadow: '0 2px 6px rgba(16, 185, 129, 0.35)' }}
-                  >
-                    3
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium flex items-center gap-2" style={{ color: '#065F46' }}>
-                      <span>Your first order will appear here</span>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#047857' }} aria-hidden="true">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#10B981' }} />
-                        Waiting
-                      </span>
-                    </p>
-                    <p className="text-xs" style={{ color: '#047857' }}>You&apos;ll get an alert with a chime when a new order comes in</p>
-                  </div>
-                </div>
-              </div>
+              {/* Interactive onboarding pills */}
+              <OnboardingPills
+                hasPaymentInfo={hasPaymentInfo}
+                onOpenPaymentSettings={() => setShowPaymentSettings(true)}
+                onSwitchVendorTab={onSwitchVendorTab}
+              />
               {/* Bottom action row removed — Pill 1 now handles payment setup,
                   and the reminder banner at top of the dashboard handles snooze.
                   We keep only the reassuring caption. */}
@@ -2618,61 +2117,18 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
       <ReviewModerationPanel businessId={businessId} />
 
       {/* Cancel order dialog */}
-      {cancellingOrderId && (
-        <div ref={cancelModalRef} onKeyDown={cancelKeyDown} className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label="Cancel order">
-          <div className="absolute inset-0 bg-black/40" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={() => !cancelSubmitting && setCancellingOrderId(null)} />
-          <div className="relative mx-4 w-full max-w-sm rounded-2xl p-6 shadow-2xl" style={{ backgroundColor: 'var(--aurora-surface, #fff)' }}>
-            <h3 className="text-lg font-bold mb-1" style={{ color: 'var(--aurora-text)' }}>Cancel Order</h3>
-            <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
-              Please select a reason for cancelling this order.
-            </p>
-            <div className="space-y-2 mb-4">
-              {VENDOR_CANCEL_REASONS.map((reason) => (
-                <label key={reason} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                  <input
-                    type="radio"
-                    name="vendor-cancel-reason"
-                    value={reason}
-                    checked={cancelReason === reason}
-                    onChange={() => setCancelReason(reason)}
-                    className="accent-red-500"
-                  />
-                  <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>{reason}</span>
-                </label>
-              ))}
-              {cancelReason === 'Other' && (
-                <textarea
-                  value={cancelOtherText}
-                  onChange={(e) => setCancelOtherText(e.target.value)}
-                  placeholder="Please describe..."
-                  rows={2}
-                  maxLength={200}
-                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none resize-none focus:ring-2 focus:ring-red-300"
-                  style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                />
-              )}
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setCancellingOrderId(null)}
-                disabled={cancelSubmitting}
-                className="flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
-                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-              >
-                Go Back
-              </button>
-              <button
-                onClick={handleCancelOrder}
-                disabled={cancelSubmitting || !cancelReason}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: '#EF4444' }}
-              >
-                {cancelSubmitting ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Cancel Order'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CancelOrderModal
+        isOpen={!!cancellingOrderId}
+        cancelReason={cancelReason}
+        cancelOtherText={cancelOtherText}
+        onReasonChange={setCancelReason}
+        onOtherTextChange={setCancelOtherText}
+        onSubmit={handleCancelOrder}
+        onClose={() => setCancellingOrderId(null)}
+        loading={cancelSubmitting}
+        modalRef={cancelModalRef}
+        onKeyDown={cancelKeyDown}
+      />
 
       {/* Messaging is now handled inline via OrderMessages component on each order card */}
 

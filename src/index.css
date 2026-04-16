@@ -610,6 +610,13 @@ button, a, [role="button"] {
   }
 }
 
+/* Sticky positioning fallback for iOS Safari < 13 */
+@supports not (position: sticky) {
+  .sticky {
+    position: -webkit-sticky;
+  }
+}
+
 /* iOS Safari: border-radius + overflow clipping fix */
 .rounded-2xl.overflow-hidden {
   -webkit-mask-image: -webkit-radial-gradient(white, black);

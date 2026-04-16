@@ -210,6 +210,11 @@ export class GroupCallManager {
     });
 
     try {
+      // Cross-browser: Check mediaDevices API availability (iOS Safari, older Firefox)
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Microphone/camera access not supported in your browser');
+      }
+
       // Acquire local media
       const constraints: MediaStreamConstraints = {
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -296,6 +301,11 @@ export class GroupCallManager {
       }
 
       const callType = roomData.callType as GroupCallType;
+
+      // Cross-browser: Check mediaDevices API availability (iOS Safari, older Firefox)
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Microphone/camera access not supported in your browser');
+      }
 
       // Acquire local media
       const constraints: MediaStreamConstraints = {
@@ -780,6 +790,10 @@ export class GroupCallManager {
     }
 
     try {
+      // Cross-browser: Check getDisplayMedia API availability (Firefox, iOS Safari don't support it)
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        throw new Error('Screen sharing not supported in your browser');
+      }
       const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: { width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
@@ -840,6 +854,11 @@ export class GroupCallManager {
     if (!this.localStream || this.state.isScreenSharing) return;
 
     try {
+      // Cross-browser: Check mediaDevices API availability before flipping camera
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera switching not supported in your browser');
+      }
+
       const currentTrack = this.localStream.getVideoTracks()[0];
       const currentFacing = currentTrack?.getSettings()?.facingMode || 'user';
       const newFacing = currentFacing === 'user' ? 'environment' : 'user';

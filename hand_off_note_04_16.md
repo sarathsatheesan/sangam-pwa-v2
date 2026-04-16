@@ -17,14 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** April 16, 2026 (Last updated: Session 32+)
+**Date:** April 16, 2026 (Last updated: Session 32++ — Karpathy Code Review Implementation)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** `96de901` (Session 32+) — refactor(marketplace): replace heritage pills with shared CountryEthnicitySelector
-**Uncommitted:** Karpathy coding skill (`.claude/skills/karpathy-coding/`), code review report (`sangam-pwa-v2-code-review.html`), `hand_off_note_04_16.md`, `archive/` directory. All code changes committed and pushed to origin.
+**Latest Commit:** `97197ab` (Session 32++) — docs: update handoff note through Session 32+ and archive old files
+**Uncommitted:** `hand_off_note_04_16.md` (this file), `sangam-pwa-v2-code-review.html` (report). All code changes committed and pushed to origin. Needs `npm run build && firebase deploy --only hosting` from macOS.
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
 **Live bundle:** Deployed and live at `https://mithr-1e5f4.web.app`
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix), Session 28 (RFP-to-Order conversion + in-order messaging + Firestore rules fix), Session 28b (Live testing of quote-to-order pipeline + 19 TypeScript error fixes + RFP badge on active/pending orders), Session 29 (Vendor Storefront Builder: grocery templates + TemplateSelector rebuild + 10 critical bug fixes across Add Item / Delete / Smart Paste / Edit flows), Session 30 (Multi-Business Architecture: global business switcher + vendor dashboard per-business routing + business registration fixes + Add Another Business flow from Settings + 6 UX bug fixes + QA Test Execution Report (48 tests) + 4 additional QA bug fixes + UI flicker elimination), Session 30b (Vendor Dashboard Header Refactor: BusinessSwitcher breadcrumb placement + Dashboard CTA + dual-role navigation fix with suppressVendorAutoSwitchRef + "My Orders" rename), Session 31 (Notification Deep-Link Routing: role field on CateringNotification + 3-tier fallback routing + vendor dashboard inline bell routing + background push handler + race condition fix), Session 32 (Handoff Note Consolidation + White-Page QA Audit + ErrorBoundary + Null Guard Fixes), Session 32+ (Profile Page Enhancements + Admin Avatar Fix + Contextual CTAs + Deep-Link Creation Forms + Heritage Selector Standardization + Karpathy Coding Skill + Full-App Karpathy Code Review)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix), Session 28 (RFP-to-Order conversion + in-order messaging + Firestore rules fix), Session 28b (Live testing of quote-to-order pipeline + 19 TypeScript error fixes + RFP badge on active/pending orders), Session 29 (Vendor Storefront Builder: grocery templates + TemplateSelector rebuild + 10 critical bug fixes across Add Item / Delete / Smart Paste / Edit flows), Session 30 (Multi-Business Architecture: global business switcher + vendor dashboard per-business routing + business registration fixes + Add Another Business flow from Settings + 6 UX bug fixes + QA Test Execution Report (48 tests) + 4 additional QA bug fixes + UI flicker elimination), Session 30b (Vendor Dashboard Header Refactor: BusinessSwitcher breadcrumb placement + Dashboard CTA + dual-role navigation fix with suppressVendorAutoSwitchRef + "My Orders" rename), Session 31 (Notification Deep-Link Routing: role field on CateringNotification + 3-tier fallback routing + vendor dashboard inline bell routing + background push handler + race condition fix), Session 32 (Handoff Note Consolidation + White-Page QA Audit + ErrorBoundary + Null Guard Fixes), Session 32+ (Profile Page Enhancements + Admin Avatar Fix + Contextual CTAs + Deep-Link Creation Forms + Heritage Selector Standardization + Karpathy Coding Skill + Full-App Karpathy Code Review), Session 32++ (Karpathy Code Review Implementation — 30 findings across 4 sprints: Sprint 1 reliability fixes, Sprint 2 type safety/dedup, Sprint 3 structural improvements, Sprint 4 polish — all validated with tsc + vite build)
 
 ---
 
@@ -273,6 +273,45 @@ TypeScript check and Vite build both pass clean after all fixes. Changes are unc
 - Key critical findings: god components (messages.tsx 5,744 lines), 13 duplicate page files, unsafe `.data()` calls, missing onSnapshot try-catch, memory leak risks
 - Cross-browser compliance: Chrome 98%, Safari 92%, Firefox 78%, iOS Safari 90%, Android Chrome 95%
 - **Report ready for user review — no code changes implemented yet from the review**
+
+**Session 32++ focused on:** Full implementation of the Karpathy Code Review — all 30 findings across 4 sprints, following a strict Validate-Before-Advance protocol (tsc + vite build gate after each sprint):
+
+**Sprint 1 — Reliability (7 items):**
+- C2: Deleted 11 duplicate page files from pages/main/ (~27,000 lines dead code eliminated — the cp sync pattern is now FULLY eliminated for all pages except messages.tsx and business.tsx)
+- C3: Fixed 50+ unsafe `.data()` calls with `.exists()` guards and cached data access across housing.tsx, settings.tsx, auth.ts, useBusinessReviews.ts, QuoteComparison.tsx, AnnouncementBanner.tsx
+- C4: Added error callbacks to 8 `onSnapshot` listeners in feed.tsx, travel.tsx, events.tsx, webrtc.ts, groupWebrtc.ts
+- C5: Verified subscription cleanup patterns — already safe
+- H5: Memoized context values in AuthContext, UserSettingsContext, NotificationContext (useMemo wrapping provider values)
+- H8: Removed invalid `-webkit-sticky` inline style from discover.tsx (Tailwind `sticky` class sufficient)
+- M4: Aligned theme-color `#F5F6FA` between index.html and vite.config.ts manifest
+
+**Sprint 2 — Type Safety + Dedup (8 items):**
+- H1: Created `src/types/firestore.ts` — 15 Firestore document interfaces (710 lines): UserProfile, BusinessListing, MarketplaceItem, EventDoc, FeedPost, ChatMessage, Conversation, CateringMenuItem, CateringOrder, CateringQuoteRequest, CateringQuoteResponse, BannedUser, DisabledUser, AppConfig, Report. All have `[key: string]: any` for backward compat.
+- H2: Created `src/utils/dateFormatting.ts` — shared `timeAgo()`, `formatTimestamp()`, `formatDate()` with safe Firestore Timestamp conversion. Replaced 11 duplicate implementations across 8 files.
+- H3: Defined `--aurora-accent` (#6366F1), `--aurora-danger` (#EF4444), `--aurora-warning` (#F59E0B) CSS vars for light+dark modes. Replaced ~115 inline hardcoded hex values in messages.tsx, VendorCateringDashboard.tsx, VendorQuoteResponse.tsx, OrderTemplates.tsx, catering.tsx.
+- H4: Fixed quote finalization race condition — removed pre-transaction duplicate check in cateringOrders.ts (the in-transaction `ordersCreated` flag is the sole atomic guard now)
+- H6: Fixed useEffect dependency array in profile.tsx (added `savedItems.length`)
+- H7: Documented error handling convention in cateringOrders.ts header comment
+- M5: Added Firefox `scrollbar-width: thin` and `scrollbar-color` to index.css
+- M9: Removed unused `ETHNICITY_OPTIONS` alias from config.ts (HERITAGE_OPTIONS still actively used)
+
+**Sprint 3 — Structural (8 items):**
+- C1/M6: Created 29KB `docs/god-component-decomposition-plan.md` — detailed extraction plan for messages.tsx (9 sub-components + 18 hooks), admin.tsx (10 sub-components), VendorCateringDashboard.tsx (10 sub-components + 8 hooks). Extracted `AvatarImg` as proof-of-concept shared component.
+- M1: Added ARIA attributes to 11 modals (role="dialog", aria-modal, aria-label/labelledby) in profile.tsx, marketplace.tsx, events.tsx. Added keyboard accessibility to 2 clickable divs in marketplace.tsx.
+- M2: Added 4 reusable CSS utility classes: `.aurora-glass-overlay`, `.aurora-card-shadow`, `.aurora-tap-highlight`, `.aurora-scroll-touch`
+- M3: Verified animations already use performant transform/opacity properties; `prefers-reduced-motion` already exists
+- M7: Added per-route `<Suspense>` boundaries with `PageLoader` fallback to all lazy-loaded routes in App.tsx
+- M8: Added `will-change: transform` to GlobalCallOverlay PiP and slideInRight animation
+- M10: Added `loading="lazy"` + `decoding="async"` to listing images in marketplace, feed, events
+
+**Sprint 4 — Polish (7 items):**
+- L1: Created `src/utils/logger.ts` — production-silent logger (`import.meta.env.PROD` gates non-error logs)
+- L2: Documented import ordering convention (10-group hierarchy)
+- L3: Removed 3 dead CSS keyframes: typingBounce, heartFloat, marqueeScroll
+- L4: Fixed 12 index-based `key` props with stable IDs in admin.tsx, feed.tsx, marketplace.tsx, events.tsx
+- L5: Added maskable icon variant to PWA manifest
+- L6: Confirmed all external links already have `rel="noopener noreferrer"`
+- L7: Added bundle size baseline comments to vite.config.ts
 
 **Key architectural change in Session 20:** The `cp` sync pattern for `discover.tsx` was ELIMINATED. Unlike `messages.tsx` and `business.tsx` which still require `cp` sync, `discover.tsx` was verified to only be imported from `src/pages/discover.tsx` (not `main/`). The duplicate `src/pages/main/discover.tsx` was deleted. This is the first page to break free of the duplicate architecture.
 
@@ -2186,14 +2225,11 @@ bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules
 - **New files (10)**: `.env`, `src/pages/business/register.tsx`, `src/hooks/useGooglePlaces.ts`, `src/components/business/registration/BusinessRegistrationWizard.tsx`, `StepIdentity.tsx`, `StepLocation.tsx`, `StepVerification.tsx`, `StepDetails.tsx`, `StepReview.tsx`, `src/services/businessRegistration.ts`
 - **Modified files (6)**: `FeatureSettingsContext.tsx`, `businessReducer.ts`, `businessValidation.ts`, `App.tsx`, `src/pages/admin.tsx`, `src/pages/main/admin.tsx`
 
-### Duplicate Page Architecture (partially cleaned — `discover.tsx` eliminated, others remain)
-- `src/pages/main/` contains near-identical copies of 11 pages from `src/pages/` (was 12 — `discover.tsx` removed in Session 20)
-- `App.tsx` only imports from `src/pages/` — the `main/` copies are dead code (~27,000+ lines)
-- Only 3 files are unique to `main/`: `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`
-- `messages.tsx` and `business.tsx` are still kept in sync via `cp` command; the other 9 have drifted
-- **Session 20 precedent:** `discover.tsx` cp sync was safely eliminated after verifying `App.tsx` imports. This same approach can be applied to other pages one-by-one.
-- **User decision (Session 10): full refactor too risky, doing incrementally instead**
-- When ready for each page: verify `App.tsx` only imports from `src/pages/`, then delete the `main/` duplicate
+### Duplicate Page Architecture — FULLY CLEANED ✅ (Session 32++)
+- **All 11 duplicate page files deleted from `src/pages/main/`** in Sprint 1 (C2) — ~27,000 lines of dead code eliminated
+- `src/pages/main/` now only contains: `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`, `auth/` — all unique files
+- The `cp` sync pattern is fully eliminated — no more manual file copying needed
+- `App.tsx` imports exclusively from `src/pages/` (except `home.tsx` from `pages/main/`)
 
 ### Call System (mostly working, but fragile)
 - Audio and video calls work Chrome-Chrome and Chrome-Safari, but edge cases remain
@@ -2238,7 +2274,12 @@ bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules
 - **Cross-Browser CSS Prefixes:** ✅ COMPLETE (Session 32+) — -webkit-keyframes, -webkit-animation, -webkit-transform for slideInRight/fadeSlideUp/slideUp; -webkit-backdrop-filter and -webkit-overflow-scrolling on profile page
 - **Karpathy Coding Principles Skill:** ✅ COMPLETE (Session 32+) — .claude/skills/karpathy-coding/SKILL.md with 4 universal principles + ethniCity project patterns
 - **Full-App Karpathy Code Review:** ✅ COMPLETE (Session 32+) — 3 parallel audits, 30 findings (5C/8H/10M/7L), interactive HTML report generated, 4-sprint implementation plan. **Awaiting user review before implementation.**
-- **All Session 32+ code changes committed** — 7 commits from `bec1c56` through `96de901`. 9 total commits ahead of origin — needs `git push` + `npm run build && firebase deploy --only hosting` from macOS
+- **All Session 32+ code changes committed** — 7 commits from `bec1c56` through `96de901`
+- **Karpathy Code Review — Sprint 1 (Reliability):** ✅ COMPLETE (Session 32++) — 11 duplicate pages deleted, 50+ unsafe .data() guarded, 8 onSnapshot error callbacks, 3 contexts memoized, -webkit-sticky fixed, theme-color aligned
+- **Karpathy Code Review — Sprint 2 (Type Safety + Dedup):** ✅ COMPLETE (Session 32++) — 15 Firestore interfaces created, 11 duplicate formatters consolidated, ~115 hex values replaced with Aurora vars, race condition fixed, useEffect deps fixed, Firefox scrollbar, ETHNICITY_OPTIONS alias removed
+- **Karpathy Code Review — Sprint 3 (Structural):** ✅ COMPLETE (Session 32++) — god-component decomposition plan created, AvatarImg extracted, 11 modals + 2 divs ARIA-tagged, 4 CSS utility classes, per-route Suspense, will-change hints, lazy-loading images
+- **Karpathy Code Review — Sprint 4 (Polish):** ✅ COMPLETE (Session 32++) — logger utility, 3 dead keyframes removed, 12 key props fixed, maskable icon, bundle baseline documented
+- **All Session 32++ code changes committed and pushed** — 5 commits from `0386a56` through `97197ab`. Needs `npm run build && firebase deploy --only hosting` from macOS
 
 **New files created in Sessions 23-24:**
 - `src/components/catering/CateringOrderStatus.tsx` — Customer order tracking with visual timeline
@@ -2293,21 +2334,22 @@ bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules
      ================================================================ -->
 ## 5. Exact Next Steps
 
-### Immediate — Push + Build + Deploy
-- **9 commits ahead of origin — needs push + build + deploy** — From macOS terminal:
+### Immediate — Build + Deploy
+- **All code committed and pushed to origin** — From macOS terminal:
   ```bash
   cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
-  git push origin main
   npm run build && firebase deploy --only hosting
   ```
-  CRITICAL: Must run `npm run build` before deploy or stale bundle gets deployed. All code changes are committed locally (Sessions 31, 32, 32+). Just needs push + deploy.
+  CRITICAL: Must run `npm run build` before deploy or stale bundle gets deployed.
 
-### Next — Implement Karpathy Code Review Findings (User-Approved)
-- **Review the code review report** (`sangam-pwa-v2-code-review.html`) — 30 findings across 4 severity tiers with a 4-sprint implementation plan
-- **Sprint 1 (Quick reliability wins, ~4hr):** Remove 13 duplicate page files (C2), add .exists() guards on .data() calls (C3), wrap onSnapshot in try-catch (C4), fix subscription cleanup/memory leaks (C5), memoize context values (H5), fix -webkit-sticky (H8), align theme-color values (M4)
-- **Sprint 2 (Type safety + dedup, ~9hr):** Define Firestore document interfaces to replace `any` (H1), extract shared formatTimestamp util (H2), batch Firestore writes in quote finalization (H4), audit useEffect deps (H6), standardize service error handling (H7), replace hardcoded hex with Aurora vars (H3), add Firefox scrollbar styles (M5), audit HERITAGE_OPTIONS usage (M9)
-- **Sprint 3 (Structural decomposition, ~16hr):** Decompose god components (C1 — messages, admin, business, vendor), add ARIA attributes (M1), extract repeated inline styles (M2), optimize animations (M3), per-route Suspense boundaries (M7), will-change hints (M8), image lazy-loading (M10)
-- **Sprint 4 (Polish, ~3hr):** Console.log cleanup, import ordering, dead keyframes, missing keys, maskable icon, noopener, Lighthouse CI
+### Next — God Component Decomposition (from decomposition plan)
+- **Execute god-component decomposition** following `docs/god-component-decomposition-plan.md`:
+  - Phase 1: Extract hooks from messages.tsx (useConversations, useMessages, useMessageActions)
+  - Phase 2: Extract JSX sub-components (ChatMessageList, ChatComposer, ConversationSidebar)
+  - Phase 3: Apply same pattern to admin.tsx (10 sub-components) and VendorCateringDashboard.tsx (10 sub-components + 8 hooks)
+  - Target: messages.tsx from 5,744 → ~300-400 lines; admin.tsx from 3,335 → ~150-200 lines
+- **Incrementally replace `any` casts with Firestore interfaces** from `src/types/firestore.ts` — start with the most-used: UserProfile, BusinessListing, CateringOrder
+- **Replace remaining Tailwind hardcoded hex** (`bg-[#6366F1]`) with Aurora variable-based classes
 - **Test after deploy**: (1) Click Profile — should load without white page even with incomplete Firestore data. (2) Click Saved Orders — should load even with favorites missing `items` or `lastOrderedAt` fields. (3) Deploy new version, then navigate WITHOUT refreshing — `lazyRetry` should handle stale chunks gracefully. (4) Test notification routing end-to-end — vendor/customer deep-links should work.
 - **Backfill existing Firestore notifications (optional)** — Existing notifications lack role field. Body-text heuristic handles legacy data, but a migration script could set role on all existing docs.
 - **2 open low-priority QA bugs** — (1) no duplicate business name detection, (2) no network error retry on addDoc failure. Recommended for next sprint.
@@ -2355,8 +2397,8 @@ Current group calls use mesh topology (max 8). For 16+ participants, deploy an S
 5. **Apply Discover architecture pattern to other pages** — The Discover refactor (useReducer + custom hooks + extracted components + accessibility) can serve as a template for Housing, Events, Feed, and other large pages.
 
 ### Medium Priority
-5. **Clean up duplicate page architecture** — Delete 12 duplicate files from `src/pages/main/` (keep only `home.tsx`, `select-ethnicity.tsx`, `signup.tsx`). Eliminates ~29,162 lines of dead code and the `cp` sync pattern. Cuts codebase from ~76k to ~47k lines. **User deferred in Session 10** — do this when the app is in a stable state.
-6. **Refactor large page files** — Messages (~5,744 lines), Admin (2,759), Housing (2,825), Events (2,788), Feed (2,703). Business is now the model to follow (useReducer + hooks + components pattern).
+5. ~~**Clean up duplicate page architecture**~~ ✅ DONE (Session 32++ Sprint 1) — Deleted 11 duplicate files from `src/pages/main/`. Eliminated ~27,000 lines dead code and `cp` sync pattern.
+6. **Refactor large page files** — Decomposition plan in `docs/god-component-decomposition-plan.md`. Messages (~5,744 lines), Admin (3,335), VendorCateringDashboard (2,719). Business is the reference model (useReducer + hooks + components: 2,500→552 lines).
 7. **Map integration for other modules** — Housing listings and event locations can reuse the Leaflet CDN pattern from BusinessMapView.
 8. **Add pagination** — Implement infinite scroll or cursor-based pagination in remaining modules.
 
@@ -2731,7 +2773,7 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   2. At the end of the session, update this file AND create a new docs/handoff/SESSION_XX.md
   3. The session file should include inline comments explaining WHY, not just WHAT
   4. Update the session list in the header comment and the "Session history" field
-  Last updated: Session 32+ (April 16, 2026)
+  Last updated: Session 32++ (April 16, 2026)
 -->
 
 *Updated April 16, 2026 (Session 32+) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phases 1-6 ALL COMPLETE (Sessions 22-23). UX Audit + Critical Fixes COMPLETE (Session 24). Medium+Large Effort Features + Architecture Refactor ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit ALL 30 findings COMPLETE (Session 26). UI Overhaul + QA + 21 Bug Fixes ALL COMPLETE (Session 27). RFP-to-Order + In-Order Messaging ALL COMPLETE (Session 28/28b). Vendor Storefront Builder + 10 Bug Fixes ALL COMPLETE (Session 29). Multi-Business Architecture + QA Audit (48 tests) + UI Flicker Fix ALL COMPLETE (Session 30). Vendor Dashboard Header Refactor + Dual-Role Nav Fix + "My Orders" Rename ALL COMPLETE (Session 30b). Notification Deep-Link Routing ALL COMPLETE (Session 31). Handoff Note Consolidation + White-Page QA Audit + ErrorBoundary & Null Guard Fixes ALL COMPLETE (Session 32). Profile Page Enhancements + Admin Avatar Fix + Contextual CTAs + Deep-Link Creation Forms + Heritage Selector Standardization + Karpathy Coding Skill + Full-App Karpathy Code Review ALL COMPLETE (Session 32+). All code committed locally — 9 commits ahead of origin, needs `git push` + `npm run build && firebase deploy --only hosting` from macOS. Critical context: ToastContext exposes `addToast` NOT `showToast`; Firestore rejects `undefined` — always strip; aurora CSS vars that DON'T exist: --aurora-primary, --aurora-green, --aurora-bg-secondary, --aurora-text-primary, --aurora-accent; useBusinessSwitcher() API: { businesses, selectedBusiness, selectBusiness, loading, isMultiBusiness }; CateringNotification now has `role?: 'vendor' | 'customer'` field; VENDOR_TYPE_FALLBACK set: new_order, modification_rejected, quote_accepted, item_reassigned, rfp_edited, reprice_requested; BOTH_PARTY_TYPES: order_cancelled, reprice_resolved (use body-text heuristic for legacy); App.tsx has `AppErrorBoundary` wrapping Routes + `lazyRetry()` on all 24 lazy imports (Session 32); always use `(field || '').substring()` for Firestore text and `(array || []).map()` for Firestore arrays; dietary tags snake_case; categories Title Case; `archived` not `isArchived`; ParsedMenuItem.price in cents; PWA SW cache can serve stale bundles — must build before deploy; `ctaConfig` record in profile.tsx maps listingsFilter → CTA label/route (Session 32+); `isImageUrl()` + `AvatarImg` helper in admin.tsx for safe avatar rendering (Session 32+); `CountryEthnicitySelector` is single source of truth for heritage — uses `"Country - Ethnicity"` scoped key format; `?action=add` deep-link pattern on business, marketplace, events pages triggers creation modal auto-open; Karpathy coding skill at `.claude/skills/karpathy-coding/SKILL.md` — auto-loads in Cowork sessions. Design tokens: primary #6366F1, error #EF4444, success #22c55e. Next: (1) git push + build + deploy, (2) test all profile page CTAs + deep-links, (3) test heritage selector in marketplace, (4) review code review report and approve sprints for implementation, (5) Phase 7 UX improvements, (6) sort/filter controls on item list. Long-term: payment integration, multi-vendor cart, driver tracking, recommendation engine, code review Sprint 1-4 implementation.*

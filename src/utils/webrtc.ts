@@ -150,6 +150,11 @@ export class CallManager {
   // ── Media Helpers ────────────────────────────────────────────────
 
   private async getMedia(callType: CallType): Promise<MediaStream> {
+    // Cross-browser: Check mediaDevices API availability (iOS Safari, older Firefox)
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Microphone/camera access not supported in your browser. Please use a modern browser like Chrome, Safari 14+, or Firefox.');
+    }
+
     const constraints: MediaStreamConstraints = {
       audio: {
         echoCancellation: true,
@@ -594,6 +599,10 @@ export class CallManager {
     console.log('[WebRTC] Switching camera from', this.currentFacingMode, 'to', newFacingMode);
 
     try {
+      // Cross-browser: Verify mediaDevices is still available
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera switching not supported in your browser');
+      }
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { exact: newFacingMode },

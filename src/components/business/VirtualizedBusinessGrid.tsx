@@ -59,6 +59,13 @@ const VirtualizedBusinessGrid: React.FC<VirtualizedBusinessGridProps> = React.me
 
   // Set up IntersectionObserver
   useEffect(() => {
+    // Cross-browser: IntersectionObserver is not available in older browsers
+    // Safari < 12.1, IE 11, older Firefox. For those, we fall back to no virtualization.
+    if (!window.IntersectionObserver) {
+      console.warn('[VirtualizedBusinessGrid] IntersectionObserver not available, falling back to simple grid');
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         setVisibleChunks((prev) => {
