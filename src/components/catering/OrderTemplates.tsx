@@ -288,7 +288,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--aurora-accent)' }} />
       </div>
     );
   }
@@ -311,8 +311,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
           onClick={() => setLookupMode(!lookupMode)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border"
           style={{
-            color: lookupMode ? '#6366F1' : 'var(--aurora-text-secondary)',
-            borderColor: lookupMode ? '#6366F1' : 'var(--aurora-border)',
+            color: lookupMode ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+            borderColor: lookupMode ? 'var(--aurora-accent)' : 'var(--aurora-border)',
           }}
         >
           <Link2 size={12} />
@@ -327,8 +327,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
           className="px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
           style={{
             backgroundColor: activeTab === 'mine' ? 'rgba(99,102,241,0.1)' : 'transparent',
-            color: activeTab === 'mine' ? '#6366F1' : 'var(--aurora-text-secondary)',
-            borderColor: activeTab === 'mine' ? '#6366F1' : 'var(--aurora-border)',
+            color: activeTab === 'mine' ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+            borderColor: activeTab === 'mine' ? 'var(--aurora-accent)' : 'var(--aurora-border)',
           }}
         >
           My Templates
@@ -338,8 +338,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
           style={{
             backgroundColor: activeTab === 'discover' ? 'rgba(99,102,241,0.1)' : 'transparent',
-            color: activeTab === 'discover' ? '#6366F1' : 'var(--aurora-text-secondary)',
-            borderColor: activeTab === 'discover' ? '#6366F1' : 'var(--aurora-border)',
+            color: activeTab === 'discover' ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+            borderColor: activeTab === 'discover' ? 'var(--aurora-accent)' : 'var(--aurora-border)',
           }}
         >
           <Sparkles size={14} />
@@ -373,7 +373,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
               onClick={handleLookup}
               disabled={lookingUp || !shareCodeInput.trim()}
               className="px-4 py-2 rounded-xl text-sm font-medium text-white disabled:opacity-50"
-              style={{ backgroundColor: '#6366F1' }}
+              style={{ backgroundColor: 'var(--aurora-accent)' }}
             >
               {lookingUp ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
             </button>
@@ -425,8 +425,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
               className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: createMode === 'from_favorite' ? 'rgba(99,102,241,0.1)' : 'transparent',
-                color: createMode === 'from_favorite' ? '#6366F1' : 'var(--aurora-text-secondary)',
-                borderColor: createMode === 'from_favorite' ? '#6366F1' : 'var(--aurora-border)',
+                color: createMode === 'from_favorite' ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+                borderColor: createMode === 'from_favorite' ? 'var(--aurora-accent)' : 'var(--aurora-border)',
               }}
             >
               From Favorite
@@ -436,8 +436,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
               className="flex-1 px-4 py-2 rounded-xl text-sm font-medium border transition-colors"
               style={{
                 backgroundColor: createMode === 'from_scratch' ? 'rgba(99,102,241,0.1)' : 'transparent',
-                color: createMode === 'from_scratch' ? '#6366F1' : 'var(--aurora-text-secondary)',
-                borderColor: createMode === 'from_scratch' ? '#6366F1' : 'var(--aurora-border)',
+                color: createMode === 'from_scratch' ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+                borderColor: createMode === 'from_scratch' ? 'var(--aurora-accent)' : 'var(--aurora-border)',
               }}
             >
               Create from Scratch
@@ -489,8 +489,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
                       style={{
                         backgroundColor: isPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
-                        color: isPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
-                        borderColor: isPublic ? '#6366F1' : 'var(--aurora-border)',
+                        color: isPublic ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+                        borderColor: isPublic ? 'var(--aurora-accent)' : 'var(--aurora-border)',
                       }}
                     >
                       <Globe size={12} />
@@ -501,8 +501,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
                       style={{
                         backgroundColor: !isPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
-                        color: !isPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
-                        borderColor: !isPublic ? '#6366F1' : 'var(--aurora-border)',
+                        color: !isPublic ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+                        borderColor: !isPublic ? 'var(--aurora-accent)' : 'var(--aurora-border)',
                       }}
                     >
                       <Lock size={12} />
@@ -531,7 +531,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                   onClick={handleCreateFromFavorite}
                   disabled={submitting}
                   className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50"
-                  style={{ backgroundColor: '#6366F1' }}
+                  style={{ backgroundColor: 'var(--aurora-accent)' }}
                 >
                   {submitting ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
                   {submitting ? 'Creating...' : 'Create Template'}
@@ -606,8 +606,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
                       style={{
                         backgroundColor: scratchIsPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
-                        color: scratchIsPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
-                        borderColor: scratchIsPublic ? '#6366F1' : 'var(--aurora-border)',
+                        color: scratchIsPublic ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+                        borderColor: scratchIsPublic ? 'var(--aurora-accent)' : 'var(--aurora-border)',
                       }}
                     >
                       <Globe size={12} />
@@ -618,8 +618,8 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors"
                       style={{
                         backgroundColor: !scratchIsPublic ? 'rgba(99,102,241,0.1)' : 'transparent',
-                        color: !scratchIsPublic ? '#6366F1' : 'var(--aurora-text-secondary)',
-                        borderColor: !scratchIsPublic ? '#6366F1' : 'var(--aurora-border)',
+                        color: !scratchIsPublic ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary)',
+                        borderColor: !scratchIsPublic ? 'var(--aurora-accent)' : 'var(--aurora-border)',
                       }}
                     >
                       <Lock size={12} />
@@ -649,7 +649,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                     <button
                       onClick={() => setScratchItems([...scratchItems, {name: '', qty: 1, unitPrice: 0, pricingType: 'per_person'}])}
                       className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-white"
-                      style={{ backgroundColor: '#6366F1' }}
+                      style={{ backgroundColor: 'var(--aurora-accent)' }}
                     >
                       <Plus size={12} />
                       Add Item
@@ -725,7 +725,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                   onClick={handleCreateFromScratch}
                   disabled={creating}
                   className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50"
-                  style={{ backgroundColor: '#6366F1' }}
+                  style={{ backgroundColor: 'var(--aurora-accent)' }}
                 >
                   {creating ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
                   {creating ? 'Creating...' : 'Create Template'}
@@ -758,7 +758,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
               <button
                 onClick={() => setCreateMode('from_scratch')}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-white"
-                style={{ backgroundColor: '#6366F1' }}
+                style={{ backgroundColor: 'var(--aurora-accent)' }}
               >
                 <Plus size={14} />
                 Create from Scratch
@@ -897,7 +897,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
                               <button
                                 onClick={() => handleRestoreVersion(tmpl, vh)}
                                 className="text-[10px] font-medium px-2 py-1 rounded text-white"
-                                style={{ backgroundColor: '#6366F1' }}
+                                style={{ backgroundColor: 'var(--aurora-accent)' }}
                               >
                                 Restore
                               </button>
@@ -951,7 +951,7 @@ export default function OrderTemplates({ onBack, prefillFromFavorite, onUseTempl
         <>
           {loadingPublic ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+              <Loader2 size={24} className="animate-spin" style={{ color: 'var(--aurora-accent)' }} />
             </div>
           ) : publicTemplates.length === 0 ? (
             <div className="text-center py-16">

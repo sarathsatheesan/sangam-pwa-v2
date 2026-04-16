@@ -7,6 +7,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useModalA11y } from '@/hooks/useModalA11y';
+import { formatTimestamp } from '@/utils/dateFormatting';
 import {
   ArrowLeft, Clock, CheckCircle2, Package, Truck, XCircle, MapPin,
   User, Phone, Calendar, Users, ChevronDown, ChevronUp, Loader2,
@@ -62,20 +63,6 @@ function getStepIndex(status: string): number {
   return idx >= 0 ? idx : -1;
 }
 
-function formatTimestamp(ts: any): string {
-  if (!ts) return '';
-  let d: Date;
-  if (typeof ts.toDate === 'function') d = ts.toDate();
-  else if (typeof ts.seconds === 'number') d = new Date(ts.seconds * 1000);
-  else if (typeof ts === 'number') d = new Date(ts);
-  else if (typeof ts === 'string') d = new Date(ts);
-  else d = new Date(ts);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    timeZoneName: 'short',
-  });
-}
 
 export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps) {
   const { user } = useAuth();

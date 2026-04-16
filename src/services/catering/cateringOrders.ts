@@ -2,6 +2,15 @@
 // CATERING ORDERS — Order CRUD, status management, payments, messaging
 // ═══════════════════════════════════════════════════════════════════════
 
+/**
+ * Error Handling Convention (H7):
+ * - All public service functions use try-catch internally
+ * - Errors are logged with console.error('[ServiceName] context:', error)
+ * - Critical mutations (order creation, payment) re-throw after logging
+ * - Non-critical reads (analytics, preferences) return fallback values silently
+ * - Fire-and-forget writes (logging, analytics) use .catch(() => {}) to avoid blocking
+ */
+
 import {
   collection,
   addDoc,
@@ -673,17 +682,6 @@ export async function createOrdersFromQuote(
       console.log('[createOrdersFromQuote] Idempotency key matched — returning existing order IDs');
       return idemSnap.docs.map((d) => d.id);
     }
-  }
-
-  // FIX-C1: Duplicate prevention — check BEFORE creating (outside transaction for index query,
-  // but we'll re-check inside with a marker field on the quote request itself for atomicity)
-  const existingOrdersSnap = await getDocs(query(
-    collection(db, ORDERS_COL),
-    where('quoteRequestId', '==', quoteRequest.id),
-  ));
-  if (existingOrdersSnap.size > 0) {
-    console.log('[createOrdersFromQuote] Orders already exist for quote', quoteRequest.id, '— returning existing IDs');
-    return existingOrdersSnap.docs.map((d) => d.id);
   }
 
   // Group assignments by vendor (businessId → assignments[])

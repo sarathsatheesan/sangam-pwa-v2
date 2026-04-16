@@ -554,7 +554,7 @@ export default function VendorQuoteResponse({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--aurora-accent)' }} />
         <span className="ml-2 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>Loading quote requests...</span>
       </div>
     );
@@ -567,7 +567,7 @@ export default function VendorQuoteResponse({
         className="flex items-start gap-3 p-3 rounded-xl"
         style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)' }}
       >
-        <ShieldCheck size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+        <ShieldCheck size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--aurora-accent)' }} />
         <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
           Customer details are hidden until they accept your quote. You'll be notified in real-time when a customer accepts.
         </p>
@@ -582,7 +582,7 @@ export default function VendorQuoteResponse({
               className="flex items-center gap-2 rounded-xl text-xs font-medium overflow-hidden"
               style={{
                 backgroundColor: r.type === 'open' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(99, 102, 241, 0.08)',
-                color: r.type === 'open' ? '#D97706' : '#6366F1',
+                color: r.type === 'open' ? '#D97706' : 'var(--aurora-accent)',
               }}
             >
               {/* Clickable pill — navigates to the request card */}
@@ -602,7 +602,7 @@ export default function VendorQuoteResponse({
                 onClick={(e) => { e.stopPropagation(); handleSnooze(r.id, 2 * 60 * 60 * 1000); }}
                 className="flex items-center gap-1 px-3 py-2 mr-1 rounded-lg text-[10px] font-semibold"
                 style={{
-                  color: r.type === 'open' ? '#D97706' : '#6366F1',
+                  color: r.type === 'open' ? '#D97706' : 'var(--aurora-accent)',
                   backgroundColor: r.type === 'open' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(99, 102, 241, 0.12)',
                   WebkitTapHighlightColor: 'transparent',
                 }}
@@ -638,7 +638,7 @@ export default function VendorQuoteResponse({
               <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>{label}</span>
               <div
                 className="w-10 h-5 rounded-full relative transition-colors cursor-pointer"
-                style={{ backgroundColor: (reminderSettings as any)[key] ? '#6366F1' : 'var(--aurora-border)' }}
+                style={{ backgroundColor: (reminderSettings as any)[key] ? 'var(--aurora-accent)' : 'var(--aurora-border)' }}
                 onClick={() => saveReminderSettings({ [key]: !(reminderSettings as any)[key] })}
               >
                 <div
@@ -782,7 +782,7 @@ export default function VendorQuoteResponse({
 
                       {/* Quote form */}
                       <div className="space-y-3">
-                        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6366F1' }}>
+                        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--aurora-accent)' }}>
                           Your Quote
                         </p>
                         {form.items.map((qi, idx) => {
@@ -801,7 +801,7 @@ export default function VendorQuoteResponse({
                                   <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>
                                     {qi.name} x {qi.qty}
                                   </span>
-                                  <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                                  <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: 'var(--aurora-accent)' }}>
                                     {pricingLabel}
                                   </span>
                                 </div>
@@ -899,7 +899,7 @@ export default function VendorQuoteResponse({
                         {/* Total preview */}
                         <div className="flex justify-between items-center p-3 rounded-xl" style={{ backgroundColor: 'var(--aurora-bg)' }}>
                           <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Quote Total</span>
-                          <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
+                          <span className="text-lg font-bold" style={{ color: 'var(--aurora-accent)' }}>
                             {formTotal > 0 ? formatPrice(formTotal) : '$0.00'}
                           </span>
                         </div>
@@ -909,7 +909,7 @@ export default function VendorQuoteResponse({
                           onClick={() => handleSubmitQuote(request)}
                           disabled={submittingId === request.id || formSubtotal === 0}
                           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
-                          style={{ backgroundColor: '#6366F1' }}
+                          style={{ backgroundColor: 'var(--aurora-accent)' }}
                         >
                           {submittingId === request.id ? (
                             <Loader2 size={16} className="animate-spin" />
@@ -1026,7 +1026,7 @@ export default function VendorQuoteResponse({
                         {request && <span className="flex items-center gap-1"><MapPin size={12} /> {request.deliveryCity}</span>}
                         {request && <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>}
                         <span>{request?.cuisineCategory}</span>
-                        <span className="font-medium" style={{ color: '#6366F1' }}>{formatPrice(response.total)}</span>
+                        <span className="font-medium" style={{ color: 'var(--aurora-accent)' }}>{formatPrice(response.total)}</span>
                       </div>
                     </div>
                     {isExpAccepted ? <ChevronUp size={18} className="opacity-40" /> : <ChevronDown size={18} className="opacity-40" />}
@@ -1039,7 +1039,7 @@ export default function VendorQuoteResponse({
                         <div className="pt-3">
                           <div className="flex items-center gap-3 flex-wrap text-xs mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
                             {request.eventType && (
-                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: 'var(--aurora-accent)' }}>
                                 {request.eventType.replace(/_/g, ' ')}
                               </span>
                             )}
@@ -1067,7 +1067,7 @@ export default function VendorQuoteResponse({
                               </div>
                             )}
                             <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}>
-                              <span>Total</span><span style={{ color: '#6366F1' }}>{formatPrice(response.total)}</span>
+                              <span>Total</span><span style={{ color: 'var(--aurora-accent)' }}>{formatPrice(response.total)}</span>
                             </div>
                           </div>
                           {request.specialInstructions && (
@@ -1149,8 +1149,8 @@ export default function VendorQuoteResponse({
           >
             <div className="flex items-center gap-3 flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold" style={{ color: '#6366F1' }}>Awaiting Decision</h3>
-                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#6366F1' }}>
+                <h3 className="font-semibold" style={{ color: 'var(--aurora-accent)' }}>Awaiting Decision</h3>
+                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: 'var(--aurora-accent)' }}>
                   {pendingResponses.length}
                 </span>
               </div>
@@ -1168,7 +1168,7 @@ export default function VendorQuoteResponse({
                 <option value="name-asc">Name: A → Z</option>
                 <option value="name-desc">Name: Z → A</option>
               </select>
-              {sectionExpanded.pending ? <ChevronUp size={18} style={{ color: '#6366F1' }} /> : <ChevronDown size={18} style={{ color: '#6366F1' }} />}
+              {sectionExpanded.pending ? <ChevronUp size={18} style={{ color: 'var(--aurora-accent)' }} /> : <ChevronDown size={18} style={{ color: 'var(--aurora-accent)' }} />}
             </div>
           </button>
 
@@ -1220,7 +1220,7 @@ export default function VendorQuoteResponse({
                       {isEditing && form ? (
                         <>
                           {/* Edit mode: quote form */}
-                          <p className="text-xs font-semibold uppercase tracking-wider pt-3" style={{ color: '#6366F1' }}>
+                          <p className="text-xs font-semibold uppercase tracking-wider pt-3" style={{ color: 'var(--aurora-accent)' }}>
                             Edit Your Quote
                           </p>
                           {form.items.map((qi, idx) => {
@@ -1233,7 +1233,7 @@ export default function VendorQuoteResponse({
                                     <span className="text-sm" style={{ color: 'var(--aurora-text)' }}>
                                       {qi.name} x {qi.qty}
                                     </span>
-                                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: '#6366F1' }}>
+                                    <span className="ml-2 text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.08)', color: 'var(--aurora-accent)' }}>
                                       {pricingLabel}
                                     </span>
                                   </div>
@@ -1318,7 +1318,7 @@ export default function VendorQuoteResponse({
                           {/* Total preview in edit mode */}
                           <div className="flex justify-between items-center p-3 rounded-xl" style={{ backgroundColor: 'var(--aurora-bg)' }}>
                             <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Updated Total</span>
-                            <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
+                            <span className="text-lg font-bold" style={{ color: 'var(--aurora-accent)' }}>
                               {formTotal > 0 ? formatPrice(formTotal) : '$0.00'}
                             </span>
                           </div>
@@ -1329,7 +1329,7 @@ export default function VendorQuoteResponse({
                               onClick={() => handleSaveQuoteChanges(response, request)}
                               disabled={submittingId === response.id || formSubtotal === 0}
                               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
-                              style={{ backgroundColor: '#6366F1' }}
+                              style={{ backgroundColor: 'var(--aurora-accent)' }}
                             >
                               {submittingId === response.id ? (
                                 <Loader2 size={16} className="animate-spin" />
@@ -1378,7 +1378,7 @@ export default function VendorQuoteResponse({
                           </div>
                           {/* Your submitted quote breakdown */}
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#6366F1' }}>
+                            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--aurora-accent)' }}>
                               Your Submitted Quote
                             </p>
                             {response.quotedItems.map((qi, i) => (
@@ -1398,7 +1398,7 @@ export default function VendorQuoteResponse({
                               </div>
                             )}
                             <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}>
-                              <span>Total</span><span style={{ color: '#6366F1' }}>{formatPrice(response.total)}</span>
+                              <span>Total</span><span style={{ color: 'var(--aurora-accent)' }}>{formatPrice(response.total)}</span>
                             </div>
                           </div>
                           {response.estimatedPrepTime && (
@@ -1515,7 +1515,7 @@ export default function VendorQuoteResponse({
                                         onClick={() => handleRepriceResponse(response, 'counter')}
                                         disabled={repriceRespondingId === response.id || !repriceCounterAmount}
                                         className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-50"
-                                        style={{ backgroundColor: '#6366F1' }}
+                                        style={{ backgroundColor: 'var(--aurora-accent)' }}
                                       >
                                         {repriceRespondingId === response.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
                                         Send Counter

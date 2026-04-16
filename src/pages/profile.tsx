@@ -529,7 +529,7 @@ export default function ProfilePage() {
     if (activeTab === 'saved' && savedItems.length === 0) {
       fetchSavedContent();
     }
-  }, [activeTab]);
+  }, [activeTab, savedItems.length]);
 
   const fetchSavedContent = async () => {
     if (!user?.uid) return;
@@ -1626,7 +1626,7 @@ export default function ProfilePage() {
          SETTINGS DRAWER
          ═══════════════════════════════════════════ */}
       {settingsOpen && (
-        <div className="fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Settings">
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/40" onClick={() => setSettingsOpen(false)} />
 
@@ -1634,7 +1634,7 @@ export default function ProfilePage() {
           <div className="absolute right-0 top-0 bottom-0 w-full max-w-sm bg-[var(--aurora-surface)] shadow-2xl overflow-y-auto animate-slideInRight">
             {/* Drawer header */}
             <div className="sticky top-0 bg-[var(--aurora-surface)] border-b border-[var(--aurora-border)] px-5 py-4 flex items-center justify-between z-10">
-              <h2 className="text-lg font-bold text-[var(--aurora-text)]">Settings</h2>
+              <h2 id="settings-modal-title" className="text-lg font-bold text-[var(--aurora-text)]">Settings</h2>
               <button
                 onClick={() => setSettingsOpen(false)}
                 className="w-8 h-8 rounded-full hover:bg-[var(--aurora-surface-variant)] flex items-center justify-center"
@@ -1754,7 +1754,7 @@ export default function ProfilePage() {
          EDIT PROFILE MODAL — Full-screen
          ═══════════════════════════════════════════ */}
       {editModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[var(--aurora-surface)] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-[var(--aurora-surface)] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="edit-profile-modal-title">
           {/* Modal Header */}
           <div className="flex-shrink-0 flex justify-between items-center px-5 py-3.5 border-b border-[var(--aurora-border)] bg-[var(--aurora-surface)]">
             <button
@@ -1763,7 +1763,7 @@ export default function ProfilePage() {
             >
               Cancel
             </button>
-            <h3 className="text-base font-bold text-[var(--aurora-text)]">Edit Profile</h3>
+            <h3 id="edit-profile-modal-title" className="text-base font-bold text-[var(--aurora-text)]">Edit Profile</h3>
             <button
               onClick={handleSaveProfile}
               disabled={isSaving}
@@ -2110,6 +2110,9 @@ export default function ProfilePage() {
         <div
           className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center"
           onClick={() => setListingDetail(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Listing details"
         >
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/50" />
@@ -2582,9 +2585,9 @@ export default function ProfilePage() {
 
       {/* Delete Data Confirmation Modal (two-step) */}
       {showDeleteDataConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={() => { setShowDeleteDataConfirm(false); setDeleteDataStep(1); }}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={() => { setShowDeleteDataConfirm(false); setDeleteDataStep(1); }} role="dialog" aria-modal="true" aria-labelledby="delete-data-modal-title">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mx-4 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            <h3 id="delete-data-modal-title" className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               {deleteDataStep === 1 ? 'Delete All Data?' : 'Final Warning'}
             </h3>
             <p className="text-gray-600 dark:text-gray-300 mb-4">

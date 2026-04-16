@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, Check, CheckCheck, Settings, ExternalLink } from 'lucide-react';
 import { useNotifications } from '../../contexts/NotificationContext';
 import type { CateringNotification } from '../../services/catering/cateringNotifications';
+import { timeAgo } from '../../utils/dateFormatting';
 
 // ─── Notification Icon Mapping ──────────────────────────────────────
 
@@ -32,22 +33,6 @@ function getNotificationIcon(type: CateringNotification['type']): string {
   return icons[type] || '\uD83D\uDD14';
 }
 
-function formatTimestamp(createdAt: any): string {
-  if (!createdAt) return '';
-  const ms = createdAt?.toMillis?.() || createdAt?.seconds * 1000 || 0;
-  if (!ms) return '';
-
-  const diff = Date.now() - ms;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return new Date(ms).toLocaleDateString();
-}
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -340,7 +325,7 @@ export default function NotificationBell() {
                           whiteSpace: 'nowrap',
                         }}
                       >
-                        {formatTimestamp(notif.createdAt)}
+                        {timeAgo(notif.createdAt)}
                       </span>
                     </div>
                     <p

@@ -118,7 +118,6 @@ export const HERITAGE_OPTIONS = [
   ...ETHNICITY_HIERARCHY.flatMap(r => r.subregions.flatMap(s => s.ethnicities)),
   ...Object.values(ETHNICITY_CHILDREN).flat(),
 ];
-export const ETHNICITY_OPTIONS = HERITAGE_OPTIONS;
 
 // Mapping of common terms to ethnicity suggestions for auto-suggest
 export const ETHNICITY_KEYWORDS: Record<string, string[]> = {

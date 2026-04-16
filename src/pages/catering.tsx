@@ -73,7 +73,7 @@ const OrderTemplates = React.lazy(() => import('@/components/catering/OrderTempl
 function LazyFallback() {
   return (
     <div className="flex items-center justify-center py-16">
-      <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+      <Loader2 size={24} className="animate-spin" style={{ color: 'var(--aurora-accent)' }} />
     </div>
   );
 }
@@ -733,7 +733,7 @@ export default function CateringPage() {
                 On every other view the icon + title text render together as before. */}
             {(getTitle() || state.view === 'vendor') && (
               <div className="flex items-center gap-2 min-w-0">
-                <ChefHat size={22} className="shrink-0" style={{ color: 'var(--aurora-primary, #6366F1)' }} />
+                <ChefHat size={22} className="shrink-0" style={{ color: 'var(--aurora-accent)' }} />
                 <h1 className="text-lg font-bold truncate hidden sm:block" style={{ color: 'var(--aurora-text, #1E2132)' }}>
                   {getTitle()}
                 </h1>
@@ -783,7 +783,7 @@ export default function CateringPage() {
               aria-label="Open my personal orders"
               className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
-                backgroundColor: state.view === 'orders' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                backgroundColor: state.view === 'orders' ? 'var(--aurora-accent)' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'orders' ? '#fff' : 'var(--aurora-text-secondary)',
                 minHeight: '36px',
                 WebkitTapHighlightColor: 'transparent',
@@ -803,7 +803,7 @@ export default function CateringPage() {
                 onClick={() => setShowMoreMenu(!showMoreMenu)}
                 className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
                 style={{
-                  backgroundColor: ['quotes', 'favorites', 'recurring', 'templates'].includes(state.view) ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                  backgroundColor: ['quotes', 'favorites', 'recurring', 'templates'].includes(state.view) ? 'var(--aurora-accent)' : 'var(--aurora-surface-variant, #EDF0F7)',
                   color: ['quotes', 'favorites', 'recurring', 'templates'].includes(state.view) ? '#fff' : 'var(--aurora-text-secondary)',
                   minHeight: '36px',
                 }}
@@ -830,7 +830,7 @@ export default function CateringPage() {
                         switchToPersonalView('quotes');
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
-                      style={{ color: state.view === 'quotes' ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
+                      style={{ color: state.view === 'quotes' ? 'var(--aurora-accent)' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
                     >
                       <FileText size={15} />
                       My Quotes
@@ -841,7 +841,7 @@ export default function CateringPage() {
                         switchToPersonalView('favorites');
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
-                      style={{ color: ['favorites', 'recurring'].includes(state.view) ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
+                      style={{ color: ['favorites', 'recurring'].includes(state.view) ? 'var(--aurora-accent)' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
                     >
                       <Heart size={15} />
                       Saved Orders
@@ -853,7 +853,7 @@ export default function CateringPage() {
                         switchToPersonalView('templates');
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
-                      style={{ color: state.view === 'templates' ? '#6366F1' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
+                      style={{ color: state.view === 'templates' ? 'var(--aurora-accent)' : 'var(--aurora-text)', backgroundColor: 'var(--aurora-bg)' }}
                     >
                       <ClipboardList size={15} />
                       Templates
@@ -884,7 +884,7 @@ export default function CateringPage() {
               aria-label="Open Vendor Dashboard"
               className="flex items-center gap-1 px-2 py-1.5 sm:gap-1.5 sm:px-3 rounded-lg text-xs sm:text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
               style={{
-                backgroundColor: state.view === 'vendor' ? '#6366F1' : 'var(--aurora-surface-variant, #EDF0F7)',
+                backgroundColor: state.view === 'vendor' ? 'var(--aurora-accent)' : 'var(--aurora-surface-variant, #EDF0F7)',
                 color: state.view === 'vendor' ? '#fff' : 'var(--aurora-text-secondary)',
                 minHeight: '36px',
                 WebkitTapHighlightColor: 'transparent',
@@ -908,7 +908,7 @@ export default function CateringPage() {
               {cartItemCount > 0 && (
                 <span
                   className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold text-white flex items-center justify-center"
-                  style={{ backgroundColor: 'var(--aurora-primary, #6366F1)' }}
+                  style={{ backgroundColor: 'var(--aurora-accent)' }}
                 >
                   {cartItemCount}
                 </span>
@@ -1167,11 +1167,11 @@ export default function CateringPage() {
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div
                 className="p-3 rounded-xl border-2 cursor-default"
-                style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99, 102, 241, 0.04)' }}
+                style={{ borderColor: 'var(--aurora-accent)', backgroundColor: 'rgba(99, 102, 241, 0.04)' }}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <ShoppingCart size={16} style={{ color: '#6366F1' }} />
-                  <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>Order Directly</p>
+                  <ShoppingCart size={16} style={{ color: 'var(--aurora-accent)' }} />
+                  <p className="text-sm font-semibold" style={{ color: 'var(--aurora-accent)' }}>Order Directly</p>
                 </div>
                 <p className="text-[11px]" style={{ color: 'var(--aurora-text-secondary)' }}>
                   Browse items with fixed prices and add to your cart.
@@ -1288,7 +1288,7 @@ export default function CateringPage() {
                   </div>
                   <div className="flex justify-between items-center mt-1">
                     <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>Total</span>
-                    <span className="text-lg font-bold" style={{ color: '#6366F1' }}>
+                    <span className="text-lg font-bold" style={{ color: 'var(--aurora-accent)' }}>
                       {formatPrice(state.lastOrderConfirmation.total)}
                     </span>
                   </div>
@@ -1305,15 +1305,15 @@ export default function CateringPage() {
                 </h3>
                 <div className="space-y-2 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                   <div className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: '#6366F1' }}>1</span>
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: 'var(--aurora-accent)' }}>1</span>
                     <span>The vendor will review and confirm your order (usually within 1–2 hours).</span>
                   </div>
                   <div className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: '#6366F1' }}>2</span>
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: 'var(--aurora-accent)' }}>2</span>
                     <span>You&apos;ll get a notification when the status changes. Track progress in My Orders.</span>
                   </div>
                   <div className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: '#6366F1' }}>3</span>
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-0.5" style={{ backgroundColor: 'var(--aurora-accent)' }}>3</span>
                     <span>If the vendor modifies items or pricing, you&apos;ll be asked to accept or reject.</span>
                   </div>
                 </div>

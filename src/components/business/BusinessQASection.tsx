@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import type { Business } from '@/reducers/businessReducer';
+import { timeAgo } from '@/utils/dateFormatting';
 
 // ── Types ──
 
@@ -37,27 +38,6 @@ interface BusinessQASectionProps {
 }
 
 // ── Helpers ──
-
-function timeAgo(ts: any): string {
-  if (!ts) return '';
-  try {
-    const date = (ts && typeof ts.toDate === 'function')
-      ? ts.toDate()
-      : (ts && ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts));
-    if (isNaN(date.getTime())) return '';
-    const diff = Date.now() - date.getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return mins + 'm ago';
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return hrs + 'h ago';
-    const days = Math.floor(hrs / 24);
-    if (days < 30) return days + 'd ago';
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  } catch {
-    return '';
-  }
-}
 
 // ── Component ──
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { copyToClipboard } from '@/utils/clipboard';
+import { timeAgo } from '@/utils/dateFormatting';
 import {
   collection,
   query,
@@ -116,17 +117,6 @@ type ViewMode = 'topics' | 'threads' | 'detail';
 type SortBy = 'newest' | 'topScore' | 'hot';
 
 /* ─── helpers ─── */
-const timeAgo = (timestamp: any): string => {
-  if (!timestamp) return '';
-  const now = new Date();
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
-  return date.toLocaleDateString();
-};
 
 const formatCount = (n: number): string => {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;

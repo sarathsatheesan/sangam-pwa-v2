@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { timeAgo } from '@/utils/dateFormatting';
 import {
   collection,
   getDocs,
@@ -228,21 +229,6 @@ const formatPrice = (price: string) => {
   return `$${num.toLocaleString()}`;
 };
 
-const timeAgo = (timestamp: any) => {
-  if (!timestamp) return 'Recently';
-  const date = timestamp instanceof Timestamp ? timestamp.toDate() : new Date(timestamp);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
-};
-
 // SUB-COMPONENTS (defined outside main component)
 
 const FormField: React.FC<{
@@ -426,7 +412,7 @@ const PhotoUploader: React.FC<{
       {photos.length > 0 && (
         <div className="mt-4 grid grid-cols-3 gap-3">
           {photos.map((photo, idx) => (
-            <div key={idx} className="relative group">
+            <div key={photo} className="relative group">
               <img
                 src={photo}
                 alt={`Photo ${idx + 1}`}
@@ -469,7 +455,7 @@ const MarketplaceCard: React.FC<{
     <>
       <div className="relative h-36 overflow-hidden">
         {coverPhoto ? (
-          <img src={coverPhoto} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+          <img src={coverPhoto} alt={item.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${categoryGradient} flex items-center justify-center`}>
             {CATEGORY_ICONS[item.category] && (
@@ -550,6 +536,9 @@ const MarketplaceCard: React.FC<{
   return (
     <div
       onClick={() => onViewDetails(item)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onViewDetails(item); } }}
       className="group bg-aurora-surface rounded-2xl overflow-hidden border border-aurora-border hover:shadow-lg hover:border-aurora-border/80 transition-all duration-200 cursor-pointer"
     >
       {cardContent}
@@ -1512,6 +1501,9 @@ export default function MarketplacePage() {
                   <div
                     className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer"
                     onClick={() => handleViewDetails(item)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleViewDetails(item); } }}
                   >
                     {item.photos?.[0] ? (
                       <img src={item.photos[0]} alt={item.title} className="w-full h-full object-cover" />
@@ -1631,10 +1623,10 @@ export default function MarketplacePage() {
 
       {/* Create Listing Modal */}
       {showCreateModal && isFeatureEnabled('marketplace_addListing') && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="marketplace-modal-title">
           <div className="bg-[var(--aurora-surface)] sm:rounded-lg max-w-2xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-4 sm:p-6 border-b border-[var(--aurora-border)] flex-shrink-0">
-              <h2 className="text-lg sm:text-2xl font-bold text-[var(--aurora-text)]">
+              <h2 id="marketplace-modal-title" className="text-lg sm:text-2xl font-bold text-[var(--aurora-text)]">
                 {editingItem ? 'Edit Listing' : 'Add My Listing'}
               </h2>
               <button onClick={() => { setShowCreateModal(false); setEditingItem(null); }} className="text-[var(--aurora-text-muted)] hover:text-[var(--aurora-text)]">
@@ -1906,10 +1898,10 @@ export default function MarketplacePage() {
 
       {/* Detail Modal */}
       {showDetailModal && selectedItem && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 sm:p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="marketplace-detail-modal-title">
           <div className="bg-[var(--aurora-surface)] sm:rounded-lg max-w-3xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-4 sm:p-6 border-b border-[var(--aurora-border)] flex-shrink-0">
-              <h2 className="text-lg sm:text-2xl font-bold text-[var(--aurora-text)] truncate pr-2">{selectedItem.title}</h2>
+              <h2 id="marketplace-detail-modal-title" className="text-lg sm:text-2xl font-bold text-[var(--aurora-text)] truncate pr-2">{selectedItem.title}</h2>
               <button onClick={() => setShowDetailModal(false)} className="text-[var(--aurora-text-muted)] hover:text-[var(--aurora-text)] flex-shrink-0">
                 <X className="w-6 h-6" />
               </button>
@@ -2227,12 +2219,12 @@ export default function MarketplacePage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-listing-modal-title">
           <div className="bg-[var(--aurora-surface)] rounded-2xl shadow-xl border border-[var(--aurora-border)] max-w-sm w-full p-6 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
               <Trash2 className="w-6 h-6 text-red-500" />
             </div>
-            <h3 className="text-lg font-bold text-[var(--aurora-text)] mb-2">Delete Listing?</h3>
+            <h3 id="delete-listing-modal-title" className="text-lg font-bold text-[var(--aurora-text)] mb-2">Delete Listing?</h3>
             <p className="text-sm text-[var(--aurora-text-muted)] mb-6">This action cannot be undone. The listing will be permanently removed.</p>
             <div className="flex gap-3">
               <button

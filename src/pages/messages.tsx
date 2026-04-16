@@ -199,7 +199,7 @@ const LinkPreviewCard = ({ url }: { url: string }) => {
   return (
     <div
       className="mt-1.5 rounded-lg overflow-hidden"
-      style={{ backgroundColor: 'rgba(99,102,241,0.06)', borderLeft: '3px solid #6366F1', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+      style={{ backgroundColor: 'rgba(99,102,241,0.06)', borderLeft: '3px solid var(--aurora-accent)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
       onClick={openLink}
       onTouchStart={openLink}
       role="link"
@@ -557,7 +557,7 @@ const renderFormattedText = (text: string): React.ReactNode => {
       hasUrlMatch = true;
       if (urlMatch.index > urlLastIndex) linkedParts.push(part.slice(urlLastIndex, urlMatch.index));
       linkedParts.push(
-        <a key={`link-${key++}`} href={urlMatch[0]} target="_blank" rel="noopener noreferrer" style={{ color: '#6366F1', textDecoration: 'underline', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+        <a key={`link-${key++}`} href={urlMatch[0]} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--aurora-accent)', textDecoration: 'underline', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
           {urlMatch[0].length > 50 ? urlMatch[0].slice(0, 47) + '...' : urlMatch[0]}
         </a>
       );
@@ -655,7 +655,7 @@ function SkeletonConversation() {
  */
 function TypingIndicator() {
   return (
-    <div className="flex items-center gap-1 text-sm" style={{ color: '#6366F1' }}>
+    <div className="flex items-center gap-1 text-sm" style={{ color: 'var(--aurora-accent)' }}>
       <span>typing</span>
       <span className="flex gap-0.5">
         <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -1047,7 +1047,7 @@ function GifPicker({ onSelect, onClose }: { onSelect: (gifUrl: string) => void; 
       <div className="overflow-y-auto px-1.5 pb-1.5" style={{ maxHeight: '280px' }}>
         {loading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+            <Loader2 size={24} className="animate-spin" style={{ color: 'var(--aurora-accent)' }} />
           </div>
         ) : gifs.length === 0 ? (
           <div className="text-center py-8 text-sm" style={{ color: 'var(--msg-secondary)' }}>
@@ -1308,7 +1308,7 @@ function VoiceMessageBubble({ duration, audioUrl, isMine, transcription, msgId, 
   return (
     <div className="py-1">
       <div className="flex items-center gap-3">
-        <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: audioError ? '#EF4444' : '#6366F1' }} title={audioError ? 'Unable to play audio' : undefined}>
+        <button onClick={togglePlay} className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: audioError ? 'var(--aurora-danger)' : 'var(--aurora-accent)' }} title={audioError ? 'Unable to play audio' : undefined}>
           {audioError ? <VolumeX size={16} className="text-white" /> : playing ? <Pause size={16} className="text-white" /> : <Play size={16} className="text-white" style={{ marginLeft: '2px' }} />}
         </button>
         <div className="flex gap-[3px] items-end flex-1">
@@ -1321,7 +1321,7 @@ function VoiceMessageBubble({ duration, audioUrl, isMine, transcription, msgId, 
                 className="w-[2.5px] rounded-full transition-colors"
                 style={{
                   height: `${4 + Math.abs(Math.sin(i * 0.8)) * 14}px`,
-                  backgroundColor: isActive ? '#6366F1' : '#A5B4FC',
+                  backgroundColor: isActive ? 'var(--aurora-accent)' : '#A5B4FC',
                 }}
               />
             );
@@ -1346,7 +1346,7 @@ function VoiceMessageBubble({ duration, audioUrl, isMine, transcription, msgId, 
           onTouchStart={handleTranscribe}
           disabled={transcribing || !audioUrl}
           className="mt-1 flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] transition-colors hover:bg-gray-100 dark:hover:bg-white/5"
-          style={{ color: transcribeError ? '#EF4444' : '#6366F1', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+          style={{ color: transcribeError ? 'var(--aurora-danger)' : 'var(--aurora-accent)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
         >
           {transcribing ? (
             <><Loader2 size={12} className="animate-spin" /> Transcribing...</>
@@ -3813,7 +3813,7 @@ export default function MessagesPage() {
                   onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = ''; }}
                 >
                   <div className="flex items-center gap-3 px-4 py-2.5">
-                    <div className="w-[45px] h-[45px] rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
+                    <div className="w-[45px] h-[45px] rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--aurora-accent)' }}>
                       <Users size={22} className="text-white" />
                     </div>
                     <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: 'var(--msg-divider)' }}>
@@ -3823,7 +3823,7 @@ export default function MessagesPage() {
                           {conv.notificationsMuted && <BellOff size={14} className="text-aurora-text-muted shrink-0" />}
                         </div>
                         {conv.lastMessageTime && (
-                          <span className="text-xs flex-shrink-0 ml-2" style={{ color: hasUnread ? '#6366F1' : 'var(--msg-secondary)' }}>
+                          <span className="text-xs flex-shrink-0 ml-2" style={{ color: hasUnread ? 'var(--aurora-accent)' : 'var(--msg-secondary)' }}>
                             {getRelativeTime(conv.lastMessageTime)}
                           </span>
                         )}
@@ -3833,7 +3833,7 @@ export default function MessagesPage() {
                           {conv.lastMessage || 'No messages'}
                         </div>
                         {hasUnread && (
-                          <span className="ml-2 min-w-[20px] h-5 flex items-center justify-center rounded-full text-white text-xs font-bold px-1.5 flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
+                          <span className="ml-2 min-w-[20px] h-5 flex items-center justify-center rounded-full text-white text-xs font-bold px-1.5 flex-shrink-0" style={{ backgroundColor: 'var(--aurora-accent)' }}>
                             {conv.unreadCount}
                           </span>
                         )}
@@ -3878,7 +3878,7 @@ export default function MessagesPage() {
                       )}
                     </div>
                     <div className="flex items-center justify-between">
-                      <div className="text-[13px] truncate flex-1" style={{ color: isTyping ? '#6366F1' : 'var(--msg-secondary)' }}>
+                      <div className="text-[13px] truncate flex-1" style={{ color: isTyping ? 'var(--aurora-accent)' : 'var(--msg-secondary)' }}>
                         {isTyping ? (
                           <TypingIndicator />
                         ) : (
@@ -4054,7 +4054,7 @@ export default function MessagesPage() {
                     </div>
                     <div className="flex-shrink-0">
                       {isAdded ? (
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: '#6366F1' }}>
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--aurora-accent)' }}>
                           <Check size={14} className="text-white" />
                         </div>
                       ) : (
@@ -4072,7 +4072,7 @@ export default function MessagesPage() {
               onClick={createGroup}
               disabled={!groupName.trim() || selectedGroupMembers.length === 0}
               className="w-full py-2.5 rounded-lg text-white font-medium text-sm transition-colors disabled:opacity-40"
-              style={{ backgroundColor: '#6366F1' }}
+              style={{ backgroundColor: 'var(--aurora-accent)' }}
             >
               Create Group{selectedGroupMembers.length > 0 ? ` (${selectedGroupMembers.length} member${selectedGroupMembers.length > 1 ? 's' : ''})` : ''}
             </button>
@@ -4470,7 +4470,7 @@ export default function MessagesPage() {
               return (
               <div key={msg.id} className="rounded-lg p-3 border border-[var(--aurora-border)] bg-white dark:bg-[var(--aurora-surface-variant)]" onClick={handleStarredClick} onTouchStart={handleStarredClick} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold" style={{ color: '#6366F1' }}>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--aurora-accent)' }}>
                     {msg.senderId === user?.uid ? 'You' : (users.find(u => u.id === msg.senderId)?.name || 'Unknown')}
                   </span>
                   <div className="flex items-center gap-1">
@@ -4522,7 +4522,7 @@ export default function MessagesPage() {
               return (
               <div key={msg.id} className="rounded-lg p-3 border border-[var(--aurora-border)] bg-white dark:bg-[var(--aurora-surface-variant)]" onClick={handlePinnedClick} onTouchStart={handlePinnedClick} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold" style={{ color: '#6366F1' }}>
+                  <span className="text-xs font-semibold" style={{ color: 'var(--aurora-accent)' }}>
                     {msg.senderId === user?.uid ? 'You' : (users.find(u => u.id === msg.senderId)?.name || 'Unknown')}
                   </span>
                   <div className="flex items-center gap-2">
@@ -4699,7 +4699,7 @@ export default function MessagesPage() {
                     <button
                       onClick={() => updateGroupName(editGroupNameValue)}
                       className="p-2 rounded-full"
-                      style={{ backgroundColor: '#6366F1' }}
+                      style={{ backgroundColor: 'var(--aurora-accent)' }}
                     >
                       <Check size={16} className="text-white" />
                     </button>
@@ -4778,7 +4778,7 @@ export default function MessagesPage() {
                           >
                             <ChatAvatar user={u} size="sm" showOnlineStatus={false} />
                             <span className="flex-1 text-sm font-medium" style={{ color: 'var(--msg-text)' }}>{u.name}</span>
-                            <UserPlus size={16} style={{ color: '#6366F1' }} />
+                            <UserPlus size={16} style={{ color: 'var(--aurora-accent)' }} />
                           </button>
                         ))
                       )}
@@ -4877,7 +4877,7 @@ export default function MessagesPage() {
       >
         {messagesLoading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 size={32} className="animate-spin" style={{ color: '#6366F1' }} />
+            <Loader2 size={32} className="animate-spin" style={{ color: 'var(--aurora-accent)' }} />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-center">
@@ -4950,7 +4950,7 @@ export default function MessagesPage() {
                           >
                             {/* Group sender name */}
                             {activeGroupConv && !isMine && msg.senderId !== 'system' && isFirstInGroup && (
-                              <div className="text-[12px] font-semibold px-2.5 pt-1.5 mb-0.5" style={{ color: '#6366F1' }}>
+                              <div className="text-[12px] font-semibold px-2.5 pt-1.5 mb-0.5" style={{ color: 'var(--aurora-accent)' }}>
                                 {users.find((u) => u.id === msg.senderId)?.name || 'Unknown'}
                               </div>
                             )}
@@ -4962,8 +4962,8 @@ export default function MessagesPage() {
                             {msg.replyTo && (() => {
                               const rt = msg.replyTo!;
                               return (
-                                <div className="mx-2 mt-1.5 mb-1 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: isMine ? 'rgba(0,0,0,0.06)' : 'rgba(99,102,241,0.08)', borderLeftColor: '#6366F1', borderLeftWidth: '3px', borderLeftStyle: 'solid' }}>
-                                  <div className="text-[11px] font-semibold" style={{ color: '#6366F1' }}>
+                                <div className="mx-2 mt-1.5 mb-1 px-2.5 py-1.5 rounded-lg" style={{ backgroundColor: isMine ? 'rgba(0,0,0,0.06)' : 'rgba(99,102,241,0.08)', borderLeftColor: 'var(--aurora-accent)', borderLeftWidth: '3px', borderLeftStyle: 'solid' }}>
+                                  <div className="text-[11px] font-semibold" style={{ color: 'var(--aurora-accent)' }}>
                                     {rt.senderId === user?.uid ? 'You' : (users.find(u => u.id === rt.senderId)?.name || 'Unknown')}
                                   </div>
                                   <div className="text-[12px] truncate" style={{ color: 'var(--msg-secondary)' }}>
@@ -5279,7 +5279,7 @@ export default function MessagesPage() {
                   }
                 }}
                 className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-                style={{ backgroundColor: '#6366F1' }}
+                style={{ backgroundColor: 'var(--aurora-accent)' }}
                 aria-label="Send message"
               >
                 <Send size={18} className="text-white" style={{ marginLeft: '2px' }} />
@@ -5301,7 +5301,7 @@ export default function MessagesPage() {
                   setIsRecording(true);
                 }}
                 className="w-10 h-10 rounded-full flex items-center justify-center transition-colors"
-                style={{ backgroundColor: '#6366F1' }}
+                style={{ backgroundColor: 'var(--aurora-accent)' }}
                 aria-label="Start voice recording"
               >
                 <Mic size={20} className="text-white" />
@@ -5334,7 +5334,7 @@ export default function MessagesPage() {
     <div className="h-full flex flex-col items-center justify-center" style={{ backgroundColor: 'var(--aurora-surface-variant)' }}>
       <div className="text-center">
         <div className="w-[200px] h-[200px] mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--msg-own-bubble-hover)' }}>
-          <MessageSquare size={80} style={{ color: '#6366F1' }} />
+          <MessageSquare size={80} style={{ color: 'var(--aurora-accent)' }} />
         </div>
         <h2 className="text-2xl font-light mb-3" style={{ color: '#41525D' }}>EthniZity Messages</h2>
         <p className="text-sm max-w-[340px] mx-auto" style={{ color: 'var(--msg-secondary)' }}>
@@ -5704,13 +5704,13 @@ export default function MessagesPage() {
                           className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700 transition-colors text-left ${isCurrent ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''} ${forwardingImage ? 'opacity-50' : ''}`}
                         >
                           {/* Avatar */}
-                          <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{ backgroundColor: conv.isGroup ? '#6366F1' : '#E8E2F8' }}>
+                          <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{ backgroundColor: conv.isGroup ? 'var(--aurora-accent)' : '#E8E2F8' }}>
                             {displayAvatar ? (
                               <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
                             ) : conv.isGroup ? (
                               <Users size={18} className="text-white" />
                             ) : (
-                              <span className="text-sm font-semibold" style={{ color: '#6366F1' }}>
+                              <span className="text-sm font-semibold" style={{ color: 'var(--aurora-accent)' }}>
                                 {displayName.charAt(0).toUpperCase()}
                               </span>
                             )}

@@ -621,7 +621,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--aurora-primary, #6366F1)' }} />
+        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--aurora-accent)' }} />
         <span className="ml-2 text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>Loading orders...</span>
       </div>
     );
@@ -752,8 +752,8 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
             onClick={() => { setBatchMode(!batchMode); setSelectedOrders(new Set()); }}
             className="inline-flex items-center gap-1.5 px-2.5 rounded-lg text-xs font-medium border transition-colors"
             style={{
-              borderColor: batchMode ? '#6366F1' : 'var(--aurora-border, #e5e7eb)',
-              color: batchMode ? '#6366F1' : 'var(--aurora-text-secondary, #6b7280)',
+              borderColor: batchMode ? 'var(--aurora-accent)' : 'var(--aurora-border, #e5e7eb)',
+              color: batchMode ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary, #6b7280)',
               backgroundColor: batchMode ? 'rgba(99,102,241,0.08)' : 'transparent',
               minHeight: 32,
               WebkitTapHighlightColor: 'transparent',
@@ -821,7 +821,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
               onClick={() => setShowPaymentSettings(!showPaymentSettings)}
               className="inline-flex items-center justify-center rounded-lg transition-colors"
               style={{
-                color: showPaymentSettings ? '#6366F1' : 'var(--aurora-text-secondary, #6b7280)',
+                color: showPaymentSettings ? 'var(--aurora-accent)' : 'var(--aurora-text-secondary, #6b7280)',
                 backgroundColor: showPaymentSettings ? 'rgba(99,102,241,0.08)' : 'transparent',
                 width: 32,
                 height: 32,
@@ -960,7 +960,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
               onClick={() => setShowPaymentSettings(true)}
               className="inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-xs font-medium text-white transition-colors"
               style={{
-                backgroundColor: '#6366F1',
+                backgroundColor: 'var(--aurora-accent)',
                 minHeight: 40,
                 WebkitTapHighlightColor: 'transparent',
               }}
@@ -1004,7 +1004,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
             type="button"
             onClick={() => setShowPaymentSettings(true)}
             className="font-medium underline"
-            style={{ color: '#6366F1', WebkitTapHighlightColor: 'transparent' }}
+            style={{ color: 'var(--aurora-accent)', WebkitTapHighlightColor: 'transparent' }}
           >
             Set up now
           </button>
@@ -1017,10 +1017,10 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
       {showPaymentSettings && (
         <div
           className="p-4 rounded-xl border space-y-3"
-          style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.03)' }}
+          style={{ borderColor: 'var(--aurora-accent)', backgroundColor: 'rgba(99,102,241,0.03)' }}
         >
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold" style={{ color: '#6366F1' }}>Payment Settings</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--aurora-accent)' }}>Payment Settings</p>
             <button
               type="button"
               onClick={() => setShowPaymentSettings(false)}
@@ -1113,7 +1113,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
               disabled={paymentSaving || paymentDeferring}
               className="inline-flex items-center justify-center gap-1.5 px-4 rounded-lg text-sm font-medium text-white disabled:opacity-50 transition-colors"
               style={{
-                backgroundColor: '#6366F1',
+                backgroundColor: 'var(--aurora-accent)',
                 minHeight: 44,
                 WebkitTapHighlightColor: 'transparent',
               }}
@@ -1245,7 +1245,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
       {/* ── Batch action bar (#17) ── */}
       {batchMode && selectedOrders.size > 0 && (
         <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: 'rgba(99,102,241,0.06)' }}>
-          <span className="text-sm font-medium" style={{ color: '#6366F1' }}>
+          <span className="text-sm font-medium" style={{ color: 'var(--aurora-accent)' }}>
             {selectedOrders.size} order(s) selected
           </span>
           <div className="flex gap-2">
@@ -1312,7 +1312,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                     WebkitAppearance: 'none',
                     appearance: 'none',
                     minHeight: 44,
-                    '--tw-ring-color': '#6366F1',
+                    '--tw-ring-color': 'var(--aurora-accent)',
                   } as React.CSSProperties}
                   onMouseEnter={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
@@ -1325,13 +1325,13 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                     el.style.backgroundColor = 'rgba(255, 255, 255, 0.55)';
                   }}
                 >
-                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: '#6366F1', boxShadow: '0 2px 6px rgba(99, 102, 241, 0.35)' }}>1</span>
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ backgroundColor: 'var(--aurora-accent)', boxShadow: '0 2px 6px rgba(99, 102, 241, 0.35)' }}>1</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium flex items-center justify-between gap-2" style={{ color: 'var(--aurora-text, #1a1a2e)' }}>
                       <span>
                         Set up payment info <span className="text-[10px] font-normal" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>(optional)</span>
                       </span>
-                      <span className="text-[11px] font-semibold shrink-0" style={{ color: '#6366F1' }} aria-hidden="true">Open →</span>
+                      <span className="text-[11px] font-semibold shrink-0" style={{ color: 'var(--aurora-accent)' }} aria-hidden="true">Open →</span>
                     </p>
                     <p className="text-xs" style={{ color: 'var(--aurora-text-muted, #6b7280)' }}>Add your payment link so customers can pay you — you can skip and add this later</p>
                   </div>
@@ -1485,7 +1485,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                           {batchMode && order.status === 'pending' && (
                             <div className="mr-3 flex-shrink-0" onClick={(e) => { e.stopPropagation(); toggleOrderSelection(order.id); }}>
                               {selectedOrders.has(order.id)
-                                ? <CheckSquare size={18} style={{ color: '#6366F1' }} />
+                                ? <CheckSquare size={18} style={{ color: 'var(--aurora-accent)' }} />
                                 : <Square size={18} style={{ color: 'var(--aurora-text-muted)' }} />}
                             </div>
                           )}
@@ -1596,8 +1596,8 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
 
                             {/* ── Order modification form (#18) ── */}
                             {editingOrderId === order.id ? (
-                              <div className="p-3 rounded-xl border space-y-2" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.02)' }}>
-                                <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>Modify Order Items</p>
+                              <div className="p-3 rounded-xl border space-y-2" style={{ borderColor: 'var(--aurora-accent)', backgroundColor: 'rgba(99,102,241,0.02)' }}>
+                                <p className="text-xs font-semibold" style={{ color: 'var(--aurora-accent)' }}>Modify Order Items</p>
                                 {editItems.map((item, i) => (
                                   <div key={i} className="flex items-center gap-2 text-sm">
                                     <input type="number" min="0" value={editItems[i].qty}
@@ -1662,7 +1662,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                 <div className="flex gap-2">
                                   <button onClick={() => setEditingOrderId(null)} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border" style={{ borderColor: 'var(--aurora-border)' }}>Cancel</button>
                                   <button onClick={() => handleSaveModification(order)} disabled={editSaving}
-                                    className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: '#6366F1' }}
+                                    className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: 'var(--aurora-accent)' }}
                                   >{editSaving ? <Loader2 size={12} className="animate-spin mx-auto" /> : 'Save Changes'}</button>
                                 </div>
                               </div>
@@ -1705,7 +1705,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                         <button
                                           onClick={() => startEditOrder(order)}
                                           className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
-                                          style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: '#EEF2FF' }}
+                                          style={{ borderColor: 'var(--aurora-accent)', color: 'var(--aurora-accent)', backgroundColor: '#EEF2FF' }}
                                         >
                                           <Pencil size={10} /> Send Counter-Proposal
                                         </button>
@@ -1716,7 +1716,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                 {/* Edit order button for confirmed/preparing */}
                                 {['confirmed', 'preparing'].includes(order.status) && (
                                   <button onClick={() => startEditOrder(order)}
-                                    className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#6366F1' }}
+                                    className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--aurora-accent)' }}
                                   >
                                     <Pencil size={12} /> Modify order items
                                   </button>
@@ -1792,8 +1792,8 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
             >
               <div className="flex items-center gap-3 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold" style={{ color: '#6366F1' }}>Active Orders</h3>
-                  <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#6366F1' }}>
+                  <h3 className="font-semibold" style={{ color: 'var(--aurora-accent)' }}>Active Orders</h3>
+                  <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold text-white" style={{ backgroundColor: 'var(--aurora-accent)' }}>
                     {activeOrders.length}
                   </span>
                 </div>
@@ -1803,14 +1803,14 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                 onChange={(e) => { e.stopPropagation(); setSort('active', e.target.value as SortDir); }}
                 onClick={(e) => e.stopPropagation()}
                 className="text-xs font-medium rounded-lg border px-2 py-1 outline-none appearance-none cursor-pointer"
-                style={{ color: '#6366F1', borderColor: 'rgba(99, 102, 241, 0.3)', backgroundColor: 'rgba(99, 102, 241, 0.06)', WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: '1.5rem', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236366F1\' stroke-width=\'2\'%3E%3Cpath d=\'M7 10l5 5 5-5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.4rem center' }}
+                style={{ color: 'var(--aurora-accent)', borderColor: 'rgba(99, 102, 241, 0.3)', backgroundColor: 'rgba(99, 102, 241, 0.06)', WebkitAppearance: 'none', MozAppearance: 'none', paddingRight: '1.5rem', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%236366F1\' stroke-width=\'2\'%3E%3Cpath d=\'M7 10l5 5 5-5\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.4rem center' }}
               >
                 <option value="date-newest">Date: Newest</option>
                 <option value="date-oldest">Date: Oldest</option>
                 <option value="name-asc">Name: A → Z</option>
                 <option value="name-desc">Name: Z → A</option>
               </select>
-              {sectionExpanded.active ? <ChevronUp size={18} style={{ color: '#6366F1' }} /> : <ChevronDown size={18} style={{ color: '#6366F1' }} />}
+              {sectionExpanded.active ? <ChevronUp size={18} style={{ color: 'var(--aurora-accent)' }} /> : <ChevronDown size={18} style={{ color: 'var(--aurora-accent)' }} />}
             </button>
 
             {/* Section Content */}
@@ -1943,8 +1943,8 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
 
                             {/* ── Order modification form (#18) ── */}
                             {editingOrderId === order.id ? (
-                              <div className="p-3 rounded-xl border space-y-2" style={{ borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.02)' }}>
-                                <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>Modify Order Items</p>
+                              <div className="p-3 rounded-xl border space-y-2" style={{ borderColor: 'var(--aurora-accent)', backgroundColor: 'rgba(99,102,241,0.02)' }}>
+                                <p className="text-xs font-semibold" style={{ color: 'var(--aurora-accent)' }}>Modify Order Items</p>
                                 {editItems.map((item, i) => (
                                   <div key={i} className="flex items-center gap-2 text-sm">
                                     <input type="number" min="0" value={editItems[i].qty}
@@ -2009,7 +2009,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                 <div className="flex gap-2">
                                   <button onClick={() => setEditingOrderId(null)} className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium border" style={{ borderColor: 'var(--aurora-border)' }}>Cancel</button>
                                   <button onClick={() => handleSaveModification(order)} disabled={editSaving}
-                                    className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: '#6366F1' }}
+                                    className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50" style={{ backgroundColor: 'var(--aurora-accent)' }}
                                   >{editSaving ? <Loader2 size={12} className="animate-spin mx-auto" /> : 'Save Changes'}</button>
                                 </div>
                               </div>
@@ -2052,7 +2052,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                         <button
                                           onClick={() => startEditOrder(order)}
                                           className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border"
-                                          style={{ borderColor: '#6366F1', color: '#6366F1', backgroundColor: '#EEF2FF' }}
+                                          style={{ borderColor: 'var(--aurora-accent)', color: 'var(--aurora-accent)', backgroundColor: '#EEF2FF' }}
                                         >
                                           <Pencil size={10} /> Send Counter-Proposal
                                         </button>
@@ -2063,7 +2063,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                 {/* Edit order button for confirmed/preparing */}
                                 {['confirmed', 'preparing'].includes(order.status) && (
                                   <button onClick={() => startEditOrder(order)}
-                                    className="flex items-center gap-1.5 text-xs font-medium" style={{ color: '#6366F1' }}
+                                    className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--aurora-accent)' }}
                                   >
                                     <Pencil size={12} /> Modify order items
                                   </button>
@@ -2099,7 +2099,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                 onClick={() => handleStatusChange(order.id, 'preparing')}
                                 disabled={isActionLoading}
                                 className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                                style={{ backgroundColor: 'var(--aurora-primary, #6366F1)' }}
+                                style={{ backgroundColor: 'var(--aurora-accent)' }}
                               >
                                 {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
                                 Mark as Preparing
@@ -2516,7 +2516,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                               {statusCfg.icon} {statusCfg.label}
                             </span>
                             {order.rfpOrigin && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide" style={{ backgroundColor: '#EFF6FF', color: '#6366F1' }}>RFP</span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide" style={{ backgroundColor: '#EFF6FF', color: 'var(--aurora-accent)' }}>RFP</span>
                             )}
                           </div>
                           <p className="text-sm mt-0.5" style={{ color: 'var(--aurora-text-secondary)' }}>
