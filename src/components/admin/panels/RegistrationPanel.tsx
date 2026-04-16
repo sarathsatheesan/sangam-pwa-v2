@@ -1,6 +1,6 @@
 import React from 'react';
 import type { PendingBusiness } from '@/services/businessRegistration';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 
 interface RegistrationPanelProps {
   registrationsLoading: boolean;
@@ -75,6 +75,40 @@ export function RegistrationPanel({
                   Reject
                 </button>
               </div>
+
+              {/* Rejection reason modal (inline expandable) */}
+              {rejectModalId === biz.id && (
+                <div className="mt-3 p-3 rounded-xl border border-red-200 bg-red-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-red-700">Rejection Reason</span>
+                    <button onClick={onCloseRejectModal} className="text-red-400 hover:text-red-600">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <textarea
+                    value={rejectReason}
+                    onChange={(e) => onRejectReasonChange(e.target.value)}
+                    placeholder="Reason for rejection (visible to applicant)..."
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-red-200 outline-none resize-none mb-2"
+                    rows={2}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => onReject(biz.id, rejectReason)}
+                      disabled={!rejectReason.trim()}
+                      className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-red-500 disabled:opacity-40 hover:bg-red-600 transition"
+                    >
+                      Confirm Reject
+                    </button>
+                    <button
+                      onClick={onCloseRejectModal}
+                      className="px-4 py-2 rounded-lg text-xs font-semibold text-[var(--aurora-text-secondary)] bg-[var(--aurora-surface)] border border-[var(--aurora-border)] hover:bg-[var(--aurora-hover)] transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

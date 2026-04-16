@@ -45,7 +45,6 @@ import {
   CancelOrderModal,
   BatchActionBar,
   OnboardingPills,
-  OrderCard,
 } from './vendor';
 
 interface VendorCateringDashboardProps {
