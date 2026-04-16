@@ -483,8 +483,8 @@ export default function CateringPage() {
       const total = subtotal + estimatedTax;
       const orderId = await createOrder({
         customerId: user.uid,
-        customerName: userProfile.name || '',
-        customerEmail: userProfile.email || user.email || '',
+        customerName: userProfile?.name || '',
+        customerEmail: userProfile?.email || user.email || '',
         customerPhone: orderForm.contactPhone,
         businessId: cart.businessId!,
         businessName: cart.businessName || '',

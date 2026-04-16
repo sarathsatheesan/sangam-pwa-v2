@@ -46,11 +46,17 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
   // Subscribe to favorites
   useEffect(() => {
     if (!user) { setLoading(false); return; }
-    const unsub = subscribeToFavorites(user.uid, (favs) => {
-      setFavorites(favs);
+    let unsub: (() => void) | undefined;
+    try {
+      unsub = subscribeToFavorites(user.uid, (favs) => {
+        setFavorites(favs);
+        setLoading(false);
+      });
+    } catch (err) {
+      console.error('[FavoriteOrders] Firestore subscription failed:', err);
       setLoading(false);
-    });
-    return unsub;
+    }
+    return () => unsub?.();
   }, [user]);
 
   // Filter favorites based on search query
@@ -60,7 +66,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
     return favorites.filter(fav =>
       fav.label.toLowerCase().includes(q) ||
       fav.businessName.toLowerCase().includes(q) ||
-      fav.items.some(item => item.name.toLowerCase().includes(q))
+      (fav.items || []).some(item => item.name?.toLowerCase().includes(q))
     );
   }, [favorites, searchQuery]);
 
@@ -285,7 +291,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
                     )}
                     {fav.lastOrderedAt && (
                       <span className="flex items-center gap-1 text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>
-                        <Clock size={10} /> Last: {new Date(fav.lastOrderedAt.toDate?.() || fav.lastOrderedAt).toLocaleDateString()}
+                        <Clock size={10} /> Last: {new Date(fav.lastOrderedAt?.toDate?.() ?? fav.lastOrderedAt).toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -303,7 +309,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
                     <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--aurora-text-muted)' }}>
                       Items
                     </p>
-                    {fav.items.map((item, i) => (
+                    {(fav.items || []).map((item, i) => (
                       <div key={i} className="flex justify-between text-xs py-1">
                         <span style={{ color: 'var(--aurora-text)' }}>
                           {item.qty}x {item.name}
@@ -358,7 +364,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
                           Adjust Quantities
                         </label>
                         <div className="space-y-1 mt-1">
-                          {fav.items.map((item) => {
+                          {(fav.items || []).map((item) => {
                             const qty = reorderQtys[item.menuItemId] ?? item.qty;
                             return (
                               <div key={item.menuItemId} className="flex items-center justify-between">

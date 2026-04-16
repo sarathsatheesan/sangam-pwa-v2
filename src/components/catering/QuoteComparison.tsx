@@ -275,9 +275,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
         quoteRequest.id,
         itemNames,
         {
-          customerName: userProfile.name || '',
-          customerEmail: userProfile.email || user.email || '',
-          customerPhone: (userProfile as any).phone || '',
+          customerName: userProfile?.name || '',
+          customerEmail: userProfile?.email || user.email || '',
+          customerPhone: (userProfile as any)?.phone || '',
         },
       );
 
