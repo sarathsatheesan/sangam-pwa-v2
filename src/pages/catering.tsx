@@ -137,15 +137,24 @@ export default function CateringPage() {
     const quoteRequestIdParam = searchParams.get('quoteRequestId');
     const vendorViewParam = searchParams.get('vendorView');
 
-    if (!viewParam && !orderIdParam && !quoteRequestIdParam) return;
+    if (!viewParam && !orderIdParam && !quoteRequestIdParam && !vendorViewParam) return;
 
     // Prevent double-processing in StrictMode / fast re-renders
-    const paramKey = `${viewParam}|${orderIdParam}|${quoteRequestIdParam}|${vendorViewParam}`;
     if (deepLinkProcessedRef.current) return;
     deepLinkProcessedRef.current = true;
 
+    // Vendor order deep-link: /catering?vendorView=orders&orderId=xxx
+    // MUST be checked before the customer order branch, because both may
+    // include orderId — vendorView disambiguates.
+    if (vendorViewParam === 'orders') {
+      dispatch({ type: 'SET_VIEW', payload: 'vendor' });
+      setVendorTab('orders');
+      if (orderIdParam) {
+        window.history.replaceState(null, '', `${window.location.pathname}#order-${orderIdParam}`);
+      }
+    }
     // Customer order deep-link: /catering?view=orders&orderId=xxx
-    if (viewParam === 'orders' || orderIdParam) {
+    else if (viewParam === 'orders' || orderIdParam) {
       dispatch({ type: 'SET_VIEW', payload: 'orders' });
       // CateringOrderStatus reads #order-{id} from hash to auto-expand
       if (orderIdParam) {
@@ -159,14 +168,6 @@ export default function CateringPage() {
       // once the real-time subscription delivers it. Store it for deferred selection.
       if (quoteRequestIdParam) {
         pendingDeepLinkQuoteRef.current = quoteRequestIdParam;
-      }
-    }
-    // Vendor order deep-link: /catering?vendorView=orders&orderId=xxx
-    else if (vendorViewParam === 'orders') {
-      dispatch({ type: 'SET_VIEW', payload: 'vendor' });
-      setVendorTab('orders');
-      if (orderIdParam) {
-        window.history.replaceState(null, '', `${window.location.pathname}#order-${orderIdParam}`);
       }
     }
 
@@ -274,7 +275,15 @@ export default function CateringPage() {
             const view = url.searchParams.get('view');
             const vendorView = url.searchParams.get('vendorView');
 
-            if (view === 'orders' || orderId) {
+            // Vendor check first — both vendor and customer may have orderId;
+            // vendorView disambiguates.
+            if (vendorView === 'orders') {
+              dispatch({ type: 'SET_VIEW', payload: 'vendor' });
+              setVendorTab('orders');
+              if (orderId) {
+                window.history.replaceState(null, '', `${window.location.pathname}#order-${orderId}`);
+              }
+            } else if (view === 'orders' || orderId) {
               dispatch({ type: 'SET_VIEW', payload: 'orders' });
               if (orderId) {
                 window.history.replaceState(null, '', `${window.location.pathname}#order-${orderId}`);
@@ -283,12 +292,6 @@ export default function CateringPage() {
               dispatch({ type: 'SET_VIEW', payload: 'quotes' });
               if (quoteRequestId) {
                 pendingDeepLinkQuoteRef.current = quoteRequestId;
-              }
-            } else if (vendorView === 'orders') {
-              dispatch({ type: 'SET_VIEW', payload: 'vendor' });
-              setVendorTab('orders');
-              if (orderId) {
-                window.history.replaceState(null, '', `${window.location.pathname}#order-${orderId}`);
               }
             }
           }
