@@ -143,15 +143,19 @@ export default function CateringPage() {
     if (deepLinkProcessedRef.current) return;
     deepLinkProcessedRef.current = true;
 
-    // Vendor order deep-link: /catering?vendorView=orders&orderId=xxx
-    // MUST be checked before the customer order branch, because both may
-    // include orderId — vendorView disambiguates.
+    // Vendor deep-links: /catering?vendorView=orders&orderId=xxx or vendorView=quotes
+    // MUST be checked before the customer branches, because both may
+    // include orderId / quoteRequestId — vendorView disambiguates.
     if (vendorViewParam === 'orders') {
       dispatch({ type: 'SET_VIEW', payload: 'vendor' });
       setVendorTab('orders');
       if (orderIdParam) {
         window.history.replaceState(null, '', `${window.location.pathname}#order-${orderIdParam}`);
       }
+    }
+    else if (vendorViewParam === 'quotes') {
+      dispatch({ type: 'SET_VIEW', payload: 'vendor' });
+      setVendorTab('quotes');
     }
     // Customer order deep-link: /catering?view=orders&orderId=xxx
     else if (viewParam === 'orders' || orderIdParam) {

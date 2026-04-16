@@ -41,6 +41,8 @@ messaging.onBackgroundMessage((payload) => {
       clickUrl = '/catering?vendorView=orders&orderId=' + orderId;
     } else if (orderId) {
       clickUrl = '/catering?view=orders&orderId=' + orderId;
+    } else if (requestId && role === 'vendor') {
+      clickUrl = '/catering?vendorView=quotes';
     } else if (requestId) {
       clickUrl = '/catering?view=quotes&quoteRequestId=' + requestId;
     } else {

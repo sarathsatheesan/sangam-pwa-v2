@@ -88,6 +88,13 @@ export default function NotificationBell() {
     }
   }, [isBellOpen, closeBell]);
 
+  // Notification types that target the vendor (not the customer).
+  // Used to route clicks to the vendor dashboard instead of the customer view.
+  const VENDOR_TYPES = new Set([
+    'new_order', 'modification_rejected', 'quote_accepted',
+    'item_reassigned', 'rfp_edited', 'reprice_requested',
+  ]);
+
   const handleNotificationClick = useCallback(
     async (notif: CateringNotification) => {
       if (!notif.read) {
@@ -95,13 +102,22 @@ export default function NotificationBell() {
       }
       closeBell();
 
+      const isVendor = VENDOR_TYPES.has(notif.type);
+
       // Deep-link: navigate to /catering with query params that the catering
       // page reads to auto-switch view and expand the correct order/quote.
       // CateringOrderStatus reads #order-{id} from hash to auto-expand.
       if (notif.orderId) {
-        navigate(`/catering?view=orders&orderId=${notif.orderId}`);
+        const prefix = isVendor ? 'vendorView' : 'view';
+        navigate(`/catering?${prefix}=orders&orderId=${notif.orderId}`);
       } else if (notif.quoteRequestId) {
-        navigate(`/catering?view=quotes&quoteRequestId=${notif.quoteRequestId}`);
+        if (isVendor) {
+          // Vendor quote notifications → vendor dashboard quotes tab
+          navigate('/catering?vendorView=quotes');
+        } else {
+          // Customer quote notifications → customer My Quotes with auto-select
+          navigate(`/catering?view=quotes&quoteRequestId=${notif.quoteRequestId}`);
+        }
       }
     },
     [markAsRead, closeBell, navigate],
