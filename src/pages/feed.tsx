@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { copyToClipboard } from '@/utils/clipboard';
+import { timeAgo } from '@/utils/dateFormatting';
 import {
   collection,
   query,
@@ -181,23 +182,6 @@ const NATIVE_HELLO: Record<string, string> = {
   'Sámi': 'Bures', 'Ainu': 'Irankarapte',
 };
 
-const timeAgo = (timestamp: any): string => {
-  if (!timestamp) return 'Just now';
-  const now = new Date();
-  const postDate = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  const seconds = Math.floor((now.getTime() - postDate.getTime()) / 1000);
-
-  if (seconds < 60) return 'Just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 4) return `${weeks}w`;
-  return postDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-};
 
 const getFullDateTime = (timestamp: any): string => {
   if (!timestamp) return '';
@@ -491,6 +475,9 @@ export default function FeedPage() {
         setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
         setHasMore(snapshot.docs.length === PAGE_SIZE);
       }
+    }, (error) => {
+      console.error('[FeedPage] Firestore listener error:', error);
+      setLoading(false);
     });
     return unsubscribe;
   }, []);
@@ -1697,10 +1684,12 @@ export default function FeedPage() {
                       /* Two images — side by side with 4:5 aspect ratio (portrait-friendly) */
                       <div className="grid grid-cols-2 gap-1.5">
                         {post.images.map((img, idx) => (
-                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                          <div key={img} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
                             <img
                               src={img}
                               alt=""
+                              loading={idx === 0 ? "eager" : "lazy"}
+                              decoding="async"
                               className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
                               style={{ aspectRatio: '4/5', minHeight: '180px' }}
                               onClick={(e) => { e.stopPropagation(); setLightboxImage(img); }}
@@ -1720,10 +1709,12 @@ export default function FeedPage() {
                           />
                         </div>
                         {post.images.slice(1).map((img, idx) => (
-                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                          <div key={img} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
                             <img
                               src={img}
                               alt=""
+                              loading="lazy"
+                              decoding="async"
                               className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
                               onClick={(e) => { e.stopPropagation(); setLightboxImage(img); }}
                             />
@@ -1734,10 +1725,12 @@ export default function FeedPage() {
                       /* Four images — 2x2 grid with 4:3 aspect ratio */
                       <div className="grid grid-cols-2 gap-1.5">
                         {post.images.map((img, idx) => (
-                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                          <div key={img} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
                             <img
                               src={img}
                               alt=""
+                              loading={idx === 0 ? "eager" : "lazy"}
+                              decoding="async"
                               className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
                               style={{ aspectRatio: '4/3' }}
                               onClick={(e) => { e.stopPropagation(); setLightboxImage(img); }}
@@ -2054,7 +2047,7 @@ export default function FeedPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {postImages.map((img, idx) => (
-                      <div key={idx} className="relative group rounded-xl overflow-hidden aspect-square bg-aurora-surface-variant">
+                      <div key={img} className="relative group rounded-xl overflow-hidden aspect-square bg-aurora-surface-variant">
                         <img src={img} alt="" className="w-full h-full object-cover" />
                         <button
                           onClick={() => setPostImages((prev) => prev.filter((_, i) => i !== idx))}
@@ -2192,7 +2185,7 @@ export default function FeedPage() {
                     ) : selectedPost.images.length === 2 ? (
                       <div className="grid grid-cols-2 gap-1.5">
                         {selectedPost.images.map((img, idx) => (
-                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                          <div key={img} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
                             <img src={img} alt="" className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity" style={{ aspectRatio: '4/5', minHeight: '180px' }} onClick={() => setLightboxImage(img)} />
                           </div>
                         ))}
@@ -2203,7 +2196,7 @@ export default function FeedPage() {
                           <img src={selectedPost.images[0]} alt="" className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setLightboxImage(selectedPost.images![0])} />
                         </div>
                         {selectedPost.images.slice(1).map((img, idx) => (
-                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                          <div key={img} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
                             <img src={img} alt="" className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setLightboxImage(img)} />
                           </div>
                         ))}
@@ -2211,7 +2204,7 @@ export default function FeedPage() {
                     ) : (
                       <div className="grid grid-cols-2 gap-1.5">
                         {selectedPost.images.map((img, idx) => (
-                          <div key={idx} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
+                          <div key={img} className="rounded-xl overflow-hidden bg-aurora-surface-variant">
                             <img src={img} alt="" className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition-opacity" style={{ aspectRatio: '4/3' }} onClick={() => setLightboxImage(img)} />
                           </div>
                         ))}

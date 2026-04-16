@@ -393,6 +393,8 @@ export class CallManager {
             console.error('[WebRTC] Failed to set remote description:', err);
           }
         }
+      }, (error) => {
+        console.error('[WebRTC] Call listener error:', error);
       });
       this.unsubscribers.push(unsubCall);
 
@@ -406,6 +408,9 @@ export class CallManager {
               this.addIceCandidateSafe(change.doc.data() as RTCIceCandidateInit);
             }
           });
+        },
+        (error) => {
+          console.error('[WebRTC] Callee candidates listener error:', error);
         }
       );
       this.unsubscribers.push(unsubCandidates);

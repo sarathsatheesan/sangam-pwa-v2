@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -204,7 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     ? 'business_owner'
     : 'user';
 
-  const value: AuthContextType = {
+  const value = useMemo<AuthContextType>(() => ({
     user,
     userProfile,
     loading,
@@ -213,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     isDisabled,
     userRole,
     setUserProfile,
-  };
+  }), [user, userProfile, loading, isAdmin, isBanned, isDisabled, userRole, setUserProfile]);
 
   return (
     <AuthContext.Provider value={value}>

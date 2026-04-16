@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Globe, ChevronDown, X, Plus } from 'lucide-react';
+import { timeAgo, formatDate } from '@/utils/dateFormatting';
 import {
   collection,
   query,
@@ -36,27 +37,6 @@ interface TravelPost {
 }
 
 type FilterMode = 'all' | 'assistance' | 'offer';
-
-const getTimeAgo = (timestamp: any) => {
-  if (!timestamp) return 'Just now';
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-  if (seconds < 60) return 'Just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
-};
-
-const formatDate = (dateStr: string) => {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  } catch {
-    return dateStr;
-  }
-};
 
 export default function TravelPage() {
   const { user, userProfile } = useAuth();
@@ -103,6 +83,8 @@ export default function TravelPage() {
         } as TravelPost);
       });
       setTravelPosts(posts);
+    }, (error) => {
+      console.error('[TravelPage] Firestore listener error:', error);
     });
 
     return unsubscribe;
@@ -380,7 +362,7 @@ export default function TravelPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-aurora-text">{post.posterName}</p>
-                    <p className="text-xs text-aurora-text-secondary">{getTimeAgo(post.createdAt)}</p>
+                    <p className="text-xs text-aurora-text-secondary">{timeAgo(post.createdAt)}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">

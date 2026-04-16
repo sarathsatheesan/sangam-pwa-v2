@@ -248,6 +248,7 @@ export const signInWithEmail = async (
       // Only attempt to resend verification email if > 24h old
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists()) return { user, needsVerification: true, verificationExpired };
         const userData = userDoc.data();
 
         if (userData?.createdAt) {

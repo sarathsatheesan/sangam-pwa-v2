@@ -293,7 +293,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
       // Notify vendor their quote was accepted (fire-and-forget, look up owner via businessId)
       getDoc(doc(db, 'businesses', response.businessId)).then((bizSnap) => {
-        const ownerId = bizSnap.data()?.ownerId;
+        if (!bizSnap.exists()) return;
+        const bizData = bizSnap.data();
+        const ownerId = bizData?.ownerId;
         if (ownerId) {
           // Multi-channel (email/SMS/push)
           notifyQuoteAccepted(ownerId, quoteRequest.id, userProfile?.name || '', response.total);
@@ -358,7 +360,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
       // Fire-and-forget: notify vendor their quote was declined
       getDoc(doc(db, 'businesses', response.businessId)).then((bizSnap) => {
-        const ownerId = bizSnap.data()?.ownerId;
+        if (!bizSnap.exists()) return;
+        const bizData = bizSnap.data();
+        const ownerId = bizData?.ownerId;
         if (ownerId) {
           notifyVendorQuoteDeclined(ownerId, quoteRequest.id, response.businessName);
           notifyVendorQuoteDeclinedMultiChannel(ownerId, quoteRequest.id, response.businessName);
@@ -394,7 +398,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
       // Fire-and-forget notifications
       getDoc(doc(db, 'businesses', response.businessId)).then((bizSnap) => {
-        const ownerId = bizSnap.data()?.ownerId;
+        if (!bizSnap.exists()) return;
+        const bizData = bizSnap.data();
+        const ownerId = bizData?.ownerId;
         if (ownerId) {
           notifyVendorRepriceRequested(ownerId, quoteRequest.id, response.businessName, priceCents).catch(() => {});
           notifyVendorRepriceRequestedMultiChannel(ownerId, quoteRequest.id, priceCents).catch(() => {});
@@ -421,7 +427,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
       // Fire-and-forget notifications
       getDoc(doc(db, 'businesses', response.businessId)).then((bizSnap) => {
-        const ownerId = bizSnap.data()?.ownerId;
+        if (!bizSnap.exists()) return;
+        const bizData = bizSnap.data();
+        const ownerId = bizData?.ownerId;
         if (ownerId) {
           notifyVendorCounterResolved(ownerId, quoteRequest.id, response.businessName, accept).catch(() => {});
           notifyVendorCounterResolvedMultiChannel(ownerId, quoteRequest.id, accept).catch(() => {});

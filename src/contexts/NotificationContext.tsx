@@ -9,6 +9,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   useRef,
   type ReactNode,
 } from 'react';
@@ -158,7 +159,7 @@ export function NotificationProvider({ userId, children }: NotificationProviderP
     }
   }, []);
 
-  const value: NotificationContextValue = {
+  const value = useMemo<NotificationContextValue>(() => ({
     notifications,
     unreadCount,
     isLoading,
@@ -171,7 +172,7 @@ export function NotificationProvider({ userId, children }: NotificationProviderP
     preferences,
     updatePreferences,
     requestPushPermission,
-  };
+  }), [notifications, unreadCount, isLoading, markAsRead, markAllRead, clearNotification, isBellOpen, toggleBell, closeBell, preferences, updatePreferences, requestPushPermission]);
 
   return (
     <NotificationContext.Provider value={value}>

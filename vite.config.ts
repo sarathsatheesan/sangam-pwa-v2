@@ -16,7 +16,7 @@ export default defineConfig({
         name: 'ethniCity — Our culture, connected.',
         short_name: 'ethniCity',
         description: 'Our culture, connected. Discover diverse communities near you.',
-        theme_color: '#0032A0',
+        theme_color: '#F5F6FA',
         background_color: '#FFFFFF',
         display: 'standalone',
         orientation: 'any',
@@ -34,6 +34,12 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any',
+          },
+          {
+            src: '/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
           {
             src: '/apple-touch-icon.png',
@@ -83,6 +89,10 @@ export default defineConfig({
   build: {
     // Explicit browser targets for cross-browser compatibility
     target: ['es2020', 'chrome87', 'firefox78', 'safari14', 'edge88'],
+    // Bundle size baseline (April 2026):
+    // index.js: ~96KB gzip, messages.js: ~64KB gzip, firebase.js: ~142KB gzip
+    // Total precache: ~4MB (176 entries)
+    // Run `npx vite build` and compare to detect regressions
     rollupOptions: {
       output: {
         manualChunks: {

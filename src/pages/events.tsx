@@ -379,7 +379,7 @@ function EventPhotoUploader({
           <div className="grid grid-cols-3 gap-2">
             {photos.map((photo, idx) => (
               <div
-                key={idx}
+                key={photo}
                 className={`relative group aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${idx === coverIndex ? 'border-aurora-indigo shadow-lg' : 'border-transparent'}`}
                 onClick={() => onCoverChange(idx)}
               >
@@ -836,6 +836,9 @@ export default function EventsPage() {
             return timeA - timeB;
           });
           setComments(commentsList);
+        },
+        (error) => {
+          console.error('[EventsPage] Comments listener error:', error);
         }
       );
       commentUnsubscribeRef.current = unsubscribe;
@@ -1568,6 +1571,8 @@ export default function EventsPage() {
                       <img
                         src={event.photos[event.coverPhotoIndex || 0] || event.photos[0]}
                         alt={event.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
@@ -1702,6 +1707,9 @@ export default function EventsPage() {
           onKeyDown={(e) => {
             if (e.key === 'Escape') setSelectedEvent(null);
           }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="event-detail-modal-title"
           tabIndex={-1}
         >
           <div
@@ -1768,7 +1776,7 @@ export default function EventsPage() {
                   {selectedEvent.emoji}
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold text-white leading-tight">{selectedEvent.title}</h2>
+                  <h2 id="event-detail-modal-title" className="text-xl font-bold text-white leading-tight">{selectedEvent.title}</h2>
                   <div className="flex gap-2 mt-1 flex-wrap">
                     <span className="inline-block text-xs bg-white/20 backdrop-blur px-2 py-0.5 rounded-md text-white/90">
                       {selectedEvent.type}
@@ -2158,6 +2166,9 @@ export default function EventsPage() {
       {showCreateModal && (
         <div
           className="fixed inset-0 bg-aurora-bg z-50 flex flex-col"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-event-modal-title"
           onKeyDown={(e) => {
             if (e.key === 'Escape') { setShowCreateModal(false); setDateError(''); setCreateStep(1); }
           }}
@@ -2168,7 +2179,7 @@ export default function EventsPage() {
               <button onClick={() => { setShowCreateModal(false); setDateError(''); setCreateStep(1); }} className="p-2 sm:p-1 hover:bg-aurora-surface-variant rounded-lg transition-colors" aria-label="Go back">
                 <ArrowLeft className="w-5 h-5 text-aurora-text-secondary" />
               </button>
-              <h2 className="text-lg font-bold text-aurora-text">Create Event</h2>
+              <h2 id="create-event-modal-title" className="text-lg font-bold text-aurora-text">Create Event</h2>
             </div>
             <button onClick={() => { setShowCreateModal(false); setDateError(''); setCreateStep(1); }} className="p-2 sm:p-1 text-aurora-text-muted hover:text-aurora-text-secondary" aria-label="Close">
               <X className="w-5 h-5" />
@@ -2468,13 +2479,13 @@ export default function EventsPage() {
 
       {/* ===== Delete Event Confirmation Modal ===== */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => { setShowDeleteConfirm(false); setDeleteEventId(null); }}>
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => { setShowDeleteConfirm(false); setDeleteEventId(null); }} role="dialog" aria-modal="true" aria-labelledby="delete-event-modal-title">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
                 <Trash2 size={20} className="text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900">Delete Event</h3>
+              <h3 id="delete-event-modal-title" className="text-lg font-bold text-gray-900">Delete Event</h3>
             </div>
             <p className="text-gray-600 mb-6">Are you sure you want to delete this event? This action cannot be undone.</p>
             <div className="flex gap-3">
@@ -2493,6 +2504,9 @@ export default function EventsPage() {
       {isEditing && selectedEvent && (
         <div
           className="fixed inset-0 bg-aurora-bg z-[60] flex flex-col"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-event-modal-title"
           onKeyDown={(e) => { if (e.key === 'Escape') setIsEditing(false); }}
           tabIndex={-1}
         >
@@ -2501,7 +2515,7 @@ export default function EventsPage() {
               <button onClick={() => setIsEditing(false)} className="p-2 sm:p-1 hover:bg-aurora-surface-variant rounded-lg transition-colors" aria-label="Go back">
                 <ArrowLeft className="w-5 h-5 text-aurora-text-secondary" />
               </button>
-              <h2 className="text-lg font-bold text-aurora-text">Edit Event</h2>
+              <h2 id="edit-event-modal-title" className="text-lg font-bold text-aurora-text">Edit Event</h2>
             </div>
             <button onClick={() => setIsEditing(false)} className="p-2 sm:p-1 text-aurora-text-muted hover:text-aurora-text-secondary" aria-label="Close">
               <X className="w-5 h-5" />

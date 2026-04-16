@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { copyToClipboard } from '@/utils/clipboard';
+import { timeAgo } from '@/utils/dateFormatting';
 import {
   collection,
   getDocs,
@@ -195,18 +196,6 @@ const formatPrice = (price: string) => {
 };
 
 const parseNumericPrice = (price: string) => parseFloat(price.replace(/[^0-9.]/g, '')) || 0;
-
-const getTimeAgo = (timestamp: any): string => {
-  if (!timestamp?.toMillis) return '';
-  const diff = Date.now() - timestamp.toMillis();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
-};
 
 const fullAddress = (l: Listing) =>
   [l.address, l.locCity, l.locState, l.locZip].filter(Boolean).join(', ');
@@ -623,50 +612,56 @@ export default function HousingPage() {
   const fetchListings = async () => {
     try {
       const snapshot = await getDocs(collection(db, 'listings'));
-      const data: Listing[] = snapshot.docs.filter((d) => !d.data().isHidden).map((d) => ({
-        id: d.id,
-        title: d.data().title || '',
-        type: d.data().type || 'rent',
-        price: d.data().price || '',
-        beds: d.data().beds || 0,
-        baths: d.data().baths || 0,
-        sqft: d.data().sqft || 0,
-        address: d.data().address || '',
-        locCity: d.data().locCity || d.data().city || '',
-        locState: d.data().locState || d.data().state || '',
-        locZip: d.data().locZip || d.data().zip || '',
-        desc: d.data().desc || '',
-        tags: d.data().tags || [],
-        featured: d.data().featured || false,
-        emoji: d.data().emoji || '🏠',
-        bgColor: d.data().bgColor || '#F5F5F5',
-        posterName: d.data().posterName || 'Anonymous',
-        posterAvatar: d.data().posterAvatar || '',
-        posterId: d.data().posterId || '',
-        createdAt: d.data().createdAt,
-        heritage: d.data().heritage,
-        contactPhone: d.data().contactPhone || '',
-        contactEmail: d.data().contactEmail || '',
-        availableDate: d.data().availableDate || '',
-        petPolicy: d.data().petPolicy || '',
-        parking: d.data().parking || '',
-        photos: d.data().photos || [],
-        coverPhotoIndex: d.data().coverPhotoIndex || 0,
-        videoUrl: d.data().videoUrl || '',
-        yearBuilt: d.data().yearBuilt || '',
-        lotSize: d.data().lotSize || '',
-        propertyType: d.data().propertyType || '',
-        heating: d.data().heating || '',
-        cooling: d.data().cooling || '',
-        laundry: d.data().laundry || '',
-        hoa: d.data().hoa || '',
-        status: d.data().status || 'active',
-        walkScore: d.data().walkScore,
-        transitScore: d.data().transitScore,
-        neighborhoodHighlights: d.data().neighborhoodHighlights || [],
-        viewCount: d.data().viewCount || 0,
-        saveCount: d.data().saveCount || 0,
-      }));
+      const data: Listing[] = snapshot.docs
+        .map((d) => {
+          const data = d.data();
+          if (data.isHidden) return null;
+          return {
+            id: d.id,
+            title: data.title || '',
+            type: data.type || 'rent',
+            price: data.price || '',
+            beds: data.beds || 0,
+            baths: data.baths || 0,
+            sqft: data.sqft || 0,
+            address: data.address || '',
+            locCity: data.locCity || data.city || '',
+            locState: data.locState || data.state || '',
+            locZip: data.locZip || data.zip || '',
+            desc: data.desc || '',
+            tags: data.tags || [],
+            featured: data.featured || false,
+            emoji: data.emoji || '🏠',
+            bgColor: data.bgColor || '#F5F5F5',
+            posterName: data.posterName || 'Anonymous',
+            posterAvatar: data.posterAvatar || '',
+            posterId: data.posterId || '',
+            createdAt: data.createdAt,
+            heritage: data.heritage,
+            contactPhone: data.contactPhone || '',
+            contactEmail: data.contactEmail || '',
+            availableDate: data.availableDate || '',
+            petPolicy: data.petPolicy || '',
+            parking: data.parking || '',
+            photos: data.photos || [],
+            coverPhotoIndex: data.coverPhotoIndex || 0,
+            videoUrl: data.videoUrl || '',
+            yearBuilt: data.yearBuilt || '',
+            lotSize: data.lotSize || '',
+            propertyType: data.propertyType || '',
+            heating: data.heating || '',
+            cooling: data.cooling || '',
+            laundry: data.laundry || '',
+            hoa: data.hoa || '',
+            status: data.status || 'active',
+            walkScore: data.walkScore,
+            transitScore: data.transitScore,
+            neighborhoodHighlights: data.neighborhoodHighlights || [],
+            viewCount: data.viewCount || 0,
+            saveCount: data.saveCount || 0,
+          };
+        })
+        .filter(Boolean) as Listing[];
       setListings(data);
     } catch (error) {
       console.error('Error fetching listings:', error);
@@ -798,17 +793,20 @@ export default function HousingPage() {
   const loadComments = async (listingId: string) => {
     try {
       const snapshot = await getDocs(collection(db, 'listings', listingId, 'comments'));
-      const data: Comment[] = snapshot.docs.map((d) => ({
-        id: d.id,
-        listingId: d.data().listingId,
-        userId: d.data().userId,
-        userName: d.data().userName,
-        userAvatar: d.data().userAvatar,
-        text: d.data().text,
-        likes: d.data().likes || 0,
-        likedBy: d.data().likedBy || [],
-        createdAt: d.data().createdAt,
-      }));
+      const data: Comment[] = snapshot.docs.map((d) => {
+        const d_data = d.data();
+        return {
+          id: d.id,
+          listingId: d_data.listingId,
+          userId: d_data.userId,
+          userName: d_data.userName,
+          userAvatar: d_data.userAvatar,
+          text: d_data.text,
+          likes: d_data.likes || 0,
+          likedBy: d_data.likedBy || [],
+          createdAt: d_data.createdAt,
+        };
+      });
       setComments(data);
     } catch (error) {
       console.error('Error loading comments:', error);
@@ -1874,7 +1872,7 @@ export default function HousingPage() {
                     {/* Time */}
                     {listing.createdAt && (
                       <span className="absolute bottom-2 left-2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 z-10">
-                        <Clock size={10} /> {getTimeAgo(listing.createdAt)}
+                        <Clock size={10} /> {timeAgo(listing.createdAt)}
                       </span>
                     )}
                   </div>
@@ -2340,7 +2338,7 @@ export default function HousingPage() {
                     <div>
                       <p className="font-semibold text-sm text-[var(--aurora-text)]">{selectedListing.posterName}</p>
                       {selectedListing.createdAt && (
-                        <p className="text-[10px] text-[var(--aurora-text-muted)]">Posted {getTimeAgo(selectedListing.createdAt)}</p>
+                        <p className="text-[10px] text-[var(--aurora-text-muted)]">Posted {timeAgo(selectedListing.createdAt)}</p>
                       )}
                     </div>
                   </div>
@@ -2398,7 +2396,7 @@ export default function HousingPage() {
                           />
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-[var(--aurora-text)]">{comment.userName}</p>
-                            <p className="text-xs text-[var(--aurora-text-muted)]">{getTimeAgo(comment.createdAt)}</p>
+                            <p className="text-xs text-[var(--aurora-text-muted)]">{timeAgo(comment.createdAt)}</p>
                           </div>
                         </div>
                         {user?.uid === comment.userId && (

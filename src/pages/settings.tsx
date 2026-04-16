@@ -135,23 +135,28 @@ const SettingsPage: React.FC = () => {
       setLoadingBlocked(true);
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().blockedUsers) {
-          const blockedUids: string[] = userDoc.data().blockedUsers;
-          const userDetails = await Promise.all(
-            blockedUids.map(async (uid) => {
-              try {
-                const blockedDoc = await getDoc(doc(db, 'users', uid));
-                if (blockedDoc.exists()) {
-                  const data = blockedDoc.data();
-                  return { uid, name: data.name || 'Unknown User', avatar: data.avatar || '' };
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          if (data?.blockedUsers) {
+            const blockedUids: string[] = data.blockedUsers;
+            const userDetails = await Promise.all(
+              blockedUids.map(async (uid) => {
+                try {
+                  const blockedDoc = await getDoc(doc(db, 'users', uid));
+                  if (blockedDoc.exists()) {
+                    const userData = blockedDoc.data();
+                    return { uid, name: userData.name || 'Unknown User', avatar: userData.avatar || '' };
+                  }
+                } catch (e) {
+                  console.error('Error loading blocked user:', e);
                 }
-              } catch (e) {
-                console.error('Error loading blocked user:', e);
-              }
-              return { uid, name: 'Unknown User', avatar: '' };
-            })
-          );
-          setBlockedUsers(userDetails);
+                return { uid, name: 'Unknown User', avatar: '' };
+              })
+            );
+            setBlockedUsers(userDetails);
+          } else {
+            setBlockedUsers([]);
+          }
         } else {
           setBlockedUsers([]);
         }

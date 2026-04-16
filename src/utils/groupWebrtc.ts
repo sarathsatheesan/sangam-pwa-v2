@@ -429,6 +429,8 @@ export class GroupCallManager {
           })
           .catch((err) => console.error('[GroupCall] setRemoteDescription error:', err));
       }
+    }, (error) => {
+      console.error('[GroupCall] Signal answer listener error:', error);
     });
     this.unsubscribers.push(unsubAnswer);
 
@@ -454,6 +456,9 @@ export class GroupCallManager {
             }
           }
         });
+      },
+      (error) => {
+        console.error('[GroupCall] Candidates listener error:', error);
       }
     );
     this.unsubscribers.push(unsubCandidates);

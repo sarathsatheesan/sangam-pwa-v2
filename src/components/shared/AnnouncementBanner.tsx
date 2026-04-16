@@ -30,13 +30,16 @@ const AnnouncementBanner: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const items: Announcement[] = snapshot.docs.map((d) => ({
-        id: d.id,
-        title: d.data().title || '',
-        message: d.data().message || '',
-        active: d.data().active,
-        createdAt: d.data().createdAt,
-      }));
+      const items: Announcement[] = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          title: data.title || '',
+          message: data.message || '',
+          active: data.active,
+          createdAt: data.createdAt,
+        };
+      });
       // Sort client-side to avoid composite index requirement
       items.sort((a, b) => {
         const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;

@@ -24,14 +24,15 @@ export function useBusinessReviews(
       const snapshot = await getDocs(q);
       const data: BusinessReview[] = [];
       snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
         data.push({
           id: docSnap.id,
-          businessId: docSnap.data().businessId,
-          userId: docSnap.data().userId,
-          userName: docSnap.data().userName,
-          rating: docSnap.data().rating,
-          text: docSnap.data().text,
-          createdAt: docSnap.data().createdAt,
+          businessId: d.businessId,
+          userId: d.userId,
+          userName: d.userName,
+          rating: d.rating,
+          text: d.text,
+          createdAt: d.createdAt,
         });
       });
       // Sort client-side (newest first) to avoid composite index requirement

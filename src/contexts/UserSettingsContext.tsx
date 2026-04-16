@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from './AuthContext';
@@ -180,8 +180,10 @@ export const UserSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     });
   }, [saveSettings]);
 
+  const value = useMemo(() => ({ settings, loading, updateSetting, saveSettings }), [settings, loading, updateSetting, saveSettings]);
+
   return (
-    <UserSettingsContext.Provider value={{ settings, loading, updateSetting, saveSettings }}>
+    <UserSettingsContext.Provider value={value}>
       {children}
     </UserSettingsContext.Provider>
   );
