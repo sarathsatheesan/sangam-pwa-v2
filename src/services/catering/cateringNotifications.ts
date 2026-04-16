@@ -47,6 +47,12 @@ export interface CateringNotification {
   quoteRequestId?: string;
   businessId?: string;
   businessName?: string;
+  /** Which role context this notification targets.
+   *  Used by the NotificationBell to deep-link to the correct view
+   *  (vendor dashboard vs customer pages). Required for "both" types
+   *  like order_cancelled and reprice_resolved where the same type
+   *  can be sent to either party. */
+  role?: 'vendor' | 'customer';
   read: boolean;
   createdAt?: any;
 }
@@ -84,6 +90,7 @@ export async function notifyVendorNewOrder(
     body: `${customerName} placed a $${(total / 100).toFixed(2)} order for ${businessName}`,
     orderId,
     businessName,
+    role: 'vendor',
   });
 }
 
@@ -133,6 +140,7 @@ export async function notifyCustomerStatusChange(
     body: msg.body,
     orderId,
     businessName,
+    role: 'customer',
   });
 }
 
@@ -152,6 +160,7 @@ export async function notifyCustomerOrderModified(
     body: `${businessName} updated your order: ${modificationNote}`,
     orderId,
     businessName,
+    role: 'customer',
   });
 }
 
@@ -171,6 +180,7 @@ export async function notifyVendorModificationRejected(
     body: `${customerName} rejected your changes to their order at ${businessName}`,
     orderId,
     businessName,
+    role: 'vendor',
   });
 }
 
@@ -275,6 +285,7 @@ export async function notifyVendorItemReassigned(
     body: `The customer reassigned the following items from ${businessName}: ${itemList}. These items are no longer part of your order.`,
     quoteRequestId,
     businessName,
+    role: 'vendor',
   });
 }
 
@@ -296,6 +307,7 @@ export async function notifyVendorsRfpEdited(
       title: 'Quote Request Updated',
       body: `A quote request you responded to was edited: ${editSummary}. Your existing quote may need to be updated.`,
       quoteRequestId,
+      role: 'vendor',
     });
   }
 }
@@ -313,6 +325,7 @@ export async function notifyCustomerRfpExpired(
     title: 'Quote Request Expired',
     body: `Your quote request with ${itemCount} items has expired after 7 days. You can create a new request at any time.`,
     quoteRequestId,
+    role: 'customer',
   });
 }
 
@@ -328,6 +341,7 @@ export async function notifyCustomerFinalizationExpired(
     title: 'Finalization Window Expired',
     body: 'Your accepted quote items were not finalized within 72 hours. Vendor capacity has been released. You can re-accept items to start a new finalization window.',
     quoteRequestId,
+    role: 'customer',
   });
 }
 
@@ -352,6 +366,7 @@ export async function notifyVendorsNewQuoteRequest(
       title: 'New Quote Request',
       body: `New ${cuisineCategory} catering request for ${headcount} guests in ${deliveryCity} on ${eventDate}. Submit your quote now!`,
       quoteRequestId,
+      role: 'vendor',
     });
   }
 }
@@ -375,6 +390,7 @@ export async function notifyCustomerQuoteReceived(
     body: `${businessName} submitted a quote for $${(total / 100).toFixed(2)}. Compare quotes and accept items to proceed.`,
     quoteRequestId,
     businessName,
+    role: 'customer',
   });
 }
 
@@ -392,6 +408,7 @@ export async function notifyVendorQuoteDeclined(
     body: `The customer did not select your quote for ${businessName}. You'll receive future requests matching your profile.`,
     quoteRequestId,
     businessName,
+    role: 'vendor',
   });
 }
 
@@ -405,6 +422,8 @@ export async function notifyOrderCancelled(
   reason: string,
 ): Promise<void> {
   const who = cancelledBy === 'customer' ? 'The customer' : businessName;
+  // The recipient is the OTHER party: if the customer cancelled, the vendor receives it.
+  const recipientRole = cancelledBy === 'customer' ? 'vendor' : 'customer';
   await sendCateringNotification({
     recipientId,
     type: 'order_cancelled',
@@ -412,6 +431,7 @@ export async function notifyOrderCancelled(
     body: `${who} cancelled the order${reason ? `: ${reason}` : '.'}`,
     orderId,
     businessName,
+    role: recipientRole,
   });
 }
 
@@ -429,6 +449,7 @@ export async function notifyVendorRfpCancelled(
     body: `A quote request you responded to for ${businessName} has been cancelled by the customer.`,
     quoteRequestId,
     businessName,
+    role: 'vendor',
   });
 }
 
@@ -444,6 +465,7 @@ export async function notifyCustomerRfpCancelled(
     title: 'Quote Request Cancelled',
     body: 'Your quote request has been cancelled. Any submitted vendor quotes have been declined.',
     quoteRequestId,
+    role: 'customer',
   });
 }
 
@@ -463,6 +485,7 @@ export async function notifyVendorQuoteAccepted(
     body: `${customerName} accepted ${itemCount} item${itemCount !== 1 ? 's' : ''} from ${businessName}. Customer contact details are now visible.`,
     quoteRequestId,
     businessName,
+    role: 'vendor',
   });
 }
 
@@ -483,6 +506,7 @@ export async function notifyVendorRepriceRequested(
     body: `A customer has requested a new price of ${formattedPrice} for your quote from ${businessName}. You have 24 hours to respond.`,
     quoteRequestId,
     businessName,
+    role: 'vendor',
   });
 }
 
@@ -510,6 +534,7 @@ export async function notifyCustomerRepriceResponse(
     body,
     quoteRequestId,
     businessName,
+    role: 'customer',
   });
 }
 
@@ -529,5 +554,6 @@ export async function notifyVendorCounterResolved(
       : `The customer declined your counter-offer for ${businessName}. The original quote price stands.`,
     quoteRequestId,
     businessName,
+    role: 'vendor',
   });
 }

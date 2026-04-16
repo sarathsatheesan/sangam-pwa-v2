@@ -88,9 +88,9 @@ export default function NotificationBell() {
     }
   }, [isBellOpen, closeBell]);
 
-  // Notification types that target the vendor (not the customer).
-  // Used to route clicks to the vendor dashboard instead of the customer view.
-  const VENDOR_TYPES = new Set([
+  // Fallback set for notifications created before the `role` field was added.
+  // New notifications always carry role='vendor'|'customer' directly.
+  const VENDOR_TYPE_FALLBACK = new Set([
     'new_order', 'modification_rejected', 'quote_accepted',
     'item_reassigned', 'rfp_edited', 'reprice_requested',
   ]);
@@ -102,7 +102,11 @@ export default function NotificationBell() {
       }
       closeBell();
 
-      const isVendor = VENDOR_TYPES.has(notif.type);
+      // Prefer the explicit `role` field; fall back to type-based inference
+      // for older notifications that predate the role field.
+      const isVendor = notif.role
+        ? notif.role === 'vendor'
+        : VENDOR_TYPE_FALLBACK.has(notif.type);
 
       // Deep-link: navigate to /catering with query params that the catering
       // page reads to auto-switch view and expand the correct order/quote.
