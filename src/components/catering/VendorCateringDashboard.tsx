@@ -1548,9 +1548,34 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                     </span>
                                   </div>
                                 ))}
-                                <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
-                                  <span>Total</span>
-                                  <span>{formatPrice(order.total)}</span>
+                                {/* Fee breakdown */}
+                                <div className="pt-1 border-t space-y-0.5" style={{ borderColor: 'var(--aurora-border)' }}>
+                                  <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                    <span>Subtotal</span>
+                                    <span>{formatPrice(order.subtotal)}</span>
+                                  </div>
+                                  {(order.serviceFee != null && order.serviceFee > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Service Fee</span>
+                                      <span>{formatPrice(order.serviceFee)}</span>
+                                    </div>
+                                  )}
+                                  {(order.deliveryFee != null && order.deliveryFee > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Delivery Fee</span>
+                                      <span>{formatPrice(order.deliveryFee)}</span>
+                                    </div>
+                                  )}
+                                  {(order.tax != null && order.tax > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Tax</span>
+                                      <span>{formatPrice(order.tax)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                                    <span>Total</span>
+                                    <span>{formatPrice(order.total)}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1870,9 +1895,34 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                     </span>
                                   </div>
                                 ))}
-                                <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
-                                  <span>Total</span>
-                                  <span>{formatPrice(order.total)}</span>
+                                {/* Fee breakdown */}
+                                <div className="pt-1 border-t space-y-0.5" style={{ borderColor: 'var(--aurora-border)' }}>
+                                  <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                    <span>Subtotal</span>
+                                    <span>{formatPrice(order.subtotal)}</span>
+                                  </div>
+                                  {(order.serviceFee != null && order.serviceFee > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Service Fee</span>
+                                      <span>{formatPrice(order.serviceFee)}</span>
+                                    </div>
+                                  )}
+                                  {(order.deliveryFee != null && order.deliveryFee > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Delivery Fee</span>
+                                      <span>{formatPrice(order.deliveryFee)}</span>
+                                    </div>
+                                  )}
+                                  {(order.tax != null && order.tax > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Tax</span>
+                                      <span>{formatPrice(order.tax)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                                    <span>Total</span>
+                                    <span>{formatPrice(order.total)}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -2310,9 +2360,34 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                     </span>
                                   </div>
                                 ))}
-                                <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
-                                  <span>Total</span>
-                                  <span>{formatPrice(order.total)}</span>
+                                {/* Fee breakdown */}
+                                <div className="pt-1 border-t space-y-0.5" style={{ borderColor: 'var(--aurora-border)' }}>
+                                  <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                    <span>Subtotal</span>
+                                    <span>{formatPrice(order.subtotal)}</span>
+                                  </div>
+                                  {(order.serviceFee != null && order.serviceFee > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Service Fee</span>
+                                      <span>{formatPrice(order.serviceFee)}</span>
+                                    </div>
+                                  )}
+                                  {(order.deliveryFee != null && order.deliveryFee > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Delivery Fee</span>
+                                      <span>{formatPrice(order.deliveryFee)}</span>
+                                    </div>
+                                  )}
+                                  {(order.tax != null && order.tax > 0) && (
+                                    <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
+                                      <span>Tax</span>
+                                      <span>{formatPrice(order.tax)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between text-sm font-semibold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+                                    <span>Total</span>
+                                    <span>{formatPrice(order.total)}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>

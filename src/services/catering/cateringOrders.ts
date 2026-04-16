@@ -747,8 +747,10 @@ export async function createOrdersFromQuote(
       if (orderItems.length === 0) continue;
 
       const subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
-      const tax = Math.round(subtotal * 0.0825);
-      const total = subtotal + tax;
+      const serviceFee = response.serviceFee || 0;
+      const deliveryFee = response.deliveryFee || 0;
+      const tax = Math.round((subtotal + serviceFee + deliveryFee) * 0.0825);
+      const total = subtotal + serviceFee + deliveryFee + tax;
 
       const order: Record<string, any> = {
         customerId: quoteRequest.customerId,
@@ -759,6 +761,8 @@ export async function createOrdersFromQuote(
         businessName,
         items: orderItems,
         subtotal,
+        serviceFee,
+        deliveryFee,
         tax,
         total,
         status: 'confirmed',

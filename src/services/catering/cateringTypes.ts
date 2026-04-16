@@ -124,6 +124,8 @@ export interface CateringOrder {
   businessName: string;
   items: OrderItem[];
   subtotal: number;           // cents
+  serviceFee?: number;        // cents — from vendor quote
+  deliveryFee?: number;       // cents — from vendor quote
   tax?: number;               // cents
   total: number;              // cents
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
