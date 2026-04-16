@@ -37,7 +37,10 @@ export interface CateringNotification {
     | 'item_reassigned'       // FIX-C3: vendor: item removed from their quote
     | 'rfp_edited'            // FIX-H5: vendor: RFP they quoted on was edited
     | 'rfp_expired'           // FIX-C5: customer: their RFP expired with no orders
-    | 'finalization_expired'; // FIX-H6: customer: pending finalization timed out
+    | 'finalization_expired'  // FIX-H6: customer: pending finalization timed out
+    | 'reprice_requested'     // vendor: customer requested a new price
+    | 'reprice_countered'     // customer: vendor sent a counter-offer
+    | 'reprice_resolved';     // both: reprice negotiation resolved (accepted/denied/expired)
   title: string;
   body: string;
   orderId?: string;
