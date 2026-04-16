@@ -654,23 +654,14 @@ export async function acceptQuoteResponseItems(
     })),
   };
 
-  if (allItemsAssigned) {
-    requestUpdate.status = 'accepted';
-  } else {
-    requestUpdate.status = 'partially_accepted';
-  }
+  // FIX-LOCK: Always keep status as 'partially_accepted' here.
+  // The customer must explicitly confirm finalization via the UI before
+  // we set status to 'accepted' and auto-decline remaining vendors.
+  // This prevents the "lock bug" where accepting items from one vendor
+  // auto-finalizes and blocks selecting from other vendors.
+  requestUpdate.status = 'partially_accepted';
 
   await updateDoc(requestRef, requestUpdate);
-
-  // 7. If all items assigned, auto-decline any remaining 'submitted' responses
-  if (allItemsAssigned) {
-    const allResponses = await fetchQuoteResponsesByRequest(requestId);
-    for (const resp of allResponses) {
-      if (resp.id !== responseId && resp.status === 'submitted') {
-        await updateDoc(doc(db, QUOTE_RESPONSES_COL, resp.id), { status: 'declined' });
-      }
-    }
-  }
 
   return { allItemsAssigned };
 }

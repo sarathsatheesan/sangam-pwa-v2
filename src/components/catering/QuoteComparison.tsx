@@ -58,6 +58,10 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     existingAssignments: Array<{itemName: string; businessName: string}>;
   } | null>(null);
 
+  // FIX-LOCK: Finalization confirmation modal — shown when all items are assigned
+  // to give the customer the choice to finalize or continue selecting from other vendors
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+
   // SB-38: Quote expiry warning state
   const [expiredQuoteId, setExpiredQuoteId] = useState<string | null>(null);
 
@@ -269,17 +273,11 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       );
 
       if (result.allItemsAssigned) {
-        // Auto-finalize: all items are assigned, auto-mark the quote as accepted
-        // and prompt for delivery address to create orders immediately
-        try {
-          await finalizeQuoteRequest(quoteRequest.id);
-          console.log('[QuoteComparison] Auto-finalized quote request:', quoteRequest.id);
-        } catch (finalizeErr) {
-          console.warn('[QuoteComparison] Auto-finalize status update failed (non-critical):', finalizeErr);
-        }
-        addToast(`All items accepted from ${response.businessName}! Provide a delivery address to complete your order.`, 'success', 5000);
-        // Auto-open address form to create orders
-        setShowAddressForm(true);
+        // FIX-LOCK: Instead of auto-finalizing (which locks the session and
+        // auto-declines other vendors), show a confirmation modal so the
+        // customer can choose to finalize or continue selecting from others.
+        setShowFinalizeConfirm(true);
+        addToast(`All items are now assigned! Confirm when you're ready to finalize.`, 'success', 5000);
       } else {
         addToast(`${itemNames.length} item${itemNames.length > 1 ? 's' : ''} accepted from ${response.businessName}. Your contact details have been shared.`, 'success', 5000);
       }
@@ -579,8 +577,8 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
         </div>
       )}
 
-      {/* Status banner for fully accepted — show address form prompt if orders not yet created.
-          Use allAssigned || isFullyAccepted to handle cases where request status wasn't updated. */}
+      {/* Status banner for fully accepted — show finalize confirmation or address form prompt.
+          Use allAssigned || isFullyAccepted to handle both computed and Firestore-based states. */}
       {(allAssigned || isFullyAccepted) && !ordersCreated && (
         <div
           className="p-3 rounded-xl space-y-2"
@@ -589,17 +587,20 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
           <div className="flex items-center gap-2">
             <CheckCircle2 size={18} style={{ color: '#D97706' }} />
             <p className="text-sm font-medium" style={{ color: '#92400E' }}>
-              All items assigned! Provide a delivery address to create your orders.
+              {isFullyAccepted
+                ? 'All items assigned! Provide a delivery address to create your orders.'
+                : 'All items are now assigned. Ready to finalize?'}
             </p>
           </div>
           <button
-            onClick={() => setShowAddressForm(true)}
+            type="button"
+            onClick={() => isFullyAccepted ? setShowAddressForm(true) : setShowFinalizeConfirm(true)}
             disabled={finalizingOrder}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
             style={{ backgroundColor: '#059669' }}
           >
             {finalizingOrder ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-            Finalize & Create Orders
+            {isFullyAccepted ? 'Provide Address & Create Orders' : 'Finalize & Create Orders'}
           </button>
         </div>
       )}
@@ -995,6 +996,51 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                 style={{ backgroundColor: '#6366F1' }}
               >
                 Reassign Items
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FIX-LOCK: Finalize Confirmation Modal — lets customer choose to
+          finalize (which auto-declines remaining vendors) or continue selecting */}
+      {showFinalizeConfirm && !showAddressForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <div className="w-full max-w-md rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle2 size={22} style={{ color: '#059669' }} />
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>All Items Assigned</h3>
+            </div>
+            <p className="text-sm mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Every item on your request has been assigned to a vendor. What would you like to do?
+            </p>
+            <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-muted)' }}>
+              <strong>Note:</strong> Finalizing will decline any vendors you haven&apos;t selected items from and lock in your choices. You can still reassign items before finalizing.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFinalizeConfirm(false);
+                  setShowAddressForm(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
+                style={{ backgroundColor: '#059669' }}
+              >
+                <CheckCircle2 size={14} />
+                I&apos;m Done — Finalize Order
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFinalizeConfirm(false);
+                  addToast('You can continue selecting items from other vendors.', 'info', 4000);
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors"
+                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+              >
+                <ArrowLeft size={14} />
+                Continue Selecting from Other Vendors
               </button>
             </div>
           </div>
