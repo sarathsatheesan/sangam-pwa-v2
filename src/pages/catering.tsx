@@ -194,6 +194,20 @@ export default function CateringPage() {
   // pending quoteRequestId and the subscription effect below resolves it.
   const pendingDeepLinkQuoteRef = useRef<string | null>(null);
 
+  // Resolve pending deep-link quote selection when quoteRequests data arrives.
+  // Handles the race condition where the subscription callback fires BEFORE the
+  // deep-link effect sets the ref (initial data from Firestore arrives on mount,
+  // but the searchParams effect runs after the first render).
+  useEffect(() => {
+    if (pendingDeepLinkQuoteRef.current && state.quoteRequests.length > 0) {
+      const target = state.quoteRequests.find((r) => r.id === pendingDeepLinkQuoteRef.current);
+      if (target) {
+        setSelectedQuoteRequest(target);
+        pendingDeepLinkQuoteRef.current = null;
+      }
+    }
+  }, [state.quoteRequests]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Switch from Vendor context into a Personal-scope view (My Orders, My Quotes,
   // Saved Orders, Templates). If we're currently on the /vendor/:id/dashboard
   // route, navigate to /catering first so the auto-switch effect above doesn't
