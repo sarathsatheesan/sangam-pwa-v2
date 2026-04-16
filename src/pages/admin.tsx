@@ -1573,34 +1573,83 @@ export default function AdminPage() {
             {/* ══════════ MODERATION ══════════ */}
             {selectedSection === 'moderation' && (
               <ModerationPanel
-                modQueue={filteredModQueue}
-                hiddenPosts={hiddenPosts}
-                hiddenBusinesses={hiddenBusinesses}
-                onApproveItem={dismissModItem}
-                onRejectItem={(id) => {
-                  const item = modQueue.find(i => i.id === id);
-                  if (item) {
-                    setConfirmModal({
-                      title: 'Permanently Delete?',
-                      message: `Permanently delete this ${item.type}? This cannot be undone.`,
-                      confirmLabel: 'Delete',
-                      onConfirm: async () => {
-                        setConfirmModal(null);
-                        try {
-                          if (item.contentId && item.collection) {
-                            await deleteDoc(doc(db, item.collection, item.contentId));
-                          }
-                          await dismissModItem(item.id);
-                          setToastMessage('Content permanently deleted.');
-                        } catch (error) {
-                          console.error('Error deleting flagged content:', error);
-                          setToastMessage('Failed to delete content.');
-                          await dismissModItem(item.id);
-                        }
-                      }
-                    });
+                loading={loading}
+                modQueue={modQueue}
+                filteredModQueue={filteredModQueue}
+                modFilterCategory={modFilterCategory}
+                modSortBy={modSortBy}
+                modCategoryCounts={modCategoryCounts}
+                onModFilterCategoryChange={setModFilterCategory}
+                onModSortByChange={setModSortBy}
+                modTab={modTab}
+                onModTabChange={(tab) => {
+                  setModTab(tab);
+                  if (tab === 'hidden') loadHiddenPosts();
+                }}
+                onDismiss={dismissModItem}
+                onHide={async (item) => {
+                  try {
+                    if (item.contentId && item.collection) {
+                      await updateDoc(doc(db, item.collection, item.contentId), {
+                        isHidden: true,
+                        hiddenAt: new Date().toISOString(),
+                        hiddenReason: item.categoryLabel || item.reason || 'Moderation action',
+                      });
+                    }
+                    await dismissModItem(item.id);
+                    setToastMessage(`${item.type || 'Content'} hidden from public view.`);
+                  } catch (error) {
+                    console.error('Error hiding content:', error);
+                    setToastMessage('Failed to hide content.');
                   }
                 }}
+                onDelete={async (item) => {
+                  setConfirmModal({
+                    title: 'Permanently Delete?',
+                    message: `Permanently delete this ${item.type}? This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    onConfirm: async () => {
+                      setConfirmModal(null);
+                      try {
+                        if (item.contentId && item.collection) {
+                          await deleteDoc(doc(db, item.collection, item.contentId));
+                        }
+                        await dismissModItem(item.id);
+                        setToastMessage('Content permanently deleted.');
+                      } catch (error) {
+                        console.error('Error deleting flagged content:', error);
+                        setToastMessage('Failed to delete content.');
+                        await dismissModItem(item.id);
+                      }
+                    }
+                  });
+                }}
+                onWarnUser={warnUser}
+                onBanUser={async (item) => {
+                  if (!item.authorId) {
+                    setToastMessage('Cannot ban: no author linked to this report.');
+                    return;
+                  }
+                  setConfirmModal({
+                    title: 'Ban User?',
+                    message: `Ban user "${item.authorName || item.authorId}"? They will no longer be able to access the platform.`,
+                    confirmLabel: 'Ban',
+                    onConfirm: async () => {
+                      setConfirmModal(null);
+                      try {
+                        await banUser(item.authorId!);
+                        await dismissModItem(item.id);
+                        setToastMessage(`User "${item.authorName || item.authorId}" has been banned.`);
+                      } catch (error) {
+                        console.error('Error banning user:', error);
+                        setToastMessage('Failed to ban user.');
+                      }
+                    }
+                  });
+                }}
+                hiddenPosts={hiddenPosts}
+                hiddenBusinesses={hiddenBusinesses}
+                loadingHidden={loadingHidden}
                 onUnhidePost={unhidePost}
                 onDeletePost={permanentlyDeletePost}
                 onUnhideBusiness={unhideBusiness}
