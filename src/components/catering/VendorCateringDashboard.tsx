@@ -2500,7 +2500,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                             </p>
                             <span
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                              style={{ backgroundColor: statusCfg.bg, color: statusCfg.color }}
+                              style={{ backgroundColor: statusCfg.bgColor, color: statusCfg.color }}
                             >
                               {statusCfg.icon} {statusCfg.label}
                             </span>
