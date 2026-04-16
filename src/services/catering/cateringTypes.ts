@@ -242,6 +242,19 @@ export interface CateringQuoteResponse {
   customerPhone?: string;
   acceptedItemNames?: string[];   // Which specific items were accepted from this vendor
   createdAt?: any;
+
+  // ── Reprice negotiation (one-shot) ──
+  // Customer requests a new price → vendor responds (accept/deny/counter) → customer accepts or declines
+  repriceStatus?: 'none' | 'requested' | 'vendor_accepted' | 'vendor_denied' | 'vendor_countered' | 'counter_accepted' | 'counter_declined' | 'expired';
+  repriceRequestedPrice?: number;  // cents — the total the customer proposed
+  repriceReason?: string;          // optional customer note explaining the ask
+  repriceRequestedAt?: any;        // Timestamp — starts the 24h vendor response window
+  repriceExpiresAt?: any;          // Timestamp — when the vendor's response window closes
+  repriceVendorNote?: string;      // vendor's note when responding
+  repriceCounterPrice?: number;    // cents — vendor's counter-offer total (when status='vendor_countered')
+  repriceRespondedAt?: any;        // Timestamp — when vendor responded
+  repriceCounterExpiresAt?: any;   // Timestamp — when the customer's acceptance window closes (24h after vendor counter)
+  repriceResolvedAt?: any;         // Timestamp — when customer accepted/declined the counter
 }
 
 export interface QuotedItem {

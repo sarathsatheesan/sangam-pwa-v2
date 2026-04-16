@@ -97,6 +97,11 @@ export {
   subscribeToBusinessQuoteResponses,
   updateQuoteResponse,
   isQuoteResponseEditable,
+  // Reprice negotiation
+  requestReprice,
+  respondToReprice,
+  resolveCounterOffer,
+  expireStaleRepriceRequests,
 } from './cateringQuotes';
 
 // Reviews
@@ -162,6 +167,10 @@ export {
   markNotificationRead,
   markAllNotificationsRead,
   getUnreadNotificationCount,
+  // Reprice notifications (in-app)
+  notifyVendorRepriceRequested,
+  notifyCustomerRepriceResponse,
+  notifyVendorCounterResolved,
 } from './cateringNotifications';
 
 // Notification types & preferences (Phase 1–4)

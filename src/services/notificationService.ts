@@ -44,7 +44,10 @@ export type CateringNotificationType =
   | 'vendor_rfq_edited'
   | 'vendor_rfq_cancelled'
   | 'vendor_new_review'
-  | 'review_flagged';
+  | 'review_flagged'
+  | 'reprice_requested'
+  | 'reprice_countered'
+  | 'reprice_resolved';
 
 export interface NotificationPayload {
   channel: NotificationChannel;
@@ -285,4 +288,45 @@ export async function notifyVendorsRfpCancelledMultiChannel(
       requestId,
     });
   }
+}
+
+// ── Reprice negotiation multi-channel notifications ──
+
+/** Notify vendor of reprice request (email/SMS/push) */
+export async function notifyVendorRepriceRequestedMultiChannel(
+  vendorOwnerId: string,
+  requestId: string,
+  requestedPrice: number,
+): Promise<void> {
+  await notifyAllChannels(vendorOwnerId, 'reprice_requested', {
+    requestId,
+    requestedPrice,
+  });
+}
+
+/** Notify customer of vendor's reprice response (email/SMS/push) */
+export async function notifyCustomerRepriceResponseMultiChannel(
+  customerId: string,
+  requestId: string,
+  action: 'accepted' | 'denied' | 'countered',
+  counterPrice?: number,
+): Promise<void> {
+  const type: CateringNotificationType = action === 'countered' ? 'reprice_countered' : 'reprice_resolved';
+  await notifyAllChannels(customerId, type, {
+    requestId,
+    action,
+    counterPrice,
+  });
+}
+
+/** Notify vendor that customer resolved their counter-offer (email/SMS/push) */
+export async function notifyVendorCounterResolvedMultiChannel(
+  vendorOwnerId: string,
+  requestId: string,
+  accepted: boolean,
+): Promise<void> {
+  await notifyAllChannels(vendorOwnerId, 'reprice_resolved', {
+    requestId,
+    accepted,
+  });
 }

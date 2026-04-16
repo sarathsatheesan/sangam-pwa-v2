@@ -847,6 +847,10 @@ export async function expireStaleQuoteRequests(): Promise<number> {
     }
   }
 
+  // Also expire stale reprice requests/counter-offers in the same pass
+  const repriceExpired = await expireStaleRepriceRequests();
+  expiredCount += repriceExpired;
+
   return expiredCount;
 }
 
@@ -879,6 +883,184 @@ export async function notifyVendorsOfRfpEdit(
       });
     }
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REPRICE NEGOTIATION — one-shot price negotiation within the RFP flow
+// Customer proposes a new total → Vendor accepts / denies / counters → Customer accepts or declines
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** 24-hour window for vendor to respond to reprice request / customer to respond to counter */
+const REPRICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Customer requests a new price for a vendor's quote.
+ * One-shot: can only be called once per response (repriceStatus must be 'none' or undefined).
+ */
+export async function requestReprice(
+  responseId: string,
+  requestedPrice: number,
+  reason?: string,
+): Promise<void> {
+  const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
+  const snap = await getDoc(responseRef);
+  if (!snap.exists()) throw new Error('Quote response not found');
+  const data = snap.data();
+
+  // Guard: only allowed on submitted quotes with no prior reprice
+  if (data.status !== 'submitted') {
+    throw new Error('Can only request a reprice on a submitted quote');
+  }
+  if (data.repriceStatus && data.repriceStatus !== 'none') {
+    throw new Error('A reprice has already been requested for this quote');
+  }
+
+  const now = Timestamp.now();
+  const expiresAt = Timestamp.fromMillis(now.toMillis() + REPRICE_WINDOW_MS);
+
+  await updateDoc(responseRef, {
+    repriceStatus: 'requested',
+    repriceRequestedPrice: requestedPrice,
+    repriceReason: reason || '',
+    repriceRequestedAt: now,
+    repriceExpiresAt: expiresAt,
+  });
+}
+
+/**
+ * Vendor responds to a customer's reprice request.
+ * action: 'accept' — vendor accepts customer's proposed price (updates quote total)
+ *         'deny'   — vendor refuses, original price stands
+ *         'counter' — vendor proposes a different total
+ */
+export async function respondToReprice(
+  responseId: string,
+  action: 'accept' | 'deny' | 'counter',
+  counterPrice?: number,
+  vendorNote?: string,
+): Promise<void> {
+  const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
+  const snap = await getDoc(responseRef);
+  if (!snap.exists()) throw new Error('Quote response not found');
+  const data = snap.data();
+
+  if (data.repriceStatus !== 'requested') {
+    throw new Error('No pending reprice request to respond to');
+  }
+
+  // Check expiry
+  const expiresMs = data.repriceExpiresAt?.toMillis?.() || 0;
+  if (Date.now() > expiresMs) {
+    throw new Error('The reprice request has expired');
+  }
+
+  const now = Timestamp.now();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const update: Record<string, any> = {
+    repriceRespondedAt: now,
+    repriceVendorNote: vendorNote || '',
+  };
+
+  if (action === 'accept') {
+    // Vendor accepts the customer's proposed price — update the quote total
+    update.repriceStatus = 'vendor_accepted';
+    update.total = data.repriceRequestedPrice;
+  } else if (action === 'deny') {
+    // Vendor refuses — original price stands, negotiation over
+    update.repriceStatus = 'vendor_denied';
+  } else if (action === 'counter') {
+    if (counterPrice == null || counterPrice <= 0) {
+      throw new Error('Counter price is required');
+    }
+    update.repriceStatus = 'vendor_countered';
+    update.repriceCounterPrice = counterPrice;
+    // Start 24h acceptance window for customer
+    update.repriceCounterExpiresAt = Timestamp.fromMillis(now.toMillis() + REPRICE_WINDOW_MS);
+  }
+
+  await updateDoc(responseRef, update);
+}
+
+/**
+ * Customer responds to a vendor's counter-offer.
+ * action: 'accept' — customer accepts the counter price (updates quote total)
+ *         'decline' — customer declines, original quote price is restored
+ */
+export async function resolveCounterOffer(
+  responseId: string,
+  action: 'accept' | 'decline',
+): Promise<void> {
+  const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
+  const snap = await getDoc(responseRef);
+  if (!snap.exists()) throw new Error('Quote response not found');
+  const data = snap.data();
+
+  if (data.repriceStatus !== 'vendor_countered') {
+    throw new Error('No pending counter-offer to resolve');
+  }
+
+  // Check expiry
+  const expiresMs = data.repriceCounterExpiresAt?.toMillis?.() || 0;
+  if (Date.now() > expiresMs) {
+    throw new Error('The counter-offer has expired');
+  }
+
+  const now = Timestamp.now();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const update: Record<string, any> = {
+    repriceResolvedAt: now,
+  };
+
+  if (action === 'accept') {
+    update.repriceStatus = 'counter_accepted';
+    update.total = data.repriceCounterPrice;
+  } else {
+    update.repriceStatus = 'counter_declined';
+    // Total stays at original value
+  }
+
+  await updateDoc(responseRef, update);
+}
+
+/**
+ * Expire stale reprice requests and counter-offers.
+ * Called alongside expireStaleQuoteRequests() or on its own schedule.
+ */
+export async function expireStaleRepriceRequests(): Promise<number> {
+  let expiredCount = 0;
+  const now = Date.now();
+
+  // 1. Expire vendor-response windows (repriceStatus === 'requested' && past expiresAt)
+  const requestedSnap = await getDocs(
+    query(collection(db, QUOTE_RESPONSES_COL), where('repriceStatus', '==', 'requested')),
+  );
+  for (const docSnap of requestedSnap.docs) {
+    const data = docSnap.data();
+    const expiresMs = data.repriceExpiresAt?.toMillis?.() || 0;
+    if (expiresMs > 0 && now > expiresMs) {
+      await updateDoc(doc(db, QUOTE_RESPONSES_COL, docSnap.id), {
+        repriceStatus: 'expired',
+      });
+      expiredCount++;
+    }
+  }
+
+  // 2. Expire customer counter-acceptance windows (repriceStatus === 'vendor_countered' && past counterExpiresAt)
+  const counteredSnap = await getDocs(
+    query(collection(db, QUOTE_RESPONSES_COL), where('repriceStatus', '==', 'vendor_countered')),
+  );
+  for (const docSnap of counteredSnap.docs) {
+    const data = docSnap.data();
+    const expiresMs = data.repriceCounterExpiresAt?.toMillis?.() || 0;
+    if (expiresMs > 0 && now > expiresMs) {
+      await updateDoc(doc(db, QUOTE_RESPONSES_COL, docSnap.id), {
+        repriceStatus: 'expired',
+      });
+      expiredCount++;
+    }
+  }
+
+  return expiredCount;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════════

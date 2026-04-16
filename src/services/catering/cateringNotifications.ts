@@ -462,3 +462,69 @@ export async function notifyVendorQuoteAccepted(
     businessName,
   });
 }
+
+// ── Reprice negotiation notifications (in-app bell) ──
+
+/** Notify vendor that the customer has requested a reprice */
+export async function notifyVendorRepriceRequested(
+  vendorOwnerId: string,
+  quoteRequestId: string,
+  businessName: string,
+  requestedPrice: number,
+): Promise<void> {
+  const formattedPrice = `$${(requestedPrice / 100).toFixed(2)}`;
+  await sendCateringNotification({
+    recipientId: vendorOwnerId,
+    type: 'reprice_requested',
+    title: 'Price Negotiation Request',
+    body: `A customer has requested a new price of ${formattedPrice} for your quote from ${businessName}. You have 24 hours to respond.`,
+    quoteRequestId,
+    businessName,
+  });
+}
+
+/** Notify customer that the vendor responded to their reprice request */
+export async function notifyCustomerRepriceResponse(
+  customerId: string,
+  quoteRequestId: string,
+  businessName: string,
+  action: 'accepted' | 'denied' | 'countered',
+  counterPrice?: number,
+): Promise<void> {
+  let body: string;
+  if (action === 'accepted') {
+    body = `${businessName} accepted your proposed price. You can now proceed to accept the quote.`;
+  } else if (action === 'denied') {
+    body = `${businessName} declined your price request. The original quote price stands — you can still accept or decline.`;
+  } else {
+    const formattedPrice = counterPrice ? `$${(counterPrice / 100).toFixed(2)}` : 'a new price';
+    body = `${businessName} sent a counter-offer of ${formattedPrice}. You have 24 hours to accept or decline.`;
+  }
+  await sendCateringNotification({
+    recipientId: customerId,
+    type: action === 'countered' ? 'reprice_countered' : 'reprice_resolved',
+    title: action === 'accepted' ? 'Price Request Accepted!' : action === 'denied' ? 'Price Request Declined' : 'Counter-Offer Received',
+    body,
+    quoteRequestId,
+    businessName,
+  });
+}
+
+/** Notify vendor that customer resolved their counter-offer */
+export async function notifyVendorCounterResolved(
+  vendorOwnerId: string,
+  quoteRequestId: string,
+  businessName: string,
+  accepted: boolean,
+): Promise<void> {
+  await sendCateringNotification({
+    recipientId: vendorOwnerId,
+    type: 'reprice_resolved',
+    title: accepted ? 'Counter-Offer Accepted!' : 'Counter-Offer Declined',
+    body: accepted
+      ? `The customer accepted your counter-offer for ${businessName}. They can now proceed with the order.`
+      : `The customer declined your counter-offer for ${businessName}. The original quote price stands.`,
+    quoteRequestId,
+    businessName,
+  });
+}

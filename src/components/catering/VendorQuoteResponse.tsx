@@ -3,10 +3,10 @@ import {
   Package, Clock, Users, MapPin, Send, Loader2,
   ChevronDown, ChevronUp, ShieldCheck, Plus, Trash2, DollarSign,
   Bell, CheckCircle2, XCircle, Check, Edit, BellRing, Timer,
-  BellOff, ChevronRight,
+  BellOff, ChevronRight, RefreshCw,
 } from 'lucide-react';
-import { notifyVendorQuoteReceived } from '@/services/notificationService';
-import { notifyCustomerQuoteReceived } from '@/services/catering/cateringNotifications';
+import { notifyVendorQuoteReceived, notifyCustomerRepriceResponseMultiChannel } from '@/services/notificationService';
+import { notifyCustomerQuoteReceived, notifyCustomerRepriceResponse } from '@/services/catering/cateringNotifications';
 
 // ── PriceInput: local-state input that avoids cursor-jump on controlled value ──
 // Manages its own string state; only pushes cents to parent on blur/Enter.
@@ -71,6 +71,7 @@ import {
   updateQuoteResponse,
   isQuoteResponseEditable,
   formatPrice,
+  respondToReprice,
 } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -94,6 +95,12 @@ export default function VendorQuoteResponse({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [editingResponseId, setEditingResponseId] = useState<string | null>(null);
+
+  // ── Reprice response state ──
+  const [repriceRespondingId, setRepriceRespondingId] = useState<string | null>(null); // loading
+  const [repriceCounterAmount, setRepriceCounterAmount] = useState('');
+  const [repriceVendorNote, setRepriceVendorNote] = useState('');
+  const [showRepriceCounter, setShowRepriceCounter] = useState<string | null>(null); // responseId showing counter form
 
   // ── Accordion & sorting state ──
   const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({
@@ -347,6 +354,61 @@ export default function VendorQuoteResponse({
       addToast(err.message || 'Failed to update quote', 'error');
     } finally {
       setSubmittingId(null);
+    }
+  };
+
+  // ── Reprice response handler ──
+  const handleRepriceResponse = async (
+    response: CateringQuoteResponse,
+    action: 'accept' | 'deny' | 'counter',
+  ) => {
+    setRepriceRespondingId(response.id);
+    try {
+      let counterPrice: number | undefined;
+      if (action === 'counter') {
+        counterPrice = Math.round(parseFloat(repriceCounterAmount) * 100);
+        if (isNaN(counterPrice) || counterPrice <= 0) {
+          addToast('Please enter a valid counter price', 'error');
+          setRepriceRespondingId(null);
+          return;
+        }
+      }
+
+      await respondToReprice(response.id, action, counterPrice, repriceVendorNote);
+
+      const actionLabel = action === 'accept' ? 'accepted' : action === 'deny' ? 'denied' : 'countered';
+      addToast(
+        action === 'accept'
+          ? 'Price request accepted! The customer can now proceed.'
+          : action === 'deny'
+            ? 'Price request declined. Your original price stands.'
+            : `Counter-offer of $${(counterPrice! / 100).toFixed(2)} sent! Waiting for customer.`,
+        action === 'accept' ? 'success' : 'info',
+        5000,
+      );
+
+      setShowRepriceCounter(null);
+      setRepriceCounterAmount('');
+      setRepriceVendorNote('');
+
+      // Notify customer (fire-and-forget)
+      const request = requests.find((r) => r.id === response.quoteRequestId);
+      if (request?.customerId) {
+        notifyCustomerRepriceResponse(
+          request.customerId, response.quoteRequestId, businessName,
+          action === 'accept' ? 'accepted' : action === 'deny' ? 'denied' : 'countered',
+          counterPrice,
+        ).catch(() => {});
+        notifyCustomerRepriceResponseMultiChannel(
+          request.customerId, response.quoteRequestId,
+          action === 'accept' ? 'accepted' : action === 'deny' ? 'denied' : 'countered',
+          counterPrice,
+        ).catch(() => {});
+      }
+    } catch (err: any) {
+      addToast(err.message || 'Failed to respond to reprice request', 'error');
+    } finally {
+      setRepriceRespondingId(null);
     }
   };
 
@@ -1348,6 +1410,177 @@ export default function VendorQuoteResponse({
                             <p className="text-xs p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
                               Customer note: {request.specialInstructions}
                             </p>
+                          )}
+
+                          {/* ── Reprice Request Panel — vendor responds to customer's price request ── */}
+                          {response.repriceStatus === 'requested' && (() => {
+                            const expiresMs = response.repriceExpiresAt?.toMillis?.() || (response.repriceExpiresAt?.seconds ? response.repriceExpiresAt.seconds * 1000 : 0);
+                            const remainingMs = Math.max(0, expiresMs - Date.now());
+                            const hrs = Math.floor(remainingMs / (60 * 60 * 1000));
+                            const mins = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+                            const isExpired = remainingMs <= 0;
+                            const isUrgent = hrs < 4 && !isExpired;
+                            const timeLeft = isExpired ? 'Expired' : hrs > 0 ? `${hrs}h ${mins}m left` : `${mins}m left`;
+
+                            return (
+                              <div className="mt-2 p-3 rounded-xl border space-y-2" style={{ borderColor: '#F59E0B', backgroundColor: '#FFFBEB' }}>
+                                <div className="flex items-center gap-2">
+                                  <RefreshCw size={16} style={{ color: '#D97706' }} />
+                                  <p className="text-sm font-semibold" style={{ color: '#92400E' }}>Price Negotiation Request</p>
+                                </div>
+                                <p className="text-sm" style={{ color: '#92400E' }}>
+                                  Customer proposes: <strong>{formatPrice(response.repriceRequestedPrice || 0)}</strong>
+                                  <span className="text-xs ml-1">(your quote: {formatPrice(response.total)})</span>
+                                </p>
+                                {response.repriceReason && (
+                                  <p className="text-xs" style={{ color: '#92400E' }}>Reason: &ldquo;{response.repriceReason}&rdquo;</p>
+                                )}
+                                <div className="flex items-center gap-1">
+                                  <Timer size={12} style={{ color: isUrgent ? '#D97706' : '#6B7280' }} />
+                                  <span className={`text-xs ${isUrgent ? 'font-medium' : ''}`} style={{ color: isUrgent ? '#D97706' : '#6B7280' }}>
+                                    {timeLeft}
+                                  </span>
+                                </div>
+
+                                {!isExpired && showRepriceCounter !== response.id && (
+                                  <div className="flex gap-2 pt-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRepriceResponse(response, 'accept')}
+                                      disabled={repriceRespondingId === response.id}
+                                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-50"
+                                      style={{ backgroundColor: '#059669' }}
+                                    >
+                                      {repriceRespondingId === response.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                                      Accept Price
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowRepriceCounter(response.id); setRepriceCounterAmount(''); setRepriceVendorNote(''); }}
+                                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                                      style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}
+                                    >
+                                      <RefreshCw size={12} />
+                                      Counter-Offer
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRepriceResponse(response, 'deny')}
+                                      disabled={repriceRespondingId === response.id}
+                                      className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                                      style={{ backgroundColor: '#FEE2E2', color: '#EF4444' }}
+                                    >
+                                      Decline
+                                    </button>
+                                  </div>
+                                )}
+
+                                {/* Counter-offer form */}
+                                {showRepriceCounter === response.id && !isExpired && (
+                                  <div className="pt-2 space-y-2 border-t" style={{ borderColor: 'rgba(245, 158, 11, 0.3)' }}>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1" style={{ color: '#92400E' }}>
+                                        Your counter price <span className="text-red-500">*</span>
+                                      </label>
+                                      <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium" style={{ color: 'var(--aurora-text-muted)' }}>$</span>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          value={repriceCounterAmount}
+                                          onChange={(e) => setRepriceCounterAmount(e.target.value)}
+                                          placeholder="0.00"
+                                          className="w-full rounded-lg border pl-7 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500"
+                                          style={{ borderColor: 'var(--aurora-border)' }}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1" style={{ color: '#92400E' }}>
+                                        Note <span className="text-xs font-normal">(optional)</span>
+                                      </label>
+                                      <textarea
+                                        value={repriceVendorNote}
+                                        onChange={(e) => setRepriceVendorNote(e.target.value)}
+                                        placeholder="Explain your counter-offer..."
+                                        rows={2}
+                                        className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                                        style={{ borderColor: 'var(--aurora-border)' }}
+                                      />
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRepriceResponse(response, 'counter')}
+                                        disabled={repriceRespondingId === response.id || !repriceCounterAmount}
+                                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-white transition-colors disabled:opacity-50"
+                                        style={{ backgroundColor: '#6366F1' }}
+                                      >
+                                        {repriceRespondingId === response.id ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                                        Send Counter
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowRepriceCounter(null)}
+                                        className="px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+                                        style={{ color: 'var(--aurora-text-secondary)' }}
+                                      >
+                                        Back
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {isExpired && (
+                                  <p className="text-xs font-medium" style={{ color: '#EF4444' }}>This reprice request has expired.</p>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          {/* Reprice resolved status banners for vendor */}
+                          {response.repriceStatus === 'vendor_accepted' && (
+                            <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#D1FAE5' }}>
+                              <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#059669' }}>
+                                <CheckCircle2 size={12} /> You accepted the customer&apos;s price of {formatPrice(response.repriceRequestedPrice || 0)}
+                              </p>
+                            </div>
+                          )}
+                          {response.repriceStatus === 'vendor_denied' && (
+                            <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#FEF3C7' }}>
+                              <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#92400E' }}>
+                                <XCircle size={12} /> You declined the price request. Original price stands.
+                              </p>
+                            </div>
+                          )}
+                          {response.repriceStatus === 'vendor_countered' && (
+                            <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#EFF6FF' }}>
+                              <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#1E40AF' }}>
+                                <RefreshCw size={12} /> Counter-offer of {formatPrice(response.repriceCounterPrice || 0)} sent. Waiting for customer response.
+                              </p>
+                            </div>
+                          )}
+                          {response.repriceStatus === 'counter_accepted' && (
+                            <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#D1FAE5' }}>
+                              <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#059669' }}>
+                                <CheckCircle2 size={12} /> Customer accepted your counter-offer of {formatPrice(response.repriceCounterPrice || 0)}
+                              </p>
+                            </div>
+                          )}
+                          {response.repriceStatus === 'counter_declined' && (
+                            <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#FEF3C7' }}>
+                              <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#92400E' }}>
+                                <XCircle size={12} /> Customer declined your counter-offer. Original price stands.
+                              </p>
+                            </div>
+                          )}
+                          {response.repriceStatus === 'expired' && (
+                            <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#F3F4F6' }}>
+                              <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#6B7280' }}>
+                                <Clock size={12} /> Price negotiation expired.
+                              </p>
+                            </div>
                           )}
 
                           {/* Edit Quote button with edit window countdown */}

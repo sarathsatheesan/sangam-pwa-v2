@@ -1,0 +1,70 @@
+%% Reprice Negotiation Flow — One-Shot Price Negotiation within RFP Workflow
+%% ═══════════════════════════════════════════════════════════════════════════
+
+sequenceDiagram
+    participant C as Customer
+    participant UI_C as QuoteComparison.tsx
+    participant DB as Firestore
+    participant UI_V as VendorQuoteResponse.tsx
+    participant V as Vendor
+
+    Note over C, V: Normal RFP flow: Vendor submits quote → Customer reviews
+
+    C->>UI_C: Clicks "Request New Price"
+    UI_C->>UI_C: Opens modal (proposed price + reason)
+    C->>UI_C: Enters $X.XX + optional reason
+    UI_C->>DB: requestReprice(responseId, priceCents, reason)
+    DB-->>DB: Set repriceStatus='requested', start 24h timer
+    UI_C->>V: 🔔 notifyVendorRepriceRequested (bell + email/SMS/push)
+    UI_C-->>C: Toast: "Reprice request sent!"
+    UI_C-->>UI_C: Shows "Waiting for vendor — Xh Ym remaining"
+
+    Note over V: Vendor has 24 hours to respond
+
+    V->>UI_V: Sees amber "Price Negotiation Request" panel
+
+    alt Vendor Accepts
+        V->>UI_V: Clicks "Accept Price"
+        UI_V->>DB: respondToReprice(id, 'accept')
+        DB-->>DB: repriceStatus='vendor_accepted', total=requestedPrice
+        UI_V->>C: 🔔 notifyCustomerRepriceResponse('accepted')
+        Note over C: Customer sees green "Price accepted!" banner
+        C->>UI_C: Can now Accept/Decline quote at new price
+    else Vendor Denies
+        V->>UI_V: Clicks "Decline"
+        UI_V->>DB: respondToReprice(id, 'deny')
+        DB-->>DB: repriceStatus='vendor_denied', total unchanged
+        UI_V->>C: 🔔 notifyCustomerRepriceResponse('denied')
+        Note over C: Customer sees yellow "Price declined" banner
+        C->>UI_C: Can still Accept/Decline at original price
+    else Vendor Counters
+        V->>UI_V: Clicks "Counter-Offer" → enters $Y.YY + note
+        UI_V->>DB: respondToReprice(id, 'counter', counterPrice)
+        DB-->>DB: repriceStatus='vendor_countered', start 24h customer timer
+        UI_V->>C: 🔔 notifyCustomerRepriceResponse('countered', counterPrice)
+
+        Note over C: Customer has 24 hours to respond to counter
+
+        alt Customer Accepts Counter
+            C->>UI_C: Clicks "Accept Counter"
+            UI_C->>DB: resolveCounterOffer(id, 'accept')
+            DB-->>DB: repriceStatus='counter_accepted', total=counterPrice
+            UI_C->>V: 🔔 notifyVendorCounterResolved(accepted=true)
+            Note over C: Quote total updated to counter price
+        else Customer Declines Counter
+            C->>UI_C: Clicks "Decline"
+            UI_C->>DB: resolveCounterOffer(id, 'decline')
+            DB-->>DB: repriceStatus='counter_declined', total unchanged
+            UI_C->>V: 🔔 notifyVendorCounterResolved(accepted=false)
+            Note over C: Original price stands
+        else Timer Expires
+            DB-->>DB: expireStaleRepriceRequests() → repriceStatus='expired'
+            Note over C, V: Counter-offer expired, original price stands
+        end
+    else Timer Expires (No Vendor Response)
+        DB-->>DB: expireStaleRepriceRequests() → repriceStatus='expired'
+        Note over C: Shows "Price negotiation expired" banner
+    end
+
+    Note over C, V: After resolution: Customer can Accept/Decline quote normally
+    Note over C, V: ONE-SHOT: "Request New Price" button never shown again
