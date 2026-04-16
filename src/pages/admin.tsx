@@ -78,226 +78,26 @@ import type { CateringOrder } from '@/services/cateringService';
 import { formatPrice, updateOrderStatus } from '@/services/cateringService';
 import AvatarImg, { isImageUrl } from '@/components/shared/AvatarImg';
 
-// ─── Interfaces ──────────────────────────────────────────
-interface Listing {
-  id: string;
-  title: string;
-  type: string;
-  source: 'business' | 'housing' | 'travel';
-  price?: number | string;
-  posterName: string;
-  posterId: string;
-  isDisabled?: boolean;
-  verified?: boolean;
-  createdAt?: any;
-}
+// Extracted helper components
+import { MiniBarChart, ToggleSwitch, StatCard, SkeletonCard, SkeletonRow } from '@/components/admin';
 
-interface UserRecord {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-  city?: string;
-  isAdmin?: boolean;
-  createdAt?: any;
-  heritage?: string | string[];
-  accountType?: string;
-  businessName?: string;
-  businessType?: string;
-  adminReviewRequired?: boolean;
-  adminApproved?: boolean;
-  phone?: string;
-  tinNumber?: string;
-  tinValidationStatus?: string;
-  verificationDocUrls?: string[];
-  photoIdUrl?: string;
-}
+// Panel components
+import {
+  DashboardPanel,
+  UserManagementPanel,
+  ListingPanel,
+  EventPanel,
+  RegistrationPanel,
+  AnnouncementPanel,
+  AdminEmailPanel,
+  ModerationPanel,
+  CateringPanel,
+} from '@/components/admin/panels';
 
-interface Announcement {
-  id: string;
-  title: string;
-  message: string;
-  active: boolean;
-  createdAt?: any;
-}
-
-interface ModerationReporter {
-  uid: string;
-  name: string;
-  avatar: string;
-  category: string;
-  details: string;
-  createdAt: string;
-}
-
-interface ModerationItem {
-  id: string;
-  content: string;
-  contentId?: string;
-  collection?: string;
-  authorId: string;
-  authorName?: string;
-  authorAvatar?: string;
-  images?: string[];
-  type: string;
-  category?: string;
-  categoryLabel?: string;
-  reason?: string;
-  reportedBy?: string;
-  reporterName?: string;
-  reporterAvatar?: string;
-  reportCount?: number;
-  reporters?: ModerationReporter[];
-  createdAt?: any;
-}
-
-interface EventRecord {
-  id: string;
-  title: string;
-  type: string;
-  fullDate: string;
-  posterName: string;
-  posterId: string;
-  promoted: boolean;
-  isDisabled?: boolean;
-  location?: string;
-  ticket?: string;
-  price?: string;
-  createdAt?: any;
-}
-
-// ─── Helper: Mini bar chart SVG ──────────────────────────
-function MiniBarChart({ data, color = '#FF3008', height = 48 }: { data: number[]; color?: string; height?: number }) {
-  if (!data.length) return null;
-  const max = Math.max(...data, 1);
-  const barW = 100 / data.length;
-  return (
-    <svg viewBox={`0 0 100 ${height}`} className="w-full" style={{ height }} preserveAspectRatio="none">
-      {data.map((v, i) => {
-        const h = (v / max) * height * 0.9;
-        return (
-          <rect
-            key={i}
-            x={i * barW + barW * 0.15}
-            y={height - h}
-            width={barW * 0.7}
-            height={h}
-            rx={2}
-            fill={color}
-            opacity={0.15 + (i / data.length) * 0.85}
-          />
-        );
-      })}
-    </svg>
-  );
-}
-
-// ─── Helper: Toggle switch ───────────────────────────────
-function ToggleSwitch({
-  enabled,
-  onChange,
-  size = 'md',
-}: {
-  enabled: boolean;
-  onChange: () => void;
-  size?: 'sm' | 'md';
-}) {
-  const dims = size === 'sm' ? 'w-9 h-5' : 'w-11 h-6';
-  const dot = size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4';
-  const translate = size === 'sm' ? (enabled ? 'translate-x-4' : 'translate-x-0.5') : (enabled ? 'translate-x-5.5' : 'translate-x-0.5');
-  return (
-    <button
-      onClick={onChange}
-      className={`${dims} rounded-full transition-colors duration-200 relative flex items-center ${
-        enabled ? 'bg-[#FF3008]' : 'bg-gray-300 dark:bg-gray-600'
-      }`}
-    >
-      <span
-        className={`${dot} rounded-full bg-white shadow-md transform transition-transform duration-200 ${translate}`}
-      />
-    </button>
-  );
-}
-
-// ─── Helper: Stat Card ───────────────────────────────────
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  trend,
-  trendLabel,
-  color,
-  chartData,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: number | string;
-  trend?: 'up' | 'down' | 'neutral';
-  trendLabel?: string;
-  color: string;
-  chartData?: number[];
-}) {
-  return (
-    <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-5 hover:shadow-lg transition-shadow">
-      <div className="flex items-start justify-between mb-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: `${color}15` }}
-        >
-          <Icon size={20} style={{ color }} />
-        </div>
-        {trend && (
-          <div
-            className={`flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
-              trend === 'up'
-                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                : trend === 'down'
-                ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-            }`}
-          >
-            {trend === 'up' ? <TrendingUp size={12} /> : trend === 'down' ? <TrendingDown size={12} /> : null}
-            {trendLabel}
-          </div>
-        )}
-      </div>
-      <p className="text-2xl font-bold text-[var(--aurora-text)] mb-0.5">{value}</p>
-      <p className="text-xs text-[var(--aurora-text-secondary)]">{label}</p>
-      {chartData && (
-        <div className="mt-3 -mx-1">
-          <MiniBarChart data={chartData} color={color} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Helper: Skeleton ────────────────────────────────────
-function SkeletonCard() {
-  return (
-    <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-5 animate-pulse">
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-10 h-10 rounded-xl bg-gray-200 dark:bg-gray-700" />
-        <div className="w-16 h-6 rounded-full bg-gray-200 dark:bg-gray-700" />
-      </div>
-      <div className="h-7 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-1" />
-      <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
-    </div>
-  );
-}
-
-function SkeletonRow() {
-  return (
-    <div className="flex items-center gap-4 p-4 animate-pulse">
-      <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700" />
-      <div className="flex-1">
-        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
-        <div className="h-3 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
-      </div>
-      <div className="h-6 w-16 rounded-full bg-gray-200 dark:bg-gray-700" />
-    </div>
-  );
-}
+// ─── Type Imports from @/types/admin ─────────────────────
+// These types are re-exported here for backward compatibility,
+// but are now defined in @/types/admin and used by the panels
+import type { Listing, UserRecord, Announcement, ModerationReporter, ModerationItem, EventRecord } from '@/types/admin';
 
 // ═══════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -1576,928 +1376,123 @@ export default function AdminPage() {
 
             {/* ══════════ DASHBOARD ══════════ */}
             {selectedSection === 'dashboard' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Dashboard</h2>
-                  <p className="text-sm text-[var(--aurora-text-secondary)]">Overview of your community platform</p>
-                </div>
-
-                {loading ? (
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    {[...Array(8)].map((_, i) => <SkeletonCard key={i} />)}
-                  </div>
-                ) : (
-                  <>
-                    {/* Top stats row */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      <StatCard
-                        icon={Users}
-                        label="Total Users"
-                        value={dashStats.totalUsers}
-                        trend="up"
-                        trendLabel={`${dashStats.activeUsers} active`}
-                        color="#FF3008"
-                        chartData={dashStats.recentSignups}
-                      />
-                      <StatCard
-                        icon={ClipboardList}
-                        label="Total Listings"
-                        value={dashStats.totalListings}
-                        trend="neutral"
-                        trendLabel={`${dashStats.businessCount}B / ${dashStats.housingCount}H / ${dashStats.travelCount}T`}
-                        color="#6366F1"
-                      />
-                      <StatCard
-                        icon={MessageSquare}
-                        label="Forum Activity"
-                        value={dashStats.forumThreads + dashStats.forumReplies}
-                        trend="up"
-                        trendLabel={`${dashStats.forumThreads} threads`}
-                        color="#10B981"
-                        chartData={[3, 5, 2, 8, 6, 4, 7]}
-                      />
-                      <StatCard
-                        icon={Activity}
-                        label="Feed Posts"
-                        value={dashStats.totalPosts}
-                        color="#F59E0B"
-                      />
-                    </div>
-
-                    {/* Second row */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      <StatCard icon={Calendar} label="Events" value={dashStats.totalEvents} color="#8B5CF6" />
-                      <StatCard
-                        icon={Flag}
-                        label="Moderation Queue"
-                        value={dashStats.modQueueCount}
-                        trend={dashStats.modQueueCount > 0 ? 'down' : 'neutral'}
-                        trendLabel={dashStats.modQueueCount > 0 ? 'Needs review' : 'Clear'}
-                        color="#EF4444"
-                      />
-                      <StatCard
-                        icon={ChefHat}
-                        label="Catering Orders"
-                        value={dashStats.cateringOrderCount}
-                        trend={dashStats.cateringPendingCount > 0 ? 'down' : 'neutral'}
-                        trendLabel={dashStats.cateringPendingCount > 0 ? `${dashStats.cateringPendingCount} pending` : `${dashStats.cateringBusinessCount} caterers`}
-                        color="#F97316"
-                      />
-                      <StatCard
-                        icon={Ban}
-                        label="Banned / Disabled"
-                        value={`${dashStats.bannedUsers} / ${dashStats.disabledUsers}`}
-                        color="#EF4444"
-                      />
-                    </div>
-
-                    {/* Quick actions */}
-                    <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-6">
-                      <h3 className="text-lg font-bold text-[var(--aurora-text)] mb-4">Quick Actions</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {[
-                          { label: 'Manage Users', icon: Users, section: 'users', color: '#FF3008' },
-                          { label: 'Feature Toggles', icon: Settings, section: 'features', color: '#6366F1' },
-                          { label: 'New Announcement', icon: Megaphone, section: 'announcements', color: '#06B6D4' },
-                          { label: 'Review Flagged', icon: Flag, section: 'moderation', color: '#EF4444' },
-                        ].map((action) => (
-                          <button
-                            key={action.section}
-                            onClick={() => setSelectedSection(action.section)}
-                            className="flex items-center gap-3 p-4 rounded-xl border border-[var(--aurora-border)] hover:border-[var(--aurora-text-secondary)]/30 hover:shadow-md transition-all text-left"
-                          >
-                            <div
-                              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: `${action.color}15` }}
-                            >
-                              <action.icon size={18} style={{ color: action.color }} />
-                            </div>
-                            <span className="text-sm font-medium text-[var(--aurora-text)]">{action.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+              <DashboardPanel loading={loading} dashStats={dashStats} onNavigate={setSelectedSection} />
             )}
 
             {/* ══════════ USERS ══════════ */}
             {selectedSection === 'users' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Users</h2>
-                    <p className="text-sm text-[var(--aurora-text-secondary)]">{users.length} registered users</p>
-                  </div>
-                </div>
-
-                {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--aurora-text-secondary)]" />
-                    <input
-                      type="text"
-                      placeholder="Search by name or email..."
-                      value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008]"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    {(['all', 'active', 'business', 'admin', 'disabled', 'banned'] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setUserFilter(f)}
-                        className={`px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition ${
-                          userFilter === f
-                            ? 'bg-[#FF3008] text-white shadow-md'
-                            : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)] hover:bg-[var(--aurora-surface-variant)]'
-                        }`}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* User list */}
-                {loading ? (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] divide-y divide-[var(--aurora-border)]">
-                    {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
-                  </div>
-                ) : (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] overflow-hidden">
-                    {filteredUsers.length === 0 ? (
-                      <div className="text-center py-16 text-[var(--aurora-text-secondary)]">
-                        <Users size={40} className="mx-auto mb-3 opacity-30" />
-                        <p>No users found</p>
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-[var(--aurora-border)]">
-                        {filteredUsers.map((u) => {
-                          const userIsAdmin = isUserAdmin(u);
-                          const isBanned = bannedUserIds.includes(u.id);
-                          const isDisabled = disabledUserIds.includes(u.id);
-                          const isExpanded = expandedUser === u.id;
-
-                          return (
-                            <div key={u.id}>
-                              <button
-                                onClick={() => setExpandedUser(isExpanded ? null : u.id)}
-                                className={`w-full flex items-center gap-4 p-4 hover:bg-[var(--aurora-surface-variant)]/50 transition text-left ${
-                                  userIsAdmin ? 'bg-[#FF3008]/[0.03]' : ''
-                                }`}
-                              >
-                                {/* Avatar */}
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0 overflow-hidden ${
-                                  userIsAdmin
-                                    ? 'bg-gradient-to-br from-[#FF3008] to-[#FF6034] text-white'
-                                    : 'bg-[var(--aurora-surface-variant)]'
-                                }`}>
-                                  <AvatarImg value={u.avatar} fallback="🧑" />
-                                </div>
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <p className="font-semibold text-[var(--aurora-text)] truncate">{u.name}</p>
-                                    {userIsAdmin && (
-                                      <span className="text-[9px] bg-[#FF3008] text-white px-1.5 py-0.5 rounded font-bold tracking-wider flex-shrink-0">
-                                        ADMIN
-                                      </span>
-                                    )}
-                                    {u.accountType === 'business' && (
-                                      <span className="text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded font-bold tracking-wider flex-shrink-0">
-                                        BUSINESS
-                                      </span>
-                                    )}
-                                    {u.accountType === 'business' && u.adminReviewRequired && u.adminApproved === false && (
-                                      <span className="text-[9px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-bold tracking-wider flex-shrink-0">
-                                        PENDING
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-[var(--aurora-text-secondary)] truncate">
-                                    {u.email}
-                                    {u.businessName ? ` — ${u.businessName}` : ''}
-                                  </p>
-                                </div>
-                                {/* Heritage */}
-                                <div className="hidden md:block text-xs text-[var(--aurora-text-secondary)] w-24 truncate">
-                                  {u.heritage
-                                    ? Array.isArray(u.heritage) ? u.heritage.join(', ') : u.heritage
-                                    : '-'}
-                                </div>
-                                {/* City */}
-                                <div className="hidden md:block text-xs text-[var(--aurora-text-secondary)] w-20 truncate">
-                                  {u.city || '-'}
-                                </div>
-                                {/* Status */}
-                                <div className="flex-shrink-0">
-                                  {userIsAdmin ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#FF3008]/10 text-[#FF3008]">
-                                      <Shield size={10} /> Protected
-                                    </span>
-                                  ) : isBanned ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                                      <XCircle size={10} /> Banned
-                                    </span>
-                                  ) : isDisabled ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                                      <AlertTriangle size={10} /> Disabled
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                      <CheckCircle2 size={10} /> Active
-                                    </span>
-                                  )}
-                                </div>
-                                <ChevronRight
-                                  size={16}
-                                  className={`text-[var(--aurora-text-secondary)] transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
-                                />
-                              </button>
-
-                              {/* Expanded actions */}
-                              {isExpanded && (
-                                <div className="px-4 pb-4 pt-1 bg-[var(--aurora-surface-variant)]/30">
-                                  <div className="flex flex-wrap gap-2 ml-14">
-                                    {userIsAdmin ? (
-                                      <p className="text-xs text-[var(--aurora-text-secondary)] italic py-2">
-                                        Admin accounts are protected from moderation actions
-                                      </p>
-                                    ) : (
-                                      <>
-                                        {isDisabled ? (
-                                          <button
-                                            onClick={() => enableUser(u.id)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 transition"
-                                          >
-                                            <CheckCircle2 size={12} /> Enable
-                                          </button>
-                                        ) : (
-                                          <button
-                                            onClick={() => disableUser(u.id)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 transition"
-                                          >
-                                            <EyeOff size={12} /> Disable
-                                          </button>
-                                        )}
-                                        {isBanned ? (
-                                          <button
-                                            onClick={() => unbanUser(u.id)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/40 transition"
-                                          >
-                                            <UserCheck size={12} /> Unban
-                                          </button>
-                                        ) : (
-                                          <button
-                                            onClick={() => banUser(u.id)}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/40 transition"
-                                          >
-                                            <Ban size={12} /> Ban
-                                          </button>
-                                        )}
-                                        <button
-                                          onClick={() => deleteAllUserContent(u.id, u.name)}
-                                          disabled={deletingContent === u.id}
-                                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 transition disabled:opacity-50"
-                                        >
-                                          <Trash2 size={12} /> {deletingContent === u.id ? 'Deleting...' : 'Delete Content'}
-                                        </button>
-                                        <button
-                                          onClick={() => removeUser(u.id, u.name)}
-                                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition"
-                                        >
-                                          <UserX size={12} /> Remove User
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <UserManagementPanel
+                loading={loading}
+                users={users}
+                filteredUsers={filteredUsers}
+                userSearch={userSearch}
+                onUserSearchChange={setUserSearch}
+                userFilter={userFilter}
+                onUserFilterChange={setUserFilter}
+                bannedUserIds={bannedUserIds}
+                disabledUserIds={disabledUserIds}
+                expandedUser={expandedUser}
+                onExpandedUserChange={setExpandedUser}
+                deletingContent={deletingContent}
+                isUserAdmin={isUserAdmin}
+                onDisableUser={disableUser}
+                onEnableUser={enableUser}
+                onBanUser={banUser}
+                onUnbanUser={unbanUser}
+                onDeleteContent={deleteAllUserContent}
+                onRemoveUser={removeUser}
+              />
             )}
 
             {/* ══════════ LISTINGS ══════════ */}
             {selectedSection === 'listings' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Listings</h2>
-                  <p className="text-sm text-[var(--aurora-text-secondary)]">Manage businesses, housing, and travel posts</p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--aurora-text-secondary)]" />
-                    <input
-                      type="text"
-                      placeholder="Search listings..."
-                      value={listingSearch}
-                      onChange={(e) => setListingSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008]"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    {(['all', 'business', 'housing', 'travel', 'disabled'] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setListingFilter(f)}
-                        className={`px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition ${
-                          listingFilter === f
-                            ? 'bg-[#FF3008] text-white shadow-md'
-                            : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)] hover:bg-[var(--aurora-surface-variant)]'
-                        }`}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {loading ? (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] divide-y divide-[var(--aurora-border)]">
-                    {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
-                  </div>
-                ) : filteredListings.length === 0 ? (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16 text-[var(--aurora-text-secondary)]">
-                    <ClipboardList size={40} className="mx-auto mb-3 opacity-30" />
-                    <p>No listings found</p>
-                  </div>
-                ) : (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] divide-y divide-[var(--aurora-border)] overflow-hidden">
-                    {filteredListings.map((listing) => (
-                      <div key={listing.id} className={`flex items-center gap-4 p-4 hover:bg-[var(--aurora-surface-variant)]/50 transition ${listing.isDisabled ? 'opacity-60' : ''}`}>
-                        <div className="w-10 h-10 rounded-xl bg-[var(--aurora-surface-variant)] flex items-center justify-center flex-shrink-0 relative">
-                          {sourceIcon(listing.source)}
-                          {listing.isDisabled && (
-                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
-                              <EyeOff size={10} className="text-white" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className={`font-semibold text-sm truncate ${listing.isDisabled ? 'text-[var(--aurora-text-secondary)] line-through' : 'text-[var(--aurora-text)]'}`}>{listing.title}</p>
-                            {listing.source === 'business' && listing.verified && (
-                              <BadgeCheck size={14} className="flex-shrink-0 text-blue-500" />
-                            )}
-                            {listing.isDisabled && (
-                              <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                                Disabled
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-[var(--aurora-text-secondary)]">
-                            By {listing.posterName} · {listing.type}
-                          </p>
-                        </div>
-                        <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)]">
-                          {sourceIcon(listing.source)}
-                          {sourceLabel(listing.source)}
-                        </span>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {listing.source === 'business' && (
-                            <button
-                              onClick={() => toggleVerifyListing(listing)}
-                              className={`p-2 rounded-lg transition ${listing.verified ? 'text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20' : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/40'}`}
-                              title={listing.verified ? 'Remove verification' : 'Verify business'}
-                            >
-                              <BadgeCheck size={16} />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => toggleDisableListing(listing)}
-                            className={`p-2 rounded-lg transition ${listing.isDisabled ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
-                            title={listing.isDisabled ? 'Enable listing' : 'Disable listing'}
-                          >
-                            {listing.isDisabled ? <Eye size={16} /> : <EyeOff size={16} />}
-                          </button>
-                          <button
-                            onClick={() => deleteListing(listing)}
-                            className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                            title="Delete listing"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ListingPanel
+                loading={loading}
+                filteredListings={filteredListings}
+                listingSearch={listingSearch}
+                onListingSearchChange={setListingSearch}
+                listingFilter={listingFilter}
+                onListingFilterChange={setListingFilter}
+                sourceIcon={sourceIcon}
+                sourceLabel={sourceLabel}
+                onToggleVerify={toggleVerifyListing}
+                onToggleDisable={toggleDisableListing}
+                onDeleteListing={deleteListing}
+              />
             )}
 
             {/* ══════════ EVENTS ══════════ */}
             {selectedSection === 'events' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Events</h2>
-                  <p className="text-sm text-[var(--aurora-text-secondary)]">Manage events, promotions, and visibility</p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--aurora-text-secondary)]" />
-                    <input
-                      type="text"
-                      placeholder="Search events..."
-                      value={eventSearch}
-                      onChange={(e) => setEventSearch(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008]"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    {(['all', 'promoted', 'disabled', 'past'] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setEventFilter(f)}
-                        className={`px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition ${
-                          eventFilter === f
-                            ? 'bg-[#FF3008] text-white shadow-md'
-                            : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)] hover:bg-[var(--aurora-surface-variant)]'
-                        }`}
-                      >
-                        {f}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {loading ? (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] divide-y divide-[var(--aurora-border)]">
-                    {[...Array(5)].map((_, i) => <SkeletonRow key={i} />)}
-                  </div>
-                ) : filteredAdminEvents.length === 0 ? (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16 text-[var(--aurora-text-secondary)]">
-                    <Calendar size={40} className="mx-auto mb-3 opacity-30" />
-                    <p>No events found</p>
-                  </div>
-                ) : (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] divide-y divide-[var(--aurora-border)] overflow-hidden">
-                    {filteredAdminEvents.map((evt) => {
-                      const isPast = (() => { try { return new Date(evt.fullDate) < new Date(); } catch { return false; } })();
-                      return (
-                        <div key={evt.id} className={`flex items-center gap-4 p-4 hover:bg-[var(--aurora-surface-variant)]/50 transition ${evt.isDisabled ? 'opacity-60' : ''}`}>
-                          <div className="w-10 h-10 rounded-xl bg-[var(--aurora-surface-variant)] flex items-center justify-center flex-shrink-0 relative">
-                            <Calendar size={16} className="text-orange-500" />
-                            {evt.isDisabled && (
-                              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center">
-                                <EyeOff size={10} className="text-white" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className={`font-semibold text-sm truncate ${evt.isDisabled ? 'text-[var(--aurora-text-secondary)] line-through' : 'text-[var(--aurora-text)]'}`}>{evt.title}</p>
-                              {evt.promoted && (
-                                <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 flex items-center gap-0.5">
-                                  <Sparkles size={8} /> Featured
-                                </span>
-                              )}
-                              {evt.isDisabled && (
-                                <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                                  Disabled
-                                </span>
-                              )}
-                              {isPast && (
-                                <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-gray-100 text-gray-500 dark:bg-gray-500/20 dark:text-gray-400">
-                                  Past
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-[var(--aurora-text-secondary)]">
-                              By {evt.posterName} · {evt.type} · {evt.fullDate}{evt.location ? ` · ${evt.location}` : ''}
-                            </p>
-                          </div>
-                          <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)]">
-                            {evt.ticket === 'free' ? 'Free' : `$${evt.price}`}
-                          </span>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              onClick={() => togglePromoteEvent(evt)}
-                              className={`p-2 rounded-lg transition ${evt.promoted ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20' : 'text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900/20'}`}
-                              title={evt.promoted ? 'Remove from Featured' : 'Promote to Featured'}
-                            >
-                              <Sparkles size={16} />
-                            </button>
-                            <button
-                              onClick={() => toggleDisableEvent(evt)}
-                              className={`p-2 rounded-lg transition ${evt.isDisabled ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20' : 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'}`}
-                              title={evt.isDisabled ? 'Enable event' : 'Disable event'}
-                            >
-                              {evt.isDisabled ? <Eye size={16} /> : <EyeOff size={16} />}
-                            </button>
-                            <button
-                              onClick={() => deleteEvent(evt)}
-                              className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                              title="Delete event"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <EventPanel
+                loading={loading}
+                filteredAdminEvents={filteredAdminEvents}
+                eventSearch={eventSearch}
+                onEventSearchChange={setEventSearch}
+                eventFilter={eventFilter}
+                onEventFilterChange={setEventFilter}
+                onTogglePromote={togglePromoteEvent}
+                onToggleDisable={toggleDisableEvent}
+                onDeleteEvent={deleteEvent}
+              />
             )}
 
             {/* ══════════ REGISTRATIONS ══════════ */}
             {selectedSection === 'registrations' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Business Registrations</h2>
-                  <p className="text-sm text-[var(--aurora-text-secondary)]">Review and approve pending business sign-up applications</p>
-                </div>
-
-                {registrationsLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="w-8 h-8 border-3 border-[var(--aurora-border)] border-t-[var(--aurora-accent)] rounded-full animate-spin" />
-                  </div>
-                ) : pendingRegistrations.length === 0 ? (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-8 text-center">
-                    <div className="text-4xl mb-3">📋</div>
-                    <h3 className="font-bold text-[var(--aurora-text)] mb-1">No Pending Registrations</h3>
-                    <p className="text-sm text-[var(--aurora-text-secondary)]">
-                      All business registrations have been reviewed. New applications will appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {pendingRegistrations.map((biz) => (
-                      <div
-                        key={biz.id}
-                        className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-5"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="font-bold text-[var(--aurora-text)]">{biz.name}</h3>
-                            <p className="text-xs text-[var(--aurora-text-secondary)]">
-                              {biz.category} &middot; {biz.country === 'CA' ? '🇨🇦' : '🇺🇸'} &middot; {biz.ownerName}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            {(biz as any)._source === 'signup' && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-600 font-bold">
-                                SIGNUP
-                              </span>
-                            )}
-                            <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">
-                              Pending
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-                          <div>
-                            <span className="text-[var(--aurora-text-secondary)]">Email: </span>
-                            <span className="text-[var(--aurora-text)]">{biz.email}</span>
-                          </div>
-                          <div>
-                            <span className="text-[var(--aurora-text-secondary)]">Phone: </span>
-                            <span className="text-[var(--aurora-text)]">{biz.phone}</span>
-                          </div>
-                          {biz.tin && (
-                            <div>
-                              <span className="text-[var(--aurora-text-secondary)]">TIN: </span>
-                              <span className="text-[var(--aurora-text)] font-mono">
-                                {biz.tin.slice(0, 2)}{'•'.repeat(Math.max(0, biz.tin.length - 4))}{biz.tin.slice(-2)}
-                              </span>
-                            </div>
-                          )}
-                          {biz.verificationDocs && biz.verificationDocs.length > 0 && (
-                            <div>
-                              <span className="text-[var(--aurora-text-secondary)]">Docs: </span>
-                              <span className="text-[var(--aurora-text)]">{biz.verificationDocs.length} uploaded</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Verification docs links */}
-                        {biz.verificationDocs && biz.verificationDocs.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-3">
-                            {biz.verificationDocs.map((vdoc: any, i: number) => (
-                              <a
-                                key={vdoc.url || i}
-                                href={vdoc.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[10px] px-2 py-1 rounded-lg bg-[var(--aurora-surface-alt)] text-[var(--aurora-accent)] font-medium hover:underline"
-                              >
-                                📄 {vdoc.name || `Document ${i + 1}`}
-                              </a>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={async () => {
-                              try {
-                                await approveRegistration(biz.id, (biz as any)._source);
-                                setPendingRegistrations((prev) => prev.filter((b) => b.id !== biz.id));
-                                setToastMessage(`${biz.name} approved!`);
-                              } catch (err: any) {
-                                console.error('Approve failed:', err);
-                                setToastMessage(`Failed to approve: ${err.message || 'Unknown error'}`);
-                              }
-                            }}
-                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-green-500 hover:bg-green-600 transition-colors"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => { setRejectModalId(biz.id); setRejectReason(''); }}
-                            className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"
-                          >
-                            Reject
-                          </button>
-                        </div>
-
-                        {/* Reject reason modal (inline) */}
-                        {rejectModalId === biz.id && (
-                          <div className="mt-3 p-3 rounded-xl border border-red-200 bg-red-50">
-                            <textarea
-                              value={rejectReason}
-                              onChange={(e) => setRejectReason(e.target.value)}
-                              placeholder="Reason for rejection (visible to applicant)..."
-                              className="w-full px-3 py-2 text-sm rounded-lg border border-red-200 outline-none resize-none mb-2"
-                              rows={2}
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    await rejectRegistration(biz.id, rejectReason, (biz as any)._source);
-                                    setPendingRegistrations((prev) => prev.filter((b) => b.id !== biz.id));
-                                    setRejectModalId(null);
-                                    setToastMessage(`${biz.name} rejected.`);
-                                  } catch (err: any) {
-                                    console.error('Reject failed:', err);
-                                    setToastMessage(`Failed to reject: ${err.message || 'Unknown error'}`);
-                                  }
-                                }}
-                                disabled={!rejectReason.trim()}
-                                className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-red-500 disabled:opacity-40"
-                              >
-                                Confirm Reject
-                              </button>
-                              <button
-                                onClick={() => setRejectModalId(null)}
-                                className="flex-1 py-2 rounded-lg text-xs font-semibold border border-gray-300"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <RegistrationPanel
+                registrationsLoading={registrationsLoading}
+                pendingRegistrations={pendingRegistrations}
+                rejectModalId={rejectModalId}
+                rejectReason={rejectReason}
+                onRejectReasonChange={setRejectReason}
+                onApprove={(id) => {
+                  const biz = pendingRegistrations.find((b) => b.id === id);
+                  if (biz) {
+                    approveRegistration(id, (biz as any)._source)
+                      .then(() => {
+                        setPendingRegistrations((prev) => prev.filter((b) => b.id !== id));
+                        setToastMessage(`${biz.name} approved!`);
+                      })
+                      .catch((err: any) => {
+                        console.error('Approve failed:', err);
+                        setToastMessage(`Failed to approve: ${err.message || 'Unknown error'}`);
+                      });
+                  }
+                }}
+                onReject={(id, reason) => {
+                  const biz = pendingRegistrations.find((b) => b.id === id);
+                  if (biz) {
+                    rejectRegistration(id, reason, (biz as any)._source)
+                      .then(() => {
+                        setPendingRegistrations((prev) => prev.filter((b) => b.id !== id));
+                        setRejectModalId(null);
+                        setToastMessage(`${biz.name} rejected.`);
+                      })
+                      .catch((err: any) => {
+                        console.error('Reject failed:', err);
+                        setToastMessage(`Failed to reject: ${err.message || 'Unknown error'}`);
+                      });
+                  }
+                }}
+                onOpenRejectModal={(id) => {
+                  setRejectModalId(id);
+                  setRejectReason('');
+                }}
+                onCloseRejectModal={() => setRejectModalId(null)}
+              />
             )}
 
             {/* ══════════ CATERING ══════════ */}
             {selectedSection === 'catering' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Catering Management</h2>
-                    <p className="text-sm text-[var(--aurora-text-secondary)]">Monitor catering orders and caterer businesses</p>
-                  </div>
-                  <button
-                    onClick={loadCateringData}
-                    className="px-4 py-2 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm font-medium text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition"
-                  >
-                    Refresh
-                  </button>
-                </div>
-
-                {/* Catering stats */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Package size={16} className="text-[#6366F1]" />
-                      <span className="text-xs font-medium text-[var(--aurora-text-secondary)]">Total Orders</span>
-                    </div>
-                    <p className="text-2xl font-bold text-[var(--aurora-text)]">{cateringOrders.length}</p>
-                  </div>
-                  <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Clock size={16} className="text-amber-500" />
-                      <span className="text-xs font-medium text-[var(--aurora-text-secondary)]">Pending</span>
-                    </div>
-                    <p className="text-2xl font-bold text-amber-500">{cateringOrders.filter(o => o.status === 'pending').length}</p>
-                  </div>
-                  <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <CheckCircle2 size={16} className="text-emerald-500" />
-                      <span className="text-xs font-medium text-[var(--aurora-text-secondary)]">Delivered</span>
-                    </div>
-                    <p className="text-2xl font-bold text-emerald-500">{cateringOrders.filter(o => o.status === 'delivered').length}</p>
-                  </div>
-                  <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Store size={16} className="text-[#6366F1]" />
-                      <span className="text-xs font-medium text-[var(--aurora-text-secondary)]">Active Caterers</span>
-                    </div>
-                    <p className="text-2xl font-bold text-[var(--aurora-text)]">{cateringBusinesses.length}</p>
-                  </div>
-                </div>
-
-                {/* Catering-enabled businesses */}
-                <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-[var(--aurora-border)]">
-                    <p className="text-sm font-semibold text-[var(--aurora-text)]">
-                      Catering-Enabled Businesses ({cateringBusinesses.length})
-                    </p>
-                  </div>
-                  {cateringLoading ? (
-                    <div className="text-center py-8 text-[var(--aurora-text-secondary)]">Loading...</div>
-                  ) : cateringBusinesses.length === 0 ? (
-                    <div className="text-center py-8 text-[var(--aurora-text-secondary)]">
-                      No catering-enabled businesses yet. Run the seed script or enable catering on a business.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-[var(--aurora-border)]">
-                      {cateringBusinesses.map((biz: any) => (
-                        <div key={biz.id} className="flex items-center justify-between px-5 py-3">
-                          <div>
-                            <p className="text-sm font-medium text-[var(--aurora-text)]">{biz.name}</p>
-                            <p className="text-xs text-[var(--aurora-text-secondary)]">{biz.category} — {biz.location || biz.city || 'No location'}</p>
-                          </div>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                            <ChefHat size={12} /> Catering Active
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Filter tabs */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-[var(--aurora-text-secondary)]">Orders:</span>
-                  {(['all', 'pending', 'active', 'completed'] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setCateringFilter(f)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
-                        cateringFilter === f
-                          ? 'bg-[#FF3008] text-white'
-                          : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)]'
-                      }`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Orders list */}
-                <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-[var(--aurora-border)]">
-                    <p className="text-sm font-semibold text-[var(--aurora-text)]">Catering Orders</p>
-                  </div>
-                  {cateringLoading ? (
-                    <div className="text-center py-8 text-[var(--aurora-text-secondary)]">Loading orders...</div>
-                  ) : (() => {
-                    const filtered = cateringOrders.filter((o) => {
-                      if (cateringFilter === 'pending') return o.status === 'pending';
-                      if (cateringFilter === 'active') return ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(o.status);
-                      if (cateringFilter === 'completed') return ['delivered', 'cancelled'].includes(o.status);
-                      return true;
-                    });
-                    if (filtered.length === 0) {
-                      return (
-                        <div className="text-center py-12">
-                          <Package size={36} className="mx-auto mb-2 opacity-30" />
-                          <p className="text-sm text-[var(--aurora-text-secondary)]">No {cateringFilter === 'all' ? '' : cateringFilter} orders</p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="divide-y divide-[var(--aurora-border)]">
-                        {filtered.map((order) => {
-                          const statusColors: Record<string, string> = {
-                            pending: '#F59E0B',
-                            confirmed: '#6366F1',
-                            preparing: '#8B5CF6',
-                            ready: '#10B981',
-                            delivered: '#059669',
-                            cancelled: '#EF4444',
-                          };
-                          const statusColor = statusColors[order.status] || '#6B7280';
-                          const isActionLoading = cateringActionLoading === order.id;
-                          return (
-                            <div key={order.id} className="px-5 py-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-sm font-semibold text-[var(--aurora-text)]">{order.customerName}</span>
-                                  <span
-                                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize"
-                                    style={{ backgroundColor: `${statusColor}15`, color: statusColor }}
-                                  >
-                                    {order.status}
-                                  </span>
-                                </div>
-                                <span className="text-sm font-semibold text-[var(--aurora-text)]">{formatPrice(order.total)}</span>
-                              </div>
-                              <div className="flex items-center gap-4 text-xs text-[var(--aurora-text-secondary)] mb-2">
-                                <span>{order.businessName}</span>
-                                <span>{order.headcount} guests</span>
-                                <span>
-                                  {order.eventDate?.toDate?.()
-                                    ? order.eventDate.toDate().toLocaleDateString()
-                                    : typeof order.eventDate === 'string' ? order.eventDate : ''}
-                                </span>
-                              </div>
-                              <div className="text-xs text-[var(--aurora-text-secondary)] mb-2">
-                                Items: {order.items.map((i) => `${i.qty}x ${i.name}`).join(', ')}
-                              </div>
-                              {/* Admin actions */}
-                              {order.status === 'pending' && (
-                                <div className="flex gap-2 mt-2">
-                                  <button
-                                    onClick={() => handleCateringStatusChange(order.id, 'confirmed')}
-                                    disabled={isActionLoading}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition disabled:opacity-50"
-                                  >
-                                    {isActionLoading ? 'Updating...' : 'Accept'}
-                                  </button>
-                                  <button
-                                    onClick={() => handleCateringStatusChange(order.id, 'cancelled')}
-                                    disabled={isActionLoading}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-red-500 hover:bg-red-600 transition disabled:opacity-50"
-                                  >
-                                    {isActionLoading ? 'Updating...' : 'Decline'}
-                                  </button>
-                                </div>
-                              )}
-                              {['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status) && (
-                                <div className="flex gap-2 mt-2 flex-wrap">
-                                  {order.status === 'confirmed' && (
-                                    <button
-                                      onClick={() => handleCateringStatusChange(order.id, 'preparing')}
-                                      disabled={isActionLoading}
-                                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-[#6366F1] hover:bg-[#5558E6] transition disabled:opacity-50"
-                                    >
-                                      Mark Preparing
-                                    </button>
-                                  )}
-                                  {order.status === 'preparing' && (
-                                    <button
-                                      onClick={() => handleCateringStatusChange(order.id, 'ready')}
-                                      disabled={isActionLoading}
-                                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-emerald-500 hover:bg-emerald-600 transition disabled:opacity-50"
-                                    >
-                                      Mark Ready
-                                    </button>
-                                  )}
-                                  {order.status === 'ready' && (
-                                    <button
-                                      onClick={() => handleCateringStatusChange(order.id, 'out_for_delivery')}
-                                      disabled={isActionLoading}
-                                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-sky-500 hover:bg-sky-600 transition disabled:opacity-50"
-                                    >
-                                      Out for Delivery
-                                    </button>
-                                  )}
-                                  {order.status === 'out_for_delivery' && (
-                                    <button
-                                      onClick={() => handleCateringStatusChange(order.id, 'delivered')}
-                                      disabled={isActionLoading}
-                                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition disabled:opacity-50"
-                                    >
-                                      Mark Delivered
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => handleCateringStatusChange(order.id, 'cancelled')}
-                                    disabled={isActionLoading}
-                                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition disabled:opacity-50"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
+              <CateringPanel
+                cateringLoading={cateringLoading}
+                cateringOrders={cateringOrders}
+                cateringBusinesses={cateringBusinesses}
+                cateringFilter={cateringFilter}
+                onCateringFilterChange={setCateringFilter}
+                cateringActionLoading={cateringActionLoading}
+                onStatusChange={handleCateringStatusChange}
+                onRefresh={loadCateringData}
+              />
             )}
 
             {/* ══════════ FEATURES ══════════ */}
@@ -2563,738 +1558,65 @@ export default function AdminPage() {
 
             {/* ══════════ ANNOUNCEMENTS ══════════ */}
             {selectedSection === 'announcements' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Announcements</h2>
-                  <p className="text-sm text-[var(--aurora-text-secondary)]">Broadcast messages to all users</p>
-                </div>
-
-                {/* Create form */}
-                <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-6">
-                  <h3 className="font-bold text-[var(--aurora-text)] mb-4 flex items-center gap-2">
-                    <Plus size={18} className="text-[#FF3008]" /> New Announcement
-                  </h3>
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      placeholder="Title"
-                      value={announcementTitle}
-                      onChange={(e) => setAnnouncementTitle(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008]"
-                    />
-                    <textarea
-                      placeholder="Message..."
-                      value={announcementMessage}
-                      onChange={(e) => setAnnouncementMessage(e.target.value)}
-                      rows={3}
-                      className="w-full px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008] resize-none"
-                    />
-                    <button
-                      onClick={createAnnouncement}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-[#FF3008] text-white rounded-xl text-sm font-semibold hover:bg-[#E02A06] transition shadow-md"
-                    >
-                      <Send size={14} /> Publish
-                    </button>
-                  </div>
-                </div>
-
-                {/* List */}
-                {loading ? (
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => <SkeletonRow key={i} />)}
-                  </div>
-                ) : announcements.length === 0 ? (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16 text-[var(--aurora-text-secondary)]">
-                    <Megaphone size={40} className="mx-auto mb-3 opacity-30" />
-                    <p>No announcements yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {announcements.map((ann) => (
-                      <div
-                        key={ann.id}
-                        className={`bg-[var(--aurora-surface)] rounded-2xl border p-5 transition ${
-                          ann.active
-                            ? 'border-emerald-200 dark:border-emerald-800/50'
-                            : 'border-[var(--aurora-border)] opacity-60'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-bold text-[var(--aurora-text)]">{ann.title}</h4>
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  ann.active
-                                    ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                    : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
-                                }`}
-                              >
-                                {ann.active ? 'LIVE' : 'OFF'}
-                              </span>
-                            </div>
-                            <p className="text-sm text-[var(--aurora-text-secondary)]">{ann.message}</p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <ToggleSwitch
-                              enabled={ann.active}
-                              onChange={() => toggleAnnouncementActive(ann.id, ann.active)}
-                              size="sm"
-                            />
-                            <button
-                              onClick={() => deleteAnnouncement(ann.id)}
-                              className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <AnnouncementPanel
+                announcements={announcements}
+                announcementTitle={announcementTitle}
+                announcementMessage={announcementMessage}
+                onTitleChange={setAnnouncementTitle}
+                onMessageChange={setAnnouncementMessage}
+                onAddAnnouncement={createAnnouncement}
+                onDeleteAnnouncement={deleteAnnouncement}
+                onToggleActive={toggleAnnouncementActive}
+              />
             )}
 
             {/* ══════════ MODERATION ══════════ */}
             {selectedSection === 'moderation' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Moderation</h2>
-                  <p className="text-sm text-[var(--aurora-text-secondary)]">Review reports and manage hidden content</p>
-                </div>
-
-                {/* Tab Toggle: Reports vs Hidden Posts */}
-                <div className="flex gap-1 p-1 bg-[var(--aurora-surface-variant)] rounded-xl w-fit">
-                  <button
-                    onClick={() => setModTab('reports')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                      modTab === 'reports'
-                        ? 'bg-[var(--aurora-surface)] shadow-sm text-[var(--aurora-text)]'
-                        : 'text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
-                    }`}
-                  >
-                    <Flag size={14} />
-                    Reports
-                    {modQueue.length > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                        {modQueue.length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setModTab('hidden')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                      modTab === 'hidden'
-                        ? 'bg-[var(--aurora-surface)] shadow-sm text-[var(--aurora-text)]'
-                        : 'text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
-                    }`}
-                  >
-                    <EyeOff size={14} />
-                    Hidden Content
-                    {(hiddenPosts.length + hiddenBusinesses.length) > 0 && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
-                        {hiddenPosts.length + hiddenBusinesses.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
-
-                {/* ─── Hidden Content Tab ─── */}
-                {modTab === 'hidden' && (
-                  <div className="space-y-4">
-                    {loadingHidden ? (
-                      <div className="space-y-3">
-                        {[...Array(2)].map((_, i) => <SkeletonRow key={i} />)}
-                      </div>
-                    ) : (hiddenPosts.length === 0 && hiddenBusinesses.length === 0) ? (
-                      <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16">
-                        <Eye size={48} className="mx-auto mb-3 text-emerald-400" />
-                        <p className="font-semibold text-[var(--aurora-text)]">No hidden content</p>
-                        <p className="text-sm text-[var(--aurora-text-secondary)]">All posts and businesses are currently visible to the public</p>
-                      </div>
-                    ) : (
-                      <>
-                      {/* Hidden Posts */}
-                      {hiddenPosts.length > 0 && (
-                        <div className="space-y-3">
-                          <h4 className="text-sm font-semibold text-[var(--aurora-text-secondary)] px-1">Hidden Posts ({hiddenPosts.length})</h4>
-                          {hiddenPosts.map((post) => (
-                        <div
-                          key={post.id}
-                          className="bg-[var(--aurora-surface)] rounded-2xl border border-orange-200 dark:border-orange-800/30 overflow-hidden"
-                        >
-                          {/* Header */}
-                          <div className="px-5 pt-4 pb-2 border-b border-[var(--aurora-border)]/50">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 uppercase flex items-center gap-1">
-                                <EyeOff size={10} /> Hidden Post
-                              </span>
-                              {post.hiddenReason && (
-                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                                  {post.hiddenReason}
-                                </span>
-                              )}
-                              <span className="text-[10px] text-[var(--aurora-text-secondary)] ml-auto">
-                                Hidden: {post.hiddenAt ? new Date(post.hiddenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Content */}
-                          <div className="px-5 py-3">
-                            <p className="text-sm text-[var(--aurora-text)] whitespace-pre-wrap leading-relaxed">
-                              &ldquo;{(post.content || '').length > 400 ? (post.content || '').slice(0, 400) + '...' : (post.content || '')}&rdquo;
-                            </p>
-                            {post.images && post.images.length > 0 && (
-                              <div className="flex gap-2 mt-2 overflow-x-auto">
-                                {post.images.slice(0, 4).map((img: string, idx: number) => (
-                                  <img key={idx} src={img} alt={`Image ${idx + 1}`} className="w-16 h-16 rounded-lg object-cover border border-[var(--aurora-border)]" />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Author */}
-                          <div className="px-5 py-2 bg-[var(--aurora-surface-variant)]/30 border-t border-[var(--aurora-border)]/50">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-[var(--aurora-surface-variant)] flex items-center justify-center text-sm overflow-hidden">
-                                <AvatarImg value={post.userAvatar} />
-                              </div>
-                              <p className="text-xs text-[var(--aurora-text-secondary)]">
-                                By <span className="font-semibold text-[var(--aurora-text)]">{post.userName || 'Unknown'}</span>
-                                {post.createdAt && (
-                                  <span className="ml-1 opacity-60">
-                                    · Posted {post.createdAt?.toDate?.()?.toLocaleDateString?.('en-US', { month: 'short', day: 'numeric' }) || ''}
-                                  </span>
-                                )}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="px-5 py-3 border-t border-[var(--aurora-border)]/50 flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setConfirmModal({
-                                  title: 'Restore Post?',
-                                  message: 'Make this post visible to the public again?',
-                                  confirmLabel: 'Restore',
-                                  onConfirm: async () => {
-                                    setConfirmModal(null);
-                                    await unhidePost(post.id);
-                                  }
-                                });
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 transition"
-                            >
-                              <Eye size={12} /> Restore / Unhide
-                            </button>
-                            <button
-                              onClick={() => {
-                                setConfirmModal({
-                                  title: 'Permanently Delete?',
-                                  message: 'This will permanently remove the post. This cannot be undone.',
-                                  confirmLabel: 'Delete Forever',
-                                  onConfirm: async () => {
-                                    setConfirmModal(null);
-                                    await permanentlyDeletePost(post.id);
-                                  }
-                                });
-                              }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 transition"
-                            >
-                              <Trash2 size={12} /> Delete Permanently
-                            </button>
-                          </div>
-                        </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Hidden Businesses */}
-                      {hiddenBusinesses.length > 0 && (
-                        <div className="space-y-3">
-                          <h4 className="text-sm font-semibold text-[var(--aurora-text-secondary)] px-1">Hidden Businesses ({hiddenBusinesses.length})</h4>
-                          {hiddenBusinesses.map((biz) => (
-                            <div
-                              key={biz.id}
-                              className="bg-[var(--aurora-surface)] rounded-2xl border border-orange-200 dark:border-orange-800/30 overflow-hidden"
-                            >
-                              {/* Header */}
-                              <div className="px-5 pt-4 pb-2 border-b border-[var(--aurora-border)]/50">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 uppercase flex items-center gap-1">
-                                    <EyeOff size={10} /> Hidden Business
-                                  </span>
-                                  {biz.hiddenReason && (
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                                      {biz.hiddenReason}
-                                    </span>
-                                  )}
-                                  <span className="text-[10px] text-[var(--aurora-text-secondary)] ml-auto">
-                                    Hidden: {biz.hiddenAt ? new Date(biz.hiddenAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Content */}
-                              <div className="px-5 py-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xl">{biz.emoji || '💼'}</span>
-                                  <p className="text-sm font-semibold text-[var(--aurora-text)]">{biz.name || 'Unnamed Business'}</p>
-                                  {biz.category && (
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)]">{biz.category}</span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-[var(--aurora-text-secondary)] leading-relaxed">
-                                  {(biz.desc || '').length > 200 ? (biz.desc || '').slice(0, 200) + '...' : (biz.desc || 'No description')}
-                                </p>
-                                {biz.photos && biz.photos.length > 0 && (
-                                  <div className="flex gap-2 mt-2 overflow-x-auto">
-                                    {biz.photos.slice(0, 4).map((img: string, idx: number) => (
-                                      <img key={idx} src={img} alt={`Photo ${idx + 1}`} className="w-16 h-16 rounded-lg object-cover border border-[var(--aurora-border)]" />
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Owner Info */}
-                              <div className="px-5 py-2 bg-[var(--aurora-surface-variant)]/30 border-t border-[var(--aurora-border)]/50">
-                                <p className="text-xs text-[var(--aurora-text-secondary)]">
-                                  {biz.location && <span>{biz.location} · </span>}
-                                  Owner ID: <span className="font-mono text-[10px]">{biz.ownerId || 'Unknown'}</span>
-                                </p>
-                              </div>
-
-                              {/* Actions */}
-                              <div className="px-5 py-3 border-t border-[var(--aurora-border)]/50 flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    setConfirmModal({
-                                      title: 'Restore Business?',
-                                      message: 'Make this business listing visible to the public again?',
-                                      confirmLabel: 'Restore',
-                                      onConfirm: async () => {
-                                        setConfirmModal(null);
-                                        await unhideBusiness(biz.id);
-                                      }
-                                    });
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 transition"
-                                >
-                                  <Eye size={12} /> Restore / Unhide
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setConfirmModal({
-                                      title: 'Permanently Delete?',
-                                      message: 'This will permanently remove the business listing. This cannot be undone.',
-                                      confirmLabel: 'Delete Forever',
-                                      onConfirm: async () => {
-                                        setConfirmModal(null);
-                                        await permanentlyDeleteBusiness(biz.id);
-                                      }
-                                    });
-                                  }}
-                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 transition"
-                                >
-                                  <Trash2 size={12} /> Delete Permanently
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {/* ─── Reports Tab ─── */}
-                {modTab === 'reports' && (<>
-
-
-                {/* Filter & Sort Bar */}
-                {modQueue.length > 0 && (
-                  <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--aurora-text-secondary)]">
-                        <Filter size={14} /> Filter:
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          onClick={() => setModFilterCategory('all')}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition ${
-                            modFilterCategory === 'all'
-                              ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
-                              : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-border)]'
-                          }`}
-                        >
-                          All ({modQueue.length})
-                        </button>
-                        {Object.entries(modCategoryCounts).map(([cat, count]) => (
-                          <button
-                            key={cat}
-                            onClick={() => setModFilterCategory(cat)}
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition capitalize ${
-                              modFilterCategory === cat
-                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-border)]'
-                            }`}
-                          >
-                            {cat.replace(/_/g, ' ')} ({count})
-                          </button>
-                        ))}
-                      </div>
-                      <div className="ml-auto flex items-center gap-1.5">
-                        <span className="text-[11px] text-[var(--aurora-text-secondary)]">Sort:</span>
-                        <button
-                          onClick={() => setModSortBy('recent')}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition ${
-                            modSortBy === 'recent' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30' : 'text-[var(--aurora-text-secondary)]'
-                          }`}
-                        >
-                          Recent
-                        </button>
-                        <button
-                          onClick={() => setModSortBy('frequency')}
-                          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition ${
-                            modSortBy === 'frequency' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30' : 'text-[var(--aurora-text-secondary)]'
-                          }`}
-                        >
-                          Most Reported
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {loading ? (
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => <SkeletonRow key={i} />)}
-                  </div>
-                ) : filteredModQueue.length === 0 ? (
-                  <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] text-center py-16">
-                    <CheckCircle2 size={48} className="mx-auto mb-3 text-emerald-400" />
-                    <p className="font-semibold text-[var(--aurora-text)]">All clear!</p>
-                    <p className="text-sm text-[var(--aurora-text-secondary)]">
-                      {modFilterCategory !== 'all' ? 'No reports in this category' : 'No flagged content to review'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredModQueue.map((item) => (
-                      <div
-                        key={item.id}
-                        className="bg-[var(--aurora-surface)] rounded-2xl border border-red-200 dark:border-red-800/30 overflow-hidden"
-                      >
-                        {/* Report Header with Category & Frequency Badge */}
-                        <div className="px-5 pt-4 pb-3 border-b border-[var(--aurora-border)]/50">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 uppercase">
-                              {item.type}
-                            </span>
-                            {item.categoryLabel && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                {item.categoryLabel}
-                              </span>
-                            )}
-                            {(item.reportCount || 1) > 1 && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 flex items-center gap-1">
-                                <AlertOctagon size={10} /> {item.reportCount} reports
-                              </span>
-                            )}
-                            <span className="text-[10px] text-[var(--aurora-text-secondary)] ml-auto">
-                              {item.createdAt?.toDate?.()?.toLocaleDateString?.('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || ''}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Flagged Content Preview */}
-                        <div className="px-5 py-3">
-                          <p className="text-sm text-[var(--aurora-text)] mb-2 whitespace-pre-wrap leading-relaxed">
-                            &ldquo;{item.content.length > 400 ? item.content.slice(0, 400) + '...' : item.content}&rdquo;
-                          </p>
-                          {/* Image thumbnails if present */}
-                          {item.images && item.images.length > 0 && (
-                            <div className="flex gap-2 mt-2 mb-2 overflow-x-auto">
-                              {item.images.slice(0, 3).map((img, idx) => (
-                                <img key={idx} src={img} alt={`Attached ${idx + 1}`} className="w-16 h-16 rounded-lg object-cover border border-[var(--aurora-border)]" />
-                              ))}
-                              {item.images.length > 3 && (
-                                <div className="w-16 h-16 rounded-lg bg-[var(--aurora-surface-variant)] flex items-center justify-center text-xs font-semibold text-[var(--aurora-text-secondary)]">
-                                  +{item.images.length - 3}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Author & Reporter Info */}
-                        <div className="px-5 py-3 bg-[var(--aurora-surface-variant)]/30 border-t border-[var(--aurora-border)]/50">
-                          <div className="flex items-center justify-between flex-wrap gap-3">
-                            {/* Author (who wrote the post) */}
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-sm shrink-0 overflow-hidden">
-                                <AvatarImg value={item.authorAvatar} />
-                              </div>
-                              <div>
-                                <p className="text-xs font-semibold text-[var(--aurora-text)]">
-                                  Author: {item.authorName || 'Unknown'}
-                                </p>
-                                {item.authorId && (
-                                  <p className="text-[10px] text-[var(--aurora-text-secondary)] opacity-60">{item.authorId.slice(0, 12)}...</p>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Reporter (who filed the report) */}
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-sm shrink-0 overflow-hidden">
-                                <AvatarImg value={item.reporterAvatar} fallback="🛡️" />
-                              </div>
-                              <div>
-                                <p className="text-xs font-semibold text-[var(--aurora-text)]">
-                                  Reported by: {item.reporterName || 'Unknown'}
-                                </p>
-                                {item.reportedBy && (
-                                  <p className="text-[10px] text-[var(--aurora-text-secondary)] opacity-60">{item.reportedBy.slice(0, 12)}...</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Multiple reporters list */}
-                          {item.reporters && item.reporters.length > 1 && (
-                            <div className="mt-2 pt-2 border-t border-[var(--aurora-border)]/30">
-                              <p className="text-[10px] font-semibold text-[var(--aurora-text-secondary)] mb-1.5 uppercase tracking-wider">All Reporters ({item.reporters.length})</p>
-                              <div className="space-y-1">
-                                {item.reporters.map((r, idx) => (
-                                  <div key={r.uid || `reporter-${idx}`} className="flex items-center gap-2 text-[11px]">
-                                    <span className="w-5 h-5 rounded-full overflow-hidden inline-flex items-center justify-center shrink-0"><AvatarImg value={r.avatar} className="w-5 h-5 rounded-full object-cover" /></span>
-                                    <span className="font-medium text-[var(--aurora-text)]">{r.name}</span>
-                                    <span className="text-[var(--aurora-text-secondary)] capitalize">— {r.category?.replace(/_/g, ' ')}</span>
-                                    {r.details && <span className="text-[var(--aurora-text-secondary)] italic truncate max-w-[150px]">"{r.details}"</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="px-5 py-3 border-t border-[var(--aurora-border)]/50 flex items-center gap-2 flex-wrap">
-                          <button
-                            onClick={() => dismissModItem(item.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 transition"
-                          >
-                            <CheckCircle2 size={12} /> Dismiss
-                          </button>
-                          <button
-                            onClick={() => {
-                              setConfirmModal({
-                                title: 'Hide Content?',
-                                message: `Hide this ${item.type} from public view? It can be restored later.`,
-                                confirmLabel: 'Hide',
-                                onConfirm: async () => {
-                                  setConfirmModal(null);
-                                  try {
-                                    if (item.contentId && item.collection) {
-                                      await updateDoc(doc(db, item.collection, item.contentId), { isHidden: true, hiddenAt: new Date().toISOString(), hiddenReason: item.categoryLabel || item.reason || '' });
-                                    }
-                                    // Standardized appeals notification to content author/owner
-                                    if (item.authorId) {
-                                      const isBusiness = item.type === 'business';
-                                      await addDoc(collection(db, 'notifications'), {
-                                        type: 'content_hidden',
-                                        recipientId: item.authorId,
-                                        recipientName: item.authorName || '',
-                                        postId: item.contentId || '',
-                                        reason: item.categoryLabel || item.reason || 'Community guideline violation',
-                                        message: isBusiness
-                                          ? 'Your business listing has been hidden by a moderator for violating community guidelines. If you believe this was a mistake, you can submit an appeal by contacting support.'
-                                          : 'Your post has been hidden by a moderator for violating community guidelines. If you believe this was a mistake, you can submit an appeal by contacting support.',
-                                        actionUrl: isBusiness ? '/business' : '/feed',
-                                        read: false,
-                                        createdAt: serverTimestamp(),
-                                      });
-                                    }
-                                    await dismissModItem(item.id);
-                                    setToastMessage('Content hidden. Author has been notified with appeal instructions.');
-                                    loadHiddenPosts();
-                                  } catch (error) {
-                                    console.error('Error hiding content:', error);
-                                    setToastMessage('Failed to hide content.');
-                                  }
-                                }
-                              });
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 transition"
-                          >
-                            <EyeOff size={12} /> Hide
-                          </button>
-                          <button
-                            onClick={() => {
-                              setConfirmModal({
-                                title: 'Permanently Delete?',
-                                message: `Permanently delete this ${item.type}? This cannot be undone.`,
-                                confirmLabel: 'Delete',
-                                onConfirm: async () => {
-                                  setConfirmModal(null);
-                                  try {
-                                    if (item.contentId && item.collection) {
-                                      await deleteDoc(doc(db, item.collection, item.contentId));
-                                    }
-                                    await dismissModItem(item.id);
-                                    setToastMessage('Content permanently deleted.');
-                                  } catch (error) {
-                                    console.error('Error deleting flagged content:', error);
-                                    setToastMessage('Failed to delete content.');
-                                    await dismissModItem(item.id);
-                                  }
-                                }
-                              });
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 transition"
-                          >
-                            <Trash2 size={12} /> Delete
-                          </button>
-                          {item.authorId && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  setConfirmModal({
-                                    title: 'Warn User?',
-                                    message: `Issue a warning to "${item.authorName}" for "${item.categoryLabel || item.reason}"? This will increment their warning count.`,
-                                    confirmLabel: 'Warn User',
-                                    onConfirm: async () => {
-                                      setConfirmModal(null);
-                                      await warnUser(item);
-                                    }
-                                  });
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 transition"
-                              >
-                                <AlertTriangle size={12} /> Warn User
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setConfirmModal({
-                                    title: 'Ban User?',
-                                    message: `Ban user "${item.authorName}" permanently? This will prevent them from accessing the app.`,
-                                    confirmLabel: 'Ban User',
-                                    onConfirm: async () => {
-                                      setConfirmModal(null);
-                                      try {
-                                        await updateDoc(doc(db, 'users', item.authorId), { isBanned: true, bannedAt: new Date().toISOString() });
-                                        if (item.contentId && item.collection) {
-                                          try { await deleteDoc(doc(db, item.collection, item.contentId)); } catch {}
-                                        }
-                                        await dismissModItem(item.id);
-                                        setToastMessage(`User "${item.authorName}" has been banned.`);
-                                      } catch (error) {
-                                        console.error('Error banning user:', error);
-                                        setToastMessage('Failed to ban user');
-                                      }
-                                    }
-                                  });
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 transition"
-                              >
-                                <Ban size={12} /> Ban User
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                </>)}
-              </div>
+              <ModerationPanel
+                modQueue={filteredModQueue}
+                hiddenPosts={hiddenPosts}
+                hiddenBusinesses={hiddenBusinesses}
+                onApproveItem={dismissModItem}
+                onRejectItem={(id) => {
+                  const item = modQueue.find(i => i.id === id);
+                  if (item) {
+                    setConfirmModal({
+                      title: 'Permanently Delete?',
+                      message: `Permanently delete this ${item.type}? This cannot be undone.`,
+                      confirmLabel: 'Delete',
+                      onConfirm: async () => {
+                        setConfirmModal(null);
+                        try {
+                          if (item.contentId && item.collection) {
+                            await deleteDoc(doc(db, item.collection, item.contentId));
+                          }
+                          await dismissModItem(item.id);
+                          setToastMessage('Content permanently deleted.');
+                        } catch (error) {
+                          console.error('Error deleting flagged content:', error);
+                          setToastMessage('Failed to delete content.');
+                          await dismissModItem(item.id);
+                        }
+                      }
+                    });
+                  }
+                }}
+                onUnhidePost={unhidePost}
+                onDeletePost={permanentlyDeletePost}
+                onUnhideBusiness={unhideBusiness}
+                onDeleteBusiness={permanentlyDeleteBusiness}
+              />
             )}
 
             {/* ══════════ ADMIN ACCESS ══════════ */}
             {selectedSection === 'admins' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-[var(--aurora-text)]">Admin Access</h2>
-                  <p className="text-sm text-[var(--aurora-text-secondary)]">Manage who has admin privileges</p>
-                </div>
-
-                {/* Add admin */}
-                <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-6">
-                  <h3 className="font-bold text-[var(--aurora-text)] mb-4 flex items-center gap-2">
-                    <Plus size={18} className="text-[#FF3008]" /> Add Admin
-                  </h3>
-                  <div className="flex gap-3">
-                    <input
-                      type="email"
-                      placeholder="Email address"
-                      value={newAdminEmail}
-                      onChange={(e) => setNewAdminEmail(e.target.value)}
-                      className="flex-1 px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008]"
-                    />
-                    <button
-                      onClick={addAdminEmail}
-                      className="px-6 py-2.5 bg-[#FF3008] text-white rounded-xl text-sm font-semibold hover:bg-[#E02A06] transition shadow-md"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-
-                {/* Admin list */}
-                {adminEmails.length === 1 && (
-                  <div className="flex items-center gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 rounded-2xl p-4">
-                    <AlertTriangle size={18} className="text-amber-500 flex-shrink-0" />
-                    <p className="text-sm text-amber-700 dark:text-amber-400">
-                      Only one admin remains. You cannot remove the last admin.
-                    </p>
-                  </div>
-                )}
-
-                <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-[var(--aurora-border)]">
-                    <p className="text-sm font-semibold text-[var(--aurora-text)]">
-                      Current Admins ({adminEmails.length})
-                    </p>
-                  </div>
-                  {adminEmails.length === 0 ? (
-                    <div className="text-center py-12 text-[var(--aurora-text-secondary)]">No admins configured</div>
-                  ) : (
-                    <div className="divide-y divide-[var(--aurora-border)]">
-                      {adminEmails.map((email) => (
-                        <div key={email} className="flex items-center justify-between px-5 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF3008] to-[#FF6034] flex items-center justify-center text-white text-sm font-bold">
-                              {email.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-[var(--aurora-text)]">{email}</p>
-                              {adminEmails.length === 1 && (
-                                <span className="text-[10px] font-bold text-amber-500">LAST ADMIN</span>
-                              )}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => removeAdminEmail(email)}
-                            disabled={adminEmails.length <= 1}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                              adminEmails.length <= 1
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
-                                : 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400'
-                            }`}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <AdminEmailPanel
+                adminEmails={adminEmails}
+                newAdminEmail={newAdminEmail}
+                onNewAdminEmailChange={setNewAdminEmail}
+                onAddAdmin={addAdminEmail}
+                onRemoveAdmin={removeAdminEmail}
+              />
             )}
           </main>
         </div>

@@ -10,7 +10,7 @@ interface CateringPanelProps {
   cateringFilter: 'all' | 'pending' | 'active' | 'completed';
   onCateringFilterChange: (filter: 'all' | 'pending' | 'active' | 'completed') => void;
   cateringActionLoading: string | null;
-  onStatusChange: (orderId: string, newStatus: string) => void;
+  onStatusChange: (orderId: string, newStatus: CateringOrder['status']) => Promise<void>;
   onRefresh: () => void;
 }
 
