@@ -244,6 +244,18 @@ export default function VendorQuoteResponse({
       return;
     }
 
+    // Validate tray size is selected for every priced item
+    const pricedItems = form.items.filter((i) => i.unitPrice > 0);
+    const missingTraySize = pricedItems.filter((i) => !i.traySize);
+    if (missingTraySize.length > 0) {
+      addToast(
+        `Please select a tray size for: ${missingTraySize.map((i) => i.name).join(', ')}`,
+        'error',
+        5000,
+      );
+      return;
+    }
+
     const total = subtotal + (form.serviceFee || 0) + (form.deliveryFee || 0);
 
     setSubmittingId(request.id);
@@ -299,6 +311,18 @@ export default function VendorQuoteResponse({
     const subtotal = form.items.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
     if (subtotal === 0) {
       addToast('Please enter prices for at least one item', 'error');
+      return;
+    }
+
+    // Validate tray size is selected for every priced item
+    const pricedItems = form.items.filter((i) => i.unitPrice > 0);
+    const missingTraySize = pricedItems.filter((i) => !i.traySize);
+    if (missingTraySize.length > 0) {
+      addToast(
+        `Please select a tray size for: ${missingTraySize.map((i) => i.name).join(', ')}`,
+        'error',
+        5000,
+      );
       return;
     }
 
@@ -738,10 +762,12 @@ export default function VendorQuoteResponse({
                                   )}
                                 </div>
                               </div>
-                              {/* Tray size selector */}
+                              {/* Tray size selector (required) */}
                               {!assignedToOther && (
                                 <div className="flex items-center gap-2 ml-1">
-                                  <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>Tray size:</span>
+                                  <span className="text-xs" style={{ color: !qi.traySize && qi.unitPrice > 0 ? '#EF4444' : 'var(--aurora-text-secondary)' }}>
+                                    Tray size{!qi.traySize && qi.unitPrice > 0 ? ' *' : ':'}
+                                  </span>
                                   {(['small', 'medium', 'large'] as const).map((size) => (
                                     <button
                                       key={size}
@@ -753,7 +779,10 @@ export default function VendorQuoteResponse({
                                       style={
                                         qi.traySize === size
                                           ? { backgroundColor: '#6366F1' }
-                                          : { borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }
+                                          : {
+                                              borderColor: !qi.traySize && qi.unitPrice > 0 ? '#FCA5A5' : 'var(--aurora-border)',
+                                              color: 'var(--aurora-text-secondary)',
+                                            }
                                       }
                                     >
                                       {size.charAt(0).toUpperCase() + size.slice(1)}
@@ -1156,6 +1185,29 @@ export default function VendorQuoteResponse({
                                     />
                                     <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>/{pricingLabel.split(' ').pop()}</span>
                                   </div>
+                                </div>
+                                {/* Tray size selector (edit mode) */}
+                                <div className="flex items-center gap-2 ml-1">
+                                  <span className="text-xs" style={{ color: !qi.traySize ? '#EF4444' : 'var(--aurora-text-secondary)' }}>
+                                    Tray size{!qi.traySize ? ' *' : ':'}
+                                  </span>
+                                  {(['small', 'medium', 'large'] as const).map((size) => (
+                                    <button
+                                      key={size}
+                                      type="button"
+                                      onClick={() => updateQuoteItem(response.id, idx, { traySize: qi.traySize === size ? undefined : size })}
+                                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                                        qi.traySize === size ? 'text-white' : 'border hover:opacity-80'
+                                      }`}
+                                      style={
+                                        qi.traySize === size
+                                          ? { backgroundColor: '#6366F1' }
+                                          : { borderColor: !qi.traySize ? '#FCA5A5' : 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }
+                                      }
+                                    >
+                                      {size.charAt(0).toUpperCase() + size.slice(1)}
+                                    </button>
+                                  ))}
                                 </div>
                               </div>
                             );
