@@ -462,12 +462,17 @@
   30% { transform: translateY(-4px); opacity: 1; }
 }
 
+@-webkit-keyframes slideInRight {
+  from { -webkit-transform: translateX(100%); transform: translateX(100%); }
+  to { -webkit-transform: translateX(0); transform: translateX(0); }
+}
 @keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  from { -webkit-transform: translateX(100%); transform: translateX(100%); }
+  to { -webkit-transform: translateX(0); transform: translateX(0); }
 }
 
 .animate-slideInRight {
+  -webkit-animation: slideInRight 0.25s ease-out;
   animation: slideInRight 0.25s ease-out;
 }
 
@@ -492,12 +497,17 @@
   overflow: hidden;
 }
 
+@-webkit-keyframes fadeSlideUp {
+  from { opacity: 0; -webkit-transform: translateY(12px); transform: translateY(12px); }
+  to { opacity: 1; -webkit-transform: translateY(0); transform: translateY(0); }
+}
 @keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; -webkit-transform: translateY(12px); transform: translateY(12px); }
+  to { opacity: 1; -webkit-transform: translateY(0); transform: translateY(0); }
 }
 
 .animate-fadeSlideUp {
+  -webkit-animation: fadeSlideUp 0.35s ease-out both;
   animation: fadeSlideUp 0.35s ease-out both;
 }
 
@@ -573,12 +583,11 @@ button, a, [role="button"] {
   }
 }
 
-/* Webkit prefix for animations used in older Safari */
-@keyframes slideInRight {
-  from { -webkit-transform: translateX(100%); transform: translateX(100%); }
-  to { -webkit-transform: translateX(0); transform: translateX(0); }
+/* Webkit prefix for additional animations */
+@-webkit-keyframes slideUp {
+  from { -webkit-transform: translateY(100%); transform: translateY(100%); opacity: 0; }
+  to { -webkit-transform: translateY(0); transform: translateY(0); opacity: 1; }
 }
-
 @keyframes slideUp {
   from { -webkit-transform: translateY(100%); transform: translateY(100%); opacity: 0; }
   to { -webkit-transform: translateY(0); transform: translateY(0); opacity: 1; }

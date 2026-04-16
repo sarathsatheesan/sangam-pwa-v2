@@ -19,7 +19,7 @@ import {
   Download, Trash2, LogOut, Lock, Eye, EyeOff, Phone,
   Mail, X, Check, Loader2, MoreHorizontal, Share2,
   Star, TrendingUp, Award, Globe, Hash, Building2,
-  Camera, Link2, ChevronDown, UserPlus, Send, Sparkles,
+  Camera, Link2, ChevronDown, UserPlus, Send, Sparkles, Plus,
   Tag, Home, Store, ShoppingBag, CalendarDays, Package, Ban, UserX
 } from 'lucide-react';
 
@@ -645,33 +645,33 @@ export default function ProfilePage() {
 
     const postItems: UserActivity[] = userPosts.map((post) => ({
       id: post.id, type: 'post' as const, title: post.type,
-      preview: post.content.substring(0, 120), likes: post.likes, comments: post.comments,
+      preview: (post.content || '').substring(0, 120), likes: post.likes, comments: post.comments,
       createdAt: post.createdAt, gradient: nextGradient(),
       icon: post.type === 'event' ? '📅' : post.type === 'professional' ? '💼' : '💬',
     }));
     const threadItems: UserActivity[] = userThreads.map((t) => ({
       id: t.id, type: 'forum' as const, title: t.title,
-      preview: t.content.substring(0, 120), likes: t.score, comments: t.replies,
+      preview: (t.content || '').substring(0, 120), likes: t.score, comments: t.replies,
       createdAt: t.createdAt, gradient: nextGradient(), icon: '🧵',
     }));
     const bizItems: UserActivity[] = userBusinesses.map((b) => ({
       id: b.id, type: 'business' as const, title: b.name,
-      preview: b.desc.substring(0, 120), likes: 0, comments: 0,
+      preview: (b.desc || '').substring(0, 120), likes: 0, comments: 0,
       createdAt: b.createdAt, gradient: nextGradient(), icon: '🏪',
     }));
     const housingItems: UserActivity[] = userHousing.map((h) => ({
       id: h.id, type: 'housing' as const, title: h.title,
-      preview: h.price ? `$${h.price.toLocaleString()} · ${h.desc.substring(0, 80)}` : h.desc.substring(0, 120),
+      preview: h.price ? `$${h.price.toLocaleString()} · ${(h.desc || '').substring(0, 80)}` : (h.desc || '').substring(0, 120),
       likes: 0, comments: 0, createdAt: h.createdAt, gradient: nextGradient(), icon: '🏠',
     }));
     const mktItems: UserActivity[] = userMarketplace.map((m) => ({
       id: m.id, type: 'marketplace' as const, title: m.title,
-      preview: m.price ? `$${m.price.toLocaleString()} · ${m.description.substring(0, 80)}` : m.description.substring(0, 120),
+      preview: m.price ? `$${m.price.toLocaleString()} · ${(m.description || '').substring(0, 80)}` : (m.description || '').substring(0, 120),
       likes: 0, comments: 0, createdAt: m.createdAt, gradient: nextGradient(), icon: '🛒',
     }));
     const evtItems: UserActivity[] = userEvents.map((e) => ({
       id: e.id, type: 'event' as const, title: e.title,
-      preview: e.desc.substring(0, 120), likes: 0, comments: 0,
+      preview: (e.desc || '').substring(0, 120), likes: 0, comments: 0,
       createdAt: e.createdAt, gradient: nextGradient(), icon: '📅',
     }));
 
@@ -1294,7 +1294,7 @@ export default function ProfilePage() {
           {activeTab === 'listings' ? (
             /* ─── My Listings Tab ─── */
             <div>
-              <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar">
+              <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {(['all', 'business', 'housing', 'marketplace', 'event'] as const).map((cat) => {
                   const config: Record<string, { label: string; icon: React.ReactNode }> = {
                     all: { label: 'All', icon: <Tag size={14} /> },
@@ -1441,12 +1441,52 @@ export default function ProfilePage() {
                   </>
                 )}
 
+                {/* Add Another Business CTA — shown for business accounts */}
+                {userProfile?.accountType === 'business' && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/business?action=add')}
+                    className="w-full flex items-center justify-center gap-2 py-3 mt-3 text-sm font-medium rounded-xl transition-colors"
+                    style={{
+                      border: '1.5px dashed var(--aurora-accent, #6366F1)',
+                      color: 'var(--aurora-accent, #6366F1)',
+                      backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                      minHeight: '44px',
+                      WebkitTapHighlightColor: 'transparent',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none' as any,
+                      appearance: 'none',
+                    }}
+                  >
+                    <Plus size={16} />
+                    Add Another Business
+                  </button>
+                )}
+
                 {/* Empty state */}
                 {userBusinesses.length + userHousing.length + userMarketplace.length + userEvents.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Package size={40} className="text-[var(--aurora-text-muted)] mb-3" />
                     <h3 className="text-base font-semibold text-[var(--aurora-text)] mb-1">No listings yet</h3>
-                    <p className="text-sm text-[var(--aurora-text-muted)]">Your business, housing, marketplace, and event listings will appear here.</p>
+                    <p className="text-sm text-[var(--aurora-text-muted)] mb-4">Your business, housing, marketplace, and event listings will appear here.</p>
+                    {userProfile?.accountType === 'business' && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/business?action=add')}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+                        style={{
+                          background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                          minHeight: '44px',
+                          WebkitTapHighlightColor: 'transparent',
+                          WebkitAppearance: 'none',
+                          MozAppearance: 'none' as any,
+                          appearance: 'none',
+                        }}
+                      >
+                        <Plus size={16} />
+                        Add Your First Business
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1454,7 +1494,7 @@ export default function ProfilePage() {
           ) : activeTab === 'grid' ? (
             <div>
               {/* Activity category filter chips */}
-              <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar">
+              <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {(['all', 'post', 'forum'] as const).map((cat) => {
                   const config = cat === 'all' ? { label: 'All', icon: '📋' } : ACTIVITY_CATEGORY_CONFIG[cat];
                   const count = cat === 'all' ? activityGrid.length : activityGrid.filter((i) => i.type === cat).length;
@@ -1489,7 +1529,7 @@ export default function ProfilePage() {
           ) : (
             <div>
               {/* Category filter chips */}
-              <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar">
+              <div className="flex gap-2 px-2 py-3 overflow-x-auto hide-scrollbar" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {(['all', 'post', 'business', 'housing', 'forum', 'event'] as const).map((cat) => {
                   const config = cat === 'all' ? { label: 'All', icon: '📋' } : SAVED_CATEGORY_CONFIG[cat];
                   const count = cat === 'all' ? savedItems.length : savedItems.filter((i) => i.category === cat).length;
@@ -2088,12 +2128,13 @@ export default function ProfilePage() {
                     <button
                       onClick={() => setListingDetail(null)}
                       className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition-colors"
+                      style={{ WebkitBackdropFilter: 'blur(4px)' }}
                     >
                       <X size={18} />
                     </button>
                   </div>
                   <div className="absolute bottom-3 left-4 right-4">
-                    <span className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2">
+                    <span className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full mb-2" style={{ WebkitBackdropFilter: 'blur(4px)' }}>
                       {iconMap[listingDetail.kind]} {labelMap[listingDetail.kind]}
                     </span>
                     <h2 className="text-lg font-bold text-white leading-tight line-clamp-2 drop-shadow-lg">
