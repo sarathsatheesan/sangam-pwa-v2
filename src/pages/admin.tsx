@@ -77,6 +77,17 @@ import {
 import type { CateringOrder } from '@/services/cateringService';
 import { formatPrice, updateOrderStatus } from '@/services/cateringService';
 
+// ─── Helpers ─────────────────────────────────────────────
+/** Returns true when a string looks like an image URL / data-URI rather than an emoji. */
+const isImageUrl = (val?: string): val is string =>
+  !!val && (val.startsWith('http') || val.startsWith('data:') || val.startsWith('blob:') || val.startsWith('/'));
+
+/** Renders an avatar value as an <img> when it's a URL, or as emoji text otherwise. */
+const AvatarImg: React.FC<{ value?: string; fallback?: string; className?: string }> = ({ value, fallback = '👤', className = 'w-full h-full rounded-full object-cover' }) =>
+  isImageUrl(value)
+    ? <img src={value} alt="avatar" className={className} />
+    : <>{value || fallback}</>;
+
 // ─── Interfaces ──────────────────────────────────────────
 interface Listing {
   id: string;
@@ -1749,12 +1760,12 @@ export default function AdminPage() {
                                 }`}
                               >
                                 {/* Avatar */}
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0 ${
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0 overflow-hidden ${
                                   userIsAdmin
                                     ? 'bg-gradient-to-br from-[#FF3008] to-[#FF6034] text-white'
                                     : 'bg-[var(--aurora-surface-variant)]'
                                 }`}>
-                                  {u.avatar || '🧑'}
+                                  <AvatarImg value={u.avatar} fallback="🧑" />
                                 </div>
                                 {/* Info */}
                                 <div className="flex-1 min-w-0">
@@ -2757,8 +2768,8 @@ export default function AdminPage() {
                           {/* Author */}
                           <div className="px-5 py-2 bg-[var(--aurora-surface-variant)]/30 border-t border-[var(--aurora-border)]/50">
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-[var(--aurora-surface-variant)] flex items-center justify-center text-sm">
-                                {post.userAvatar || '👤'}
+                              <div className="w-6 h-6 rounded-full bg-[var(--aurora-surface-variant)] flex items-center justify-center text-sm overflow-hidden">
+                                <AvatarImg value={post.userAvatar} />
                               </div>
                               <p className="text-xs text-[var(--aurora-text-secondary)]">
                                 By <span className="font-semibold text-[var(--aurora-text)]">{post.userName || 'Unknown'}</span>
@@ -3035,8 +3046,8 @@ export default function AdminPage() {
                           <div className="flex items-center justify-between flex-wrap gap-3">
                             {/* Author (who wrote the post) */}
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-sm shrink-0">
-                                {item.authorAvatar || '👤'}
+                              <div className="w-7 h-7 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-sm shrink-0 overflow-hidden">
+                                <AvatarImg value={item.authorAvatar} />
                               </div>
                               <div>
                                 <p className="text-xs font-semibold text-[var(--aurora-text)]">
@@ -3050,8 +3061,8 @@ export default function AdminPage() {
 
                             {/* Reporter (who filed the report) */}
                             <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-sm shrink-0">
-                                {item.reporterAvatar || '🛡️'}
+                              <div className="w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-sm shrink-0 overflow-hidden">
+                                <AvatarImg value={item.reporterAvatar} fallback="🛡️" />
                               </div>
                               <div>
                                 <p className="text-xs font-semibold text-[var(--aurora-text)]">
@@ -3071,7 +3082,7 @@ export default function AdminPage() {
                               <div className="space-y-1">
                                 {item.reporters.map((r, idx) => (
                                   <div key={idx} className="flex items-center gap-2 text-[11px]">
-                                    <span>{r.avatar || '👤'}</span>
+                                    <span className="w-5 h-5 rounded-full overflow-hidden inline-flex items-center justify-center shrink-0"><AvatarImg value={r.avatar} className="w-5 h-5 rounded-full object-cover" /></span>
                                     <span className="font-medium text-[var(--aurora-text)]">{r.name}</span>
                                     <span className="text-[var(--aurora-text-secondary)] capitalize">— {r.category?.replace(/_/g, ' ')}</span>
                                     {r.details && <span className="text-[var(--aurora-text-secondary)] italic truncate max-w-[150px]">"{r.details}"</span>}
