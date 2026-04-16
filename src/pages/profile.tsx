@@ -1441,27 +1441,38 @@ export default function ProfilePage() {
                   </>
                 )}
 
-                {/* Add Another Business CTA — shown for business + admin accounts */}
-                {(userProfile?.accountType === 'business' || isAdmin) && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/business?action=add')}
-                    className="w-full flex items-center justify-center gap-2 py-3 mt-3 text-sm font-medium rounded-xl transition-colors"
-                    style={{
-                      border: '1.5px dashed var(--aurora-accent, #6366F1)',
-                      color: 'var(--aurora-accent, #6366F1)',
-                      backgroundColor: 'rgba(99, 102, 241, 0.04)',
-                      minHeight: '44px',
-                      WebkitTapHighlightColor: 'transparent',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none' as any,
-                      appearance: 'none',
-                    }}
-                  >
-                    <Plus size={16} />
-                    Add Another Business
-                  </button>
-                )}
+                {/* Contextual Add CTA — changes label & route based on active filter */}
+                {(userProfile?.accountType === 'business' || isAdmin) && (() => {
+                  const ctaConfig: Record<string, { label: string; route: string } | null> = {
+                    all: { label: 'Add New Listing', route: '/business?action=add' },
+                    business: { label: 'Add Another Business', route: '/business?action=add' },
+                    housing: null,
+                    marketplace: { label: 'Add Marketplace Listing', route: '/marketplace' },
+                    event: { label: 'Add Event', route: '/events' },
+                  };
+                  const cta = ctaConfig[listingsFilter];
+                  if (!cta) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => navigate(cta.route)}
+                      className="w-full flex items-center justify-center gap-2 py-3 mt-3 text-sm font-medium rounded-xl transition-colors"
+                      style={{
+                        border: '1.5px dashed var(--aurora-accent, #6366F1)',
+                        color: 'var(--aurora-accent, #6366F1)',
+                        backgroundColor: 'rgba(99, 102, 241, 0.04)',
+                        minHeight: '44px',
+                        WebkitTapHighlightColor: 'transparent',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none' as any,
+                        appearance: 'none',
+                      }}
+                    >
+                      <Plus size={16} />
+                      {cta.label}
+                    </button>
+                  );
+                })()}
 
                 {/* Empty state */}
                 {userBusinesses.length + userHousing.length + userMarketplace.length + userEvents.length === 0 && (
@@ -1470,22 +1481,32 @@ export default function ProfilePage() {
                     <h3 className="text-base font-semibold text-[var(--aurora-text)] mb-1">No listings yet</h3>
                     <p className="text-sm text-[var(--aurora-text-muted)] mb-4">Your business, housing, marketplace, and event listings will appear here.</p>
                     {(userProfile?.accountType === 'business' || isAdmin) && (
-                      <button
-                        type="button"
-                        onClick={() => navigate('/business?action=add')}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-                        style={{
-                          background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                          minHeight: '44px',
-                          WebkitTapHighlightColor: 'transparent',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none' as any,
-                          appearance: 'none',
-                        }}
-                      >
-                        <Plus size={16} />
-                        Add Your First Business
-                      </button>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        {([
+                          { label: 'Add Business', route: '/business?action=add' },
+                          { label: 'Add Marketplace Listing', route: '/marketplace' },
+                          { label: 'Add Event', route: '/events' },
+                        ] as const).map((cta) => (
+                          <button
+                            key={cta.route}
+                            type="button"
+                            onClick={() => navigate(cta.route)}
+                            onTouchStart={() => {}}
+                            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+                            style={{
+                              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                              minHeight: '44px',
+                              WebkitTapHighlightColor: 'transparent',
+                              WebkitAppearance: 'none',
+                              MozAppearance: 'none' as any,
+                              appearance: 'none',
+                            }}
+                          >
+                            <Plus size={14} />
+                            {cta.label}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}
