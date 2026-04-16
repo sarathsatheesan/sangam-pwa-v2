@@ -101,6 +101,7 @@ export async function notifyQuoteRequestSubmitted(
     cuisineCategory,
     eventDate,
     headcount,
+    // Deep-link: service worker uses requestId to build /catering?view=quotes&quoteRequestId=xxx
   });
 }
 
@@ -161,6 +162,7 @@ export async function notifyQuoteAccepted(
     requestId,
     customerName,
     totalPrice,
+    role: 'vendor',
   });
 }
 
@@ -192,6 +194,7 @@ export async function notifyVendorsNewRFQ(
       cuisineCategory,
       deliveryCity,
       headcount,
+      role: 'vendor',
     });
   }
 }
@@ -226,7 +229,9 @@ export async function notifyReviewFlagged(
   });
 }
 
-/** Order confirmed — notify both parties */
+/** Order confirmed — notify both parties
+ *  Each payload includes `role` so the service worker can build the correct
+ *  deep-link URL (customer → /catering?view=orders, vendor → /catering?vendorView=orders). */
 export async function notifyOrderConfirmed(
   customerId: string,
   vendorOwnerId: string,
@@ -301,6 +306,7 @@ export async function notifyVendorRepriceRequestedMultiChannel(
   await notifyAllChannels(vendorOwnerId, 'reprice_requested', {
     requestId,
     requestedPrice,
+    role: 'vendor',
   });
 }
 
@@ -328,5 +334,6 @@ export async function notifyVendorCounterResolvedMultiChannel(
   await notifyAllChannels(vendorOwnerId, 'reprice_resolved', {
     requestId,
     accepted,
+    role: 'vendor',
   });
 }

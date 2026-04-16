@@ -95,11 +95,13 @@ export default function NotificationBell() {
       }
       closeBell();
 
-      // Navigate to the relevant page
+      // Deep-link: navigate to /catering with query params that the catering
+      // page reads to auto-switch view and expand the correct order/quote.
+      // CateringOrderStatus reads #order-{id} from hash to auto-expand.
       if (notif.orderId) {
-        navigate(`/catering/orders/${notif.orderId}`);
+        navigate(`/catering?view=orders&orderId=${notif.orderId}`);
       } else if (notif.quoteRequestId) {
-        navigate(`/catering/quotes/${notif.quoteRequestId}`);
+        navigate(`/catering?view=quotes&quoteRequestId=${notif.quoteRequestId}`);
       }
     },
     [markAsRead, closeBell, navigate],

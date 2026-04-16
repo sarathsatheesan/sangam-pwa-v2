@@ -20,7 +20,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useBusinessSwitcher } from '@/contexts/BusinessSwitcherContext';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { cateringReducer, createInitialState } from '@/reducers/cateringReducer';
 import { Timestamp, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/services/firebase';
@@ -84,6 +84,7 @@ export default function CateringPage() {
   const { businesses: ownedBusinesses, selectedBusiness: ctxBusiness, selectBusiness, loading: bizLoading } = useBusinessSwitcher();
   const { businessId: routeBusinessId } = useParams<{ businessId?: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [state, dispatch] = useReducer(cateringReducer, undefined, createInitialState);
   const [businessCounts, setBusinessCounts] = useState<Record<string, number>>({});
   const [allCateringBusinesses, setAllCateringBusinesses] = useState<any[]>([]);
@@ -123,6 +124,74 @@ export default function CateringPage() {
       dispatch({ type: 'SET_VIEW', payload: 'vendor' });
     }
   }, [routeBusinessId, userOwnedBusiness, state.view]);
+
+  // ── Deep-link handling: navigate from notification click to specific order/quote ──
+  // Reads ?view=orders&orderId=xxx or ?view=quotes&quoteRequestId=xxx from URL.
+  // Sets the correct view, expands the order (via hash), or selects the quote.
+  // Consumes the params after processing to keep the URL clean.
+  // Runs once on mount + whenever searchParams change (e.g. service worker navigates).
+  const deepLinkProcessedRef = useRef(false);
+  useEffect(() => {
+    const viewParam = searchParams.get('view');
+    const orderIdParam = searchParams.get('orderId');
+    const quoteRequestIdParam = searchParams.get('quoteRequestId');
+    const vendorViewParam = searchParams.get('vendorView');
+
+    if (!viewParam && !orderIdParam && !quoteRequestIdParam) return;
+
+    // Prevent double-processing in StrictMode / fast re-renders
+    const paramKey = `${viewParam}|${orderIdParam}|${quoteRequestIdParam}|${vendorViewParam}`;
+    if (deepLinkProcessedRef.current) return;
+    deepLinkProcessedRef.current = true;
+
+    // Customer order deep-link: /catering?view=orders&orderId=xxx
+    if (viewParam === 'orders' || orderIdParam) {
+      dispatch({ type: 'SET_VIEW', payload: 'orders' });
+      // CateringOrderStatus reads #order-{id} from hash to auto-expand
+      if (orderIdParam) {
+        window.history.replaceState(null, '', `${window.location.pathname}#order-${orderIdParam}`);
+      }
+    }
+    // Customer quote deep-link: /catering?view=quotes&quoteRequestId=xxx
+    else if (viewParam === 'quotes' || quoteRequestIdParam) {
+      dispatch({ type: 'SET_VIEW', payload: 'quotes' });
+      // If we have a quoteRequestId, we need to find and select the quote request
+      // once the real-time subscription delivers it. Store it for deferred selection.
+      if (quoteRequestIdParam) {
+        pendingDeepLinkQuoteRef.current = quoteRequestIdParam;
+      }
+    }
+    // Vendor order deep-link: /catering?vendorView=orders&orderId=xxx
+    else if (vendorViewParam === 'orders') {
+      dispatch({ type: 'SET_VIEW', payload: 'vendor' });
+      setVendorTab('orders');
+      if (orderIdParam) {
+        window.history.replaceState(null, '', `${window.location.pathname}#order-${orderIdParam}`);
+      }
+    }
+
+    // Clean up search params to keep URL tidy (without triggering navigation)
+    const cleaned = new URLSearchParams(searchParams);
+    cleaned.delete('view');
+    cleaned.delete('orderId');
+    cleaned.delete('quoteRequestId');
+    cleaned.delete('vendorView');
+    const remaining = cleaned.toString();
+    // Use replaceState to avoid adding a history entry
+    const hash = window.location.hash;
+    window.history.replaceState(
+      null, '',
+      window.location.pathname + (remaining ? `?${remaining}` : '') + hash,
+    );
+
+    // Reset processed flag after a tick so future deep-link navigations work
+    requestAnimationFrame(() => { deepLinkProcessedRef.current = false; });
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Deferred quote selection: when deep-linking to a quote, the real-time
+  // subscription may not have delivered the data yet. This ref holds the
+  // pending quoteRequestId and the subscription effect below resolves it.
+  const pendingDeepLinkQuoteRef = useRef<string | null>(null);
 
   // Switch from Vendor context into a Personal-scope view (My Orders, My Quotes,
   // Saved Orders, Templates). If we're currently on the /vendor/:id/dashboard
@@ -189,6 +258,46 @@ export default function CateringPage() {
 
   // ── Business detection now handled by BusinessSwitcherContext ──
   // (Removed old single-business Firestore query — context provides real-time list)
+
+  // ── Deep-link: listen for service worker NOTIFICATION_CLICK messages (Firefox fallback) ──
+  // When the service worker can't use client.navigate() it falls back to postMessage.
+  // We parse the URL and apply the same deep-link logic as the searchParams effect.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    function handleSWMessage(event: MessageEvent) {
+      if (event.data?.type === 'NOTIFICATION_CLICK' && event.data?.url) {
+        try {
+          const url = new URL(event.data.url, window.location.origin);
+          if (url.pathname === '/catering' || url.pathname.startsWith('/catering')) {
+            const orderId = url.searchParams.get('orderId');
+            const quoteRequestId = url.searchParams.get('quoteRequestId');
+            const view = url.searchParams.get('view');
+            const vendorView = url.searchParams.get('vendorView');
+
+            if (view === 'orders' || orderId) {
+              dispatch({ type: 'SET_VIEW', payload: 'orders' });
+              if (orderId) {
+                window.history.replaceState(null, '', `${window.location.pathname}#order-${orderId}`);
+              }
+            } else if (view === 'quotes' || quoteRequestId) {
+              dispatch({ type: 'SET_VIEW', payload: 'quotes' });
+              if (quoteRequestId) {
+                pendingDeepLinkQuoteRef.current = quoteRequestId;
+              }
+            } else if (vendorView === 'orders') {
+              dispatch({ type: 'SET_VIEW', payload: 'vendor' });
+              setVendorTab('orders');
+              if (orderId) {
+                window.history.replaceState(null, '', `${window.location.pathname}#order-${orderId}`);
+              }
+            }
+          }
+        } catch { /* malformed URL — ignore */ }
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Cart persistence: hydrate from localStorage on mount ──
   const CART_STORAGE_KEY = 'ethniCity_catering_cart';
@@ -272,6 +381,16 @@ export default function CateringPage() {
       if (current) {
         const updated = requests.find((r) => r.id === current.id);
         if (updated) setSelectedQuoteRequest(updated);
+      }
+
+      // Deep-link: if a pending quoteRequestId was set by the deep-link effect,
+      // select it now that real-time data is available
+      if (pendingDeepLinkQuoteRef.current) {
+        const target = requests.find((r) => r.id === pendingDeepLinkQuoteRef.current);
+        if (target) {
+          setSelectedQuoteRequest(target);
+          pendingDeepLinkQuoteRef.current = null;
+        }
       }
     });
     return unsub;

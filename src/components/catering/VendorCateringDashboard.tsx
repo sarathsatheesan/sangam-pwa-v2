@@ -92,7 +92,14 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
   const { user } = useAuth();
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  // Deep-link: read #order-{id} from URL hash to auto-expand an order
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#order-', '');
+      return hash && hash !== '' ? hash : null;
+    }
+    return null;
+  });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'completed'>('all');
   const { addToast } = useToast();
