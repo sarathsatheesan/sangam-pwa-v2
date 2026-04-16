@@ -434,15 +434,17 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     }
   };
 
-  // ── Countdown timer helper ──
-  const useCountdown = (expiresAt: any): { timeLeft: string; isExpired: boolean; isUrgent: boolean } => {
-    const [now, setNow] = useState(Date.now());
-    useEffect(() => {
-      const interval = setInterval(() => setNow(Date.now()), 10_000); // update every 10s for accuracy
-      return () => clearInterval(interval);
-    }, []);
+  // ── Countdown timer: single top-level interval drives re-renders,
+  //    getCountdown is a pure function safe to call anywhere in JSX ──
+  const [_tickNow, setTickNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setTickNow(Date.now()), 10_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getCountdown = (expiresAt: any): { timeLeft: string; isExpired: boolean; isUrgent: boolean } => {
     const expiresMs = expiresAt?.toMillis?.() || (expiresAt?.seconds ? expiresAt.seconds * 1000 : 0);
-    const remainingMs = Math.max(0, expiresMs - now);
+    const remainingMs = Math.max(0, expiresMs - Date.now());
     const isExpired = remainingMs <= 0;
     const hrs = Math.floor(remainingMs / (60 * 60 * 1000));
     const mins = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
@@ -1015,7 +1017,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
                   // Vendor sent a counter-offer — customer must respond
                   if (rs === 'vendor_countered') {
-                    const counterExpiry = useCountdown(response.repriceCounterExpiresAt);
+                    const counterExpiry = getCountdown(response.repriceCounterExpiresAt);
                     return (
                       <div className="p-3 rounded-xl space-y-2" style={{ backgroundColor: '#EFF6FF' }}>
                         <div className="flex items-center gap-2">
@@ -1094,7 +1096,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
                   // Reprice request pending vendor response
                   if (rs === 'requested') {
-                    const reqExpiry = useCountdown(response.repriceExpiresAt);
+                    const reqExpiry = getCountdown(response.repriceExpiresAt);
                     return (
                       <div className="p-3 rounded-xl space-y-1" style={{ backgroundColor: '#FFF7ED' }}>
                         <div className="flex items-center gap-2">
