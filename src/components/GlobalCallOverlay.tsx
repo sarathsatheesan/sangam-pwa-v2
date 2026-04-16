@@ -367,6 +367,7 @@ const GlobalCallOverlay: React.FC = () => {
             pointerEvents: 'none', // let clicks pass through to buttons below
             // Smooth transition when switching between PiP and fullscreen
             transition: 'all 0.3s ease-in-out',
+            willChange: 'transform, width, height, opacity',
             WebkitTransform: 'translateZ(0)',
             ...(callMinimized ? {
               // PiP position
@@ -395,6 +396,7 @@ const GlobalCallOverlay: React.FC = () => {
             width: isVideoCall ? '140px' : '200px',
             backgroundColor: '#1a1a2e',
             border: '2px solid rgba(99,102,241,0.5)',
+            willChange: 'transform',
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)',
             WebkitBackfaceVisibility: 'hidden',
@@ -474,6 +476,7 @@ const GlobalCallOverlay: React.FC = () => {
           className="fixed inset-0 z-[10001] flex items-center justify-center"
           style={{
             backgroundColor: isVideoCall && showRemoteVideo ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.92)',
+            willChange: 'background-color',
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)',
           }}

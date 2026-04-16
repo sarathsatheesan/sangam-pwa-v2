@@ -76,17 +76,7 @@ import {
 } from '@/services/businessRegistration';
 import type { CateringOrder } from '@/services/cateringService';
 import { formatPrice, updateOrderStatus } from '@/services/cateringService';
-
-// ─── Helpers ─────────────────────────────────────────────
-/** Returns true when a string looks like an image URL / data-URI rather than an emoji. */
-const isImageUrl = (val?: string): val is string =>
-  !!val && (val.startsWith('http') || val.startsWith('data:') || val.startsWith('blob:') || val.startsWith('/'));
-
-/** Renders an avatar value as an <img> when it's a URL, or as emoji text otherwise. */
-const AvatarImg: React.FC<{ value?: string; fallback?: string; className?: string }> = ({ value, fallback = '👤', className = 'w-full h-full rounded-full object-cover' }) =>
-  isImageUrl(value)
-    ? <img src={value} alt="avatar" className={className} />
-    : <>{value || fallback}</>;
+import AvatarImg, { isImageUrl } from '@/components/shared/AvatarImg';
 
 // ─── Interfaces ──────────────────────────────────────────
 interface Listing {
@@ -2197,7 +2187,7 @@ export default function AdminPage() {
                           <div className="flex flex-wrap gap-1.5 mb-3">
                             {biz.verificationDocs.map((vdoc: any, i: number) => (
                               <a
-                                key={i}
+                                key={vdoc.url || i}
                                 href={vdoc.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -3081,7 +3071,7 @@ export default function AdminPage() {
                               <p className="text-[10px] font-semibold text-[var(--aurora-text-secondary)] mb-1.5 uppercase tracking-wider">All Reporters ({item.reporters.length})</p>
                               <div className="space-y-1">
                                 {item.reporters.map((r, idx) => (
-                                  <div key={idx} className="flex items-center gap-2 text-[11px]">
+                                  <div key={r.uid || `reporter-${idx}`} className="flex items-center gap-2 text-[11px]">
                                     <span className="w-5 h-5 rounded-full overflow-hidden inline-flex items-center justify-center shrink-0"><AvatarImg value={r.avatar} className="w-5 h-5 rounded-full object-cover" /></span>
                                     <span className="font-medium text-[var(--aurora-text)]">{r.name}</span>
                                     <span className="text-[var(--aurora-text-secondary)] capitalize">— {r.category?.replace(/_/g, ' ')}</span>

@@ -107,7 +107,7 @@ const NotificationCenterPage = lazyRetry(() => import('./components/shared/Notif
 const NotificationSettingsPage = lazyRetry(() => import('./components/shared/NotificationSettings'));
 const NotificationAnalyticsPage = lazyRetry(() => import('./components/shared/NotificationAnalytics'));
 
-// Loading spinner component
+// Loading spinner component (full-page for auth routes)
 const LoadingSpinner = () => (
   <div style={{
     display: 'flex',
@@ -137,6 +137,16 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Optimized page loader for per-route suspense (lower-height, faster perceived load)
+const PageLoader = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh', color: 'var(--aurora-text-secondary)' }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--aurora-border)', borderTopColor: 'var(--aurora-accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+      <span>Loading...</span>
+    </div>
+  </div>
+);
+
 function App() {
   return (
     <BrowserRouter>
@@ -160,25 +170,39 @@ function App() {
                 <Route element={<PrivateRoute />}>
                   <Route element={<Suspense fallback={<LoadingSpinner />}><MainLayout /></Suspense>}>
                     <Route index element={<Navigate to="/home" replace />} />
-                    <Route path="/home" element={<Suspense fallback={<LoadingSpinner />}><HomePage /></Suspense>} />
-                    <Route path="/feed" element={<Suspense fallback={<LoadingSpinner />}><FeedPage /></Suspense>} />
-                    <Route path="/discover" element={<Suspense fallback={<LoadingSpinner />}><DiscoverPage /></Suspense>} />
-                    <Route path="/business" element={<Suspense fallback={<LoadingSpinner />}><BusinessPage /></Suspense>} />
-                    <Route path="/housing" element={<Suspense fallback={<LoadingSpinner />}><HousingPage /></Suspense>} />
-                    <Route path="/marketplace" element={<Suspense fallback={<LoadingSpinner />}><MarketplacePage /></Suspense>} />
-                    <Route path="/events" element={<Suspense fallback={<LoadingSpinner />}><EventsPage /></Suspense>} />
-                    <Route path="/travel" element={<Suspense fallback={<LoadingSpinner />}><TravelPage /></Suspense>} />
-                    <Route path="/forum" element={<Suspense fallback={<LoadingSpinner />}><ForumPage /></Suspense>} />
-                    <Route path="/messages" element={<Suspense fallback={<LoadingSpinner />}><MessagesPage /></Suspense>} />
-                    <Route path="/profile" element={<Suspense fallback={<LoadingSpinner />}><ProfilePage /></Suspense>} />
-                    <Route path="/admin" element={<Suspense fallback={<LoadingSpinner />}><AdminPage /></Suspense>} />
-                    <Route path="/settings" element={<Suspense fallback={<LoadingSpinner />}><SettingsPage /></Suspense>} />
-                    <Route path="/business/register" element={<Suspense fallback={<LoadingSpinner />}><BusinessRegisterPage /></Suspense>} />
-                    <Route path="/catering" element={<Suspense fallback={<LoadingSpinner />}><CateringPage /></Suspense>} />
-                    <Route path="/vendor/:businessId/*" element={<Suspense fallback={<LoadingSpinner />}><CateringPage /></Suspense>} />
-                    <Route path="/notifications" element={<Suspense fallback={<LoadingSpinner />}><NotificationCenterPage /></Suspense>} />
-                    <Route path="/notifications/settings" element={<Suspense fallback={<LoadingSpinner />}><NotificationSettingsPage /></Suspense>} />
-                    <Route path="/notifications/analytics" element={<Suspense fallback={<LoadingSpinner />}><NotificationAnalyticsPage /></Suspense>} />
+
+                    {/* Home & Discovery Routes */}
+                    <Route path="/home" element={<Suspense fallback={<PageLoader />}><HomePage /></Suspense>} />
+                    <Route path="/feed" element={<Suspense fallback={<PageLoader />}><FeedPage /></Suspense>} />
+                    <Route path="/discover" element={<Suspense fallback={<PageLoader />}><DiscoverPage /></Suspense>} />
+
+                    {/* Commerce Routes (Business, Marketplace, Housing, Events) */}
+                    <Route path="/business" element={<Suspense fallback={<PageLoader />}><BusinessPage /></Suspense>} />
+                    <Route path="/business/register" element={<Suspense fallback={<PageLoader />}><BusinessRegisterPage /></Suspense>} />
+                    <Route path="/marketplace" element={<Suspense fallback={<PageLoader />}><MarketplacePage /></Suspense>} />
+                    <Route path="/housing" element={<Suspense fallback={<PageLoader />}><HousingPage /></Suspense>} />
+                    <Route path="/events" element={<Suspense fallback={<PageLoader />}><EventsPage /></Suspense>} />
+
+                    {/* Catering/Vendor Routes */}
+                    <Route path="/catering" element={<Suspense fallback={<PageLoader />}><CateringPage /></Suspense>} />
+                    <Route path="/vendor/:businessId/*" element={<Suspense fallback={<PageLoader />}><CateringPage /></Suspense>} />
+
+                    {/* Community Routes (Travel, Forum) */}
+                    <Route path="/travel" element={<Suspense fallback={<PageLoader />}><TravelPage /></Suspense>} />
+                    <Route path="/forum" element={<Suspense fallback={<PageLoader />}><ForumPage /></Suspense>} />
+
+                    {/* User Routes (Messages, Profile, Settings) */}
+                    <Route path="/messages" element={<Suspense fallback={<PageLoader />}><MessagesPage /></Suspense>} />
+                    <Route path="/profile" element={<Suspense fallback={<PageLoader />}><ProfilePage /></Suspense>} />
+                    <Route path="/settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
+
+                    {/* Notifications Routes */}
+                    <Route path="/notifications" element={<Suspense fallback={<PageLoader />}><NotificationCenterPage /></Suspense>} />
+                    <Route path="/notifications/settings" element={<Suspense fallback={<PageLoader />}><NotificationSettingsPage /></Suspense>} />
+                    <Route path="/notifications/analytics" element={<Suspense fallback={<PageLoader />}><NotificationAnalyticsPage /></Suspense>} />
+
+                    {/* Admin Routes */}
+                    <Route path="/admin" element={<Suspense fallback={<PageLoader />}><AdminPage /></Suspense>} />
                   </Route>
                 </Route>
 
