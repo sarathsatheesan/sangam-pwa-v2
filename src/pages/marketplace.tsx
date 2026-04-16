@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
-import { HERITAGE_OPTIONS } from '@/constants/config';
+import CountryEthnicitySelector from '@/components/CountryEthnicitySelector';
 import {
   Search,
   X,
@@ -1679,25 +1679,14 @@ export default function MarketplacePage() {
                     </select>
                   </div>
                 </div>
-                {/* Heritage Tags */}
+                {/* Heritage / EthniZity — shared component (same as Profile & Onboarding) */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-[var(--aurora-text)] mb-2">Heritage</label>
-                  <div className="flex flex-wrap gap-2">
-                    {HERITAGE_OPTIONS.map((h) => (
-                      <button
-                        key={h}
-                        type="button"
-                        onClick={() => setFormHeritage((prev) => prev.includes(h) ? prev.filter((x) => x !== h) : [...prev, h])}
-                        className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                          formHeritage.includes(h)
-                            ? 'bg-amber-500 text-white'
-                            : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]'
-                        }`}
-                      >
-                        {h}
-                      </button>
-                    ))}
-                  </div>
+                  <label className="block text-sm font-medium text-[var(--aurora-text)] mb-2">Heritage / EthniZity</label>
+                  <CountryEthnicitySelector
+                    selected={formHeritage}
+                    onChange={setFormHeritage}
+                    maxHeight="240px"
+                  />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="mb-4">
