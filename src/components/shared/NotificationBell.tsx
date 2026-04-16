@@ -104,14 +104,15 @@ export default function NotificationBell() {
 
       // Prefer the explicit `role` field; fall back to type-based inference
       // for older notifications that predate the role field.
-      // Special case: `order_cancelled` is sent to both parties with the same
-      // type, so the VENDOR_TYPE_FALLBACK set can't handle it. For legacy
-      // notifications without `role`, infer from the body text — vendor
-      // recipients get "The customer cancelled…" while customer recipients
-      // get "{businessName} cancelled…".
+      // Special case: `order_cancelled` and `reprice_resolved` are sent to
+      // both parties with the same type, so VENDOR_TYPE_FALLBACK can't handle
+      // them. For legacy notifications without `role`, infer from body text —
+      // vendor recipients get "The customer …" while customer recipients get
+      // "{businessName} …".
+      const BOTH_PARTY_TYPES = new Set(['order_cancelled', 'reprice_resolved']);
       const isVendor = notif.role
         ? notif.role === 'vendor'
-        : notif.type === 'order_cancelled'
+        : BOTH_PARTY_TYPES.has(notif.type)
           ? notif.body?.startsWith('The customer')
           : VENDOR_TYPE_FALLBACK.has(notif.type);
 

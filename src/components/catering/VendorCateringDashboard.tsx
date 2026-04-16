@@ -893,10 +893,14 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                         if (!n.read) {
                           markNotificationRead(n.id).catch(console.warn);
                         }
-                        // Expand the related order if it exists
+                        setShowNotifPanel(false);
+                        // Route to the correct tab based on notification content
                         if (n.orderId) {
+                          // Order-related notification → stay on orders tab, expand order
                           setExpandedOrder(n.orderId);
-                          setShowNotifPanel(false);
+                        } else if (n.quoteRequestId) {
+                          // Quote-related notification → switch to quotes tab
+                          onSwitchVendorTab?.('quotes');
                         }
                       }}
                       className={`p-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 ${!n.read ? 'bg-indigo-50/50' : ''}`}
