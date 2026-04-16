@@ -257,7 +257,7 @@ function SectionHeader({ icon, title, action }: { icon: React.ReactNode; title: 
    MAIN COMPONENT
    ═══════════════════════════════════════════ */
 export default function ProfilePage() {
-  const { user, userProfile, setUserProfile } = useAuth();
+  const { user, userProfile, setUserProfile, isAdmin } = useAuth();
   const { settings, updateSetting } = useUserSettings();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -1441,8 +1441,8 @@ export default function ProfilePage() {
                   </>
                 )}
 
-                {/* Add Another Business CTA — shown for business accounts */}
-                {userProfile?.accountType === 'business' && (
+                {/* Add Another Business CTA — shown for business + admin accounts */}
+                {(userProfile?.accountType === 'business' || isAdmin) && (
                   <button
                     type="button"
                     onClick={() => navigate('/business?action=add')}
@@ -1469,7 +1469,7 @@ export default function ProfilePage() {
                     <Package size={40} className="text-[var(--aurora-text-muted)] mb-3" />
                     <h3 className="text-base font-semibold text-[var(--aurora-text)] mb-1">No listings yet</h3>
                     <p className="text-sm text-[var(--aurora-text-muted)] mb-4">Your business, housing, marketplace, and event listings will appear here.</p>
-                    {userProfile?.accountType === 'business' && (
+                    {(userProfile?.accountType === 'business' || isAdmin) && (
                       <button
                         type="button"
                         onClick={() => navigate('/business?action=add')}
