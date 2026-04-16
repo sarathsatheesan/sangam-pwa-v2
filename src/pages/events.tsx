@@ -798,6 +798,16 @@ export default function EventsPage() {
     }
   }, [searchParams, events]);
 
+  // Deep-link: auto-open create modal from Profile "Add Event"
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'add' && !showCreateModal && !loading) {
+      setCreateStep(1);
+      setShowCreateModal(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, showCreateModal, loading]);
+
   const loadComments = (eventId: string) => {
     try {
       // Clean up previous subscription

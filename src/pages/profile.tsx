@@ -1447,8 +1447,8 @@ export default function ProfilePage() {
                     all: { label: 'Add New Listing', route: '/business?action=add' },
                     business: { label: 'Add Another Business', route: '/business?action=add' },
                     housing: null,
-                    marketplace: { label: 'Add Marketplace Listing', route: '/marketplace' },
-                    event: { label: 'Add Event', route: '/events' },
+                    marketplace: { label: 'Add Marketplace Listing', route: '/marketplace?action=add' },
+                    event: { label: 'Add Event', route: '/events?action=add' },
                   };
                   const cta = ctaConfig[listingsFilter];
                   if (!cta) return null;
@@ -1484,8 +1484,8 @@ export default function ProfilePage() {
                       <div className="flex flex-wrap items-center justify-center gap-2">
                         {([
                           { label: 'Add Business', route: '/business?action=add' },
-                          { label: 'Add Marketplace Listing', route: '/marketplace' },
-                          { label: 'Add Event', route: '/events' },
+                          { label: 'Add Marketplace Listing', route: '/marketplace?action=add' },
+                          { label: 'Add Event', route: '/events?action=add' },
                         ] as const).map((cta) => (
                           <button
                             key={cta.route}

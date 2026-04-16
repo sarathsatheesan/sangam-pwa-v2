@@ -777,6 +777,16 @@ export default function MarketplacePage() {
     }
   }, [searchParams, listings]);
 
+  // Deep-link: auto-open create modal from Profile "Add Marketplace Listing"
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'add' && !showCreateModal && !loading) {
+      resetForm();
+      setShowCreateModal(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, showCreateModal, loading]);
+
   // Fetch comments for selected item
   useEffect(() => {
     const fetchComments = async () => {
