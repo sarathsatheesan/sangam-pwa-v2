@@ -1661,6 +1661,68 @@ export default function CateringPage() {
         )}
       </div>
 
+      {/* Sticky checkout bar — visible while browsing items with cart items */}
+      {cartItemCount > 0 && ['items', 'categories'].includes(state.view) && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-[90] border-t shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+          style={{ backgroundColor: 'var(--aurora-surface, #fff)', borderColor: 'var(--aurora-border)' }}
+        >
+          <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3 gap-3">
+            {/* Cart summary */}
+            <button
+              onClick={() => dispatch({ type: 'TOGGLE_CART' })}
+              className="flex items-center gap-2 min-w-0"
+            >
+              <div
+                className="relative flex items-center justify-center w-10 h-10 rounded-xl shrink-0"
+                style={{ backgroundColor: 'var(--aurora-accent-light, #EEF2FF)' }}
+              >
+                <ShoppingCart size={18} style={{ color: 'var(--aurora-accent)' }} />
+                <span
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
+                  style={{ backgroundColor: 'var(--aurora-accent)' }}
+                >
+                  {cartItemCount}
+                </span>
+              </div>
+              <div className="text-left min-w-0">
+                <p className="text-xs font-medium truncate" style={{ color: 'var(--aurora-text-secondary)' }}>
+                  {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'} {state.cart.businessName ? `from ${state.cart.businessName}` : ''}
+                </p>
+                <p className="text-sm font-bold" style={{ color: 'var(--aurora-text)' }}>
+                  {formatPrice(calculateOrderTotal(state.cart.items))}
+                </p>
+              </div>
+            </button>
+
+            {/* Proceed to checkout */}
+            <button
+              onClick={() => {
+                if (userProfile) {
+                  const prefill: Record<string, any> = {};
+                  if (!state.orderForm.contactName && userProfile.name) prefill.contactName = userProfile.name;
+                  if (!state.orderForm.contactPhone && userProfile.phone) prefill.contactPhone = userProfile.phone;
+                  if (!state.orderForm.deliveryAddress?.city && userProfile.city) {
+                    prefill.deliveryAddress = {
+                      ...(state.orderForm.deliveryAddress || { street: '', city: '', state: '', zip: '' }),
+                      city: userProfile.city,
+                    };
+                  }
+                  if (Object.keys(prefill).length > 0) {
+                    dispatch({ type: 'UPDATE_ORDER_FORM', payload: prefill });
+                  }
+                }
+                dispatch({ type: 'SET_VIEW', payload: 'checkout' });
+              }}
+              className="shrink-0 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
+              style={{ backgroundColor: 'var(--aurora-accent)' }}
+            >
+              Checkout →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Cart slide-out */}
       <CateringCart
         items={state.cart.items}
