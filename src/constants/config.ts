@@ -1062,6 +1062,7 @@ export const BUSINESS_CATEGORIES = [
   'Religious/Spiritual',
   'Entertainment',
   'Fitness',
+  'Photo/Videography',
   'Retail',
   'Other',
 ];
@@ -1087,6 +1088,7 @@ export const BUSINESS_TYPES = [
   'Legal & Immigration',
   'Media & Advertising',
   'Non-Profit',
+  'Photo/Videography',
   'Real Estate / Property',
   'Religious / Spiritual',
   'Restaurant & Food',

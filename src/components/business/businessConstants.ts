@@ -6,7 +6,7 @@
 import {
   Palette, Scissors, Shirt, BookOpen, DollarSign, ShoppingBag,
   Stethoscope, Flower2, Building2, Gem, Scale, Users, Home,
-  Utensils, Laptop, UtensilsCrossed, Plane, Briefcase,
+  Utensils, Laptop, UtensilsCrossed, Plane, Briefcase, Camera,
 } from 'lucide-react';
 
 // ── Category list ──
@@ -23,6 +23,7 @@ export const CATEGORIES = [
   'Jewelry',
   'Legal & Immigration',
   'Non-Profit',
+  'Photo/Videography',
   'Real Estate',
   'Restaurant & Food',
   'Technology',
@@ -45,6 +46,7 @@ export const CATEGORY_EMOJI_MAP: { [key: string]: string } = {
   'Jewelry': '💎',
   'Legal & Immigration': '⚖️',
   'Non-Profit': '🤝',
+  'Photo/Videography': '📸',
   'Real Estate': '🏠',
   'Restaurant & Food': '🍛',
   'Technology': '💻',
@@ -67,6 +69,7 @@ export const CATEGORY_COLORS: { [key: string]: string } = {
   'Jewelry': '#CA8A04',
   'Legal & Immigration': '#B45309',
   'Non-Profit': '#DC2626',
+  'Photo/Videography': '#EC4899',
   'Real Estate': '#1E40AF',
   'Restaurant & Food': '#EA580C',
   'Technology': '#7C3AED',
@@ -89,6 +92,7 @@ export const CATEGORY_ICONS: { [key: string]: any } = {
   'Jewelry': Gem,
   'Legal & Immigration': Scale,
   'Non-Profit': Users,
+  'Photo/Videography': Camera,
   'Real Estate': Home,
   'Restaurant & Food': Utensils,
   'Technology': Laptop,
