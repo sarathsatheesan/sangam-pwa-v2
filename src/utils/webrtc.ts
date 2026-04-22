@@ -245,6 +245,16 @@ export class CallManager {
         this.remoteStream = refreshedStream;
         this.setState({ remoteStream: refreshedStream });
       };
+
+      // Safari: handle track termination to refresh stream reference
+      event.track.onended = () => {
+        console.log('[WebRTC] Track ended:', event.track.kind);
+        if (this.remoteStream) {
+          const refreshedStream = new MediaStream(this.remoteStream.getTracks().filter(t => t.readyState === 'live'));
+          this.remoteStream = refreshedStream;
+          this.setState({ remoteStream: refreshedStream });
+        }
+      };
     };
 
     // Send ICE candidates to Firestore
@@ -389,8 +399,7 @@ export class CallManager {
         if (data.answer && this.pc && !this.pc.currentRemoteDescription) {
           try {
             console.log('[WebRTC] Received answer, setting remote description');
-            const answer = new RTCSessionDescription(data.answer);
-            await this.pc.setRemoteDescription(answer);
+            await this.pc.setRemoteDescription(data.answer);
             // Flush any buffered ICE candidates now that remote description is set
             await this.flushIceCandidates();
             this.setState({ status: 'connecting' });
@@ -494,8 +503,7 @@ export class CallManager {
 
       // Set the offer as remote description
       console.log('[WebRTC] Setting offer as remote description');
-      const offer = new RTCSessionDescription(callData.offer);
-      await this.pc.setRemoteDescription(offer);
+      await this.pc.setRemoteDescription(callData.offer);
 
       // Now flush any ICE candidates that arrived while we were setting up
       await this.flushIceCandidates();

@@ -23,9 +23,11 @@ export function VoiceRecorder({ onSend, onCancel }: { onSend: (duration: number,
         }
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
+        // Safari doesn't support webm; falls through to mp4/aac/browser default
         const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
           : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
-          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4'
+          : MediaRecorder.isTypeSupported('audio/aac') ? 'audio/aac' : '';
         const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
         mediaRecorderRef.current = recorder;
         chunksRef.current = [];

@@ -1665,7 +1665,11 @@ export default function CateringPage() {
       {cartItemCount > 0 && ['items', 'categories'].includes(state.view) && (
         <div
           className="fixed bottom-0 left-0 right-0 z-[90] border-t shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
-          style={{ backgroundColor: 'var(--aurora-surface, #fff)', borderColor: 'var(--aurora-border)' }}
+          style={{
+            backgroundColor: 'var(--aurora-surface, #fff)',
+            borderColor: 'var(--aurora-border)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          }}
         >
           <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3 gap-3">
             {/* Cart summary */}

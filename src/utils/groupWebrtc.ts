@@ -427,7 +427,7 @@ export class GroupCallManager {
       const data = snap.data();
       if (data?.answer && !peerConn.remoteDescriptionSet) {
         console.log('[GroupCall] Received answer from', peerUid);
-        pc.setRemoteDescription(new RTCSessionDescription(data.answer))
+        pc.setRemoteDescription(data.answer)
           .then(() => {
             peerConn.remoteDescriptionSet = true;
             // Flush buffered ICE candidates
@@ -567,7 +567,7 @@ export class GroupCallManager {
     };
 
     // Set remote description (offer), create answer
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    await pc.setRemoteDescription(offer);
     peerConn.remoteDescriptionSet = true;
 
     // Flush any buffered candidates

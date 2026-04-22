@@ -40,23 +40,34 @@ function openKeyDB(): Promise<IDBDatabase> {
 }
 
 async function idbGet<T>(key: string): Promise<T | undefined> {
-  const db = await openKeyDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).get(key);
-    req.onsuccess = () => resolve(req.result as T | undefined);
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    const db = await openKeyDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const req = tx.objectStore(STORE_NAME).get(key);
+      req.onsuccess = () => resolve(req.result as T | undefined);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    // Safari private browsing throws on IndexedDB access
+    console.warn('[E2EE] IndexedDB unavailable (private browsing?):', err);
+    return undefined;
+  }
 }
 
 async function idbSet(key: string, value: unknown): Promise<void> {
-  const db = await openKeyDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  try {
+    const db = await openKeyDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    // Safari private browsing — keys will only live in memory this session
+    console.warn('[E2EE] IndexedDB write failed (private browsing?):', err);
+  }
 }
 
 // ─── ECDH Key Pair Management ────────────────────────────────────────
