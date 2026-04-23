@@ -316,7 +316,7 @@ export default function CateringCheckout({
                       aria-required={true}
                       aria-invalid={!!showError('eventDate')}
                       aria-describedby={showError('eventDate') ? 'event-date-error' : undefined}
-                      style={{ ...inputStyle, WebkitAppearance: 'auto', appearance: 'auto' }}
+                      style={{ ...inputStyle, appearance: 'auto' } as React.CSSProperties}
                     />
                     {showError('eventDate') && (
                       <p id="event-date-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
@@ -339,7 +339,7 @@ export default function CateringCheckout({
                       aria-required={true}
                       aria-invalid={!!showError('eventTime')}
                       aria-describedby={showError('eventTime') ? 'event-time-error' : undefined}
-                      style={{ ...inputStyle, WebkitAppearance: 'auto', appearance: 'auto' }}
+                      style={{ ...inputStyle, appearance: 'auto' } as React.CSSProperties}
                     />
                     {showError('eventTime') && (
                       <p id="event-time-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
