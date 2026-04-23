@@ -361,6 +361,7 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
         },
         orderForm: {
           eventDate: '',
+          eventTime: '',
           headcount: 0,
           deliveryAddress: null,
           specialInstructions: '',
