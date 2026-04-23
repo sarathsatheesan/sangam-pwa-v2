@@ -2273,6 +2273,7 @@ export default function EventsPage() {
                     value={formData.date}
                     min={getTodayISO()}
                     onChange={(e) => handleDateChange(e.target.value)}
+                    onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                     className={`w-full px-4 py-2.5 bg-aurora-surface border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all ${
                       dateError ? 'border-red-400 bg-red-50 dark:bg-red-500/5' : 'border-aurora-border'
                     }`}
@@ -2288,6 +2289,7 @@ export default function EventsPage() {
                       type="time"
                       value={formData.time}
                       onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                      onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                       className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
                     />
                     {formData.time && <p className="text-aurora-text-muted text-xs mt-1">{time24to12(formData.time)}</p>}
@@ -2298,6 +2300,7 @@ export default function EventsPage() {
                       type="time"
                       value={formData.endTime}
                       onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                      onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                       className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
                     />
                     {formData.endTime && <p className="text-aurora-text-muted text-xs mt-1">{time24to12(formData.endTime)}</p>}
@@ -2566,6 +2569,7 @@ export default function EventsPage() {
                   type="date"
                   value={editData.fullDate}
                   onChange={(e) => setEditData({ ...editData, fullDate: e.target.value })}
+                  onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                   className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
                 />
                 {editData.fullDate && <p className="text-aurora-text-muted text-xs mt-1">{isoToReadable(editData.fullDate)}</p>}
@@ -2578,6 +2582,7 @@ export default function EventsPage() {
                     type="time"
                     value={editData.time}
                     onChange={(e) => setEditData({ ...editData, time: e.target.value })}
+                    onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                     className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
                   />
                   {editData.time && <p className="text-aurora-text-muted text-xs mt-1">{time24to12(editData.time)}</p>}
@@ -2588,6 +2593,7 @@ export default function EventsPage() {
                     type="time"
                     value={editData.endTime}
                     onChange={(e) => setEditData({ ...editData, endTime: e.target.value })}
+                    onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                     className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
                   />
                   {editData.endTime && <p className="text-aurora-text-muted text-xs mt-1">{time24to12(editData.endTime)}</p>}

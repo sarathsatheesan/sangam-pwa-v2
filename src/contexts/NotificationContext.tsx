@@ -151,8 +151,14 @@ export function NotificationProvider({ userId, children }: NotificationProviderP
       if (!('Notification' in window)) return false;
       if (!('serviceWorker' in navigator)) return false;
 
-      // Safari may return the old callback-based API; wrap for compat
-      const permission = await Notification.requestPermission();
+      // Safari < 16.4 uses callback-based API; wrap in Promise for compat
+      const permission = await new Promise<NotificationPermission>((resolve) => {
+        const result = Notification.requestPermission((p) => resolve(p));
+        // Modern browsers return a Promise; resolve from it if available
+        if (result && typeof (result as any).then === 'function') {
+          (result as any).then(resolve);
+        }
+      });
       return permission === 'granted';
     } catch {
       return false;

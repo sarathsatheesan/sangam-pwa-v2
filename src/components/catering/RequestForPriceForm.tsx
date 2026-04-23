@@ -256,6 +256,7 @@ export default function RequestForPriceForm({
                 type="date"
                 value={rfpForm.eventDate}
                 onChange={(e) => onUpdateForm({ eventDate: e.target.value })}
+                onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                 className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
                 style={{
                   backgroundColor: 'var(--aurora-bg)',

@@ -274,6 +274,7 @@ const StepDetails: React.FC<StepDetailsProps> = ({
                       type="time"
                       value={hours[day]?.open || '09:00'}
                       onChange={(e) => updateHours(day, 'open', e.target.value)}
+                      onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                       className="px-2 py-1 text-xs rounded-lg outline-none"
                       style={inputStyle(false)}
                     />
@@ -282,6 +283,7 @@ const StepDetails: React.FC<StepDetailsProps> = ({
                       type="time"
                       value={hours[day]?.close || '17:00'}
                       onChange={(e) => updateHours(day, 'close', e.target.value)}
+                      onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                       className="px-2 py-1 text-xs rounded-lg outline-none"
                       style={inputStyle(false)}
                     />

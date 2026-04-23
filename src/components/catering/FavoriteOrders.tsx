@@ -397,6 +397,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
                           type="date"
                           value={reorderDate}
                           onChange={(e) => setReorderDate(e.target.value)}
+                          onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                           min={new Date().toISOString().slice(0, 10)}
                           className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
                           style={{ borderColor: 'var(--aurora-border)' }}

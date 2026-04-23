@@ -466,6 +466,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
                 type="time"
                 value={timeOfDay}
                 onChange={(e) => setTimeOfDay(e.target.value)}
+                onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                 className="w-full mt-1 px-2 py-1.5 rounded-lg border text-xs"
                 style={{ borderColor: 'var(--aurora-border)' }}
               />
@@ -476,6 +477,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                 min={new Date().toISOString().slice(0, 10)}
                 className="w-full mt-1 px-2 py-1.5 rounded-lg border text-xs"
                 style={{ borderColor: 'var(--aurora-border)' }}
@@ -489,6 +491,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                 min={startDate || new Date().toISOString().slice(0, 10)}
                 className="w-full mt-1 px-2 py-1.5 rounded-lg border text-xs"
                 style={{ borderColor: 'var(--aurora-border)' }}

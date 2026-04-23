@@ -426,6 +426,7 @@ export default function NotificationSettings() {
                   type="time"
                   value={localPrefs.quietHours.start}
                   onChange={(e) => handleQuietHoursChange('start', e.target.value)}
+                  onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -446,6 +447,7 @@ export default function NotificationSettings() {
                   type="time"
                   value={localPrefs.quietHours.end}
                   onChange={(e) => handleQuietHoursChange('end', e.target.value)}
+                  onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',

@@ -620,6 +620,7 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
                         type="date"
                         value={newDeal.expiresAt}
                         onChange={(e) => setNewDeal({ ...newDeal, expiresAt: e.target.value })}
+                        onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                         className="w-full px-3 py-2 bg-aurora-surface border border-aurora-border rounded-lg text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
                       />
                     </div>
