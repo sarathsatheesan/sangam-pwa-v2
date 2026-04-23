@@ -311,6 +311,7 @@ export default function CateringCheckout({
                       min={tomorrow}
                       value={orderForm.eventDate}
                       onChange={(e) => onUpdateForm({ eventDate: e.target.value })}
+                      onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                       onBlur={() => handleBlur('eventDate')}
                       className={inputClass('eventDate')}
                       aria-required={true}
@@ -334,6 +335,7 @@ export default function CateringCheckout({
                       type="time"
                       value={orderForm.eventTime}
                       onChange={(e) => onUpdateForm({ eventTime: e.target.value })}
+                      onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                       onBlur={() => handleBlur('eventTime')}
                       className={inputClass('eventTime')}
                       aria-required={true}
