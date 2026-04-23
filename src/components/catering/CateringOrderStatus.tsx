@@ -245,6 +245,12 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                         {order.eventDate?.toDate?.()
                           ? order.eventDate.toDate().toLocaleDateString('en-US')
                           : order.eventDate}
+                        {order.eventTime && (() => {
+                          const [h, m] = order.eventTime.split(':').map(Number);
+                          const period = h >= 12 ? 'PM' : 'AM';
+                          const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                          return ` at ${hour12}:${String(m).padStart(2, '0')} ${period}`;
+                        })()}
                       </span>
                       <span className="flex items-center gap-1">
                         <Users size={12} />

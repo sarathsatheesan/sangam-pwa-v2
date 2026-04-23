@@ -130,6 +130,7 @@ export interface CateringOrder {
   total: number;              // cents
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
   eventDate: any;
+  eventTime?: string;           // HH:MM (24h) — event/delivery start time
   deliveryAddress: DeliveryAddress;
   headcount: number;
   specialInstructions?: string;
@@ -203,6 +204,7 @@ export interface CateringQuoteRequest {
   cuisineCategory: string;
   eventType?: string;             // corporate_meeting | wedding | cultural_festival | religious | birthday | other
   eventDate: any;
+  eventTime?: string;             // HH:MM (24h) — event/delivery start time
   headcount: number;
   items: QuoteRequestItem[];      // What they want catered
   specialInstructions?: string;

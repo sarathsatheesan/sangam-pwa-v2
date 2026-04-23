@@ -612,11 +612,18 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
   const completedOrders = sortOrders(orders.filter(o => o.status === 'delivered'), sortDir.completed);
   const cancelledOrders = sortOrders(orders.filter(o => o.status === 'cancelled'), sortDir.cancelled);
 
-  const formatEventDate = (eventDate: any): string => {
+  const formatEventDate = (eventDate: any, eventTime?: string): string => {
     if (!eventDate) return '—';
     const d = eventDate.toDate?.() || (eventDate.seconds ? new Date(eventDate.seconds * 1000) : null);
     if (!d) return String(eventDate);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    let str = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (eventTime) {
+      const [h, m] = eventTime.split(':').map(Number);
+      const period = h >= 12 ? 'PM' : 'AM';
+      const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      str += ` at ${hour12}:${String(m).padStart(2, '0')} ${period}`;
+    }
+    return str;
   };
 
   if (loading) {
@@ -990,7 +997,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                                {order.customerName} · {formatEventDate(order.eventDate)}
+                                {order.customerName} · {formatEventDate(order.eventDate, order.eventTime)}
                               </span>
                               <span
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
@@ -1341,7 +1348,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                                {order.customerName} · {formatEventDate(order.eventDate)}
+                                {order.customerName} · {formatEventDate(order.eventDate, order.eventTime)}
                               </span>
                               <span
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
@@ -1811,7 +1818,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                                {order.customerName} · {formatEventDate(order.eventDate)}
+                                {order.customerName} · {formatEventDate(order.eventDate, order.eventTime)}
                               </span>
                               <span
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"

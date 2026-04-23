@@ -494,6 +494,7 @@ export default function CateringPage() {
         total,
         status: 'pending',
         eventDate: orderForm.eventDate,
+        ...(orderForm.eventTime ? { eventTime: orderForm.eventTime } : {}),
         deliveryAddress: orderForm.deliveryAddress!,
         headcount: orderForm.headcount,
         ...(orderForm.specialInstructions ? { specialInstructions: orderForm.specialInstructions } : {}),
@@ -541,6 +542,7 @@ export default function CateringPage() {
           subtotal,
           itemCount: cart.items.length,
           eventDate: orderForm.eventDate,
+          eventTime: orderForm.eventTime,
           contactName: orderForm.contactName,
         },
       });
@@ -1269,6 +1271,21 @@ export default function CateringPage() {
                     {new Date(state.lastOrderConfirmation.eventDate + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                 </div>
+                {state.lastOrderConfirmation.eventTime && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--aurora-text-muted)' }}>
+                      Event Time
+                    </span>
+                    <span className="text-sm font-medium" style={{ color: 'var(--aurora-text)' }}>
+                      {(() => {
+                        const [h, m] = state.lastOrderConfirmation.eventTime.split(':').map(Number);
+                        const period = h >= 12 ? 'PM' : 'AM';
+                        const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+                        return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+                      })()}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--aurora-text-muted)' }}>
                     Items

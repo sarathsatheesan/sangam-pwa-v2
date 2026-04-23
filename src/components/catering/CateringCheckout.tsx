@@ -18,6 +18,7 @@ interface CateringCheckoutProps {
   };
   orderForm: {
     eventDate: string;
+    eventTime: string;
     headcount: number;
     deliveryAddress: DeliveryAddress | null;
     specialInstructions: string;
@@ -44,6 +45,7 @@ function getTomorrow(): string {
 
 interface FieldError {
   eventDate?: string;
+  eventTime?: string;
   headcount?: string;
   contactName?: string;
   contactPhone?: string;
@@ -64,6 +66,10 @@ function validateForm(form: CateringCheckoutProps['orderForm']): FieldError {
     errors.eventDate = 'Event date is required';
   } else if (form.eventDate < tomorrow) {
     errors.eventDate = 'Event date must be in the future';
+  }
+
+  if (!form.eventTime) {
+    errors.eventTime = 'Event time is required';
   }
 
   if (!form.headcount || form.headcount < 1) {
@@ -160,7 +166,7 @@ export default function CateringCheckout({
 
   // SB-19: Helper to check if a section is valid
   const isSectionValid = useMemo(() => ({
-    1: !errors.eventDate && !errors.headcount,
+    1: !errors.eventDate && !errors.eventTime && !errors.headcount,
     2: !errors.contactName && !errors.contactPhone && !errors.street && !errors.city && !errors.state && !errors.zip,
     3: true, // Order Preferences section is always valid (mostly optional)
   }), [errors]);
@@ -314,6 +320,29 @@ export default function CateringCheckout({
                     {showError('eventDate') && (
                       <p id="event-date-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
                         <AlertCircle size={12} /> {errors.eventDate}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="event-time" className="block text-sm font-medium mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                      Event Time <span className="text-red-500" aria-hidden="true">*</span>
+                    </label>
+                    <input
+                      id="event-time"
+                      type="time"
+                      value={orderForm.eventTime}
+                      onChange={(e) => onUpdateForm({ eventTime: e.target.value })}
+                      onBlur={() => handleBlur('eventTime')}
+                      className={inputClass('eventTime')}
+                      aria-required={true}
+                      aria-invalid={!!showError('eventTime')}
+                      aria-describedby={showError('eventTime') ? 'event-time-error' : undefined}
+                      style={inputStyle}
+                    />
+                    {showError('eventTime') && (
+                      <p id="event-time-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                        <AlertCircle size={12} /> {errors.eventTime}
                       </p>
                     )}
                   </div>

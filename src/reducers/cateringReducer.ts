@@ -27,6 +27,7 @@ export interface CateringState {
     subtotal: number;
     itemCount: number;
     eventDate: string;
+    eventTime: string;
     contactName: string;
   } | null;
 
@@ -53,6 +54,7 @@ export interface CateringState {
   checkoutStep: 'details' | 'review' | 'confirm';
   orderForm: {
     eventDate: string;
+    eventTime: string;
     headcount: number;
     deliveryAddress: DeliveryAddress | null;
     specialInstructions: string;
@@ -124,6 +126,7 @@ export function createInitialState(): CateringState {
     checkoutStep: 'details',
     orderForm: restoredForm || {
       eventDate: '',
+      eventTime: '',
       headcount: 0,
       deliveryAddress: null,
       specialInstructions: '',
