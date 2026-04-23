@@ -1719,6 +1719,8 @@ export default function CateringPage() {
             {/* Proceed to checkout */}
             <button
               onClick={() => {
+                // Close cart slide-out if open so checkout page isn't obscured
+                if (state.cartOpen) dispatch({ type: 'TOGGLE_CART' });
                 if (userProfile) {
                   const prefill: Record<string, any> = {};
                   if (!state.orderForm.contactName && userProfile.name) prefill.contactName = userProfile.name;
