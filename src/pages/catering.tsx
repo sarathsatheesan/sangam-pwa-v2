@@ -15,7 +15,7 @@ import { useModalA11y } from '@/hooks/useModalA11y';
 import {
   ArrowLeft, ShoppingCart, ChefHat, Loader2, Store, Search,
   Send, FileText, ClipboardList, Star, Heart, Repeat, Share2, Pencil, Package, CheckCircle,
-  MoreHorizontal, UtensilsCrossed, LayoutDashboard,
+  MoreHorizontal, UtensilsCrossed, LayoutDashboard, Clock, DollarSign, X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
@@ -76,6 +76,41 @@ function LazyFallback() {
       <Loader2 size={24} className="animate-spin" style={{ color: 'var(--aurora-accent)' }} />
     </div>
   );
+}
+
+// ── RFQ Interception Logic ──
+// When BOTH triggers are met during direct-order checkout, the user is offered
+// the option to convert their cart into a Request-for-Quote instead.
+// Trigger 1: Event date is more than 48 hours from now.
+// Trigger 2: Order subtotal exceeds $149.99 (14999 cents).
+
+const RFQ_SUBTOTAL_THRESHOLD_CENTS = 14999; // $149.99
+const RFQ_HOURS_THRESHOLD = 48;
+
+/** Check whether both RFQ triggers are satisfied. Pure, no side-effects. */
+function shouldShowRfqInterception(eventDateStr: string, subtotalCents: number): boolean {
+  if (!eventDateStr || subtotalCents <= RFQ_SUBTOTAL_THRESHOLD_CENTS) return false;
+
+  // Parse the YYYY-MM-DD date string into a local-midnight Date.
+  // Using explicit year/month/day avoids Safari's quirky Date.parse behavior.
+  const [y, m, d] = eventDateStr.split('-').map(Number);
+  if (!y || !m || !d) return false;
+  const eventDate = new Date(y, m - 1, d); // local midnight on event day
+
+  const now = new Date();
+  const msUntilEvent = eventDate.getTime() - now.getTime();
+  const hoursUntilEvent = msUntilEvent / (1000 * 60 * 60);
+
+  return hoursUntilEvent > RFQ_HOURS_THRESHOLD;
+}
+
+/** Convert cart OrderItems into QuoteRequestItems for the RFP form. */
+function cartItemsToQuoteItems(items: OrderItem[]): QuoteRequestItem[] {
+  return items.map((item) => ({
+    name: item.name,
+    qty: item.qty,
+    pricingType: (item.pricingType || 'per_person') as QuoteRequestItem['pricingType'],
+  }));
 }
 
 export default function CateringPage() {
@@ -231,6 +266,15 @@ export default function CateringPage() {
     [routeBusinessId, navigate],
   );
   const [submitting, setSubmitting] = useState(false);
+  const [showRfqModal, setShowRfqModal] = useState(false);
+  const rfqModalRef = useRef<HTMLDivElement>(null);
+
+  // Focus-trap the RFQ modal when it opens (accessibility + keyboard nav)
+  useEffect(() => {
+    if (showRfqModal && rfqModalRef.current) {
+      rfqModalRef.current.focus();
+    }
+  }, [showRfqModal]);
   const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory' | 'menu'>('quotes');
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
   const [editingQuoteRequestId, setEditingQuoteRequestId] = useState<string | null>(null);
@@ -556,6 +600,52 @@ export default function CateringPage() {
       setSubmitting(false);
     }
   }, [user, userProfile, state, addToast, allCateringBusinesses, submitting]);
+
+  // ── RFQ Interception ──
+  // Intercepts the checkout "Place Order" action. If both RFQ triggers are met
+  // (event >48h away AND subtotal >$149.99), shows a choice modal instead of
+  // placing the order immediately. Zero changes to the underlying RFP pipeline.
+
+  const handleCheckoutSubmit = useCallback(() => {
+    const subtotal = calculateOrderTotal(state.cart.items);
+    if (shouldShowRfqInterception(state.orderForm.eventDate, subtotal)) {
+      setShowRfqModal(true);
+      return;
+    }
+    // Triggers not met — proceed with standard order
+    handlePlaceOrder();
+  }, [state.cart.items, state.orderForm.eventDate, handlePlaceOrder]);
+
+  /** User chose "Request for Quote" from the RFQ modal. Convert cart → RFP. */
+  const handleConvertToRfq = useCallback(() => {
+    setShowRfqModal(false);
+
+    const { orderForm, cart } = state;
+
+    // Prefill the RFP form with data already collected in checkout
+    dispatch({
+      type: 'UPDATE_RFP_FORM',
+      payload: {
+        eventDate: orderForm.eventDate,
+        headcount: orderForm.headcount,
+        deliveryCity: orderForm.deliveryAddress?.city || '',
+        specialInstructions: orderForm.specialInstructions || '',
+        orderForContext: orderForm.orderForContext,
+        items: cartItemsToQuoteItems(cart.items),
+        targetBusinessIds: cart.businessId ? [cart.businessId] : [],
+      },
+    });
+
+    // Navigate to the existing RFP form — state is fully preserved
+    dispatch({ type: 'SET_VIEW', payload: 'rfp' });
+    addToast('Switched to Request for Quote — review your details below', 'info');
+  }, [state, addToast]);
+
+  /** User chose "Proceed to Checkout" from the RFQ modal. Place the order. */
+  const handleProceedWithOrder = useCallback(() => {
+    setShowRfqModal(false);
+    handlePlaceOrder();
+  }, [handlePlaceOrder]);
 
   // ── RFP Handlers ──
   const handleSubmitRFP = useCallback(async () => {
@@ -1219,7 +1309,7 @@ export default function CateringPage() {
               cart={state.cart}
               orderForm={state.orderForm}
               onUpdateForm={(updates) => dispatch({ type: 'UPDATE_ORDER_FORM', payload: updates })}
-              onPlaceOrder={handlePlaceOrder}
+              onPlaceOrder={handleCheckoutSubmit}
               onBack={handleBackToItems}
               loading={submitting}
             />
@@ -1775,6 +1865,88 @@ export default function CateringPage() {
           dispatch({ type: 'SET_VIEW', payload: 'checkout' });
         }}
       />
+
+      {/* ── RFQ Interception Modal ──
+          Shown when both triggers are met: event >48h away AND subtotal >$149.99.
+          Offers user the choice between standard checkout and RFP conversion. */}
+      {showRfqModal && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40"
+          style={{ WebkitBackdropFilter: 'blur(4px)', backdropFilter: 'blur(4px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowRfqModal(false); }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rfq-modal-title"
+        >
+          <div
+            ref={rfqModalRef}
+            className="relative w-[90vw] max-w-md rounded-2xl border p-6 shadow-xl"
+            style={{ backgroundColor: 'var(--aurora-surface, #fff)', borderColor: 'var(--aurora-border, #E2E5EF)' }}
+            onKeyDown={(e) => { if (e.key === 'Escape') setShowRfqModal(false); }}
+            tabIndex={-1}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowRfqModal(false)}
+              className="absolute top-3 right-3 p-1.5 rounded-lg transition-colors"
+              style={{ color: 'var(--aurora-text-muted)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--aurora-surface-variant, #F3F4F6)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Title */}
+            <h2 id="rfq-modal-title" className="text-lg font-bold mb-2" style={{ color: 'var(--aurora-text)' }}>
+              Save on Your Order?
+            </h2>
+
+            <p className="text-sm mb-5" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Your order qualifies for a custom quote. Request competitive pricing from caterers — you may get a better deal on large or advance orders.
+            </p>
+
+            {/* Trigger indicators */}
+            <div className="flex flex-col gap-2 mb-6">
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                <Clock size={14} style={{ color: '#6366F1' }} />
+                <span>Event is more than 48 hours away</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                <DollarSign size={14} style={{ color: '#6366F1' }} />
+                <span>Order total exceeds $149.99</span>
+              </div>
+            </div>
+
+            {/* Choice buttons */}
+            <div className="flex flex-col gap-3">
+              {/* Primary: Request for Quote */}
+              <button
+                onClick={handleConvertToRfq}
+                className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98]"
+                style={{ backgroundColor: '#6366F1' }}
+              >
+                <FileText size={16} />
+                Request for Quote
+              </button>
+
+              {/* Secondary: Proceed with standard order */}
+              <button
+                onClick={handleProceedWithOrder}
+                className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl text-sm font-medium border transition-all active:scale-[0.98]"
+                style={{
+                  borderColor: 'var(--aurora-border, #E2E5EF)',
+                  color: 'var(--aurora-text)',
+                  backgroundColor: 'var(--aurora-bg)',
+                }}
+              >
+                <ShoppingCart size={16} />
+                Proceed to Checkout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Vendor switch confirmation dialog */}
       {state.pendingVendorSwitch && (
