@@ -88,7 +88,7 @@ export default defineConfig({
   },
   build: {
     // Explicit browser targets for cross-browser compatibility
-    target: ['es2020', 'chrome87', 'firefox78', 'safari14', 'edge88'],
+    target: ['es2020', 'chrome87', 'firefox78', 'safari15', 'edge88'],
     // Bundle size baseline (April 2026):
     // index.js: ~96KB gzip, messages.js: ~64KB gzip, firebase.js: ~142KB gzip
     // Total precache: ~4MB (176 entries)
