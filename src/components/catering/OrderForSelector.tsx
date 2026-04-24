@@ -62,7 +62,7 @@ export default function OrderForSelector({
           value="self"
           checked={value.type === 'self'}
           onChange={() => handleTypeChange('self')}
-          className="sr-only"
+          className="sr-only" onFocus={(e) => { try { e.target.blur(); } catch {} }}
         />
         <div
           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -93,7 +93,7 @@ export default function OrderForSelector({
             value="individual"
             checked={value.type === 'individual'}
             onChange={() => handleTypeChange('individual')}
-            className="sr-only"
+            className="sr-only" onFocus={(e) => { try { e.target.blur(); } catch {} }}
           />
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -206,7 +206,7 @@ export default function OrderForSelector({
             value="organization"
             checked={value.type === 'organization'}
             onChange={() => handleTypeChange('organization')}
-            className="sr-only"
+            className="sr-only" onFocus={(e) => { try { e.target.blur(); } catch {} }}
           />
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -289,7 +289,7 @@ export default function OrderForSelector({
           value="anonymous"
           checked={value.type === 'anonymous'}
           onChange={() => handleTypeChange('anonymous')}
-          className="sr-only"
+          className="sr-only" onFocus={(e) => { try { e.target.blur(); } catch {} }}
         />
         <div
           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
