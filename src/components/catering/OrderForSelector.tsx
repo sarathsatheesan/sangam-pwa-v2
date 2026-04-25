@@ -49,7 +49,7 @@ export default function OrderForSelector({
     <div className="space-y-4" role="radiogroup" aria-label="Who is this order for?">
       {/* For Myself */}
       <label
-        className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
+        className={`relative flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
           value.type === 'self'
             ? 'bg-indigo-50'
             : 'hover:border-gray-300'
@@ -62,7 +62,7 @@ export default function OrderForSelector({
           value="self"
           checked={value.type === 'self'}
           onChange={() => handleTypeChange('self')}
-          className="sr-only" onFocus={(e) => { try { e.target.blur(); } catch {} }}
+          style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden', pointerEvents: 'none' }}
         />
         <div
           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -80,7 +80,7 @@ export default function OrderForSelector({
       {/* On Behalf of Someone */}
       <div>
         <label
-          className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
+          className={`relative flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
             value.type === 'individual'
               ? 'bg-indigo-50'
               : 'hover:border-gray-300'
@@ -93,7 +93,7 @@ export default function OrderForSelector({
             value="individual"
             checked={value.type === 'individual'}
             onChange={() => handleTypeChange('individual')}
-            className="sr-only" onFocus={(e) => { try { e.target.blur(); } catch {} }}
+            style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden', pointerEvents: 'none' }}
           />
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -193,7 +193,7 @@ export default function OrderForSelector({
       {/* For a Team/Department */}
       <div>
         <label
-          className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
+          className={`relative flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
             value.type === 'organization'
               ? 'bg-indigo-50'
               : 'hover:border-gray-300'
@@ -206,7 +206,7 @@ export default function OrderForSelector({
             value="organization"
             checked={value.type === 'organization'}
             onChange={() => handleTypeChange('organization')}
-            className="sr-only" onFocus={(e) => { try { e.target.blur(); } catch {} }}
+            style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden', pointerEvents: 'none' }}
           />
           <div
             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
@@ -276,7 +276,7 @@ export default function OrderForSelector({
 
       {/* Prefer Not to Say */}
       <label
-        className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
+        className={`relative flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
           value.type === 'anonymous'
             ? 'bg-indigo-50'
             : 'hover:border-gray-300'
@@ -289,7 +289,7 @@ export default function OrderForSelector({
           value="anonymous"
           checked={value.type === 'anonymous'}
           onChange={() => handleTypeChange('anonymous')}
-          className="sr-only" onFocus={(e) => { try { e.target.blur(); } catch {} }}
+          style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden', pointerEvents: 'none' }}
         />
         <div
           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
