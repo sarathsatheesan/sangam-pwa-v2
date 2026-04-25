@@ -110,19 +110,56 @@ export default function RequestForPriceForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const handleBlur = (field: string) => setTouched((prev) => ({ ...prev, [field]: true }));
 
+  // Submit-attempt state — shows all errors at once when user tries to submit
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
   // Validation errors — identical logic to CateringCheckout
+  const cityError = useMemo(() => {
+    if (!rfpForm.deliveryCity.trim()) return 'Delivery city is required';
+    return '';
+  }, [rfpForm.deliveryCity]);
+
   const dateError = useMemo(() => {
     if (!rfpForm.eventDate) return 'Event date is required';
     if (rfpForm.eventDate < tomorrow) return 'Event date must be in the future';
     return '';
   }, [rfpForm.eventDate, tomorrow]);
-  const showDateError = dateError && touched['eventDate'];
 
   const timeError = useMemo(() => {
     if (!rfpForm.eventTime) return 'Event time is required';
     return '';
   }, [rfpForm.eventTime]);
-  const showTimeError = timeError && touched['eventTime'];
+
+  const headcountError = useMemo(() => {
+    if (!rfpForm.headcount || rfpForm.headcount < 1) return 'Headcount must be at least 1';
+    return '';
+  }, [rfpForm.headcount]);
+
+  const itemsError = useMemo(() => {
+    if (rfpForm.items.length === 0) return 'At least one menu item is required';
+    return '';
+  }, [rfpForm.items.length]);
+
+  // Progressive disclosure: show errors after field touched OR after submit attempt
+  const showError = (field: string, error: string) =>
+    error && (touched[field] || submitAttempted);
+
+  const showCityError = showError('deliveryCity', cityError);
+  const showDateError = showError('eventDate', dateError);
+  const showTimeError = showError('eventTime', timeError);
+  const showHeadcountError = showError('headcount', headcountError);
+  const showItemsError = submitAttempted && !!itemsError;
+
+  // Collect all current errors for the validation summary
+  const allErrors = useMemo(() => {
+    const errs: string[] = [];
+    if (cityError) errs.push(cityError);
+    if (dateError) errs.push(dateError);
+    if (timeError) errs.push(timeError);
+    if (headcountError) errs.push(headcountError);
+    if (itemsError) errs.push(itemsError);
+    return errs;
+  }, [cityError, dateError, timeError, headcountError, itemsError]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -180,10 +217,13 @@ export default function RequestForPriceForm({
     ? cuisineItems.filter((item) => item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
     : cuisineItems;
 
-  const canSubmit = rfpForm.deliveryCity.trim() && rfpForm.eventDate && !dateError && rfpForm.eventTime && !timeError && rfpForm.headcount > 0 && rfpForm.items.length > 0;
+  const canSubmit = allErrors.length === 0;
 
   // Handle submit with qty validation
   const handleSubmitWithQtyCheck = () => {
+    setSubmitAttempted(true);
+    if (!canSubmit) return;
+
     const itemsWithDefaultQty = rfpForm.items.filter(i => i.qty === 1);
     if (itemsWithDefaultQty.length > 0 && !confirmedDefaultQty) {
       setShowQtyWarning(true);
@@ -229,21 +269,35 @@ export default function RequestForPriceForm({
         </h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
-              Delivery City *
+            <label htmlFor="rfp-delivery-city" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Delivery City <span className="text-red-500" aria-hidden="true">*</span>
             </label>
             <input
+              id="rfp-delivery-city"
               type="text"
               value={rfpForm.deliveryCity}
               onChange={(e) => onUpdateForm({ deliveryCity: e.target.value })}
+              onBlur={() => handleBlur('deliveryCity')}
               placeholder="e.g. Toronto, San Francisco"
-              className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+              className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors ${
+                showCityError
+                  ? 'border-red-400 focus:ring-2 focus:ring-red-300 focus:border-red-500'
+                  : 'focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500'
+              }`}
+              aria-required={true}
+              aria-invalid={!!showCityError}
+              aria-describedby={showCityError ? 'rfp-delivery-city-error' : undefined}
               style={{
                 backgroundColor: 'var(--aurora-bg)',
-                borderColor: 'var(--aurora-border)',
+                borderColor: showCityError ? undefined : 'var(--aurora-border)',
                 color: 'var(--aurora-text)',
               }}
             />
+            {showCityError && (
+              <p id="rfp-delivery-city-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                <AlertCircle size={12} /> {cityError}
+              </p>
+            )}
           </div>
 
           {/* Event Type */}
@@ -320,14 +374,25 @@ export default function RequestForPriceForm({
                 onChange={(e) => onUpdateForm({ headcount: parseInt(e.target.value) || 0 })}
                 onBlur={() => handleBlur('headcount')}
                 placeholder="e.g. 50"
-                className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors ${
+                  showHeadcountError
+                    ? 'border-red-400 focus:ring-2 focus:ring-red-300 focus:border-red-500'
+                    : 'focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500'
+                }`}
                 aria-required={true}
+                aria-invalid={!!showHeadcountError}
+                aria-describedby={showHeadcountError ? 'rfp-headcount-error' : undefined}
                 style={{
                   backgroundColor: 'var(--aurora-bg)',
-                  borderColor: 'var(--aurora-border)',
+                  borderColor: showHeadcountError ? undefined : 'var(--aurora-border)',
                   color: 'var(--aurora-text)',
                 }}
               />
+              {showHeadcountError && (
+                <p id="rfp-headcount-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                  <AlertCircle size={12} /> {headcountError}
+                </p>
+              )}
             </div>
           </div>
 
@@ -380,9 +445,14 @@ export default function RequestForPriceForm({
           borderColor: 'var(--aurora-border)',
         }}
       >
-        <h2 className="text-base font-bold mb-4" style={{ color: 'var(--aurora-text)' }}>
-          What do you need? *
+        <h2 className="text-base font-bold mb-2" style={{ color: 'var(--aurora-text)' }}>
+          What do you need? <span className="text-red-500" aria-hidden="true">*</span>
         </h2>
+        {showItemsError && (
+          <p className="flex items-center gap-1 mb-3 text-xs text-red-500" role="alert">
+            <AlertCircle size={12} /> {itemsError}
+          </p>
+        )}
 
         {/* Cuisine Type Picker */}
         <div className="space-y-3 mb-4">
@@ -848,6 +918,26 @@ export default function RequestForPriceForm({
         </div>
       )}
 
+      {/* Validation summary on submit attempt */}
+      {submitAttempted && allErrors.length > 0 && (
+        <div
+          className="border border-red-200 rounded-2xl p-4 flex items-start gap-3"
+          style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)' }}
+          role="alert"
+          aria-live="polite"
+        >
+          <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-red-800">Please fix the following before submitting:</p>
+            <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
+              {allErrors.map((msg, i) => (
+                <li key={i}>{msg}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* Vendor targeting info */}
       <div
         className="flex items-start gap-2 p-3 rounded-xl text-xs"
@@ -882,7 +972,7 @@ export default function RequestForPriceForm({
         </button>
         <button
           onClick={handleSubmitWithQtyCheck}
-          disabled={loading || !canSubmit}
+          disabled={loading}
           className="flex-1 px-6 py-3 text-white font-medium rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           style={{ backgroundColor: '#6366F1' }}
         >
