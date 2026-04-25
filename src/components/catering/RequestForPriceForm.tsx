@@ -1,15 +1,23 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check, Store, TrendingUp, Info } from 'lucide-react';
+import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check, Store, TrendingUp, Info, AlertCircle } from 'lucide-react';
 import type { QuoteRequestItem, OrderForContext } from '@/services/cateringService';
 import { CUISINE_CATEGORIES, CUISINE_CATEGORY_KEYS } from '@/constants/cateringFoodItems';
 import type { CuisineFoodItem } from '@/constants/cateringFoodItems';
 import OrderForSelector from './OrderForSelector';
+
+// Shared date constraint — identical to CateringCheckout
+function getTomorrow(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 interface RequestForPriceFormProps {
   rfpForm: {
     deliveryCity: string;
     eventType: string;
     eventDate: string;
+    eventTime?: string;
     headcount: number;
     specialInstructions: string;
     items: QuoteRequestItem[];
@@ -97,6 +105,19 @@ export default function RequestForPriceForm({
   const [showQtyWarning, setShowQtyWarning] = useState(false);
   const [confirmedDefaultQty, setConfirmedDefaultQty] = useState(false);
 
+  // Date validation — same constraint as CateringCheckout
+  const tomorrow = useMemo(() => getTomorrow(), []);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const handleBlur = (field: string) => setTouched((prev) => ({ ...prev, [field]: true }));
+
+  // Validation errors for event date
+  const dateError = useMemo(() => {
+    if (!rfpForm.eventDate) return 'Event date is required';
+    if (rfpForm.eventDate < tomorrow) return 'Event date must be in the future';
+    return '';
+  }, [rfpForm.eventDate, tomorrow]);
+  const showDateError = dateError && touched['eventDate'];
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -153,7 +174,7 @@ export default function RequestForPriceForm({
     ? cuisineItems.filter((item) => item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
     : cuisineItems;
 
-  const canSubmit = rfpForm.deliveryCity.trim() && rfpForm.eventDate && rfpForm.headcount > 0 && rfpForm.items.length > 0;
+  const canSubmit = rfpForm.deliveryCity.trim() && rfpForm.eventDate && !dateError && rfpForm.headcount > 0 && rfpForm.items.length > 0;
 
   // Handle submit with qty validation
   const handleSubmitWithQtyCheck = () => {
@@ -249,33 +270,52 @@ export default function RequestForPriceForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
-                Event Date *
+              <label htmlFor="rfp-event-date" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Event Date <span className="text-red-500" aria-hidden="true">*</span>
               </label>
               <input
+                id="rfp-event-date"
                 type="date"
+                min={tomorrow}
                 value={rfpForm.eventDate}
                 onChange={(e) => onUpdateForm({ eventDate: e.target.value })}
                 onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
-                className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                onBlur={() => handleBlur('eventDate')}
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors ${
+                  showDateError
+                    ? 'border-red-400 focus:ring-2 focus:ring-red-300 focus:border-red-500'
+                    : 'focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500'
+                }`}
+                aria-required={true}
+                aria-invalid={!!showDateError}
+                aria-describedby={showDateError ? 'rfp-event-date-error' : undefined}
                 style={{
                   backgroundColor: 'var(--aurora-bg)',
-                  borderColor: 'var(--aurora-border)',
+                  borderColor: showDateError ? undefined : 'var(--aurora-border)',
                   color: 'var(--aurora-text)',
-                }}
+                  appearance: 'auto',
+                } as React.CSSProperties}
               />
+              {showDateError && (
+                <p id="rfp-event-date-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                  <AlertCircle size={12} /> {dateError}
+                </p>
+              )}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
-                Headcount *
+              <label htmlFor="rfp-headcount" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Headcount <span className="text-red-500" aria-hidden="true">*</span>
               </label>
               <input
+                id="rfp-headcount"
                 type="number"
                 min="1"
                 value={rfpForm.headcount || ''}
                 onChange={(e) => onUpdateForm({ headcount: parseInt(e.target.value) || 0 })}
+                onBlur={() => handleBlur('headcount')}
                 placeholder="e.g. 50"
                 className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                aria-required={true}
                 style={{
                   backgroundColor: 'var(--aurora-bg)',
                   borderColor: 'var(--aurora-border)',
@@ -283,6 +323,27 @@ export default function RequestForPriceForm({
                 }}
               />
             </div>
+          </div>
+
+          {/* Event Time — optional, matches Order Placement module */}
+          <div>
+            <label htmlFor="rfp-event-time" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Event Time <span className="text-xs font-normal" style={{ color: 'var(--aurora-text-muted)' }}>(optional)</span>
+            </label>
+            <input
+              id="rfp-event-time"
+              type="time"
+              value={rfpForm.eventTime || ''}
+              onChange={(e) => onUpdateForm({ eventTime: e.target.value })}
+              onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
+              className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+              style={{
+                backgroundColor: 'var(--aurora-bg)',
+                borderColor: 'var(--aurora-border)',
+                color: 'var(--aurora-text)',
+                appearance: 'auto',
+              } as React.CSSProperties}
+            />
           </div>
         </div>
       </section>

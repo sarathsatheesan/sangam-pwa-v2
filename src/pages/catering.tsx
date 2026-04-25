@@ -627,6 +627,7 @@ export default function CateringPage() {
       type: 'UPDATE_RFP_FORM',
       payload: {
         eventDate: orderForm.eventDate,
+        eventTime: orderForm.eventTime,
         headcount: orderForm.headcount,
         deliveryCity: orderForm.deliveryAddress?.city || '',
         specialInstructions: orderForm.specialInstructions || '',
@@ -667,6 +668,7 @@ export default function CateringPage() {
           deliveryCity: rfpForm.deliveryCity,
           eventType: rfpForm.eventType || undefined,
           eventDate: rfpForm.eventDate,
+          ...(rfpForm.eventTime ? { eventTime: rfpForm.eventTime } : {}),
           headcount: rfpForm.headcount,
           items: rfpForm.items,
           specialInstructions: rfpForm.specialInstructions || '',
@@ -685,6 +687,7 @@ export default function CateringPage() {
           cuisineCategory: state.selectedCategory || '',
           eventType: rfpForm.eventType || undefined,
           eventDate: rfpForm.eventDate,
+          ...(rfpForm.eventTime ? { eventTime: rfpForm.eventTime } : {}),
           headcount: rfpForm.headcount,
           items: rfpForm.items,
           specialInstructions: rfpForm.specialInstructions || '',

@@ -88,6 +88,7 @@ export interface CateringState {
     deliveryCity: string;
     eventType: string;
     eventDate: string;
+    eventTime: string;
     headcount: number;
     specialInstructions: string;
     items: QuoteRequestItem[];
@@ -155,6 +156,7 @@ export function createInitialState(): CateringState {
       deliveryCity: '',
       eventType: '',
       eventDate: '',
+      eventTime: '',
       headcount: 0,
       specialInstructions: '',
       items: [],
@@ -453,6 +455,7 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
           deliveryCity: '',
           eventType: '',
           eventDate: '',
+          eventTime: '',
           headcount: 0,
           specialInstructions: '',
           items: [],
