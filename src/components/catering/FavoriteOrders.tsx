@@ -400,7 +400,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
                           onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                           min={new Date().toISOString().slice(0, 10)}
                           className="w-full mt-1 px-3 py-2 rounded-lg border text-sm"
-                          style={{ borderColor: 'var(--aurora-border)' }}
+                          style={{ borderColor: 'var(--aurora-border)', appearance: 'auto' } as React.CSSProperties}
                         />
                       </div>
                       <div className="flex gap-2">

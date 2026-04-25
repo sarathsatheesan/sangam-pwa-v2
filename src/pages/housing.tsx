@@ -1362,7 +1362,7 @@ export default function HousingPage() {
       {/* Property details grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField label="Available Date">
-          <input type="date" value={data.availableDate || ''} onChange={(e) => setData({ ...data, availableDate: e.target.value })} onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }} className={inputCls} />
+          <input type="date" value={data.availableDate || ''} onChange={(e) => setData({ ...data, availableDate: e.target.value })} onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }} className={inputCls} style={{ appearance: 'auto' } as React.CSSProperties} />
         </FormField>
         <FormField label="Year Built">
           <input type="text" value={data.yearBuilt || ''} onChange={(e) => setData({ ...data, yearBuilt: e.target.value })} className={inputCls} placeholder="2020" />

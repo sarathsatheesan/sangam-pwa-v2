@@ -110,13 +110,19 @@ export default function RequestForPriceForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const handleBlur = (field: string) => setTouched((prev) => ({ ...prev, [field]: true }));
 
-  // Validation errors for event date
+  // Validation errors — identical logic to CateringCheckout
   const dateError = useMemo(() => {
     if (!rfpForm.eventDate) return 'Event date is required';
     if (rfpForm.eventDate < tomorrow) return 'Event date must be in the future';
     return '';
   }, [rfpForm.eventDate, tomorrow]);
   const showDateError = dateError && touched['eventDate'];
+
+  const timeError = useMemo(() => {
+    if (!rfpForm.eventTime) return 'Event time is required';
+    return '';
+  }, [rfpForm.eventTime]);
+  const showTimeError = timeError && touched['eventTime'];
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -174,7 +180,7 @@ export default function RequestForPriceForm({
     ? cuisineItems.filter((item) => item.name.toLowerCase().includes(itemSearchQuery.toLowerCase()))
     : cuisineItems;
 
-  const canSubmit = rfpForm.deliveryCity.trim() && rfpForm.eventDate && !dateError && rfpForm.headcount > 0 && rfpForm.items.length > 0;
+  const canSubmit = rfpForm.deliveryCity.trim() && rfpForm.eventDate && !dateError && rfpForm.eventTime && !timeError && rfpForm.headcount > 0 && rfpForm.items.length > 0;
 
   // Handle submit with qty validation
   const handleSubmitWithQtyCheck = () => {
@@ -325,10 +331,10 @@ export default function RequestForPriceForm({
             </div>
           </div>
 
-          {/* Event Time — optional, matches Order Placement module */}
+          {/* Event Time — required, matches Order Placement module */}
           <div>
             <label htmlFor="rfp-event-time" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
-              Event Time <span className="text-xs font-normal" style={{ color: 'var(--aurora-text-muted)' }}>(optional)</span>
+              Event Time <span className="text-red-500" aria-hidden="true">*</span>
             </label>
             <input
               id="rfp-event-time"
@@ -336,14 +342,27 @@ export default function RequestForPriceForm({
               value={rfpForm.eventTime || ''}
               onChange={(e) => onUpdateForm({ eventTime: e.target.value })}
               onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
-              className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+              onBlur={() => handleBlur('eventTime')}
+              className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors ${
+                showTimeError
+                  ? 'border-red-400 focus:ring-2 focus:ring-red-300 focus:border-red-500'
+                  : 'focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500'
+              }`}
+              aria-required={true}
+              aria-invalid={!!showTimeError}
+              aria-describedby={showTimeError ? 'rfp-event-time-error' : undefined}
               style={{
                 backgroundColor: 'var(--aurora-bg)',
-                borderColor: 'var(--aurora-border)',
+                borderColor: showTimeError ? undefined : 'var(--aurora-border)',
                 color: 'var(--aurora-text)',
                 appearance: 'auto',
               } as React.CSSProperties}
             />
+            {showTimeError && (
+              <p id="rfp-event-time-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
+                <AlertCircle size={12} /> {timeError}
+              </p>
+            )}
           </div>
         </div>
       </section>

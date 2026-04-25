@@ -16,6 +16,7 @@ const inputStyle = (hasError: boolean): React.CSSProperties => ({
   border: `1.5px solid ${hasError ? '#ef4444' : 'var(--aurora-border)'}`,
   color: 'var(--aurora-text-primary)',
   borderRadius: '0.75rem',
+  appearance: 'auto',
 });
 
 // ── Day-of-week hours helper ──

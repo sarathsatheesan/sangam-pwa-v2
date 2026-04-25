@@ -300,7 +300,7 @@ export default function VendorInventoryManager({ businessId, businessName, onBac
                           onChange={(e) => setEditAvailFrom(e.target.value)}
                           onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                           className="w-full mt-1 rounded-lg border px-3 py-1.5 text-xs outline-none"
-                          style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                          style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)', appearance: 'auto' } as React.CSSProperties}
                         />
                       </div>
                       <div>
@@ -311,7 +311,7 @@ export default function VendorInventoryManager({ businessId, businessName, onBac
                           onChange={(e) => setEditAvailUntil(e.target.value)}
                           onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                           className="w-full mt-1 rounded-lg border px-3 py-1.5 text-xs outline-none"
-                          style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                          style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)', appearance: 'auto' } as React.CSSProperties}
                         />
                       </div>
                     </div>

@@ -434,6 +434,7 @@ export default function NotificationSettings() {
                     border: '1px solid #D1D5DB',
                     fontSize: '14px',
                     color: '#111827',
+                    appearance: 'auto' as const,
                   }}
                 />
               </div>
@@ -455,6 +456,7 @@ export default function NotificationSettings() {
                     border: '1px solid #D1D5DB',
                     fontSize: '14px',
                     color: '#111827',
+                    appearance: 'auto' as const,
                   }}
                 />
               </div>

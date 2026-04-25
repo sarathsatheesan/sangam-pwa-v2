@@ -1620,7 +1620,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                     onChange={(e) => setEtaInputs(prev => ({ ...prev, [`prep_${order.id}`]: e.target.value }))}
                                     onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                                     className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500/30"
-                                    style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                    style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)', appearance: 'auto' } as React.CSSProperties}
                                     aria-label="Estimated ready time"
                                   />
                                   {etaInputs[`prep_${order.id}`]?.trim() && (
@@ -1671,7 +1671,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                       onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
                                       onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                                       className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
-                                      style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                                      style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)', appearance: 'auto' } as React.CSSProperties}
                                     />
                                   ) : (
                                     <div className="flex items-center gap-1 flex-1">

@@ -2277,6 +2277,7 @@ export default function EventsPage() {
                     className={`w-full px-4 py-2.5 bg-aurora-surface border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 transition-all ${
                       dateError ? 'border-red-400 bg-red-50 dark:bg-red-500/5' : 'border-aurora-border'
                     }`}
+                    style={{ appearance: 'auto' } as React.CSSProperties}
                   />
                   {dateError && <p className="text-red-500 text-xs mt-1">{dateError}</p>}
                   {formData.date && !dateError && <p className="text-aurora-text-muted text-xs mt-1">{isoToReadable(formData.date)}</p>}
@@ -2291,6 +2292,7 @@ export default function EventsPage() {
                       onChange={(e) => setFormData({ ...formData, time: e.target.value })}
                       onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                       className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                      style={{ appearance: 'auto' } as React.CSSProperties}
                     />
                     {formData.time && <p className="text-aurora-text-muted text-xs mt-1">{time24to12(formData.time)}</p>}
                   </div>
@@ -2302,6 +2304,7 @@ export default function EventsPage() {
                       onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                       onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                       className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                      style={{ appearance: 'auto' } as React.CSSProperties}
                     />
                     {formData.endTime && <p className="text-aurora-text-muted text-xs mt-1">{time24to12(formData.endTime)}</p>}
                   </div>
@@ -2571,6 +2574,7 @@ export default function EventsPage() {
                   onChange={(e) => setEditData({ ...editData, fullDate: e.target.value })}
                   onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                   className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                  style={{ appearance: 'auto' } as React.CSSProperties}
                 />
                 {editData.fullDate && <p className="text-aurora-text-muted text-xs mt-1">{isoToReadable(editData.fullDate)}</p>}
               </div>
@@ -2584,6 +2588,7 @@ export default function EventsPage() {
                     onChange={(e) => setEditData({ ...editData, time: e.target.value })}
                     onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                     className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                    style={{ appearance: 'auto' } as React.CSSProperties}
                   />
                   {editData.time && <p className="text-aurora-text-muted text-xs mt-1">{time24to12(editData.time)}</p>}
                 </div>
@@ -2595,6 +2600,7 @@ export default function EventsPage() {
                     onChange={(e) => setEditData({ ...editData, endTime: e.target.value })}
                     onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
                     className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                    style={{ appearance: 'auto' } as React.CSSProperties}
                   />
                   {editData.endTime && <p className="text-aurora-text-muted text-xs mt-1">{time24to12(editData.endTime)}</p>}
                 </div>
