@@ -1,6 +1,6 @@
 import { ChevronDown, AlertCircle } from 'lucide-react';
 import type { OrderForContext } from '@/services/cateringService';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 interface OrderForSelectorProps {
   value: OrderForContext;
@@ -11,104 +11,106 @@ interface OrderForSelectorProps {
 
 const relationships = ['Colleague', 'Family', 'Friend', 'Client', 'Other'];
 
+type OrderForType = 'self' | 'individual' | 'organization' | 'anonymous';
+
 export default function OrderForSelector({
   value,
   onChange,
   errors,
   onBlur,
 }: OrderForSelectorProps) {
-  const [expandedOption, setExpandedOption] = useState<
-    'self' | 'individual' | 'organization' | 'anonymous'
-  >(value.type);
+  const [expandedOption, setExpandedOption] = useState<OrderForType>(value.type);
 
-  const handleTypeChange = (
-    type: 'self' | 'individual' | 'organization' | 'anonymous'
-  ) => {
-    setExpandedOption(type);
-    if (type === 'self') {
-      onChange({ type: 'self' });
-    } else if (type === 'individual') {
-      onChange({
-        type: 'individual',
-        recipientName: '',
-        recipientContact: '',
-        relationship: 'Colleague',
-      });
-    } else if (type === 'organization') {
-      onChange({
-        type: 'organization',
-        organizationName: '',
-        department: '',
-      });
-    } else {
-      onChange({ type: 'anonymous' });
-    }
-  };
+  const handleTypeChange = useCallback(
+    (type: OrderForType) => {
+      setExpandedOption(type);
+      if (type === 'self') {
+        onChange({ type: 'self' });
+      } else if (type === 'individual') {
+        onChange({
+          type: 'individual',
+          recipientName: '',
+          recipientContact: '',
+          relationship: 'Colleague',
+        });
+      } else if (type === 'organization') {
+        onChange({
+          type: 'organization',
+          organizationName: '',
+          department: '',
+        });
+      } else {
+        onChange({ type: 'anonymous' });
+      }
+    },
+    [onChange],
+  );
+
+  /** Keyboard handler for ARIA radio — activate on Space or Enter */
+  const makeKeyHandler = useCallback(
+    (type: OrderForType) => (e: React.KeyboardEvent) => {
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        handleTypeChange(type);
+      }
+    },
+    [handleTypeChange],
+  );
 
   return (
     <div className="space-y-4" role="radiogroup" aria-label="Who is this order for?">
       {/* For Myself */}
-      <label
-        className={`relative flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
+      <div
+        role="radio"
+        aria-checked={value.type === 'self'}
+        tabIndex={0}
+        onClick={() => handleTypeChange('self')}
+        onKeyDown={makeKeyHandler('self')}
+        className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
           value.type === 'self'
             ? 'bg-indigo-50'
             : 'hover:border-gray-300'
         }`}
         style={{ borderColor: value.type === 'self' ? '#6366F1' : 'var(--aurora-border)' }}
       >
-        <input
-          type="radio"
-          name="order-for-type"
-          value="self"
-          checked={value.type === 'self'}
-          onChange={() => handleTypeChange('self')}
-          style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden', pointerEvents: 'none' }}
-        />
         <div
-          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-            value.type === 'self' ? '' : ''
-          }`}
+          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0`}
           style={{ borderColor: value.type === 'self' ? '#6366F1' : 'var(--aurora-text-muted)' }}
         >
           {value.type === 'self' && (
-            <div className="w-2 h-2 rounded-full bg-white" />
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6366F1' }} />
           )}
         </div>
         <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>For Myself</span>
-      </label>
+      </div>
 
       {/* On Behalf of Someone */}
       <div>
-        <label
-          className={`relative flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
+        <div
+          role="radio"
+          aria-checked={value.type === 'individual'}
+          tabIndex={0}
+          onClick={() => handleTypeChange('individual')}
+          onKeyDown={makeKeyHandler('individual')}
+          className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
             value.type === 'individual'
               ? 'bg-indigo-50'
               : 'hover:border-gray-300'
           }`}
           style={{ borderColor: value.type === 'individual' ? '#6366F1' : 'var(--aurora-border)' }}
         >
-          <input
-            type="radio"
-            name="order-for-type"
-            value="individual"
-            checked={value.type === 'individual'}
-            onChange={() => handleTypeChange('individual')}
-            style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden', pointerEvents: 'none' }}
-          />
           <div
-            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-              value.type === 'individual' ? '' : ''
-            }`}
+            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0`}
             style={{ borderColor: value.type === 'individual' ? '#6366F1' : 'var(--aurora-text-muted)' }}
           >
             {value.type === 'individual' && (
-              <div className="w-2 h-2 rounded-full bg-white" />
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6366F1' }} />
             )}
           </div>
           <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
             On Behalf of Someone
           </span>
-        </label>
+        </div>
 
         {value.type === 'individual' && (
           <div className="mt-3 ml-8 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -192,36 +194,31 @@ export default function OrderForSelector({
 
       {/* For a Team/Department */}
       <div>
-        <label
-          className={`relative flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
+        <div
+          role="radio"
+          aria-checked={value.type === 'organization'}
+          tabIndex={0}
+          onClick={() => handleTypeChange('organization')}
+          onKeyDown={makeKeyHandler('organization')}
+          className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
             value.type === 'organization'
               ? 'bg-indigo-50'
               : 'hover:border-gray-300'
           }`}
           style={{ borderColor: value.type === 'organization' ? '#6366F1' : 'var(--aurora-border)' }}
         >
-          <input
-            type="radio"
-            name="order-for-type"
-            value="organization"
-            checked={value.type === 'organization'}
-            onChange={() => handleTypeChange('organization')}
-            style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden', pointerEvents: 'none' }}
-          />
           <div
-            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-              value.type === 'organization' ? '' : ''
-            }`}
+            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0`}
             style={{ borderColor: value.type === 'organization' ? '#6366F1' : 'var(--aurora-text-muted)' }}
           >
             {value.type === 'organization' && (
-              <div className="w-2 h-2 rounded-full bg-white" />
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6366F1' }} />
             )}
           </div>
           <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>
             For a Team/Department
           </span>
-        </label>
+        </div>
 
         {value.type === 'organization' && (
           <div className="mt-3 ml-8 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -275,34 +272,29 @@ export default function OrderForSelector({
       </div>
 
       {/* Prefer Not to Say */}
-      <label
-        className={`relative flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
+      <div
+        role="radio"
+        aria-checked={value.type === 'anonymous'}
+        tabIndex={0}
+        onClick={() => handleTypeChange('anonymous')}
+        onKeyDown={makeKeyHandler('anonymous')}
+        className={`flex items-center gap-3 w-full p-4 border rounded-lg cursor-pointer transition-all ${
           value.type === 'anonymous'
             ? 'bg-indigo-50'
             : 'hover:border-gray-300'
         }`}
         style={{ borderColor: value.type === 'anonymous' ? '#6366F1' : 'var(--aurora-border)' }}
       >
-        <input
-          type="radio"
-          name="order-for-type"
-          value="anonymous"
-          checked={value.type === 'anonymous'}
-          onChange={() => handleTypeChange('anonymous')}
-          style={{ position: 'absolute', opacity: 0, width: 0, height: 0, margin: 0, padding: 0, overflow: 'hidden', pointerEvents: 'none' }}
-        />
         <div
-          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-            value.type === 'anonymous' ? '' : ''
-          }`}
+          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0`}
           style={{ borderColor: value.type === 'anonymous' ? '#6366F1' : 'var(--aurora-text-muted)' }}
         >
           {value.type === 'anonymous' && (
-            <div className="w-2 h-2 rounded-full bg-white" />
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#6366F1' }} />
           )}
         </div>
         <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Prefer Not to Say</span>
-      </label>
+      </div>
     </div>
   );
 }
