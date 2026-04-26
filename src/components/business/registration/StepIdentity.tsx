@@ -162,6 +162,39 @@ const StepIdentity: React.FC<StepProps> = ({ formData, updateField, errors }) =>
           {(formData.desc || '').length}/300
         </p>
       </FormField>
+
+      {/* Maximum Service Radius */}
+      <FormField label="Maximum Service Radius (Miles)" error={errors.serviceRadius} required>
+        <div className="relative">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={100}
+            step={1}
+            value={formData.serviceRadius ?? 25}
+            onChange={(e) => {
+              const val = e.target.value === '' ? ('' as const) : parseInt(e.target.value, 10) || 0;
+              updateField('serviceRadius', val);
+            }}
+            placeholder="25"
+            className="w-full px-3 py-2.5 pr-14 text-sm rounded-xl outline-none focus:ring-2 focus:ring-indigo-400/40"
+            style={{ ...inputStyle(!!errors.serviceRadius), appearance: 'auto' } as React.CSSProperties}
+            aria-required={true}
+            aria-describedby="service-radius-hint"
+          />
+          <span
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium pointer-events-none"
+            style={{ color: 'var(--aurora-text-tertiary)' }}
+            aria-hidden="true"
+          >
+            miles
+          </span>
+        </div>
+        <p id="service-radius-hint" className="text-[10px] mt-1" style={{ color: 'var(--aurora-text-tertiary)' }}>
+          How far will you travel or deliver? (1–100 miles)
+        </p>
+      </FormField>
     </div>
   );
 };

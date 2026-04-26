@@ -33,6 +33,7 @@ interface CSVRow {
   paymentMethods: string;
   deliveryOptions: string;
   heritage: string;
+  serviceRadius: string;
 }
 
 interface ParsedRow extends CSVRow {
@@ -119,6 +120,13 @@ const COLUMN_MAP: Record<string, keyof CSVRow> = {
   'heritage': 'heritage',
   'ethnicity': 'heritage',
   'community': 'heritage',
+  'service radius': 'serviceRadius',
+  'service_radius': 'serviceRadius',
+  'serviceradius': 'serviceRadius',
+  'max service radius': 'serviceRadius',
+  'max_service_radius': 'serviceRadius',
+  'delivery radius': 'serviceRadius',
+  'delivery_radius': 'serviceRadius',
 };
 
 // ── CSV Parser ───────────────────────────────────────────────────────────────
@@ -372,6 +380,7 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
           yearEstablished: row.yearEstablished ? Number(row.yearEstablished) : 0,
           paymentMethods: row.paymentMethods ? row.paymentMethods.split(';').map((s) => s.trim()).filter(Boolean) : [],
           deliveryOptions: row.deliveryOptions ? row.deliveryOptions.split(';').map((s) => s.trim()).filter(Boolean) : [],
+          serviceRadius: row.serviceRadius ? Math.min(100, Math.max(1, Number(row.serviceRadius))) : 25,
           specialtyTags: row.specialtyTags ? row.specialtyTags.split(';').map((s) => s.trim()).filter(Boolean) : [],
           emoji: CATEGORY_EMOJI_MAP[category] || '\uD83D\uDCBC',
           bgColor: CATEGORY_COLORS[category] || '#999',

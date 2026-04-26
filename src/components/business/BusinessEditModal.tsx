@@ -236,6 +236,35 @@ const BusinessEditModal: React.FC<BusinessEditModalProps> = ({
         <FormInput label="Email" type="email" value={editData.email} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, email: e.target.value } })} />
         <FormInput label="Website" type="url" value={editData.website} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, website: e.target.value } })} />
         <FormInput label="Booking / Reservation URL" type="url" value={editData.bookingUrl || ''} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, bookingUrl: e.target.value } })} placeholder="https://www.opentable.com/mybusiness" />
+        <div>
+          <label className="block text-sm font-medium text-aurora-text mb-1.5">
+            Max Service Radius (Miles) <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={100}
+              step={1}
+              value={editData.serviceRadius ?? ''}
+              onChange={(e: any) => {
+                const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0;
+                dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, serviceRadius: val } });
+              }}
+              placeholder="25"
+              className="w-full px-4 py-2.5 pr-14 bg-aurora-surface border border-aurora-border rounded-xl
+                         text-sm text-aurora-text placeholder:text-aurora-text-muted
+                         focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo transition-all"
+              style={{ appearance: 'auto' } as React.CSSProperties}
+              aria-required={true}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-aurora-text-muted pointer-events-none" aria-hidden="true">
+              miles
+            </span>
+          </div>
+          <p className="text-[10px] text-aurora-text-muted mt-1">How far will you travel or deliver? (1–100 miles)</p>
+        </div>
         <FormTextarea label="Business Hours" value={editData.hours} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, hours: e.target.value } })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
         <FormInput label="Year Established" type="number" value={editData.yearEstablished} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, yearEstablished: parseInt(e.target.value) } })} />
         <FormInput label="Price Range" type="text" value={editData.priceRange} placeholder="$$-$$$" onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, priceRange: e.target.value } })} />

@@ -265,6 +265,37 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
         <FormInput label="Email" required error={formErrors.email} type="email" value={formData.email} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'email', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'email' }); }} placeholder="contact@business.com" />
         <FormInput label="Website" error={formErrors.website} type="url" value={formData.website} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'website', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'website' }); }} placeholder="https://www.mybusiness.com" />
         <FormInput label="Booking / Reservation URL" type="url" value={formData.bookingUrl} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'bookingUrl', value: e.target.value })} placeholder="https://www.opentable.com/mybusiness" />
+        <div>
+          <label className="block text-sm font-medium text-aurora-text mb-1.5">
+            Max Service Radius (Miles) <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={100}
+              step={1}
+              value={formData.serviceRadius}
+              onChange={(e: any) => {
+                const val = e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0;
+                dispatch({ type: 'UPDATE_FORM_FIELD', field: 'serviceRadius', value: val });
+              }}
+              placeholder="25"
+              className={`w-full px-4 py-2.5 pr-14 bg-aurora-surface border rounded-xl
+                         text-sm text-aurora-text placeholder:text-aurora-text-muted
+                         focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo transition-all
+                         ${formErrors.serviceRadius ? 'border-red-400 ring-1 ring-red-400/30' : 'border-aurora-border'}`}
+              style={{ appearance: 'auto' } as React.CSSProperties}
+              aria-required={true}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-aurora-text-muted pointer-events-none" aria-hidden="true">
+              miles
+            </span>
+          </div>
+          {formErrors.serviceRadius && <p className="mt-1 text-xs text-red-500">{formErrors.serviceRadius}</p>}
+          <p className="text-[10px] text-aurora-text-muted mt-1">How far will you travel or deliver? (1–100 miles)</p>
+        </div>
         <FormTextarea label="Business Hours" value={formData.hours} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'hours', value: e.target.value })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
         <FormInput label="Year Established" type="number" value={formData.yearEstablished} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'yearEstablished', value: e.target.value === '' ? '' : parseInt(e.target.value) || '' })} placeholder="e.g. 2020" />
         <FormInput label="Price Range" type="text" value={formData.priceRange} placeholder="$$-$$$" onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'priceRange', value: e.target.value })} />

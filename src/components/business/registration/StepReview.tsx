@@ -134,6 +134,7 @@ const StepReview: React.FC<StepReviewProps> = ({
         <Field label="Email" value={formData.email} />
         <Field label="Phone" value={formData.phone} />
         {formData.desc && <Field label="Description" value={formData.desc} />}
+        <Field label="Service Radius" value={formData.serviceRadius ? `${formData.serviceRadius} miles` : undefined} />
       </ReviewSection>
 
       {/* ── Section 2: Location ── */}

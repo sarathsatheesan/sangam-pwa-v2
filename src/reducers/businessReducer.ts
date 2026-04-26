@@ -32,6 +32,7 @@ export interface Business {
   specialtyTags?: string[];
   paymentMethods?: string[];
   deliveryOptions?: string[];
+  serviceRadius?: number;
   priceRange?: string;
   yearEstablished?: number;
   deals?: Deal[];
@@ -153,6 +154,7 @@ export interface BusinessFormData {
   latitude: number | '';
   longitude: number | '';
   bookingUrl: string;
+  serviceRadius: number | '';
   // ── Sign-up wizard fields (optional — unused by existing create modal) ──
   country?: 'US' | 'CA' | '';
   placeId?: string;
@@ -344,6 +346,7 @@ export function createInitialState(): BusinessState {
       latitude: '',
       longitude: '',
       bookingUrl: '',
+      serviceRadius: 25,
     },
     formErrors: {},
     formPhotos: [],

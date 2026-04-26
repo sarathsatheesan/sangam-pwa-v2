@@ -23,6 +23,7 @@ export interface BusinessFormData {
   paymentMethods: string[];
   deliveryOptions: string[];
   specialtyTags: string[];
+  serviceRadius?: number | '';
 }
 
 /**
@@ -36,6 +37,14 @@ export function validateBusinessForm(formData: BusinessFormData): Record<string,
   if (!formData.category) errors.category = 'Category is required';
   if (!formData.desc?.trim()) errors.desc = 'A brief description helps customers find you';
   if (!formData.location.trim()) errors.location = 'Location is required';
+
+  // Service radius
+  const sr = formData.serviceRadius;
+  if (sr === '' || sr === undefined || sr === null) {
+    errors.serviceRadius = 'Service radius is required';
+  } else if (typeof sr === 'number' && (sr < 1 || sr > 100)) {
+    errors.serviceRadius = 'Service radius must be between 1 and 100 miles';
+  }
 
   if (!formData.phone.trim()) {
     errors.phone = 'Phone number is required';
@@ -184,6 +193,15 @@ export function validateSignupStep(
         errors.phone = 'Please enter a valid phone number';
       }
       if (!formData.country) errors.country = 'Country is required';
+      // Service radius validation
+      if (formData.serviceRadius === '' || formData.serviceRadius === undefined || formData.serviceRadius === null) {
+        errors.serviceRadius = 'Service radius is required';
+      } else {
+        const sr = typeof formData.serviceRadius === 'string' ? parseInt(formData.serviceRadius, 10) : formData.serviceRadius;
+        if (isNaN(sr) || sr < 1 || sr > 100) {
+          errors.serviceRadius = 'Service radius must be between 1 and 100 miles';
+        }
+      }
       break;
 
     case 2: // Location

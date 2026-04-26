@@ -146,6 +146,7 @@ export interface BusinessListing {
   specialtyTags?: string[];
   paymentMethods?: string[];
   deliveryOptions?: string[];
+  serviceRadius?: number;
   menu?: string;
   services?: string;
 
