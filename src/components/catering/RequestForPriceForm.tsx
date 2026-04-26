@@ -1148,11 +1148,30 @@ function RfpConfirmationModal({
   onConfirm,
   onClose,
 }: RfpConfirmationModalProps) {
-  // ESC to close
+  // ESC to close + body scroll lock (critical for iOS Safari)
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
+
+    // Lock body scroll to prevent background scrolling (iOS Safari fix)
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      // Restore body scroll position
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.overflow = '';
+      window.scrollTo(0, scrollY);
+    };
   }, [onClose]);
 
   // Price guidance calculation
@@ -1182,18 +1201,35 @@ function RfpConfirmationModal({
       })()
     : '';
 
+  // Backdrop click/touch handler — works on both desktop and iOS
+  const handleBackdropInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        /* iOS Safari: use dvh with vh fallback for correct viewport height */
+        height: '100vh',
+        // @ts-ignore — dvh is valid CSS but not in React's CSSProperties type
+        ...(CSS.supports?.('height', '100dvh') ? { height: '100dvh' } : {}),
+      }}
+      onClick={handleBackdropInteraction}
+      onTouchEnd={handleBackdropInteraction}
       role="dialog"
       aria-modal="true"
       aria-label="Review your quote request"
     >
       <div
         className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
-        style={{ backgroundColor: 'var(--aurora-bg, #fff)', maxHeight: '90vh' }}
+        style={{
+          backgroundColor: 'var(--aurora-bg, #fff)',
+          maxHeight: '90vh',
+          /* Prevent iOS text size adjustment */
+          WebkitTextSizeAdjust: '100%',
+        }}
       >
         {/* Header */}
         <div
@@ -1201,20 +1237,27 @@ function RfpConfirmationModal({
           style={{ background: 'linear-gradient(135deg, #6366F1, #818CF8)' }}
         >
           <div className="flex items-center gap-2.5">
-            <Eye size={20} className="text-white/90" />
+            <Eye size={20} style={{ color: 'rgba(255,255,255,0.9)' }} />
             <h2 className="text-lg font-bold text-white">Review Your Request</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/20 transition-colors"
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
             aria-label="Close"
           >
             <X size={18} className="text-white" />
           </button>
         </div>
 
-        {/* Scrollable body */}
-        <div className="px-6 py-5 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+        {/* Scrollable body — -webkit-overflow-scrolling for iOS momentum scroll */}
+        <div
+          className="px-6 py-5 space-y-4 overflow-y-auto"
+          style={{
+            maxHeight: 'calc(90vh - 140px)',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {/* Event details grid */}
           <div className="grid grid-cols-2 gap-3">
             <div
@@ -1290,14 +1333,18 @@ function RfpConfirmationModal({
               </p>
             </div>
             <div
-              className="rounded-xl border divide-y overflow-hidden"
-              style={{ borderColor: 'var(--aurora-border)', divideColor: 'var(--aurora-border)' } as any}
+              className="rounded-xl border overflow-hidden"
+              style={{ borderColor: 'var(--aurora-border)' }}
             >
               {rfpForm.items.map((item, idx) => (
                 <div
                   key={idx}
                   className="flex items-center justify-between px-3 py-2 text-sm"
-                  style={{ backgroundColor: idx % 2 === 0 ? 'transparent' : 'var(--aurora-surface, #f8f9fa)' }}
+                  style={{
+                    backgroundColor: idx % 2 === 0 ? 'transparent' : 'var(--aurora-surface, #f8f9fa)',
+                    /* Border between items — skip first item (cross-browser safe vs divide-y) */
+                    ...(idx > 0 ? { borderTop: '1px solid var(--aurora-border, #e5e7eb)' } : {}),
+                  }}
                 >
                   <div className="flex items-center gap-2">
                     <span style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
@@ -1395,13 +1442,22 @@ function RfpConfirmationModal({
         {/* Footer buttons */}
         <div
           className="px-6 py-4 flex gap-3 border-t"
-          style={{ borderColor: 'var(--aurora-border)' }}
+          style={{
+            borderColor: 'var(--aurora-border)',
+            /* Safe area inset for iOS notch/home indicator */
+            paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+          }}
         >
           <button
             onClick={onClose}
             disabled={loading}
             className="flex-1 px-4 py-3 border font-medium rounded-xl text-sm transition-colors disabled:opacity-50"
-            style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
+            style={{
+              borderColor: 'var(--aurora-border)',
+              color: 'var(--aurora-text-secondary)',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '44px', /* iOS minimum tap target */
+            }}
           >
             Go Back & Edit
           </button>
@@ -1409,7 +1465,11 @@ function RfpConfirmationModal({
             onClick={onConfirm}
             disabled={loading}
             className="flex-1 px-4 py-3 text-white font-semibold rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg, #6366F1, #818CF8)' }}
+            style={{
+              background: 'linear-gradient(135deg, #6366F1, #818CF8)',
+              WebkitTapHighlightColor: 'transparent',
+              minHeight: '44px', /* iOS minimum tap target */
+            }}
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send size={16} />}
             Confirm & Send
