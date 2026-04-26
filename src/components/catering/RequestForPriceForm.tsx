@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check, Store, TrendingUp, Info, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check, Store, TrendingUp, Info, AlertCircle, MapPin, Calendar, Clock, Users, UtensilsCrossed, Eye } from 'lucide-react';
 import type { QuoteRequestItem, OrderForContext, DeliveryAddress } from '@/services/cateringService';
 import { CUISINE_CATEGORIES, CUISINE_CATEGORY_KEYS } from '@/constants/cateringFoodItems';
 import type { CuisineFoodItem } from '@/constants/cateringFoodItems';
@@ -108,6 +108,9 @@ export default function RequestForPriceForm({
   // Qty validation state for P-09
   const [showQtyWarning, setShowQtyWarning] = useState(false);
   const [confirmedDefaultQty, setConfirmedDefaultQty] = useState(false);
+
+  // Phase 3: Confirmation modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Date validation — same constraint as CateringCheckout
   const tomorrow = useMemo(() => getTomorrow(), []);
@@ -247,11 +250,19 @@ export default function RequestForPriceForm({
       setShowQtyWarning(true);
       return;
     }
-    // All items have been checked or confirmed
-    setConfirmedDefaultQty(false);
+    // All items have been checked or confirmed — show confirmation modal
     setShowQtyWarning(false);
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSubmit = () => {
+    setShowConfirmModal(false);
+    setConfirmedDefaultQty(false);
     onSubmit();
   };
+
+  // Event type label lookup
+  const eventTypeLabel = EVENT_TYPES.find(e => e.value === rfpForm.eventType);
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -1015,6 +1026,19 @@ export default function RequestForPriceForm({
         </span>
       </div>
 
+      {/* ── Phase 3: Confirmation Modal ── */}
+      {showConfirmModal && (
+        <RfpConfirmationModal
+          rfpForm={rfpForm}
+          eventTypeLabel={eventTypeLabel ? `${eventTypeLabel.emoji} ${eventTypeLabel.label}` : rfpForm.eventType || 'Not specified'}
+          cuisineCategory={cuisineCategory}
+          reachableVendorCount={reachableVendorCount}
+          loading={loading}
+          onConfirm={handleConfirmSubmit}
+          onClose={() => setShowConfirmModal(false)}
+        />
+      )}
+
       {/* Footer Actions */}
       <div
         className="flex gap-3 sticky bottom-0 py-4 -mx-4 px-4 border-t"
@@ -1085,6 +1109,311 @@ function PriceGuidanceBanner({ cuisineCategory, headcount }: { cuisineCategory: 
           <p className="text-[10px] mt-1 italic" style={{ color: 'var(--aurora-text-muted)' }}>
             Estimates based on market averages — actual quotes may vary by vendor.
           </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Phase 3: RFP Confirmation Modal ──
+// Shows a summary of the request before final submission with price guidance.
+
+interface RfpConfirmationModalProps {
+  rfpForm: {
+    deliveryCity: string;
+    deliveryAddress: DeliveryAddress | null;
+    eventType: string;
+    eventDate: string;
+    eventTime?: string;
+    headcount: number;
+    specialInstructions: string;
+    items: QuoteRequestItem[];
+    orderForContext: OrderForContext;
+    targetBusinessIds: string[];
+  };
+  eventTypeLabel: string;
+  cuisineCategory: string;
+  reachableVendorCount: number | null;
+  loading: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}
+
+function RfpConfirmationModal({
+  rfpForm,
+  eventTypeLabel,
+  cuisineCategory,
+  reachableVendorCount,
+  loading,
+  onConfirm,
+  onClose,
+}: RfpConfirmationModalProps) {
+  // ESC to close
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  // Price guidance calculation
+  const guidance = PRICE_GUIDANCE[cuisineCategory] || PRICE_GUIDANCE.default;
+  const lowEst = guidance.perPerson[0] * rfpForm.headcount;
+  const highEst = guidance.perPerson[1] * rfpForm.headcount;
+  const priceBarMin = guidance.perPerson[0];
+  const priceBarMax = guidance.perPerson[1];
+  // Map range for visual bar (normalize to 0-100%)
+  const globalMin = 10; // lowest possible per-person price
+  const globalMax = 50; // highest possible per-person price
+  const barLeft = Math.max(0, ((priceBarMin - globalMin) / (globalMax - globalMin)) * 100);
+  const barWidth = Math.max(10, ((priceBarMax - priceBarMin) / (globalMax - globalMin)) * 100);
+
+  // Format date for display
+  const formattedDate = rfpForm.eventDate
+    ? new Date(rfpForm.eventDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+
+  // Format time for display
+  const formattedTime = rfpForm.eventTime
+    ? (() => {
+        const [h, m] = rfpForm.eventTime.split(':').map(Number);
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
+      })()
+    : '';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Review your quote request"
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
+        style={{ backgroundColor: 'var(--aurora-bg, #fff)', maxHeight: '90vh' }}
+      >
+        {/* Header */}
+        <div
+          className="px-6 py-4 flex items-center justify-between"
+          style={{ background: 'linear-gradient(135deg, #6366F1, #818CF8)' }}
+        >
+          <div className="flex items-center gap-2.5">
+            <Eye size={20} className="text-white/90" />
+            <h2 className="text-lg font-bold text-white">Review Your Request</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-white/20 transition-colors"
+            aria-label="Close"
+          >
+            <X size={18} className="text-white" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="px-6 py-5 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
+          {/* Event details grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div
+              className="flex items-start gap-2.5 p-3 rounded-xl"
+              style={{ backgroundColor: 'var(--aurora-surface, #f8f9fa)' }}
+            >
+              <MapPin size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--aurora-text-muted)' }}>Delivery City</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                  {rfpForm.deliveryAddress?.city || rfpForm.deliveryCity || '—'}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className="flex items-start gap-2.5 p-3 rounded-xl"
+              style={{ backgroundColor: 'var(--aurora-surface, #f8f9fa)' }}
+            >
+              <Calendar size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--aurora-text-muted)' }}>Event Date</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                  {formattedDate || '—'}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className="flex items-start gap-2.5 p-3 rounded-xl"
+              style={{ backgroundColor: 'var(--aurora-surface, #f8f9fa)' }}
+            >
+              <Users size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--aurora-text-muted)' }}>Headcount</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                  {rfpForm.headcount > 0 ? `${rfpForm.headcount} guests` : '—'}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className="flex items-start gap-2.5 p-3 rounded-xl"
+              style={{ backgroundColor: 'var(--aurora-surface, #f8f9fa)' }}
+            >
+              <Clock size={16} className="flex-shrink-0 mt-0.5" style={{ color: '#6366F1' }} />
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: 'var(--aurora-text-muted)' }}>Event Time</p>
+                <p className="text-sm font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                  {formattedTime || '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Event type */}
+          {rfpForm.eventType && (
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: 'var(--aurora-surface, #f8f9fa)', color: 'var(--aurora-text)' }}
+            >
+              <span className="font-medium" style={{ color: 'var(--aurora-text-muted)' }}>Event:</span>
+              <span className="font-semibold">{eventTypeLabel}</span>
+            </div>
+          )}
+
+          {/* Items list */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <UtensilsCrossed size={14} style={{ color: '#6366F1' }} />
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--aurora-text-muted)' }}>
+                Menu Items ({rfpForm.items.length})
+              </p>
+            </div>
+            <div
+              className="rounded-xl border divide-y overflow-hidden"
+              style={{ borderColor: 'var(--aurora-border)', divideColor: 'var(--aurora-border)' } as any}
+            >
+              {rfpForm.items.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between px-3 py-2 text-sm"
+                  style={{ backgroundColor: idx % 2 === 0 ? 'transparent' : 'var(--aurora-surface, #f8f9fa)' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: 'var(--aurora-text)' }}>{item.name}</span>
+                    {item.dietaryTags && item.dietaryTags.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(99,102,241,0.1)', color: '#6366F1' }}>
+                        {item.dietaryTags.join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                    <span className="font-medium">Qty: {item.qty}</span>
+                    <span className="capitalize">{item.pricingType.replace('_', ' ')}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Special instructions */}
+          {rfpForm.specialInstructions.trim() && (
+            <div
+              className="px-3 py-2 rounded-xl text-sm"
+              style={{ backgroundColor: 'rgba(251, 191, 36, 0.08)', color: 'var(--aurora-text-secondary)' }}
+            >
+              <span className="font-medium" style={{ color: 'var(--aurora-text-muted)' }}>Notes: </span>
+              {rfpForm.specialInstructions}
+            </div>
+          )}
+
+          {/* Price Guidance — visual bar */}
+          {rfpForm.headcount > 0 && (
+            <div
+              className="rounded-xl border p-4"
+              style={{ borderColor: 'rgba(99,102,241,0.2)', backgroundColor: 'rgba(99,102,241,0.03)' }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <TrendingUp size={15} style={{ color: '#6366F1' }} />
+                <p className="text-xs font-semibold" style={{ color: '#6366F1' }}>Estimated Price Range</p>
+              </div>
+
+              {/* Visual range bar */}
+              <div className="mb-3">
+                <div
+                  className="relative h-2.5 rounded-full overflow-hidden"
+                  style={{ backgroundColor: 'rgba(99,102,241,0.1)' }}
+                >
+                  <div
+                    className="absolute top-0 h-full rounded-full"
+                    style={{
+                      left: `${barLeft}%`,
+                      width: `${barWidth}%`,
+                      background: 'linear-gradient(90deg, #818CF8, #6366F1)',
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between mt-1.5">
+                  <span className="text-xs font-bold" style={{ color: '#6366F1' }}>
+                    ${lowEst.toLocaleString()}
+                  </span>
+                  <span className="text-[10px]" style={{ color: 'var(--aurora-text-muted)' }}>
+                    ${guidance.perPerson[0]}–${guidance.perPerson[1]} per person
+                  </span>
+                  <span className="text-xs font-bold" style={{ color: '#6366F1' }}>
+                    ${highEst.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--aurora-text-muted)' }}>
+                {guidance.note}. Trays typically serve {guidance.trayServes} people.
+              </p>
+              <p className="text-[10px] mt-1 italic" style={{ color: 'var(--aurora-text-muted)' }}>
+                Estimates based on market averages — actual quotes may vary.
+              </p>
+            </div>
+          )}
+
+          {/* Vendor reach info */}
+          <div
+            className="flex items-start gap-2 p-3 rounded-xl text-xs"
+            style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)', color: 'var(--aurora-text-secondary)' }}
+          >
+            <Store size={14} className="mt-0.5 flex-shrink-0" style={{ color: '#6366F1' }} />
+            <span>
+              {reachableVendorCount !== null && reachableVendorCount > 0 ? (
+                <>Sending to <strong>{reachableVendorCount} caterer{reachableVendorCount !== 1 ? 's' : ''}</strong> in your area.</>
+              ) : (
+                <>Your request will be visible to all caterers on the platform.</>
+              )}
+              {' '}Only your delivery <strong>city</strong> is shared — full address stays private until you accept a quote.
+            </span>
+          </div>
+        </div>
+
+        {/* Footer buttons */}
+        <div
+          className="px-6 py-4 flex gap-3 border-t"
+          style={{ borderColor: 'var(--aurora-border)' }}
+        >
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 px-4 py-3 border font-medium rounded-xl text-sm transition-colors disabled:opacity-50"
+            style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
+          >
+            Go Back & Edit
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 px-4 py-3 text-white font-semibold rounded-xl text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, #6366F1, #818CF8)' }}
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send size={16} />}
+            Confirm & Send
+          </button>
         </div>
       </div>
     </div>
