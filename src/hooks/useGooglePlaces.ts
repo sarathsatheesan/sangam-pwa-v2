@@ -204,12 +204,12 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
         // Determine which API variant is available
         if (hasNewAPI()) {
           apiMode.current = 'new';
-          sessionToken.current = new gp().AutocompleteSessionToken();
+          sessionToken.current = new (gp().AutocompleteSessionToken as any)();
         } else if (hasLegacyAPI()) {
           apiMode.current = 'legacy';
-          legacySvc.current = new gp().AutocompleteService();
+          legacySvc.current = new (gp().AutocompleteService as any)();
           const el = document.createElement('div');
-          legacyPlacesSvc.current = new gp().PlacesService(el);
+          legacyPlacesSvc.current = new (gp().PlacesService as any)(el);
         } else {
           throw new Error(
             'Places API not available. Enable "Places API" or "Places API (New)" in Google Cloud Console.',
@@ -288,9 +288,9 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
   const detailsNew = useCallback(async (placeId: string, raw: any): Promise<PlaceResult | null> => {
     let place: any;
     if (raw?.toPlace) { place = raw.toPlace(); }
-    else { place = new gp().Place({ id: placeId }); }
+    else { place = new (gp().Place as any)({ id: placeId }); }
     await place.fetchFields({ fields: ['addressComponents', 'formattedAddress', 'location', 'id'] });
-    sessionToken.current = new gp().AutocompleteSessionToken();
+    sessionToken.current = new (gp().AutocompleteSessionToken as any)();
     return {
       placeId: place.id || placeId,
       formattedAddress: place.formattedAddress || '',
@@ -332,7 +332,7 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
     } catch (err) {
       console.warn('Place details error:', err);
       if (apiMode.current === 'new') {
-        try { sessionToken.current = new gp().AutocompleteSessionToken(); } catch {}
+        try { sessionToken.current = new (gp().AutocompleteSessionToken as any)(); } catch {}
       }
       return null;
     }
