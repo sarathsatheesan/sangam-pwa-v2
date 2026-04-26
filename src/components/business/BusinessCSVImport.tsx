@@ -298,7 +298,7 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
           phone: '', website: '', email: '', hours: '', priceRange: '',
           yearEstablished: '', latitude: '', longitude: '', bookingUrl: '',
           services: '', specialtyTags: '', paymentMethods: '', deliveryOptions: '',
-          heritage: '',
+          heritage: '', serviceRadius: '',
         };
         cells.forEach((cell, colIdx) => {
           const field = headerMap[colIdx];
