@@ -290,7 +290,7 @@ const BusinessEditModal: React.FC<BusinessEditModalProps> = ({
           <p className="text-[10px] text-aurora-text-muted mt-1">How far will you travel or deliver? (1–100 miles)</p>
         </div>
         {/* Cuisine Types — only show for food-related categories */}
-        {(editData.category === 'Restaurant & Food' || editData.category === 'Restaurant & Food Catering') && (
+        {(editData.category === 'Restaurant & Food' || editData.category === 'Tiffin' || editData.category === 'Grocery & Market') && (
           <div>
             <label className="block text-sm font-medium text-aurora-text mb-1.5">
               Cuisine Types Served

@@ -453,8 +453,8 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
   // ── Download template ──────────────────────────────────────────────────────
 
   const downloadTemplate = useCallback(() => {
-    const headers = 'name,category,description,location,phone,website,email,hours,price range,year established,latitude,longitude,booking url,services,specialty tags,payment methods,delivery options,heritage';
-    const example = '"Spice Route Kitchen","Restaurant & Food","Authentic South Indian cuisine","123 Main St, Edison NJ","(732) 555-0123","https://spiceroute.com","info@spiceroute.com","Mon-Sat 11am-10pm; Sun 12pm-9pm","$$","2019","40.5187","-74.4121","https://spiceroute.com/reserve","Dine-in;Takeout;Catering","South Indian;Vegetarian;Vegan","Cash;Credit Card;Apple Pay","Dine-in;Takeout;Delivery","Indian"';
+    const headers = 'name,category,description,location,phone,website,email,hours,price range,year established,latitude,longitude,booking url,services,specialty tags,cuisine types,payment methods,delivery options,heritage';
+    const example = '"Spice Route Kitchen","Restaurant & Food","Authentic South Indian cuisine","123 Main St, Edison NJ","(732) 555-0123","https://spiceroute.com","info@spiceroute.com","Mon-Sat 11am-10pm; Sun 12pm-9pm","$$","2019","40.5187","-74.4121","https://spiceroute.com/reserve","Dine-in;Takeout;Catering","South Indian;Vegetarian;Vegan","indian;breakfast;healthy","Cash;Credit Card;Apple Pay","Dine-in;Takeout;Delivery","Indian"';
     const csv = headers + '\n' + example;
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);

@@ -328,7 +328,7 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
           <p className="text-[10px] text-aurora-text-muted mt-1">How far will you travel or deliver? (1–100 miles)</p>
         </div>
         {/* Cuisine Types — only show for food-related categories */}
-        {(formData.category === 'Restaurant & Food' || formData.category === 'Restaurant & Food Catering') && (
+        {(formData.category === 'Restaurant & Food' || formData.category === 'Tiffin' || formData.category === 'Grocery & Market') && (
           <div>
             <label className="block text-sm font-medium text-aurora-text mb-1.5">
               Cuisine Types Served

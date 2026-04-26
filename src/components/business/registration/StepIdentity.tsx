@@ -198,7 +198,7 @@ const StepIdentity: React.FC<StepProps> = ({ formData, updateField, errors }) =>
       </FormField>
 
       {/* Cuisine Types — only show for food-related categories */}
-      {(formData.category === 'Restaurant & Food' || formData.category === 'Restaurant & Food Catering') && (
+      {(formData.category === 'Restaurant & Food' || formData.category === 'Tiffin' || formData.category === 'Grocery & Market') && (
         <FormField label="Cuisine Types Served" error="">
           <p className="text-[10px] mb-2" style={{ color: 'var(--aurora-text-tertiary)' }}>
             Select the cuisines your business offers for catering
