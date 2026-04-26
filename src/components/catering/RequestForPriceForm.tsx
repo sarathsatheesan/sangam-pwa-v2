@@ -240,6 +240,37 @@ export default function RequestForPriceForm({
     return count;
   }, [rfpForm.deliveryAddress, businesses]);
 
+  // ── Available cuisine types: only show cuisines offered by reachable vendors ──
+  const availableCuisineKeys = useMemo(() => {
+    const addr = rfpForm.deliveryAddress;
+    // No address entered yet → show all cuisines (unfiltered)
+    if (!addr?.lat || !addr?.lng || !businesses || businesses.length === 0) {
+      return CUISINE_CATEGORY_KEYS;
+    }
+    // Collect cuisineTypes from businesses within delivery radius
+    const reachableCuisines = new Set<string>();
+    for (const biz of businesses) {
+      if (biz.latitude == null || biz.longitude == null) continue;
+      const radius = biz.serviceRadius || 25;
+      const dist = getDistanceMiles(addr.lat, addr.lng, biz.latitude, biz.longitude);
+      if (dist <= radius) {
+        const cuisines: string[] = biz.cuisineTypes || [];
+        for (const c of cuisines) reachableCuisines.add(c);
+      }
+    }
+    // If no reachable businesses have cuisineTypes set, fall back to showing all
+    // (graceful degradation for businesses that haven't updated their profile yet)
+    if (reachableCuisines.size === 0) return CUISINE_CATEGORY_KEYS;
+    return CUISINE_CATEGORY_KEYS.filter((key) => reachableCuisines.has(key));
+  }, [rfpForm.deliveryAddress, businesses]);
+
+  // If the user had a cuisine selected but it got filtered out, clear it
+  useEffect(() => {
+    if (selectedCuisine && !availableCuisineKeys.includes(selectedCuisine)) {
+      setSelectedCuisine(null);
+    }
+  }, [availableCuisineKeys, selectedCuisine]);
+
   // Handle submit with qty validation
   const handleSubmitWithQtyCheck = () => {
     setSubmitAttempted(true);
@@ -551,7 +582,11 @@ export default function RequestForPriceForm({
                 }}
               >
                 <div className="max-h-64 overflow-y-auto py-1">
-                  {CUISINE_CATEGORY_KEYS.map((key) => {
+                  {availableCuisineKeys.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-center" style={{ color: 'var(--aurora-text-muted)' }}>
+                      No cuisines available for this delivery area
+                    </div>
+                  ) : availableCuisineKeys.map((key) => {
                     const cat = CUISINE_CATEGORIES[key];
                     const isSelected = selectedCuisine === key;
                     return (

@@ -7,6 +7,7 @@ import { compressImagesParallel, MAX_FILE_SIZE } from '@/components/business/ima
 import type { BusinessFormData } from '@/reducers/businessReducer';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import type { AddressResult } from '@/components/shared/AddressAutocomplete';
+import { CUISINE_CATEGORIES, CUISINE_CATEGORY_KEYS } from '@/constants/cateringFoodItems';
 
 // ── Local form helpers (kept outside component to avoid re-mount) ──
 const FormInput = ({ label, required, error, ...props }: any) => (
@@ -326,6 +327,46 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
           {formErrors.serviceRadius && <p className="mt-1 text-xs text-red-500">{formErrors.serviceRadius}</p>}
           <p className="text-[10px] text-aurora-text-muted mt-1">How far will you travel or deliver? (1–100 miles)</p>
         </div>
+        {/* Cuisine Types — only show for food-related categories */}
+        {(formData.category === 'Restaurant & Food' || formData.category === 'Restaurant & Food Catering') && (
+          <div>
+            <label className="block text-sm font-medium text-aurora-text mb-1.5">
+              Cuisine Types Served
+            </label>
+            <p className="text-[10px] text-aurora-text-muted mb-2">Select the cuisines your business offers for catering</p>
+            <div className="flex flex-wrap gap-1.5">
+              {CUISINE_CATEGORY_KEYS.map((key) => {
+                const cat = CUISINE_CATEGORIES[key];
+                const isSelected = (formData.cuisineTypes || []).includes(key);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      const current = formData.cuisineTypes || [];
+                      const updated = isSelected
+                        ? current.filter((k: string) => k !== key)
+                        : [...current, key];
+                      dispatch({ type: 'UPDATE_FORM_FIELD', field: 'cuisineTypes', value: updated });
+                    }}
+                    className={`text-xs px-2.5 py-1.5 rounded-full border transition-all ${
+                      isSelected
+                        ? 'bg-aurora-indigo text-white border-aurora-indigo'
+                        : 'bg-aurora-surface text-aurora-text-secondary border-aurora-border hover:border-aurora-indigo/40'
+                    }`}
+                  >
+                    {cat.emoji} {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+            {(formData.cuisineTypes || []).length > 0 && (
+              <p className="text-[10px] text-aurora-text-muted mt-1.5">
+                {(formData.cuisineTypes || []).length} cuisine{(formData.cuisineTypes || []).length !== 1 ? 's' : ''} selected
+              </p>
+            )}
+          </div>
+        )}
         <FormTextarea label="Business Hours" value={formData.hours} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'hours', value: e.target.value })} rows={3} placeholder="Mon-Fri: 9am-5pm&#10;Sat: 10am-2pm&#10;Sun: Closed" />
         <FormInput label="Year Established" type="number" value={formData.yearEstablished} onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'yearEstablished', value: e.target.value === '' ? '' : parseInt(e.target.value) || '' })} placeholder="e.g. 2020" />
         <FormInput label="Price Range" type="text" value={formData.priceRange} placeholder="$$-$$$" onChange={(e: any) => dispatch({ type: 'UPDATE_FORM_FIELD', field: 'priceRange', value: e.target.value })} />

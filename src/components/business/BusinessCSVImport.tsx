@@ -30,6 +30,7 @@ interface CSVRow {
   bookingUrl: string;
   services: string;
   specialtyTags: string;
+  cuisineTypes: string;
   paymentMethods: string;
   deliveryOptions: string;
   heritage: string;
@@ -109,6 +110,10 @@ const COLUMN_MAP: Record<string, keyof CSVRow> = {
   'specialty_tags': 'specialtyTags',
   'specialtytags': 'specialtyTags',
   'tags': 'specialtyTags',
+  'cuisine types': 'cuisineTypes',
+  'cuisine_types': 'cuisineTypes',
+  'cuisinetypes': 'cuisineTypes',
+  'cuisines': 'cuisineTypes',
   'payment methods': 'paymentMethods',
   'payment_methods': 'paymentMethods',
   'paymentmethods': 'paymentMethods',
@@ -297,7 +302,7 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
           name: '', category: '', description: '', location: '',
           phone: '', website: '', email: '', hours: '', priceRange: '',
           yearEstablished: '', latitude: '', longitude: '', bookingUrl: '',
-          services: '', specialtyTags: '', paymentMethods: '', deliveryOptions: '',
+          services: '', specialtyTags: '', cuisineTypes: '', paymentMethods: '', deliveryOptions: '',
           heritage: '', serviceRadius: '',
         };
         cells.forEach((cell, colIdx) => {
@@ -382,6 +387,7 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
           deliveryOptions: row.deliveryOptions ? row.deliveryOptions.split(';').map((s) => s.trim()).filter(Boolean) : [],
           serviceRadius: row.serviceRadius ? Math.min(100, Math.max(1, Number(row.serviceRadius))) : 25,
           specialtyTags: row.specialtyTags ? row.specialtyTags.split(';').map((s) => s.trim()).filter(Boolean) : [],
+          cuisineTypes: row.cuisineTypes ? row.cuisineTypes.split(';').map((s) => s.trim()).filter(Boolean) : [],
           emoji: CATEGORY_EMOJI_MAP[category] || '\uD83D\uDCBC',
           bgColor: CATEGORY_COLORS[category] || '#999',
           rating: 0,

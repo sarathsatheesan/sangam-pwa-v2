@@ -135,6 +135,9 @@ const StepReview: React.FC<StepReviewProps> = ({
         <Field label="Phone" value={formData.phone} />
         {formData.desc && <Field label="Description" value={formData.desc} />}
         <Field label="Service Radius" value={formData.serviceRadius ? `${formData.serviceRadius} miles` : undefined} />
+        {(formData.cuisineTypes as string[] | undefined)?.length ? (
+          <Field label="Cuisine Types" value={(formData.cuisineTypes as string[]).join(', ')} />
+        ) : null}
       </ReviewSection>
 
       {/* ── Section 2: Location ── */}

@@ -30,6 +30,7 @@ export interface Business {
   services?: string;
   createdAt?: any;
   specialtyTags?: string[];
+  cuisineTypes?: string[];
   paymentMethods?: string[];
   deliveryOptions?: string[];
   serviceRadius?: number;
@@ -151,6 +152,7 @@ export interface BusinessFormData {
   paymentMethods: string[];
   deliveryOptions: string[];
   specialtyTags: string[];
+  cuisineTypes: string[];
   latitude: number | '';
   longitude: number | '';
   bookingUrl: string;
@@ -343,6 +345,7 @@ export function createInitialState(): BusinessState {
       paymentMethods: [],
       deliveryOptions: [],
       specialtyTags: [],
+      cuisineTypes: [],
       latitude: '',
       longitude: '',
       bookingUrl: '',

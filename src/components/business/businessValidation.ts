@@ -23,6 +23,7 @@ export interface BusinessFormData {
   paymentMethods: string[];
   deliveryOptions: string[];
   specialtyTags: string[];
+  cuisineTypes?: string[];
   serviceRadius?: number | '';
 }
 

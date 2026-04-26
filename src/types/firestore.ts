@@ -144,6 +144,7 @@ export interface BusinessListing {
   yearEstablished?: number;
   priceRange?: string;
   specialtyTags?: string[];
+  cuisineTypes?: string[];       // Keys from CUISINE_CATEGORIES (e.g. 'indian', 'mediterranean')
   paymentMethods?: string[];
   deliveryOptions?: string[];
   serviceRadius?: number;

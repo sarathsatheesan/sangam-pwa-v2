@@ -6,6 +6,7 @@
 import React from 'react';
 import { CATEGORIES } from '../businessConstants';
 import type { BusinessFormData } from '../../../reducers/businessReducer';
+import { CUISINE_CATEGORIES, CUISINE_CATEGORY_KEYS } from '@/constants/cateringFoodItems';
 
 // ── Shared types for step components ──
 
@@ -195,6 +196,50 @@ const StepIdentity: React.FC<StepProps> = ({ formData, updateField, errors }) =>
           How far will you travel or deliver? (1–100 miles)
         </p>
       </FormField>
+
+      {/* Cuisine Types — only show for food-related categories */}
+      {(formData.category === 'Restaurant & Food' || formData.category === 'Restaurant & Food Catering') && (
+        <FormField label="Cuisine Types Served" error="">
+          <p className="text-[10px] mb-2" style={{ color: 'var(--aurora-text-tertiary)' }}>
+            Select the cuisines your business offers for catering
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {CUISINE_CATEGORY_KEYS.map((key) => {
+              const cat = CUISINE_CATEGORIES[key];
+              const currentCuisines = (formData.cuisineTypes || []) as string[];
+              const isSelected = currentCuisines.includes(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    const updated = isSelected
+                      ? currentCuisines.filter((k) => k !== key)
+                      : [...currentCuisines, key];
+                    updateField('cuisineTypes', updated);
+                  }}
+                  className={`text-xs px-2.5 py-1.5 rounded-full border transition-all ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'border-[var(--aurora-border)] hover:border-indigo-400/40'
+                  }`}
+                  style={isSelected ? {} : {
+                    background: 'var(--aurora-surface)',
+                    color: 'var(--aurora-text-secondary)',
+                  }}
+                >
+                  {cat.emoji} {cat.label}
+                </button>
+              );
+            })}
+          </div>
+          {((formData.cuisineTypes || []) as string[]).length > 0 && (
+            <p className="text-[10px] mt-1.5" style={{ color: 'var(--aurora-text-tertiary)' }}>
+              {((formData.cuisineTypes || []) as string[]).length} cuisine{((formData.cuisineTypes || []) as string[]).length !== 1 ? 's' : ''} selected
+            </p>
+          )}
+        </FormField>
+      )}
     </div>
   );
 };
