@@ -5,6 +5,8 @@ import {
 import { CATEGORIES } from '@/components/business/businessConstants';
 import { compressImagesParallel, MAX_FILE_SIZE } from '@/components/business/imageUtils';
 import type { BusinessFormData } from '@/reducers/businessReducer';
+import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
+import type { AddressResult } from '@/components/shared/AddressAutocomplete';
 
 // ── Local form helpers (kept outside component to avoid re-mount) ──
 const FormInput = ({ label, required, error, ...props }: any) => (
@@ -231,7 +233,28 @@ const BusinessEditModal: React.FC<BusinessEditModalProps> = ({
             coverIndex={editCoverPhotoIndex}
           />
         )}
-        <FormInput label="Location / Address" type="text" value={editData.location} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, location: e.target.value } })} />
+        {/* Location / Address with Google Places Autocomplete */}
+        <div>
+          <label className="block text-sm font-medium text-aurora-text mb-1.5">Location / Address</label>
+          <AddressAutocomplete
+            id="edit-biz-address"
+            value={editData.location}
+            onChange={(val) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, location: val } })}
+            onSelect={(result: AddressResult) => {
+              dispatch({ type: 'SET_EDIT_DATA', payload: {
+                ...editData,
+                location: result.formattedAddress || result.street,
+                addressComponents: { street: result.street, city: result.city, state: result.state, zip: result.zip, country: 'US' },
+                ...(result.lat ? { latitude: result.lat } : {}),
+                ...(result.lng ? { longitude: result.lng } : {}),
+              }});
+            }}
+            placeholder="Start typing your address..."
+            className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl
+                       text-sm text-aurora-text placeholder:text-aurora-text-muted
+                       focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo transition-all"
+          />
+        </div>
         <FormInput label="Phone" type="tel" value={editData.phone} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, phone: e.target.value } })} />
         <FormInput label="Email" type="email" value={editData.email} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, email: e.target.value } })} />
         <FormInput label="Website" type="url" value={editData.website} onChange={(e: any) => dispatch({ type: 'SET_EDIT_DATA', payload: { ...editData, website: e.target.value } })} />

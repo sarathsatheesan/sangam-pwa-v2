@@ -4,6 +4,7 @@
 // AutocompleteService. Loads Google Maps JS API on demand, provides address
 // autocomplete suggestions, and parses place details into structured components.
 //
+// Cross-browser: Chrome, Safari (desktop + iOS), Firefox, Android Chrome.
 // Requires "Places API (New)" to be enabled in Google Cloud Console.
 // ═════════════════════════════════════════════════════════════════════════════════
 
@@ -54,13 +55,49 @@ export interface PlacePrediction {
 }
 
 // ── Script loader (singleton) ──
+// Prevents duplicate script injection even when many components mount concurrently.
 
 let scriptLoadPromise: Promise<void> | null = null;
 
+/**
+ * Safely check if Google Maps is already loaded.
+ * Uses try/catch to avoid ReferenceError in strict-mode Safari/Firefox.
+ */
+function isGoogleMapsReady(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      typeof (window as any).google !== 'undefined' &&
+      typeof (window as any).google.maps?.importLibrary === 'function'
+    );
+  } catch {
+    return false;
+  }
+}
+
 function loadGoogleMapsScript(apiKey: string): Promise<void> {
   if (scriptLoadPromise) return scriptLoadPromise;
-  if (typeof google !== 'undefined' && typeof google.maps?.importLibrary === 'function') {
-    return Promise.resolve();
+  if (isGoogleMapsReady()) return Promise.resolve();
+
+  // Check if a script tag already exists (another component may have added one)
+  const existingScript = document.querySelector(
+    'script[src*="maps.googleapis.com/maps/api/js"]',
+  ) as HTMLScriptElement | null;
+
+  if (existingScript) {
+    // Wait for the existing script to finish loading
+    scriptLoadPromise = new Promise<void>((resolve, reject) => {
+      if (isGoogleMapsReady()) {
+        resolve();
+        return;
+      }
+      existingScript.addEventListener('load', () => resolve());
+      existingScript.addEventListener('error', () => {
+        scriptLoadPromise = null;
+        reject(new Error('Failed to load Google Maps script'));
+      });
+    });
+    return scriptLoadPromise;
   }
 
   scriptLoadPromise = new Promise<void>((resolve, reject) => {
@@ -85,10 +122,14 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
 function parseAddressComponents(
   components: any[],
 ): AddressComponents {
+  if (!components || !Array.isArray(components)) {
+    return { street: '', city: '', state: '', zip: '', country: '' };
+  }
+
   const get = (type: string): string =>
-    components.find((c: any) => c.types.includes(type))?.longText || '';
+    components.find((c: any) => c.types?.includes(type))?.longText || '';
   const getShort = (type: string): string =>
-    components.find((c: any) => c.types.includes(type))?.shortText || '';
+    components.find((c: any) => c.types?.includes(type))?.shortText || '';
 
   const streetNumber = get('street_number');
   const route = get('route');
@@ -100,6 +141,17 @@ function parseAddressComponents(
     zip: get('postal_code'),
     country: getShort('country'),
   };
+}
+
+/**
+ * Safely extract text from a Places API (New) text object.
+ * The value may be: a string, an object with .text property, or have .toString().
+ */
+function safeText(val: any): string {
+  if (!val) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val.text === 'string') return val.text;
+  return String(val);
 }
 
 // ── Hook ──
@@ -126,18 +178,18 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
       if (!cancelled && !isLoaded) {
         setLoadError('Google Places took too long to load. Please enter address manually.');
       }
-    }, 10000);
+    }, 10_000);
 
     loadGoogleMapsScript(apiKey)
       .then(async () => {
         if (cancelled) return;
         // Import the places library using the new API
-        if (typeof google === 'undefined' || typeof google.maps?.importLibrary !== 'function') {
+        if (!isGoogleMapsReady()) {
           throw new Error('Google Maps failed to initialize');
         }
-        await google.maps.importLibrary('places');
+        await (window as any).google.maps.importLibrary('places');
         if (cancelled) return;
-        sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+        sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
         setIsLoaded(true);
       })
       .catch((err) => {
@@ -154,7 +206,7 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [apiKey]);
+  }, [apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get autocomplete predictions using Places API (New)
   const getPlacePredictions = useCallback(
@@ -170,13 +222,14 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
         const request: any = {
           input,
           sessionToken: sessionToken.current,
-          includedPrimaryTypes: types || ['street_address', 'premise', 'subpremise', 'route'],
+          includedPrimaryTypes: types || ['street_address', 'premise', 'subpremise', 'route', 'geocode'],
           ...(country && {
             includedRegionCodes: [country.toLowerCase()],
           }),
         };
 
-        const { suggestions } = await (google.maps.places as any).AutocompleteSuggestion
+        const placesLib = (window as any).google.maps.places;
+        const { suggestions } = await placesLib.AutocompleteSuggestion
           .fetchAutocompleteSuggestions(request);
 
         // Normalize predictions to match the shape consumers expect
@@ -185,11 +238,11 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
           .map((s: any) => {
             const pred = s.placePrediction;
             return {
-              place_id: pred.placeId || '',
-              description: pred.text?.toString() || '',
+              place_id: pred.placeId || pred.place_id || '',
+              description: safeText(pred.text),
               structured_formatting: {
-                main_text: pred.mainText?.toString() || '',
-                secondary_text: pred.secondaryText?.toString() || '',
+                main_text: safeText(pred.mainText),
+                secondary_text: safeText(pred.secondaryText),
               },
               _raw: pred,
             };
@@ -212,6 +265,8 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
       if (!isLoaded) return null;
 
       try {
+        const placesLib = (window as any).google.maps.places;
+
         // Find the raw prediction with this placeId to use toPlace()
         const rawPrediction = predictions.find((p) => p.place_id === placeId)?._raw;
 
@@ -222,8 +277,7 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
           place = rawPrediction.toPlace();
         } else {
           // Fallback: construct a Place object directly
-          const PlaceClass = (google.maps.places as any).Place;
-          place = new PlaceClass({ id: placeId });
+          place = new placesLib.Place({ id: placeId });
         }
 
         await place.fetchFields({
@@ -231,7 +285,7 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
         });
 
         // Refresh session token after fetchFields (per Google billing best practices)
-        sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+        sessionToken.current = new placesLib.AutocompleteSessionToken();
 
         const addressComponents = parseAddressComponents(
           place.addressComponents || [],
@@ -241,14 +295,14 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
           placeId: place.id || placeId,
           formattedAddress: place.formattedAddress || '',
           addressComponents,
-          latitude: place.location?.lat() || 0,
-          longitude: place.location?.lng() || 0,
+          latitude: place.location?.lat?.() ?? place.location?.lat ?? 0,
+          longitude: place.location?.lng?.() ?? place.location?.lng ?? 0,
         };
       } catch (err: any) {
         console.warn('Place details error:', err);
         // Refresh session token even on error
         try {
-          sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+          sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
         } catch (_) { /* ignore */ }
         return null;
       }

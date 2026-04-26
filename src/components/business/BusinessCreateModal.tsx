@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   X, Plus, ArrowLeft, Loader2, Upload, Star,
 } from 'lucide-react';
 import { CATEGORIES, CATEGORY_EMOJI_MAP } from '@/components/business/businessConstants';
 import { compressImagesParallel, MAX_FILE_SIZE } from '@/components/business/imageUtils';
 import type { BusinessFormData } from '@/reducers/businessReducer';
+import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
+import type { AddressResult } from '@/components/shared/AddressAutocomplete';
 
 // ── Local form helpers (kept outside component to avoid re-mount) ──
 const FormInput = ({ label, required, error, ...props }: any) => (
@@ -254,13 +256,41 @@ const BusinessCreateModal: React.FC<BusinessCreateModalProps> = ({
             coverIndex={coverPhotoIndex}
           />
         )}
-        <FormInput label="Location / Address" required error={formErrors.location} type="text" value={formData.location} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'location', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'location' }); }} placeholder="123 Main St, City, State" />
-        {/* Map coordinates (optional — for map pin placement) */}
+        {/* Location / Address with Google Places Autocomplete */}
+        <div>
+          <label className="block text-sm font-medium text-aurora-text mb-1.5">
+            Location / Address <span className="text-red-500">*</span>
+          </label>
+          <AddressAutocomplete
+            id="create-biz-address"
+            value={formData.location}
+            onChange={(val) => {
+              dispatch({ type: 'UPDATE_FORM_FIELD', field: 'location', value: val });
+              dispatch({ type: 'CLEAR_FORM_ERROR', field: 'location' });
+            }}
+            onSelect={(result: AddressResult) => {
+              dispatch({ type: 'UPDATE_FORM_FIELD', field: 'location', value: result.formattedAddress || result.street });
+              dispatch({ type: 'UPDATE_FORM_FIELD', field: 'addressComponents', value: { street: result.street, city: result.city, state: result.state, zip: result.zip, country: 'US' } });
+              if (result.lat) dispatch({ type: 'UPDATE_FORM_FIELD', field: 'latitude', value: result.lat });
+              if (result.lng) dispatch({ type: 'UPDATE_FORM_FIELD', field: 'longitude', value: result.lng });
+              dispatch({ type: 'CLEAR_FORM_ERROR', field: 'location' });
+              dispatch({ type: 'CLEAR_FORM_ERROR', field: 'latitude' });
+              dispatch({ type: 'CLEAR_FORM_ERROR', field: 'longitude' });
+            }}
+            placeholder="Start typing your address..."
+            className={`w-full px-4 py-2.5 bg-aurora-surface border rounded-xl
+                       text-sm text-aurora-text placeholder:text-aurora-text-muted
+                       focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo transition-all
+                       ${formErrors.location ? 'border-red-400 ring-1 ring-red-400/30' : 'border-aurora-border'}`}
+          />
+          {formErrors.location && <p className="mt-1 text-xs text-red-500">{formErrors.location}</p>}
+        </div>
+        {/* Map coordinates (auto-filled by autocomplete, editable as fallback) */}
         <div className="grid grid-cols-2 gap-3">
           <FormInput label="Latitude" error={formErrors.latitude} type="number" value={formData.latitude} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'latitude', value: e.target.value === '' ? '' : parseFloat(e.target.value) }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'latitude' }); }} placeholder="40.7608" />
           <FormInput label="Longitude" error={formErrors.longitude} type="number" value={formData.longitude} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'longitude', value: e.target.value === '' ? '' : parseFloat(e.target.value) }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'longitude' }); }} placeholder="-111.891" />
         </div>
-        <p className="text-[10px] text-aurora-text-muted -mt-2">Optional — enables your business on the map view. Find coordinates on Google Maps.</p>
+        <p className="text-[10px] text-aurora-text-muted -mt-2">Auto-filled when you select an address above. Edit manually if needed.</p>
         <FormInput label="Phone" required error={formErrors.phone} type="tel" value={formData.phone} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'phone', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'phone' }); }} placeholder="(555) 123-4567" />
         <FormInput label="Email" required error={formErrors.email} type="email" value={formData.email} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'email', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'email' }); }} placeholder="contact@business.com" />
         <FormInput label="Website" error={formErrors.website} type="url" value={formData.website} onChange={(e: any) => { dispatch({ type: 'UPDATE_FORM_FIELD', field: 'website', value: e.target.value }); dispatch({ type: 'CLEAR_FORM_ERROR', field: 'website' }); }} placeholder="https://www.mybusiness.com" />

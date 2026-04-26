@@ -1,12 +1,16 @@
 // ═════════════════════════════════════════════════════════════════════════════════
 // ADDRESS AUTOCOMPLETE
 // Reusable component wrapping Google Places Autocomplete for address entry.
+// Uses the modern Places API (New) via useGooglePlaces hook.
 // Falls back to a plain text input when the API key is not configured.
-// Phase 7 Sprint 2: Address Autocomplete
+//
+// Cross-browser: Chrome, Safari (desktop + iOS), Firefox, Android Chrome.
 // ═════════════════════════════════════════════════════════════════════════════════
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
+import { useGooglePlaces } from '../../hooks/useGooglePlaces';
+import type { PlacePrediction } from '../../hooks/useGooglePlaces';
 
 export interface AddressResult {
   street: string;
@@ -26,190 +30,198 @@ interface AddressAutocompleteProps {
   className?: string;
   id?: string;
   disabled?: boolean;
+  /** Restrict results to a specific country (ISO 3166-1 alpha-2) */
+  country?: 'US' | 'CA' | '';
   'aria-required'?: boolean;
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
   onBlur?: () => void;
 }
 
-// Check if Google Maps Places API is available
-function isGooglePlacesAvailable(): boolean {
-  return !!(
-    typeof window !== 'undefined' &&
-    (window as any).google?.maps?.places?.AutocompleteService
-  );
-}
-
-interface Prediction {
-  description: string;
-  place_id: string;
-}
+const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 export default function AddressAutocomplete({
   value,
   onChange,
   onSelect,
-  placeholder = '123 Main Street',
+  placeholder = 'Start typing your address...',
   className = '',
   id,
   disabled,
+  country,
   onBlur,
   ...ariaProps
 }: AddressAutocompleteProps) {
-  const [suggestions, setSuggestions] = useState<Prediction[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [hasApi, setHasApi] = useState(false);
-  const serviceRef = useRef<any>(null);
-  const placesServiceRef = useRef<any>(null);
-  const debounceRef = useRef<number | undefined>(undefined);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Google Places service
-  useEffect(() => {
-    if (isGooglePlacesAvailable()) {
-      setHasApi(true);
-      serviceRef.current = new (window as any).google.maps.places.AutocompleteService();
-      // PlacesService needs a dummy element
-      const div = document.createElement('div');
-      placesServiceRef.current = new (window as any).google.maps.places.PlacesService(div);
-    }
-  }, []);
+  const {
+    isLoaded,
+    loadError,
+    predictions,
+    isSearching,
+    getPlacePredictions,
+    getPlaceDetails,
+    clearPredictions,
+  } = useGooglePlaces({
+    apiKey: API_KEY,
+    country: country || undefined,
+    types: ['street_address', 'premise', 'subpremise', 'route'],
+  });
 
-  // Close suggestions on outside click
+  // Close suggestions on outside click / touch
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
+    const handler = (e: MouseEvent | TouchEvent) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
       }
     };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
   }, []);
 
-  const fetchSuggestions = useCallback((input: string) => {
-    if (!serviceRef.current || input.length < 3) {
-      setSuggestions([]);
-      return;
-    }
-
-    setLoading(true);
-    serviceRef.current.getPlacePredictions(
-      {
-        input,
-        types: ['address'],
-        componentRestrictions: { country: 'us' },
-      },
-      (predictions: Prediction[] | null, status: string) => {
-        setLoading(false);
-        if (status === 'OK' && predictions) {
-          setSuggestions(predictions.slice(0, 5));
-          setShowSuggestions(true);
-        } else {
-          setSuggestions([]);
-        }
-      },
-    );
-  }, []);
-
-  const handleInputChange = (val: string) => {
+  // Debounced search
+  const handleInputChange = useCallback((val: string) => {
     onChange(val);
-    if (hasApi) {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => fetchSuggestions(val), 300);
-    }
-  };
+    if (!isLoaded) return;
 
-  const handleSelectSuggestion = (prediction: Prediction) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (val.trim().length >= 3) {
+      debounceRef.current = setTimeout(() => {
+        getPlacePredictions(val);
+        setShowSuggestions(true);
+      }, 300);
+    } else {
+      clearPredictions();
+      setShowSuggestions(false);
+    }
+  }, [isLoaded, onChange, getPlacePredictions, clearPredictions]);
+
+  // Select a prediction → fetch full details → emit structured result
+  const handleSelectPrediction = useCallback(async (pred: PlacePrediction) => {
     setShowSuggestions(false);
-    setSuggestions([]);
+    clearPredictions();
 
-    if (!placesServiceRef.current) {
-      onChange(prediction.description);
-      return;
+    // Set the description immediately for visual feedback
+    onChange(pred.description);
+
+    const details = await getPlaceDetails(pred.place_id);
+    if (details) {
+      const result: AddressResult = {
+        street: details.addressComponents.street,
+        city: details.addressComponents.city,
+        state: details.addressComponents.state,
+        zip: details.addressComponents.zip,
+        lat: details.latitude,
+        lng: details.longitude,
+        formattedAddress: details.formattedAddress,
+      };
+
+      // Update the visible input to show the street
+      onChange(result.street || pred.description);
+      onSelect(result);
     }
+  }, [getPlaceDetails, clearPredictions, onChange, onSelect]);
 
-    placesServiceRef.current.getDetails(
-      { placeId: prediction.place_id, fields: ['address_components', 'geometry', 'formatted_address'] },
-      (place: any, status: string) => {
-        if (status !== 'OK' || !place) {
-          onChange(prediction.description);
-          return;
-        }
-
-        const components = place.address_components || [];
-        const get = (type: string): string => {
-          const comp = components.find((c: any) => c.types.includes(type));
-          return comp?.short_name || comp?.long_name || '';
-        };
-
-        const streetNumber = get('street_number');
-        const route = get('route');
-        const street = streetNumber ? `${streetNumber} ${route}` : route;
-
-        const result: AddressResult = {
-          street,
-          city: get('locality') || get('sublocality_level_1') || get('administrative_area_level_2'),
-          state: get('administrative_area_level_1'),
-          zip: get('postal_code'),
-          formattedAddress: place.formatted_address,
-        };
-
-        if (place.geometry?.location) {
-          result.lat = place.geometry.location.lat();
-          result.lng = place.geometry.location.lng();
-        }
-
-        onChange(result.street);
-        onSelect(result);
-      },
-    );
-  };
+  // Compute placeholder based on API state
+  const effectivePlaceholder = isLoaded
+    ? placeholder
+    : loadError
+      ? 'Enter address manually'
+      : 'Loading address search...';
 
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
-        <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <MapPin
+          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2"
+          style={{ color: 'var(--aurora-text-tertiary, #9CA3AF)' }}
+        />
         <input
           id={id}
           type="text"
           value={value}
           onChange={(e) => handleInputChange(e.target.value)}
-          onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+          onFocus={() => predictions.length > 0 && setShowSuggestions(true)}
           onBlur={onBlur}
-          placeholder={placeholder}
+          placeholder={effectivePlaceholder}
           disabled={disabled}
           className={`pl-9 ${className}`}
           autoComplete="off"
+          role="combobox"
+          aria-expanded={showSuggestions && predictions.length > 0}
+          aria-autocomplete="list"
+          aria-controls={id ? `${id}-listbox` : undefined}
           {...ariaProps}
         />
-        {loading && (
-          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400" />
+        {isSearching && (
+          <Loader2
+            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin"
+            style={{ color: 'var(--aurora-text-tertiary, #9CA3AF)' }}
+          />
         )}
       </div>
 
       {/* Suggestions dropdown */}
-      {showSuggestions && suggestions.length > 0 && (
+      {showSuggestions && predictions.length > 0 && (
         <div
-          className="absolute z-20 mt-1 w-full rounded-lg border bg-white shadow-lg overflow-hidden"
-          style={{ borderColor: 'var(--aurora-border, #E5E7EB)' }}
+          id={id ? `${id}-listbox` : undefined}
+          role="listbox"
+          className="absolute z-50 mt-1 w-full rounded-xl border shadow-lg overflow-hidden"
+          style={{
+            background: 'var(--aurora-surface, #FFFFFF)',
+            borderColor: 'var(--aurora-border, #E5E7EB)',
+          }}
         >
-          {suggestions.map((s) => (
+          {predictions.map((pred) => (
             <button
-              key={s.place_id}
+              key={pred.place_id}
               type="button"
-              className="w-full text-left px-4 py-2.5 text-sm hover:bg-indigo-50 transition-colors flex items-start gap-2"
-              style={{ color: 'var(--aurora-text)' }}
+              role="option"
+              className="w-full text-left px-4 py-2.5 text-sm transition-colors flex items-start gap-2"
+              style={{ color: 'var(--aurora-text, #1F2937)' }}
+              // onMouseDown for desktop; onTouchEnd for mobile Safari/Android
               onMouseDown={(e) => {
                 e.preventDefault(); // prevent blur before click
-                handleSelectSuggestion(s);
+                handleSelectPrediction(pred);
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault(); // prevent ghost click + blur on mobile
+                handleSelectPrediction(pred);
               }}
             >
-              <MapPin className="h-4 w-4 mt-0.5 text-gray-400 shrink-0" />
-              <span>{s.description}</span>
+              <MapPin
+                className="h-4 w-4 mt-0.5 shrink-0"
+                style={{ color: 'var(--aurora-text-tertiary, #9CA3AF)' }}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-sm truncate">
+                  {pred.structured_formatting?.main_text || pred.description}
+                </div>
+                {pred.structured_formatting?.secondary_text && (
+                  <div
+                    className="text-xs mt-0.5 truncate"
+                    style={{ color: 'var(--aurora-text-secondary, #6B7280)' }}
+                  >
+                    {pred.structured_formatting.secondary_text}
+                  </div>
+                )}
+              </div>
             </button>
           ))}
-          <div className="px-4 py-1.5 text-[10px] text-gray-400 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
+          <div
+            className="px-4 py-1.5 text-[10px] border-t"
+            style={{
+              color: 'var(--aurora-text-tertiary, #9CA3AF)',
+              borderColor: 'var(--aurora-border, #E5E7EB)',
+            }}
+          >
             Powered by Google
           </div>
         </div>

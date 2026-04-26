@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { copyToClipboard } from '@/utils/clipboard';
 import { timeAgo } from '@/utils/dateFormatting';
+import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
+import type { AddressResult } from '@/components/shared/AddressAutocomplete';
 import {
   collection,
   getDocs,
@@ -1332,11 +1334,22 @@ export default function HousingPage() {
 
       {/* Location */}
       <FormField label="Street Address" required>
-        <div className="relative">
-          <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--aurora-text-muted)]" />
-          <input type="text" value={data.address} onChange={(e) => setData({ ...data, address: e.target.value })}
-            className={`${inputCls} pl-9`} placeholder="123 Main St, Apt 4B" />
-        </div>
+        <AddressAutocomplete
+          id="housing-address"
+          value={data.address}
+          onChange={(val) => setData({ ...data, address: val })}
+          onSelect={(result: AddressResult) => {
+            setData((prev: any) => ({
+              ...prev,
+              address: result.street || result.formattedAddress || '',
+              city: result.city || prev.city,
+              state: result.state || prev.state,
+              zip: result.zip || prev.zip,
+            }));
+          }}
+          placeholder="123 Main St, Apt 4B"
+          className={inputCls}
+        />
       </FormField>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

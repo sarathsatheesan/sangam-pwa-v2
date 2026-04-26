@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { copyToClipboard } from '@/utils/clipboard';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
+import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
+import type { AddressResult } from '@/components/shared/AddressAutocomplete';
 import {
   collection, query, where, orderBy, getDocs, getDoc, addDoc, deleteDoc,
   doc, updateDoc, Timestamp, limit, arrayUnion, arrayRemove, onSnapshot, serverTimestamp,
@@ -2310,7 +2312,28 @@ export default function EventsPage() {
                   </div>
                 </div>
 
-                <FormInput label="Venue / Address" required type="text" value={formData.location} onChange={(e: any) => setFormData({ ...formData, location: e.target.value })} placeholder="Event venue or address" />
+                {/* Venue / Address with Google Places Autocomplete */}
+                <div>
+                  <label className="block text-sm font-medium text-aurora-text mb-1.5">
+                    Venue / Address <span className="text-red-500">*</span>
+                  </label>
+                  <AddressAutocomplete
+                    id="event-create-address"
+                    value={formData.location}
+                    onChange={(val) => setFormData({ ...formData, location: val })}
+                    onSelect={(result: AddressResult) => {
+                      setFormData((prev: any) => ({
+                        ...prev,
+                        location: result.formattedAddress || `${result.street}, ${result.city}, ${result.state}`,
+                        city: result.city,
+                        state: result.state,
+                        zip: result.zip,
+                      }));
+                    }}
+                    placeholder="Event venue or address"
+                    className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                  />
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
@@ -2606,7 +2629,28 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              <FormInput label="Venue / Address" required type="text" value={editData.location} onChange={(e: any) => setEditData({ ...editData, location: e.target.value })} placeholder="Event venue or address" />
+              {/* Venue / Address with Google Places Autocomplete */}
+              <div>
+                <label className="block text-sm font-medium text-aurora-text mb-1.5">
+                  Venue / Address <span className="text-red-500">*</span>
+                </label>
+                <AddressAutocomplete
+                  id="event-edit-address"
+                  value={editData.location}
+                  onChange={(val) => setEditData({ ...editData, location: val })}
+                  onSelect={(result: AddressResult) => {
+                    setEditData((prev: any) => ({
+                      ...prev,
+                      location: result.formattedAddress || `${result.street}, ${result.city}, ${result.state}`,
+                      city: result.city,
+                      state: result.state,
+                      zip: result.zip,
+                    }));
+                  }}
+                  placeholder="Event venue or address"
+                  className="w-full px-4 py-2.5 bg-aurora-surface border border-aurora-border rounded-xl text-sm text-aurora-text placeholder:text-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                />
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
