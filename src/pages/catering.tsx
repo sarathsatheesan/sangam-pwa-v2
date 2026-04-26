@@ -695,6 +695,7 @@ export default function CateringPage() {
           status: 'open',
           expiresAt,
           ...(rfpForm.targetBusinessIds.length > 0 ? { targetBusinessIds: rfpForm.targetBusinessIds } : {}),
+          ...(rfpForm.deliveryAddress ? { deliveryAddress: rfpForm.deliveryAddress } : {}),
         });
 
         addToast('Quote request sent! You can edit it within 24 hours (if the event is more than 2 days away).', 'success', 7000);
@@ -1583,6 +1584,7 @@ export default function CateringPage() {
                                 type: 'UPDATE_RFP_FORM',
                                 payload: {
                                   deliveryCity: req.deliveryCity,
+                                  deliveryAddress: req.deliveryAddress || null,
                                   eventType: req.eventType || '',
                                   eventDate: req.eventDate?.toDate?.()
                                     ? req.eventDate.toDate().toISOString().slice(0, 10)

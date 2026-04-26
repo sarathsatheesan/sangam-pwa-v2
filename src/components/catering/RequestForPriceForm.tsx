@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Loader2, Send, ShieldCheck, ChevronDown, Search, X, Check, Store, TrendingUp, Info, AlertCircle } from 'lucide-react';
-import type { QuoteRequestItem, OrderForContext } from '@/services/cateringService';
+import type { QuoteRequestItem, OrderForContext, DeliveryAddress } from '@/services/cateringService';
 import { CUISINE_CATEGORIES, CUISINE_CATEGORY_KEYS } from '@/constants/cateringFoodItems';
 import type { CuisineFoodItem } from '@/constants/cateringFoodItems';
+import AddressAutocomplete from '../shared/AddressAutocomplete';
+import type { AddressResult } from '../shared/AddressAutocomplete';
 import OrderForSelector from './OrderForSelector';
 
 // Shared date constraint — identical to CateringCheckout
@@ -15,6 +17,7 @@ function getTomorrow(): string {
 interface RequestForPriceFormProps {
   rfpForm: {
     deliveryCity: string;
+    deliveryAddress: DeliveryAddress | null;
     eventType: string;
     eventDate: string;
     eventTime?: string;
@@ -269,16 +272,34 @@ export default function RequestForPriceForm({
         </h2>
         <div className="space-y-4">
           <div>
-            <label htmlFor="rfp-delivery-city" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
-              Delivery City <span className="text-red-500" aria-hidden="true">*</span>
+            <label htmlFor="rfp-delivery-address" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--aurora-text-secondary)' }}>
+              Delivery Address <span className="text-red-500" aria-hidden="true">*</span>
             </label>
-            <input
-              id="rfp-delivery-city"
-              type="text"
-              value={rfpForm.deliveryCity}
-              onChange={(e) => onUpdateForm({ deliveryCity: e.target.value })}
+            <AddressAutocomplete
+              id="rfp-delivery-address"
+              value={rfpForm.deliveryAddress?.formattedAddress || rfpForm.deliveryCity || ''}
+              onChange={(val) => {
+                // User is typing freely — clear structured address (will be re-set on selection)
+                // Keep deliveryCity in sync as fallback for manual entry
+                onUpdateForm({ deliveryCity: val, deliveryAddress: null });
+              }}
+              onSelect={(addr: AddressResult) => {
+                // Store full structured address + extract city for vendor-facing field
+                onUpdateForm({
+                  deliveryCity: addr.city,
+                  deliveryAddress: {
+                    street: addr.street,
+                    city: addr.city,
+                    state: addr.state,
+                    zip: addr.zip,
+                    lat: addr.lat,
+                    lng: addr.lng,
+                    formattedAddress: addr.formattedAddress || `${addr.street}, ${addr.city}, ${addr.state} ${addr.zip}`,
+                  },
+                });
+              }}
               onBlur={() => handleBlur('deliveryCity')}
-              placeholder="e.g. Toronto, San Francisco"
+              placeholder="Start typing your delivery address..."
               className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors ${
                 showCityError
                   ? 'border-red-400 focus:ring-2 focus:ring-red-300 focus:border-red-500'
@@ -287,18 +308,29 @@ export default function RequestForPriceForm({
               aria-required={true}
               aria-invalid={!!showCityError}
               aria-describedby={showCityError ? 'rfp-delivery-city-error' : undefined}
-              style={{
-                backgroundColor: 'var(--aurora-bg)',
-                borderColor: showCityError ? undefined : 'var(--aurora-border)',
-                color: 'var(--aurora-text)',
-              }}
             />
             {showCityError && (
               <p id="rfp-delivery-city-error" className="flex items-center gap-1 mt-1 text-xs text-red-500" role="alert">
                 <AlertCircle size={12} /> {cityError}
               </p>
             )}
+            {/* Privacy note: only city is shared with vendors */}
+            {rfpForm.deliveryAddress && (
+              <p className="text-[11px] mt-1.5 flex items-center gap-1" style={{ color: 'var(--aurora-text-muted)' }}>
+                <ShieldCheck size={11} />
+                Only "{rfpForm.deliveryAddress.city}" will be shared with caterers — your full address stays private until you accept a quote.
+              </p>
+            )}
           </div>
+
+          {/* Leaflet map preview — shown after address selection */}
+          {rfpForm.deliveryAddress?.lat && rfpForm.deliveryAddress?.lng && (
+            <RfpMapPreview
+              lat={rfpForm.deliveryAddress.lat}
+              lng={rfpForm.deliveryAddress.lng}
+              label={rfpForm.deliveryAddress.formattedAddress || rfpForm.deliveryCity}
+            />
+          )}
 
           {/* Event Type */}
           <div>
@@ -1022,6 +1054,96 @@ function PriceGuidanceBanner({ cuisineCategory, headcount }: { cuisineCategory: 
             Estimates based on market averages — actual quotes may vary by vendor.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Leaflet Map Preview for RFP delivery address ──
+// Lightweight map showing the delivery pin. Customer-side only.
+
+declare const L: any;
+
+let _leafletReady = false;
+let _leafletPromise: Promise<void> | null = null;
+
+function loadLeaflet(): Promise<void> {
+  if (_leafletReady && typeof L !== 'undefined') return Promise.resolve();
+  if (_leafletPromise) return _leafletPromise;
+
+  _leafletPromise = new Promise<void>((resolve, reject) => {
+    if (!document.querySelector('link[href*="leaflet"]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.crossOrigin = '';
+      document.head.appendChild(link);
+    }
+    if (typeof L !== 'undefined') { _leafletReady = true; resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.async = true;
+    s.onload = () => { _leafletReady = true; resolve(); };
+    s.onerror = () => { _leafletPromise = null; reject(new Error('Leaflet load failed')); };
+    document.head.appendChild(s);
+  });
+  return _leafletPromise;
+}
+
+function RfpMapPreview({ lat, lng, label }: { lat: number; lng: number; label: string }) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const mapRef = React.useRef<any>(null);
+  const markerRef = React.useRef<any>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    loadLeaflet().then(() => {
+      if (cancelled || !containerRef.current) return;
+      if (!mapRef.current) {
+        mapRef.current = L.map(containerRef.current, {
+          zoomControl: false, attributionControl: false,
+          dragging: false, scrollWheelZoom: false, touchZoom: false, doubleClickZoom: false,
+        }).setView([lat, lng], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapRef.current);
+      } else {
+        mapRef.current.setView([lat, lng], 14);
+      }
+      if (markerRef.current) {
+        markerRef.current.setLatLng([lat, lng]);
+      } else {
+        const icon = L.divIcon({
+          className: '',
+          html: '<div style="font-size:24px;filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3))">📍</div>',
+          iconSize: [24, 24], iconAnchor: [12, 24],
+        });
+        markerRef.current = L.marker([lat, lng], { icon }).addTo(mapRef.current);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [lat, lng]);
+
+  React.useEffect(() => {
+    return () => {
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; markerRef.current = null; }
+    };
+  }, []);
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden border"
+      style={{ borderColor: 'var(--aurora-border)' }}
+    >
+      <div ref={containerRef} className="h-32 w-full" />
+      <div
+        className="px-3 py-1.5 flex items-center justify-between"
+        style={{ background: 'var(--aurora-surface-alt, var(--aurora-bg))' }}
+      >
+        <span className="text-[10px]" style={{ color: 'var(--aurora-text-tertiary, var(--aurora-text-muted))' }}>
+          {lat.toFixed(4)}, {lng.toFixed(4)}
+        </span>
+        <span className="text-[10px] font-medium truncate ml-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+          {label}
+        </span>
       </div>
     </div>
   );

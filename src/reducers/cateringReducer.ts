@@ -86,6 +86,7 @@ export interface CateringState {
   activeQuoteRequestId: string | null;
   rfpForm: {
     deliveryCity: string;
+    deliveryAddress: DeliveryAddress | null;
     eventType: string;
     eventDate: string;
     eventTime: string;
@@ -154,6 +155,7 @@ export function createInitialState(): CateringState {
     activeQuoteRequestId: null,
     rfpForm: {
       deliveryCity: '',
+      deliveryAddress: null,
       eventType: '',
       eventDate: '',
       eventTime: '',
@@ -453,6 +455,7 @@ export function cateringReducer(state: CateringState, action: CateringAction): C
         ...state,
         rfpForm: {
           deliveryCity: '',
+          deliveryAddress: null,
           eventType: '',
           eventDate: '',
           eventTime: '',

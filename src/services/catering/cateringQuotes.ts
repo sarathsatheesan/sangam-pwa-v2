@@ -93,6 +93,8 @@ export async function createQuoteRequest(request: Omit<CateringQuoteRequest, 'id
     payload.targetBusinessIds = request.targetBusinessIds;
   }
   if (request.expiresAt) payload.expiresAt = request.expiresAt;
+  // Store full delivery address if provided (privacy: vendors only see deliveryCity)
+  if (request.deliveryAddress) payload.deliveryAddress = request.deliveryAddress;
 
   const docRef = await addDoc(collection(db, QUOTE_REQUESTS_COL), payload);
   return docRef.id;

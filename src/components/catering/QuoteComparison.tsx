@@ -41,12 +41,24 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   const [ordersCreated, setOrdersCreated] = useState(false);
 
   // SB-37: Delivery address form state
+  // Pre-fill from stored deliveryAddress if available (captured during RFP submission)
   const [showAddressForm, setShowAddressForm] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState({
-    street: '',
-    city: quoteRequest.deliveryCity || '',
-    state: '',
-    zip: '',
+  const [deliveryAddress, setDeliveryAddress] = useState(() => {
+    const saved = quoteRequest.deliveryAddress;
+    if (saved?.street) {
+      return {
+        street: saved.street,
+        city: saved.city || quoteRequest.deliveryCity || '',
+        state: saved.state || '',
+        zip: saved.zip || '',
+      };
+    }
+    return {
+      street: '',
+      city: quoteRequest.deliveryCity || '',
+      state: '',
+      zip: '',
+    };
   });
   const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
 
