@@ -1,11 +1,13 @@
 // ═════════════════════════════════════════════════════════════════════════════════
-// GOOGLE PLACES AUTOCOMPLETE HOOK — Places API (New)
-// Uses the modern AutocompleteSuggestion API instead of the legacy
-// AutocompleteService. Loads Google Maps JS API on demand, provides address
-// autocomplete suggestions, and parses place details into structured components.
+// GOOGLE PLACES AUTOCOMPLETE HOOK
+// Loads Google Maps JS API on demand and provides address autocomplete.
+//
+// Strategy: tries the modern "Places API (New)" first (AutocompleteSuggestion).
+// If that API isn't available, falls back to the legacy AutocompleteService.
+// This ensures autocomplete works regardless of which API is enabled in the
+// Google Cloud Console.
 //
 // Cross-browser: Chrome, Safari (desktop + iOS), Firefox, Android Chrome.
-// Requires "Places API (New)" to be enabled in Google Cloud Console.
 // ═════════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -42,7 +44,7 @@ export interface UseGooglePlacesOptions {
   types?: string[];
 }
 
-// Prediction shape exposed to consumers (normalized from the new API)
+// Prediction shape exposed to consumers (normalized)
 export interface PlacePrediction {
   place_id: string;
   description: string;
@@ -50,26 +52,40 @@ export interface PlacePrediction {
     main_text?: string;
     secondary_text?: string;
   };
-  // Internal: keep the raw suggestion for toPlace()
+  // Internal: keep the raw suggestion for toPlace() (new API only)
   _raw?: any;
 }
 
 // ── Script loader (singleton) ──
-// Prevents duplicate script injection even when many components mount concurrently.
 
 let scriptLoadPromise: Promise<void> | null = null;
 
-/**
- * Safely check if Google Maps is already loaded.
- * Uses try/catch to avoid ReferenceError in strict-mode Safari/Firefox.
- */
+/** Safely check if Google Maps is already loaded. */
 function isGoogleMapsReady(): boolean {
   try {
     return (
       typeof window !== 'undefined' &&
       typeof (window as any).google !== 'undefined' &&
-      typeof (window as any).google.maps?.importLibrary === 'function'
+      typeof (window as any).google.maps !== 'undefined'
     );
+  } catch {
+    return false;
+  }
+}
+
+/** Check if the new Places API (AutocompleteSuggestion) is available */
+function hasNewPlacesAPI(): boolean {
+  try {
+    return typeof (window as any).google?.maps?.places?.AutocompleteSuggestion?.fetchAutocompleteSuggestions === 'function';
+  } catch {
+    return false;
+  }
+}
+
+/** Check if the legacy Places API (AutocompleteService) is available */
+function hasLegacyPlacesAPI(): boolean {
+  try {
+    return typeof (window as any).google?.maps?.places?.AutocompleteService === 'function';
   } catch {
     return false;
   }
@@ -79,18 +95,14 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
   if (scriptLoadPromise) return scriptLoadPromise;
   if (isGoogleMapsReady()) return Promise.resolve();
 
-  // Check if a script tag already exists (another component may have added one)
+  // Check if a script tag already exists
   const existingScript = document.querySelector(
     'script[src*="maps.googleapis.com/maps/api/js"]',
   ) as HTMLScriptElement | null;
 
   if (existingScript) {
-    // Wait for the existing script to finish loading
     scriptLoadPromise = new Promise<void>((resolve, reject) => {
-      if (isGoogleMapsReady()) {
-        resolve();
-        return;
-      }
+      if (isGoogleMapsReady()) { resolve(); return; }
       existingScript.addEventListener('load', () => resolve());
       existingScript.addEventListener('error', () => {
         scriptLoadPromise = null;
@@ -116,16 +128,13 @@ function loadGoogleMapsScript(apiKey: string): Promise<void> {
   return scriptLoadPromise;
 }
 
-// ── Parse address components from Places API (New) result ──
-// New API uses `longText` / `shortText` instead of `long_name` / `short_name`
+// ── Address component parsers ──
 
-function parseAddressComponents(
-  components: any[],
-): AddressComponents {
+/** Parse from Places API (New) — uses longText/shortText */
+function parseNewApiComponents(components: any[]): AddressComponents {
   if (!components || !Array.isArray(components)) {
     return { street: '', city: '', state: '', zip: '', country: '' };
   }
-
   const get = (type: string): string =>
     components.find((c: any) => c.types?.includes(type))?.longText || '';
   const getShort = (type: string): string =>
@@ -133,7 +142,6 @@ function parseAddressComponents(
 
   const streetNumber = get('street_number');
   const route = get('route');
-
   return {
     street: streetNumber ? `${streetNumber} ${route}` : route,
     city: get('locality') || get('sublocality_level_1') || get('administrative_area_level_2'),
@@ -143,10 +151,32 @@ function parseAddressComponents(
   };
 }
 
-/**
- * Safely extract text from a Places API (New) text object.
- * The value may be: a string, an object with .text property, or have .toString().
- */
+/** Parse from legacy Places API — uses long_name/short_name */
+function parseLegacyComponents(components: any[]): AddressComponents {
+  if (!components || !Array.isArray(components)) {
+    return { street: '', city: '', state: '', zip: '', country: '' };
+  }
+  const get = (type: string): string => {
+    const c = components.find((c: any) => c.types?.includes(type));
+    return c?.long_name || c?.short_name || '';
+  };
+  const getShort = (type: string): string => {
+    const c = components.find((c: any) => c.types?.includes(type));
+    return c?.short_name || c?.long_name || '';
+  };
+
+  const streetNumber = get('street_number');
+  const route = get('route');
+  return {
+    street: streetNumber ? `${streetNumber} ${route}` : route,
+    city: get('locality') || get('sublocality_level_1') || get('administrative_area_level_2'),
+    state: getShort('administrative_area_level_1'),
+    zip: get('postal_code'),
+    country: getShort('country'),
+  };
+}
+
+/** Safely extract text from a Places API (New) text object. */
 function safeText(val: any): string {
   if (!val) return '';
   if (typeof val === 'string') return val;
@@ -163,6 +193,11 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
   const [isSearching, setIsSearching] = useState(false);
 
   const sessionToken = useRef<any>(null);
+  // Track which API variant is available: 'new' | 'legacy' | null
+  const apiMode = useRef<'new' | 'legacy' | null>(null);
+  // Legacy API refs
+  const legacyService = useRef<any>(null);
+  const legacyPlacesService = useRef<any>(null);
 
   // Load the script and import the places library
   useEffect(() => {
@@ -173,23 +208,42 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
 
     let cancelled = false;
 
-    // Set a timeout — if loading takes > 10s, give up and show manual entry
     const timeout = setTimeout(() => {
       if (!cancelled && !isLoaded) {
         setLoadError('Google Places took too long to load. Please enter address manually.');
       }
-    }, 10_000);
+    }, 12_000);
 
     loadGoogleMapsScript(apiKey)
       .then(async () => {
         if (cancelled) return;
-        // Import the places library using the new API
-        if (!isGoogleMapsReady()) {
-          throw new Error('Google Maps failed to initialize');
+
+        // Try to import the places library using the new dynamic import API
+        const g = (window as any).google;
+        if (g?.maps?.importLibrary) {
+          try {
+            await g.maps.importLibrary('places');
+          } catch {
+            // importLibrary may fail if only legacy API is enabled — that's ok
+          }
         }
-        await (window as any).google.maps.importLibrary('places');
+
         if (cancelled) return;
-        sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
+
+        // Determine which API is available
+        if (hasNewPlacesAPI()) {
+          apiMode.current = 'new';
+          sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
+        } else if (hasLegacyPlacesAPI()) {
+          apiMode.current = 'legacy';
+          legacyService.current = new (window as any).google.maps.places.AutocompleteService();
+          // PlacesService needs a DOM element
+          const div = document.createElement('div');
+          legacyPlacesService.current = new (window as any).google.maps.places.PlacesService(div);
+        } else {
+          throw new Error('Google Places API not available. Check that "Places API" or "Places API (New)" is enabled in Google Cloud Console.');
+        }
+
         setIsLoaded(true);
       })
       .catch((err) => {
@@ -208,7 +262,75 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
     };
   }, [apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Get autocomplete predictions using Places API (New)
+  // ── NEW API: get predictions ──
+  const getNewApiPredictions = useCallback(
+    async (input: string) => {
+      const request: any = {
+        input,
+        sessionToken: sessionToken.current,
+        includedPrimaryTypes: types || ['street_address', 'premise', 'subpremise', 'route', 'geocode'],
+        ...(country && { includedRegionCodes: [country.toLowerCase()] }),
+      };
+
+      const placesLib = (window as any).google.maps.places;
+      const { suggestions } = await placesLib.AutocompleteSuggestion
+        .fetchAutocompleteSuggestions(request);
+
+      return (suggestions || [])
+        .filter((s: any) => s.placePrediction)
+        .map((s: any) => {
+          const pred = s.placePrediction;
+          return {
+            place_id: pred.placeId || pred.place_id || '',
+            description: safeText(pred.text),
+            structured_formatting: {
+              main_text: safeText(pred.mainText),
+              secondary_text: safeText(pred.secondaryText),
+            },
+            _raw: pred,
+          } as PlacePrediction;
+        });
+    },
+    [country, types],
+  );
+
+  // ── LEGACY API: get predictions ──
+  const getLegacyPredictions = useCallback(
+    (input: string): Promise<PlacePrediction[]> => {
+      return new Promise((resolve) => {
+        if (!legacyService.current) { resolve([]); return; }
+
+        const request: any = {
+          input,
+          types: ['address'],
+          ...(country && { componentRestrictions: { country: country.toLowerCase() } }),
+        };
+
+        legacyService.current.getPlacePredictions(
+          request,
+          (results: any[] | null, status: string) => {
+            if (status === 'OK' && results) {
+              resolve(
+                results.slice(0, 5).map((r: any) => ({
+                  place_id: r.place_id,
+                  description: r.description,
+                  structured_formatting: {
+                    main_text: r.structured_formatting?.main_text || r.description,
+                    secondary_text: r.structured_formatting?.secondary_text || '',
+                  },
+                })),
+              );
+            } else {
+              resolve([]);
+            }
+          },
+        );
+      });
+    },
+    [country],
+  );
+
+  // ── Public: get predictions (dispatches to correct API) ──
   const getPlacePredictions = useCallback(
     async (input: string) => {
       if (!isLoaded || !input.trim()) {
@@ -217,38 +339,11 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
       }
 
       setIsSearching(true);
-
       try {
-        const request: any = {
-          input,
-          sessionToken: sessionToken.current,
-          includedPrimaryTypes: types || ['street_address', 'premise', 'subpremise', 'route', 'geocode'],
-          ...(country && {
-            includedRegionCodes: [country.toLowerCase()],
-          }),
-        };
-
-        const placesLib = (window as any).google.maps.places;
-        const { suggestions } = await placesLib.AutocompleteSuggestion
-          .fetchAutocompleteSuggestions(request);
-
-        // Normalize predictions to match the shape consumers expect
-        const normalized: PlacePrediction[] = (suggestions || [])
-          .filter((s: any) => s.placePrediction)
-          .map((s: any) => {
-            const pred = s.placePrediction;
-            return {
-              place_id: pred.placeId || pred.place_id || '',
-              description: safeText(pred.text),
-              structured_formatting: {
-                main_text: safeText(pred.mainText),
-                secondary_text: safeText(pred.secondaryText),
-              },
-              _raw: pred,
-            };
-          });
-
-        setPredictions(normalized);
+        const results = apiMode.current === 'new'
+          ? await getNewApiPredictions(input)
+          : await getLegacyPredictions(input);
+        setPredictions(results);
       } catch (err: any) {
         console.warn('Places autocomplete error:', err);
         setPredictions([]);
@@ -256,58 +351,87 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
         setIsSearching(false);
       }
     },
-    [isLoaded, country, types],
+    [isLoaded, getNewApiPredictions, getLegacyPredictions],
   );
 
-  // Get full place details from a prediction using Places API (New)
+  // ── NEW API: get place details ──
+  const getNewApiDetails = useCallback(
+    async (placeId: string, rawPrediction: any): Promise<PlaceResult | null> => {
+      const placesLib = (window as any).google.maps.places;
+
+      let place: any;
+      if (rawPrediction?.toPlace) {
+        place = rawPrediction.toPlace();
+      } else {
+        place = new placesLib.Place({ id: placeId });
+      }
+
+      await place.fetchFields({
+        fields: ['addressComponents', 'formattedAddress', 'location', 'id'],
+      });
+
+      sessionToken.current = new placesLib.AutocompleteSessionToken();
+
+      return {
+        placeId: place.id || placeId,
+        formattedAddress: place.formattedAddress || '',
+        addressComponents: parseNewApiComponents(place.addressComponents || []),
+        latitude: place.location?.lat?.() ?? place.location?.lat ?? 0,
+        longitude: place.location?.lng?.() ?? place.location?.lng ?? 0,
+      };
+    },
+    [],
+  );
+
+  // ── LEGACY API: get place details ──
+  const getLegacyDetails = useCallback(
+    (placeId: string): Promise<PlaceResult | null> => {
+      return new Promise((resolve) => {
+        if (!legacyPlacesService.current) { resolve(null); return; }
+
+        legacyPlacesService.current.getDetails(
+          { placeId, fields: ['address_components', 'geometry', 'formatted_address'] },
+          (place: any, status: string) => {
+            if (status !== 'OK' || !place) { resolve(null); return; }
+
+            const addr = parseLegacyComponents(place.address_components || []);
+            resolve({
+              placeId,
+              formattedAddress: place.formatted_address || '',
+              addressComponents: addr,
+              latitude: place.geometry?.location?.lat?.() ?? 0,
+              longitude: place.geometry?.location?.lng?.() ?? 0,
+            });
+          },
+        );
+      });
+    },
+    [],
+  );
+
+  // ── Public: get place details (dispatches to correct API) ──
   const getPlaceDetails = useCallback(
     async (placeId: string): Promise<PlaceResult | null> => {
       if (!isLoaded) return null;
 
       try {
-        const placesLib = (window as any).google.maps.places;
-
-        // Find the raw prediction with this placeId to use toPlace()
-        const rawPrediction = predictions.find((p) => p.place_id === placeId)?._raw;
-
-        let place: any;
-
-        if (rawPrediction?.toPlace) {
-          // Preferred: use toPlace() from the prediction (uses session token automatically)
-          place = rawPrediction.toPlace();
-        } else {
-          // Fallback: construct a Place object directly
-          place = new placesLib.Place({ id: placeId });
+        if (apiMode.current === 'new') {
+          const rawPrediction = predictions.find((p) => p.place_id === placeId)?._raw;
+          return await getNewApiDetails(placeId, rawPrediction);
         }
-
-        await place.fetchFields({
-          fields: ['addressComponents', 'formattedAddress', 'location', 'id'],
-        });
-
-        // Refresh session token after fetchFields (per Google billing best practices)
-        sessionToken.current = new placesLib.AutocompleteSessionToken();
-
-        const addressComponents = parseAddressComponents(
-          place.addressComponents || [],
-        );
-
-        return {
-          placeId: place.id || placeId,
-          formattedAddress: place.formattedAddress || '',
-          addressComponents,
-          latitude: place.location?.lat?.() ?? place.location?.lat ?? 0,
-          longitude: place.location?.lng?.() ?? place.location?.lng ?? 0,
-        };
+        return await getLegacyDetails(placeId);
       } catch (err: any) {
         console.warn('Place details error:', err);
-        // Refresh session token even on error
-        try {
-          sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
-        } catch (_) { /* ignore */ }
+        // Refresh session token even on error (new API only)
+        if (apiMode.current === 'new') {
+          try {
+            sessionToken.current = new (window as any).google.maps.places.AutocompleteSessionToken();
+          } catch (_) { /* ignore */ }
+        }
         return null;
       }
     },
-    [isLoaded, predictions],
+    [isLoaded, predictions, getNewApiDetails, getLegacyDetails],
   );
 
   // Clear predictions
