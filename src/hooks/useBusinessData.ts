@@ -334,6 +334,8 @@ export function useBusinessData(
       paymentMethods: state.selectedBusiness.paymentMethods || [],
       deliveryOptions: state.selectedBusiness.deliveryOptions || [],
       specialtyTags: state.selectedBusiness.specialtyTags || [],
+      latitude: state.selectedBusiness.latitude ?? null,
+      longitude: state.selectedBusiness.longitude ?? null,
     } });
     dispatch({ type: 'SET_EDIT_PHOTOS', payload: state.selectedBusiness.photos || [] });
     dispatch({ type: 'SET_EDIT_COVER_INDEX', payload: state.selectedBusiness.coverPhotoIndex || 0 });
@@ -363,6 +365,8 @@ export function useBusinessData(
         paymentMethods: state.editData.paymentMethods,
         deliveryOptions: state.editData.deliveryOptions,
         serviceRadius: typeof state.editData.serviceRadius === 'number' ? state.editData.serviceRadius : 25,
+        latitude: state.editData.latitude ?? null,
+        longitude: state.editData.longitude ?? null,
         specialtyTags: state.editData.specialtyTags,
         emoji: CATEGORY_EMOJI_MAP[state.editData.category] || state.selectedBusiness.emoji,
         bgColor: CATEGORY_COLORS[state.editData.category] || state.selectedBusiness.bgColor,
