@@ -46,6 +46,7 @@ import {
   notifyVendorsNewRFQ,
 } from '@/services/notificationService';
 import { notifyVendorsNewQuoteRequest } from '@/services/catering/cateringNotifications';
+import { getDistanceMiles } from '@/components/business/businessUtils';
 
 // ── Components (eager: lightweight, needed on first render) ──
 import CateringCategoryGrid from '@/components/catering/CateringCategoryGrid';
@@ -705,12 +706,30 @@ export default function CateringPage() {
         ).catch(() => {});
 
         // Fire-and-forget: notify vendors (in-app + email/SMS/push)
-        // For targeted RFPs, notify only those businesses. For broadcast, skip (vendors discover via dashboard).
-        if (rfpForm.targetBusinessIds.length > 0) {
+        // For targeted RFPs, notify only those businesses.
+        // For broadcast: if delivery address has lat/lng, filter by distance (serviceRadius).
+        // Otherwise vendors discover via dashboard.
+        const vendorIdsToNotify: string[] = rfpForm.targetBusinessIds.length > 0
+          ? [...rfpForm.targetBusinessIds]
+          : [];
+
+        // Distance-based filtering for broadcast RFPs
+        if (vendorIdsToNotify.length === 0 && rfpForm.deliveryAddress?.lat && rfpForm.deliveryAddress?.lng) {
+          const deliveryLat = rfpForm.deliveryAddress.lat;
+          const deliveryLng = rfpForm.deliveryAddress.lng;
+          for (const biz of state.businesses) {
+            if (biz.latitude == null || biz.longitude == null) continue;
+            const radius = biz.serviceRadius || 25; // default 25 miles
+            const dist = getDistanceMiles(deliveryLat, deliveryLng, biz.latitude, biz.longitude);
+            if (dist <= radius) vendorIdsToNotify.push(biz.id);
+          }
+        }
+
+        if (vendorIdsToNotify.length > 0) {
           (async () => {
             try {
               const ownerIds: string[] = [];
-              for (const bizId of rfpForm.targetBusinessIds) {
+              for (const bizId of vendorIdsToNotify) {
                 const bizSnap = await getDoc(doc(db, 'businesses', bizId));
                 const ownerId = bizSnap.data()?.ownerId;
                 if (ownerId) ownerIds.push(ownerId);

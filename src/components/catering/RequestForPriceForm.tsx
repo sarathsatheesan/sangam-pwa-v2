@@ -5,6 +5,7 @@ import { CUISINE_CATEGORIES, CUISINE_CATEGORY_KEYS } from '@/constants/cateringF
 import type { CuisineFoodItem } from '@/constants/cateringFoodItems';
 import AddressAutocomplete from '../shared/AddressAutocomplete';
 import type { AddressResult } from '../shared/AddressAutocomplete';
+import { getDistanceMiles } from '../business/businessUtils';
 import OrderForSelector from './OrderForSelector';
 
 // Shared date constraint — identical to CateringCheckout
@@ -221,6 +222,20 @@ export default function RequestForPriceForm({
     : cuisineItems;
 
   const canSubmit = allErrors.length === 0;
+
+  // ── Vendor match count: how many caterers can serve this delivery location ──
+  const reachableVendorCount = useMemo(() => {
+    const addr = rfpForm.deliveryAddress;
+    if (!addr?.lat || !addr?.lng || !businesses || businesses.length === 0) return null;
+    let count = 0;
+    for (const biz of businesses) {
+      if (biz.latitude == null || biz.longitude == null) continue;
+      const radius = biz.serviceRadius || 25; // default 25 miles
+      const dist = getDistanceMiles(addr.lat, addr.lng, biz.latitude, biz.longitude);
+      if (dist <= radius) count++;
+    }
+    return count;
+  }, [rfpForm.deliveryAddress, businesses]);
 
   // Handle submit with qty validation
   const handleSubmitWithQtyCheck = () => {
@@ -970,16 +985,33 @@ export default function RequestForPriceForm({
         </div>
       )}
 
-      {/* Vendor targeting info */}
+      {/* Vendor targeting info — shows reachable count when address is set */}
       <div
         className="flex items-start gap-2 p-3 rounded-xl text-xs"
         style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)', color: 'var(--aurora-text-secondary)' }}
       >
         <Store size={14} className="mt-0.5 flex-shrink-0" style={{ color: '#6366F1' }} />
         <span>
-          Your request will be sent to <strong>all {cuisineCategory || ''} caterers</strong> on the platform.
-          Vendor identities remain private until they respond with quotes.
-          You can then compare and choose the best option.
+          {reachableVendorCount !== null ? (
+            reachableVendorCount > 0 ? (
+              <>
+                <strong>{reachableVendorCount} {cuisineCategory || ''} caterer{reachableVendorCount !== 1 ? 's' : ''}</strong> can deliver to your area.
+                {' '}Your request will be sent to them.
+                {' '}Vendor identities remain private until they respond with quotes.
+              </>
+            ) : (
+              <>
+                No {cuisineCategory || ''} caterers currently cover your delivery area.
+                {' '}Your request will still be posted — caterers may expand their coverage.
+              </>
+            )
+          ) : (
+            <>
+              Your request will be sent to <strong>all {cuisineCategory || ''} caterers</strong> on the platform.
+              {' '}Vendor identities remain private until they respond with quotes.
+              {' '}You can then compare and choose the best option.
+            </>
+          )}
         </span>
       </div>
 
