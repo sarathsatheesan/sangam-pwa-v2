@@ -65,6 +65,7 @@ export interface BusinessExtras {
     confidence: number;
   };
   profitStatus: 'profit' | 'non-profit';
+  serviceRadius?: number;
   adminReviewRequired?: boolean;
   // Address fields
   businessAddress?: BusinessAddress;

@@ -44,6 +44,7 @@ interface FormData {
   isRegistered: boolean | null;
   tinNumber: string;
   profitStatus: 'profit' | 'non-profit' | '';
+  serviceRadius: number | '';
   tinValidationStatus: 'pending' | 'valid' | 'invalid' | 'not_checked';
   tinValidationMessage: string;
   // Step 1 — business address (Google Places)
@@ -168,6 +169,7 @@ export const SignupPage: React.FC = () => {
     isRegistered: null,
     tinNumber: '',
     profitStatus: '',
+    serviceRadius: 25,
     tinValidationStatus: 'not_checked',
     tinValidationMessage: '',
     businessStreet: '',
@@ -329,6 +331,16 @@ export const SignupPage: React.FC = () => {
         newErrors.tinNumber = 'TIN/EIN number is required for registered businesses';
       }
       if (!formData.profitStatus) newErrors.profitStatus = 'Please select profit classification';
+
+      // Service radius validation
+      if (formData.serviceRadius === '' || formData.serviceRadius === undefined) {
+        newErrors.serviceRadius = 'Service radius is required';
+      } else {
+        const sr = typeof formData.serviceRadius === 'string' ? parseInt(formData.serviceRadius, 10) : formData.serviceRadius;
+        if (isNaN(sr) || sr < 1 || sr > 100) {
+          newErrors.serviceRadius = 'Service radius must be between 1 and 100 miles';
+        }
+      }
 
       // Address validation
       if (!formData.businessStreet.trim() && !addressInput.trim()) {
@@ -499,6 +511,7 @@ export const SignupPage: React.FC = () => {
               }
             : undefined,
           profitStatus: formData.profitStatus as 'profit' | 'non-profit',
+          serviceRadius: typeof formData.serviceRadius === 'number' ? formData.serviceRadius : 25,
           adminReviewRequired: isUnregistered || formData.tinValidationStatus === 'invalid' || kycChecks.adminReviewRequired,
           // New address fields
           businessAddress: {
@@ -895,6 +908,35 @@ export const SignupPage: React.FC = () => {
                 </button>
               </div>
               {errors.profitStatus && <p className="text-aurora-danger text-sm mt-2">{errors.profitStatus}</p>}
+            </div>
+
+            {/* Service Radius */}
+            <div>
+              <label className="block text-sm font-semibold text-aurora-text mb-2">Maximum Service Radius (Miles) *</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={formData.serviceRadius}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? ('' as const) : parseInt(e.target.value, 10) || 0;
+                    updateFormData('serviceRadius', val);
+                  }}
+                  placeholder="25"
+                  className={`w-full px-3 py-2 pr-14 border rounded-xl text-aurora-text placeholder-aurora-text-muted text-sm focus:outline-none focus:ring-2 focus:ring-aurora-indigo ${
+                    errors.serviceRadius ? 'border-red-500 bg-aurora-danger/10' : 'border-aurora-border'
+                  }`}
+                  style={{ appearance: 'auto' } as React.CSSProperties}
+                  aria-required={true}
+                  aria-describedby="auth-signup-service-radius-hint"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium pointer-events-none text-aurora-text-secondary" aria-hidden="true">miles</span>
+              </div>
+              <p id="auth-signup-service-radius-hint" className="text-xs text-aurora-text-secondary mt-1">How far will you travel or deliver? (1–100 miles)</p>
+              {errors.serviceRadius && <p className="text-aurora-danger text-sm mt-2">{errors.serviceRadius}</p>}
             </div>
           </div>
 
@@ -1411,6 +1453,9 @@ export const SignupPage: React.FC = () => {
           </p>
           <p className="text-sm text-aurora-text-secondary mb-1">
             Registered: {formData.isRegistered ? 'Yes' : 'No'}
+          </p>
+          <p className="text-sm text-aurora-text-secondary mb-1">
+            Service Radius: {formData.serviceRadius ? `${formData.serviceRadius} miles` : '25 miles'}
           </p>
           {formData.businessFormattedAddress && (
             <p className="text-sm text-aurora-text-secondary mb-1">
