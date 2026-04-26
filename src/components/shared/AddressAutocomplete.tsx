@@ -67,7 +67,7 @@ export default function AddressAutocomplete({
   } = useGooglePlaces({
     apiKey: API_KEY,
     country: country || undefined,
-    types: ['street_address', 'premise', 'subpremise', 'route'],
+    types: ['street_address', 'premise', 'subpremise', 'route', 'establishment'],
   });
 
   // Close suggestions on outside click / touch

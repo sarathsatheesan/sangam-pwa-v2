@@ -235,7 +235,7 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
     const req: any = {
       input,
       sessionToken: sessionToken.current,
-      includedPrimaryTypes: types || ['street_address', 'premise', 'subpremise', 'route', 'geocode'],
+      includedPrimaryTypes: types || ['street_address', 'premise', 'subpremise', 'route', 'geocode', 'establishment'],
       ...(country && { includedRegionCodes: [country.toLowerCase()] }),
     };
     const { suggestions } = await gp().AutocompleteSuggestion.fetchAutocompleteSuggestions(req);
@@ -255,7 +255,7 @@ export function useGooglePlaces({ apiKey, country, types }: UseGooglePlacesOptio
     return new Promise((resolve) => {
       if (!legacySvc.current) { resolve([]); return; }
       legacySvc.current.getPlacePredictions(
-        { input, types: ['address'], ...(country && { componentRestrictions: { country: country.toLowerCase() } }) },
+        { input, ...(country && { componentRestrictions: { country: country.toLowerCase() } }) },
         (res: any[] | null, status: string) => {
           if (status === 'OK' && res) {
             resolve(res.slice(0, 5).map((r: any) => ({

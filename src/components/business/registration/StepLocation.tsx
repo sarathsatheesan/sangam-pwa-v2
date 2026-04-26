@@ -178,7 +178,7 @@ const StepLocation: React.FC<StepLocationProps> = ({ formData, updateField, erro
   } = useGooglePlaces({
     apiKey: GOOGLE_API_KEY,
     country: country || undefined,
-    types: ['address'],
+    types: ['street_address', 'premise', 'subpremise', 'route', 'establishment'],
   });
 
   // Debounced search

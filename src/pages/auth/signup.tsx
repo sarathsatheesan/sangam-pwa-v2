@@ -214,7 +214,7 @@ export const SignupPage: React.FC = () => {
   } = useGooglePlaces({
     apiKey: GOOGLE_MAPS_API_KEY,
     country: (formData.businessCountry as 'US' | 'CA' | '') || '',
-    types: ['street_address', 'premise', 'subpremise', 'route'],
+    types: ['street_address', 'premise', 'subpremise', 'route', 'establishment'],
   });
   // Fall back to manual entry if Google Places fails to load
   const placesAvailable = placesLoaded && !placesError;
