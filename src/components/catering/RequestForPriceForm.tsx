@@ -960,7 +960,7 @@ export default function RequestForPriceForm({
               onClick={() => {
                 setConfirmedDefaultQty(true);
                 setShowQtyWarning(false);
-                handleSubmitWithQtyCheck();
+                setShowConfirmModal(true);
               }}
               className="text-xs px-3 py-1.5 rounded-lg bg-amber-600 text-white font-medium transition-colors hover:bg-amber-700"
             >
