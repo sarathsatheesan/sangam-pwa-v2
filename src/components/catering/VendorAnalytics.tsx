@@ -18,6 +18,7 @@ import {
   subscribeToBusinessOrders,
   subscribeToBusinessQuoteResponses,
   formatPrice,
+  toEpochMs,
 } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -74,7 +75,7 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
     if (timeRange !== 'all') {
       const cutoff = getCutoffTime(timeRange);
       result = result.filter((o) => {
-        const t = o.createdAt?.toMillis?.() || o.createdAt?.seconds * 1000 || 0;
+        const t = toEpochMs(o.createdAt);
         return t >= cutoff;
       });
     }
@@ -93,7 +94,7 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
     const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
     const endTime = now - (days * 86400000);
     return orders.filter((o) => {
-      const t = o.createdAt?.toMillis?.() || o.createdAt?.seconds * 1000 || 0;
+      const t = toEpochMs(o.createdAt);
       return t >= cutoff && t < endTime;
     });
   }, [orders, timeRange, compareMode]);
@@ -102,7 +103,7 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
     if (timeRange === 'all') return quoteResponses;
     const cutoff = getCutoffTime(timeRange);
     return quoteResponses.filter((q) => {
-      const t = q.createdAt?.toMillis?.() || q.createdAt?.seconds * 1000 || 0;
+      const t = toEpochMs(q.createdAt);
       return t >= cutoff;
     });
   }, [quoteResponses, timeRange]);
@@ -147,7 +148,7 @@ export default function VendorAnalytics({ businessId, businessName }: VendorAnal
       const now = Date.now();
       const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
       const endTime = now - (days * 86400000);
-      const t = q.createdAt?.toMillis?.() || q.createdAt?.seconds * 1000 || 0;
+      const t = toEpochMs(q.createdAt);
       return t >= cutoff && t < endTime;
     });
     return computeMetrics(comparisonOrders, compQuotes);

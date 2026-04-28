@@ -105,14 +105,34 @@ export interface DeliveryAddress {
   formattedAddress?: string;
 }
 
-export interface OrderForContext {
-  type: 'self' | 'individual' | 'organization' | 'anonymous';
+interface OrderForBase {
   recipientName?: string;
   recipientContact?: string;
-  organizationName?: string;
-  department?: string;
+}
+
+interface OrderForSelf extends OrderForBase {
+  type: 'self';
+}
+
+interface OrderForIndividual extends OrderForBase {
+  type: 'individual';
+  recipientName: string; // required for individual
+  recipientContact?: string;
   relationship?: string;
 }
+
+interface OrderForOrganization extends OrderForBase {
+  type: 'organization';
+  organizationName: string; // required for org
+  department?: string;
+  recipientName?: string;
+}
+
+interface OrderForAnonymous extends OrderForBase {
+  type: 'anonymous';
+}
+
+export type OrderForContext = OrderForSelf | OrderForIndividual | OrderForOrganization | OrderForAnonymous;
 
 export interface CateringOrder {
   id: string;

@@ -5,7 +5,7 @@
 // Tier 2: Calendar-based (specific days of week, day of month, skip dates)
 // ═════════════════════════════════════════════════════════════════════════════════
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   ArrowLeft, Calendar, Clock, Loader2, Pause, Play, Trash2,
   Plus, ChevronDown, ChevronUp, Repeat, AlertCircle, Check,
@@ -63,6 +63,18 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
   // ── Execution history state ──
   const [historyMap, setHistoryMap] = useState<Record<string, CateringOrder[]>>({});
   const [loadingHistory, setLoadingHistory] = useState<string | null>(null);
+
+  // ── Refs to avoid stale closures in async callbacks ──
+  const recurringOrdersRef = useRef(recurringOrders);
+  const occItemsRef = useRef(occItems);
+  const occHeadcountRef = useRef(occHeadcount);
+  const occInstructionsRef = useRef(occInstructions);
+
+  // Sync refs with state
+  useEffect(() => { recurringOrdersRef.current = recurringOrders; }, [recurringOrders]);
+  useEffect(() => { occItemsRef.current = occItems; }, [occItems]);
+  useEffect(() => { occHeadcountRef.current = occHeadcount; }, [occHeadcount]);
+  useEffect(() => { occInstructionsRef.current = occInstructions; }, [occInstructions]);
 
   // ── Create form state ──
   const [scheduleMode, setScheduleMode] = useState<'simple' | 'calendar'>('simple');
@@ -226,12 +238,12 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
     // Capture previous state for revert
     const previousOverride = rec.nextOccurrenceOverride;
 
-    // Optimistically update local state with the new override
+    // Optimistically update local state with the new override (using ref values)
     const optimisticOverride = {
       forDate: rec.nextRunDate,
-      items: occItems,
-      headcount: occHeadcount || undefined,
-      specialInstructions: occInstructions || undefined,
+      items: occItemsRef.current,
+      headcount: occHeadcountRef.current || undefined,
+      specialInstructions: occInstructionsRef.current || undefined,
     };
     setRecurringOrders((prev) =>
       prev.map((r) =>
@@ -259,7 +271,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
     } finally {
       setSavingOcc(false);
     }
-  }, [occItems, occHeadcount, occInstructions, addToast]);
+  }, [user, addToast]);
 
   const skipNextOccurrence = useCallback(async (rec: RecurringOrder) => {
     // Capture previous state for revert
@@ -285,11 +297,11 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
       );
       addToast(err.message || 'Failed to skip', 'error');
     }
-  }, [recurringOrders, addToast]);
+  }, [user, addToast]);
 
   const revertOverride = useCallback(async (recId: string) => {
-    // Capture previous override for revert
-    const previousOverride = recurringOrders.find((r) => r.id === recId)?.nextOccurrenceOverride;
+    // Capture previous override for revert (using ref to avoid stale closure)
+    const previousOverride = recurringOrdersRef.current.find((r) => r.id === recId)?.nextOccurrenceOverride;
 
     // Optimistically clear the override from local state
     setRecurringOrders((prev) =>
@@ -311,7 +323,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
       );
       addToast(err.message || 'Failed to revert', 'error');
     }
-  }, [recurringOrders, addToast]);
+  }, [user, addToast]);
 
   const updateOccItemQty = useCallback((idx: number, qty: number) => {
     setOccItems((prev) => prev.map((item, i) => i === idx ? { ...item, qty: Math.max(1, qty) } : item));

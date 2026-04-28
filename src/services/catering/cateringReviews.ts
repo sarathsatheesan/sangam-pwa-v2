@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { CateringReview } from './cateringTypes';
+import { toEpochMs } from './cateringUtils';
 
 /**
  * Fetch all catering reviews for a business, sorted newest-first (client-side).
@@ -31,8 +32,8 @@ export async function fetchCateringReviews(businessId: string): Promise<Catering
     ...d.data(),
   } as CateringReview));
   reviews.sort((a, b) => {
-    const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
-    const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+    const aTime = toEpochMs(a.createdAt);
+    const bTime = toEpochMs(b.createdAt);
     return bTime - aTime;
   });
   return reviews;
@@ -150,8 +151,8 @@ export async function fetchFlaggedReviews(businessId: string): Promise<CateringR
   const snap = await getDocs(q);
   const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringReview));
   results.sort((a, b) => {
-    const aTime = a.flaggedAt?.toMillis?.() || a.flaggedAt?.seconds || 0;
-    const bTime = b.flaggedAt?.toMillis?.() || b.flaggedAt?.seconds || 0;
+    const aTime = toEpochMs(a.flaggedAt);
+    const bTime = toEpochMs(b.flaggedAt);
     return bTime - aTime;
   });
   return results;

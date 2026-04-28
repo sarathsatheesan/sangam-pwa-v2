@@ -95,9 +95,6 @@ export interface UserProfile {
   updatedAt?: Timestamp;
   verifiedAt?: Timestamp | null;
   lastLoginAt?: Timestamp;
-
-  // Extra fields for extensibility
-  [key: string]: any;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -220,9 +217,6 @@ export interface BusinessListing {
     completedSteps: number[];
   };
   country?: 'US' | 'CA';
-
-  // Extra fields for extensibility
-  [key: string]: any;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,9 +269,6 @@ export interface MarketplaceItem {
   // Metadata
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-
-  // Extra fields for extensibility
-  [key: string]: any;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -364,9 +355,6 @@ export interface EventDoc {
   // Metadata
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-
-  // Extra fields for extensibility
-  [key: string]: any;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -411,9 +399,6 @@ export interface FeedPost {
   // Metadata
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-
-  // Extra fields for extensibility
-  [key: string]: any;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -490,9 +475,6 @@ export interface ChatMessage {
 
   // Metadata
   createdAt?: Timestamp;
-
-  // Extra fields for extensibility
-  [key: string]: any;
 }
 
 /**
@@ -512,7 +494,6 @@ export interface Conversation {
   messageCount?: number;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-  [key: string]: any;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -546,7 +527,6 @@ export interface CateringMenuItem {
   sortOrder?: number;
   archived?: boolean;
   createdAt?: Timestamp;
-  [key: string]: any;
 }
 
 /**
@@ -595,7 +575,6 @@ export interface CateringOrder {
   paymentMethod?: string;
   vendorModified?: boolean;
   createdAt?: Timestamp;
-  [key: string]: any;
 }
 
 /**
@@ -623,7 +602,6 @@ export interface CateringQuoteRequest {
   responseCount: number;
   expiresAt?: Timestamp;
   createdAt?: Timestamp;
-  [key: string]: any;
 }
 
 /**
@@ -650,7 +628,6 @@ export interface CateringQuoteResponse {
   message?: string;
   status: 'submitted' | 'accepted' | 'declined' | 'expired';
   createdAt?: Timestamp;
-  [key: string]: any;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -666,7 +643,6 @@ export interface BannedUser {
   bannedAt?: Timestamp;
   bannedBy?: string;
   reason?: string;
-  [key: string]: any;
 }
 
 /**
@@ -678,7 +654,6 @@ export interface DisabledUser {
   disabledAt?: Timestamp;
   disabledBy?: string;
   reason?: string;
-  [key: string]: any;
 }
 
 /**
@@ -689,7 +664,6 @@ export interface AppConfig {
   adminEmails?: string[];
   settings?: Record<string, any>;
   featureFlags?: Record<string, boolean>;
-  [key: string]: any;
 }
 
 /**
@@ -708,5 +682,4 @@ export interface Report {
   resolution?: string;
   createdAt?: Timestamp;
   resolvedAt?: Timestamp;
-  [key: string]: any;
 }

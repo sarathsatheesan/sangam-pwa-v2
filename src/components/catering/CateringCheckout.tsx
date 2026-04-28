@@ -39,10 +39,15 @@ interface CateringCheckoutProps {
 const SPECIAL_INSTRUCTIONS_MAX = 500;
 
 // Compute tomorrow's date string for min date constraint
+// Uses UTC to avoid DST issues when adding days
 function getTomorrow(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return d.toISOString().slice(0, 10);
+  const now = new Date();
+  // Use UTC to avoid DST issues when adding days
+  const tomorrow = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  const year = tomorrow.getUTCFullYear();
+  const month = String(tomorrow.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(tomorrow.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 interface FieldError {

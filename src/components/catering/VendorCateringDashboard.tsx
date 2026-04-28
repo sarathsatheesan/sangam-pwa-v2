@@ -27,6 +27,8 @@ import {
   subscribeToCateringNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  toEpochMs,
+  toDate,
 } from '@/services/cateringService';
 import type { CateringNotification } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
@@ -306,8 +308,8 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
       const reminders: typeof activeReminders = [];
 
       for (const order of orders) {
-        const eventMs = order.eventDate?.toDate?.()?.getTime?.() || (order.eventDate?.seconds ? order.eventDate.seconds * 1000 : 0);
-        const createdMs = order.createdAt?.toDate?.()?.getTime?.() || (order.createdAt?.seconds ? order.createdAt.seconds * 1000 : 0);
+        const eventMs = toDate(order.eventDate).getTime();
+        const createdMs = toEpochMs(order.createdAt);
 
         // Pending orders sitting > 30 min
         if (reminderSettings.pendingAlert && order.status === 'pending' && createdMs && (now - createdMs) > 30 * 60 * 1000) {
@@ -317,7 +319,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
         }
         // Preparing > 2 hours
         if (reminderSettings.preparingReminder && order.status === 'preparing') {
-          const confirmedMs = order.confirmedAt?.toDate?.()?.getTime?.() || (order.confirmedAt?.seconds ? order.confirmedAt.seconds * 1000 : 0);
+          const confirmedMs = toEpochMs(order.confirmedAt);
           if (confirmedMs && (now - confirmedMs) > 2 * 60 * 60 * 1000) {
             reminders.push({ id: `preparing_${order.id}`, type: 'preparing', message: `Order for ${order.customerName} has been preparing for ${Math.round((now - confirmedMs) / 3600000)}h`, orderId: order.id });
           }
@@ -614,8 +616,8 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
         const cmp = nameA.localeCompare(nameB, 'en-US', { sensitivity: 'base' });
         return dir === 'name-asc' ? cmp : -cmp;
       }
-      const aMs = a.eventDate?.toDate?.()?.getTime?.() || (a.eventDate?.seconds ? a.eventDate.seconds * 1000 : 0);
-      const bMs = b.eventDate?.toDate?.()?.getTime?.() || (b.eventDate?.seconds ? b.eventDate.seconds * 1000 : 0);
+      const aMs = toDate(a.eventDate).getTime();
+      const bMs = toDate(b.eventDate).getTime();
       return dir === 'date-newest' ? bMs - aMs : aMs - bMs;
     });
   };
@@ -626,7 +628,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
 
   const formatEventDate = (eventDate: any, eventTime?: string): string => {
     if (!eventDate) return '—';
-    const d = eventDate.toDate?.() || (eventDate.seconds ? new Date(eventDate.seconds * 1000) : null);
+    const d = toDate(eventDate);
     if (!d) return String(eventDate);
     let str = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     if (eventTime) {

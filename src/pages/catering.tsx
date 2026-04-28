@@ -54,6 +54,7 @@ import CateringCategoryGrid from '@/components/catering/CateringCategoryGrid';
 import CateringItemList from '@/components/catering/CateringItemList';
 import CateringCart from '@/components/catering/CateringCart';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
+import { CateringErrorBoundary } from '@/components/catering/CateringErrorBoundary';
 
 // ── Components (lazy: heavy, only loaded when navigated to) ──
 const CateringCheckout = React.lazy(() => import('@/components/catering/CateringCheckout'));
@@ -1497,7 +1498,9 @@ export default function CateringPage() {
         {/* My Orders view with status timeline */}
         {state.view === 'orders' && (
           <React.Suspense fallback={<LazyFallback />}>
-            <CateringOrderStatus onBack={handleBackToCategories} />
+            <CateringErrorBoundary fallbackTitle="Failed to load orders">
+              <CateringOrderStatus onBack={handleBackToCategories} />
+            </CateringErrorBoundary>
           </React.Suspense>
         )}
 
@@ -1653,14 +1656,16 @@ export default function CateringPage() {
         {/* Quote comparison view (viewing responses for a specific request) */}
         {state.view === 'quotes' && selectedQuoteRequest && (
           <React.Suspense fallback={<LazyFallback />}>
-            <QuoteComparison
-              quoteRequest={selectedQuoteRequest}
-              onBack={() => setSelectedQuoteRequest(null)}
-              onViewOrders={() => {
-                setSelectedQuoteRequest(null);
-                dispatch({ type: 'SET_VIEW', payload: 'orders' });
-              }}
-            />
+            <CateringErrorBoundary fallbackTitle="Failed to load quotes">
+              <QuoteComparison
+                quoteRequest={selectedQuoteRequest}
+                onBack={() => setSelectedQuoteRequest(null)}
+                onViewOrders={() => {
+                  setSelectedQuoteRequest(null);
+                  dispatch({ type: 'SET_VIEW', payload: 'orders' });
+                }}
+              />
+            </CateringErrorBoundary>
           </React.Suspense>
         )}
 
@@ -1783,29 +1788,31 @@ export default function CateringPage() {
         {/* Phase 6: Order Templates view */}
         {state.view === 'templates' && (
           <React.Suspense fallback={<LazyFallback />}>
-            <OrderTemplates
-              onBack={() => {
-                setSelectedFavoriteForTemplate(null);
-                dispatch({ type: 'SET_VIEW', payload: 'favorites' });
-              }}
-              prefillFromFavorite={selectedFavoriteForTemplate}
-              onUseTemplate={(tmpl) => {
-                // Load template items into cart
-                dispatch({ type: 'CLEAR_CART' });
-                tmpl.items.forEach((item) => {
-                  dispatch({
-                    type: 'ADD_TO_CART',
-                    payload: {
-                      item,
-                      businessId: tmpl.businessId,
-                      businessName: tmpl.businessName,
-                    },
+            <CateringErrorBoundary fallbackTitle="Failed to load templates">
+              <OrderTemplates
+                onBack={() => {
+                  setSelectedFavoriteForTemplate(null);
+                  dispatch({ type: 'SET_VIEW', payload: 'favorites' });
+                }}
+                prefillFromFavorite={selectedFavoriteForTemplate}
+                onUseTemplate={(tmpl) => {
+                  // Load template items into cart
+                  dispatch({ type: 'CLEAR_CART' });
+                  tmpl.items.forEach((item) => {
+                    dispatch({
+                      type: 'ADD_TO_CART',
+                      payload: {
+                        item,
+                        businessId: tmpl.businessId,
+                        businessName: tmpl.businessName,
+                      },
+                    });
                   });
-                });
-                dispatch({ type: 'SET_VIEW', payload: 'checkout' });
-                addToast('Template loaded into cart! Customize and place your order.', 'success', 4000);
-              }}
-            />
+                  dispatch({ type: 'SET_VIEW', payload: 'checkout' });
+                  addToast('Template loaded into cart! Customize and place your order.', 'success', 4000);
+                }}
+              />
+            </CateringErrorBoundary>
           </React.Suspense>
         )}
       </div>

@@ -12,7 +12,7 @@ import {
   ArrowUpDown, Filter, Flag, AlertTriangle,
 } from 'lucide-react';
 import type { CateringReview } from '@/services/cateringService';
-import { fetchCateringReviews, addVendorResponse, flagReview } from '@/services/cateringService';
+import { fetchCateringReviews, addVendorResponse, flagReview, toEpochMs, toDate } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 
 type SortOption = 'newest' | 'oldest' | 'highest' | 'lowest';
@@ -123,13 +123,9 @@ function ReviewCard({
   const [showFlagForm, setShowFlagForm] = useState(false);
   const [flagReason, setFlagReason] = useState('');
 
-  const createdDate = review.createdAt?.toDate
-    ? review.createdAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '';
+  const createdDate = toDate(review.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const respondedDate = review.vendorRespondedAt?.toDate
-    ? review.vendorRespondedAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '';
+  const respondedDate = toDate(review.vendorRespondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const handleReply = () => {
     if (replyText.trim()) {
@@ -427,8 +423,8 @@ export default function CateringReviews({
     result.sort((a, b) => {
       switch (sortBy) {
         case 'oldest': {
-          const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-          const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+          const aTime = toDate(a.createdAt).getTime();
+          const bTime = toDate(b.createdAt).getTime();
           return aTime - bTime;
         }
         case 'highest':
@@ -437,8 +433,8 @@ export default function CateringReviews({
           return a.rating - b.rating;
         case 'newest':
         default: {
-          const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
-          const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+          const aTime = toDate(a.createdAt).getTime();
+          const bTime = toDate(b.createdAt).getTime();
           return bTime - aTime;
         }
       }

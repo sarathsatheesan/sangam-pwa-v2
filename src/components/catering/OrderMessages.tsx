@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Send, MessageSquare, ChevronDown, ChevronUp, Check, CheckCheck, Lock } from 'lucide-react';
 import type { OrderNote } from '@/services/cateringService';
-import { addOrderNote, subscribeToOrderNotes, markOrderNotesRead } from '@/services/cateringService';
+import { addOrderNote, subscribeToOrderNotes, markOrderNotesRead, toEpochMs } from '@/services/cateringService';
 
 const MESSAGING_WINDOW_MS = 48 * 60 * 60 * 1000; // 48 hours
 
@@ -16,24 +16,6 @@ interface OrderMessagesProps {
   deliveredAt?: any;
   /** Current order status */
   orderStatus?: string;
-}
-
-/**
- * Safely extract epoch milliseconds from a Firestore Timestamp, epoch number, or Date.
- * Returns 0 when the value is unrecognisable — callers treat 0 as "no timestamp".
- */
-function toEpochMs(ts: any): number {
-  if (!ts) return 0;
-  if (typeof ts === 'number') return ts;
-  if (typeof ts.toMillis === 'function') return ts.toMillis();
-  if (typeof ts.seconds === 'number') return ts.seconds * 1000;
-  if (ts instanceof Date) return ts.getTime();
-  // ISO-8601 string fallback (Android WebView sometimes serialises dates this way)
-  if (typeof ts === 'string') {
-    const parsed = Date.parse(ts);
-    return Number.isNaN(parsed) ? 0 : parsed;
-  }
-  return 0;
 }
 
 /**

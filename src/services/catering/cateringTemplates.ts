@@ -22,6 +22,7 @@ import type { Unsubscribe } from 'firebase/firestore';
 
 import { db } from '../firebase';
 import type { OrderTemplate } from './cateringTypes';
+import { toEpochMs, toDate } from './cateringUtils';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -86,8 +87,8 @@ export async function fetchMyTemplates(userId: string): Promise<OrderTemplate[]>
   const snap = await getDocs(q);
   const templates = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderTemplate));
   templates.sort((a, b) => {
-    const aTime = a.updatedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
-    const bTime = b.updatedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+    const aTime = toEpochMs(a.updatedAt) || toEpochMs(a.createdAt);
+    const bTime = toEpochMs(b.updatedAt) || toEpochMs(b.createdAt);
     return bTime - aTime;
   });
   return templates;
@@ -232,8 +233,8 @@ export async function fetchPublicTemplates(options?: {
   // Client-side sort
   if (options?.sortBy === 'newest') {
     templates.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
-      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+      const aTime = toEpochMs(a.createdAt);
+      const bTime = toEpochMs(b.createdAt);
       return bTime - aTime;
     });
   } else {
@@ -267,20 +268,20 @@ export async function fetchTemplateUsageStats(
   }));
 
   const last7Days = allLogs.filter((log) => {
-    const logTime = log.usedAt?.toDate?.() || new Date(0);
+    const logTime = toDate(log.usedAt);
     return logTime >= sevenDaysAgo;
   }).length;
 
   const last30Days = allLogs.filter((log) => {
-    const logTime = log.usedAt?.toDate?.() || new Date(0);
+    const logTime = toDate(log.usedAt);
     return logTime >= thirtyDaysAgo;
   }).length;
 
   // Sort by recent and take first 5
   const recentUsers = allLogs
     .sort((a, b) => {
-      const aTime = a.usedAt?.toMillis?.() || 0;
-      const bTime = b.usedAt?.toMillis?.() || 0;
+      const aTime = toEpochMs(a.usedAt);
+      const bTime = toEpochMs(b.usedAt);
       return bTime - aTime;
     })
     .slice(0, 5);

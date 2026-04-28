@@ -175,6 +175,19 @@ export {
   notifyVendorCounterResolved,
 } from './cateringNotifications';
 
+// Shared utilities
+export {
+  toEpochMs,
+  toDate,
+  formatCents,
+} from './cateringUtils';
+
+// Zod schemas & validation
+export {
+  safeParseCateringOrder,
+  CateringOrderSchema,
+} from './cateringSchemas';
+
 // Notification types & preferences (Phase 1–4)
 export type {
   NotificationUrgency,

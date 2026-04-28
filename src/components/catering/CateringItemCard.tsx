@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Plus, Minus, Utensils, Users, Cake, Coffee, UtensilsCrossed, Soup, Salad, Clock, TrendingUp } from 'lucide-react';
 import type { CateringMenuItem } from '@/services/cateringService';
 import { formatPrice } from '@/services/cateringService';
@@ -23,7 +23,7 @@ const DIETARY_TAG_INFO: Record<string, { bg: string; text: string; icon: string 
   __default: { bg: 'bg-gray-100', text: 'text-gray-600', icon: '🏷️' },
 };
 
-export default function CateringItemCard({
+function CateringItemCard({
   item,
   onAddToCart,
   onUpdateQty,
@@ -311,3 +311,5 @@ export default function CateringItemCard({
     </div>
   );
 }
+
+export default memo(CateringItemCard);

@@ -78,6 +78,8 @@ import {
   isQuoteResponseEditable,
   formatPrice,
   respondToReprice,
+  toEpochMs,
+  toDate,
 } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -165,6 +167,18 @@ export default function VendorQuoteResponse({
       .catch((err) => console.error('Failed to load quote requests:', err))
       .finally(() => setLoading(false));
   }, [businessId]);
+
+  // ── Clean up quoteForms when requests change — remove entries for requests no longer in the list ──
+  useEffect(() => {
+    setQuoteForms(prev => {
+      const activeIds = new Set(requests.map(r => r.id));
+      const pruned: typeof prev = {};
+      for (const [key, val] of Object.entries(prev)) {
+        if (activeIds.has(key)) pruned[key] = val;
+      }
+      return Object.keys(pruned).length === Object.keys(prev).length ? prev : pruned;
+    });
+  }, [requests]);
 
   // ── Real-time subscription for vendor's own quote responses ──
   useEffect(() => {
@@ -433,13 +447,13 @@ export default function VendorQuoteResponse({
 
   const formatEventDate = (eventDate: any): string => {
     if (!eventDate) return '';
-    const date = eventDate?.toDate?.() || new Date(eventDate?.seconds ? eventDate.seconds * 1000 : eventDate);
+    const date = toDate(eventDate);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const getRequestEventMs = (req: CateringQuoteRequest): number => {
     if (!req.eventDate) return 0;
-    const d = req.eventDate?.toDate?.() || new Date((req.eventDate as any)?.seconds ? (req.eventDate as any).seconds * 1000 : req.eventDate);
+    const d = toDate(req.eventDate);
     return d.getTime();
   };
 
@@ -522,7 +536,7 @@ export default function VendorQuoteResponse({
 
       if (reminderSettings.openRequestAlert) {
         for (const req of requests.filter((r) => !hasRespondedTo(r.id))) {
-          const createdMs = req.createdAt?.toMillis?.() || (req.createdAt?.seconds ? req.createdAt.seconds * 1000 : 0);
+          const createdMs = toEpochMs(req.createdAt);
           if (createdMs > 0 && now - createdMs > 30 * 60 * 1000) {
             const elapsedMin = Math.round((now - createdMs) / 60000);
             const waitLabel = elapsedMin < 60 ? `${elapsedMin} min` : elapsedMin < 1440 ? `${(elapsedMin / 60).toFixed(1)} hrs` : `${(elapsedMin / 1440).toFixed(1)} days`;
@@ -1037,7 +1051,7 @@ export default function VendorQuoteResponse({
                             )}
                             <span className="flex items-center gap-1">
                               <Clock size={12} />
-                              {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
+                              {toDate(request.eventDate).toLocaleDateString('en-US')}
                             </span>
                           </div>
                           {/* Full item breakdown */}
@@ -1335,7 +1349,7 @@ export default function VendorQuoteResponse({
                             <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
                             <span className="flex items-center gap-1">
                               <Clock size={12} />
-                              {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
+                              {toDate(request.eventDate).toLocaleDateString('en-US')}
                             </span>
                           </div>
                           {/* Requested items */}
@@ -1387,7 +1401,7 @@ export default function VendorQuoteResponse({
 
                           {/* ── Reprice Request Panel — vendor responds to customer's price request ── */}
                           {response.repriceStatus === 'requested' && (() => {
-                            const expiresMs = response.repriceExpiresAt?.toMillis?.() || (response.repriceExpiresAt?.seconds ? response.repriceExpiresAt.seconds * 1000 : 0);
+                            const expiresMs = toEpochMs(response.repriceExpiresAt);
                             const remainingMs = Math.max(0, expiresMs - Date.now());
                             const hrs = Math.floor(remainingMs / (60 * 60 * 1000));
                             const mins = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
@@ -1572,7 +1586,7 @@ export default function VendorQuoteResponse({
 
                           {/* Edit Quote button with edit window countdown */}
                           {canEdit && (() => {
-                            const createdMs = response.createdAt?.toMillis?.() || (response.createdAt?.seconds ? response.createdAt.seconds * 1000 : 0);
+                            const createdMs = toEpochMs(response.createdAt);
                             const expiresMs = createdMs + 24 * 60 * 60 * 1000;
                             const remainingMs = Math.max(0, expiresMs - Date.now());
                             const remainingHrs = Math.floor(remainingMs / (60 * 60 * 1000));
@@ -1674,7 +1688,7 @@ export default function VendorQuoteResponse({
                         <span className="flex items-center gap-1"><Users size={12} /> {request.headcount} guests</span>
                         <span className="flex items-center gap-1">
                           <Clock size={12} />
-                          {request.eventDate?.toDate?.() ? request.eventDate.toDate().toLocaleDateString('en-US') : String(request.eventDate || '')}
+                          {toDate(request.eventDate).toLocaleDateString('en-US')}
                         </span>
                       </div>
                       <div>

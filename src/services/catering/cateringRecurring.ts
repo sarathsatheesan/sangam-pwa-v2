@@ -29,6 +29,7 @@ import type {
   CateringOrder,
 } from './cateringTypes';
 import { calculateOrderTotal, createOrder } from './cateringOrders';
+import { toEpochMs } from './cateringUtils';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FAVORITES
@@ -64,8 +65,8 @@ export async function fetchFavoriteOrders(userId: string): Promise<FavoriteOrder
   const favorites = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FavoriteOrder));
   // Sort client-side: most recently used first, then by creation date
   favorites.sort((a, b) => {
-    const aTime = a.lastOrderedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
-    const bTime = b.lastOrderedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+    const aTime = toEpochMs(a.lastOrderedAt) || toEpochMs(a.createdAt);
+    const bTime = toEpochMs(b.lastOrderedAt) || toEpochMs(b.createdAt);
     return bTime - aTime;
   });
   return favorites;
@@ -85,8 +86,8 @@ export function subscribeToFavorites(
   return onSnapshot(q, (snap) => {
     const favorites = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FavoriteOrder));
     favorites.sort((a, b) => {
-      const aTime = a.lastOrderedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
-      const bTime = b.lastOrderedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+      const aTime = toEpochMs(a.lastOrderedAt) || toEpochMs(a.createdAt);
+      const bTime = toEpochMs(b.lastOrderedAt) || toEpochMs(b.createdAt);
       return bTime - aTime;
     });
     callback(favorites);
@@ -498,8 +499,8 @@ export async function fetchRecurringExecutionHistory(
   const snap = await getDocs(q);
   const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
   results.sort((a, b) => {
-    const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds || 0;
-    const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds || 0;
+    const aTime = toEpochMs(a.createdAt);
+    const bTime = toEpochMs(b.createdAt);
     return bTime - aTime;
   });
   return results.slice(0, limitCount);

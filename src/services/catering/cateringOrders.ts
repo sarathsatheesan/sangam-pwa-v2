@@ -35,6 +35,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { CateringOrder, OrderItem, OrderNote, CateringQuoteRequest, CateringQuoteResponse } from './cateringTypes';
+import { toEpochMs } from './cateringUtils';
 import { notifyCustomerStatusChange, notifyCustomerOrderModified, notifyOrderCancelled } from './cateringNotifications';
 import { notifyOrderCancelledMultiChannel } from '../notificationService';
 
@@ -63,8 +64,8 @@ export async function fetchOrdersByCustomer(customerId: string): Promise<Caterin
   const snap = await getDocs(q);
   const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
   return results.sort((a, b) => {
-    const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-    const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+    const aTime = toEpochMs(a.createdAt);
+    const bTime = toEpochMs(b.createdAt);
     return bTime - aTime;
   });
 }
@@ -77,8 +78,8 @@ export async function fetchOrdersByBusiness(businessId: string): Promise<Caterin
   const snap = await getDocs(q);
   const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
   return results.sort((a, b) => {
-    const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-    const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+    const aTime = toEpochMs(a.createdAt);
+    const bTime = toEpochMs(b.createdAt);
     return bTime - aTime;
   });
 }
@@ -86,18 +87,16 @@ export async function fetchOrdersByBusiness(businessId: string): Promise<Caterin
 export function subscribeToCustomerOrders(
   customerId: string,
   callback: (orders: CateringOrder[]) => void,
+  pageSize: number = 25,
 ): Unsubscribe {
   const q = query(
     collection(db, ORDERS_COL),
     where('customerId', '==', customerId),
+    orderBy('createdAt', 'desc'),
+    firestoreLimit(pageSize),
   );
   return onSnapshot(q, (snap) => {
     const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
-    results.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
-      return bTime - aTime;
-    });
     callback(results);
   }, (err) => {
     console.warn('subscribeToCustomerOrders error:', err);
@@ -105,27 +104,57 @@ export function subscribeToCustomerOrders(
   });
 }
 
+export async function fetchMoreCustomerOrders(
+  customerId: string,
+  lastTimestamp: any,
+  pageSize: number = 25,
+): Promise<CateringOrder[]> {
+  const q = query(
+    collection(db, ORDERS_COL),
+    where('customerId', '==', customerId),
+    orderBy('createdAt', 'desc'),
+    startAfter(lastTimestamp),
+    firestoreLimit(pageSize),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
+}
+
 export function subscribeToBusinessOrders(
   businessId: string,
   callback: (orders: CateringOrder[]) => void,
+  pageSize: number = 25,
 ): Unsubscribe {
-  // Use single-field where to avoid composite index requirement; sort client-side
+  // Use orderBy + limit for server-side pagination
   const q = query(
     collection(db, ORDERS_COL),
     where('businessId', '==', businessId),
+    orderBy('createdAt', 'desc'),
+    firestoreLimit(pageSize),
   );
   return onSnapshot(q, (snap) => {
     const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
-    results.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
-      return bTime - aTime;
-    });
     callback(results);
   }, (err) => {
     console.warn('subscribeToBusinessOrders error:', err);
     callback([]);
   });
+}
+
+export async function fetchMoreBusinessOrders(
+  businessId: string,
+  lastTimestamp: any,
+  pageSize: number = 25,
+): Promise<CateringOrder[]> {
+  const q = query(
+    collection(db, ORDERS_COL),
+    where('businessId', '==', businessId),
+    orderBy('createdAt', 'desc'),
+    startAfter(lastTimestamp),
+    firestoreLimit(pageSize),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
 }
 
 // ── Status state machine — valid transitions ──
@@ -497,9 +526,7 @@ export async function getBusinessPaymentInfo(
   let skippedUntil: number | null = null;
   const raw = data.paymentSetupSkippedUntil;
   if (raw) {
-    if (typeof raw?.toMillis === 'function') skippedUntil = raw.toMillis();
-    else if (typeof raw === 'number') skippedUntil = raw;
-    else if (raw instanceof Date) skippedUntil = raw.getTime();
+    skippedUntil = toEpochMs(raw) || null;
   }
   return {
     paymentUrl: data.paymentUrl,
@@ -876,19 +903,13 @@ export function subscribeToOrderNotes(
   pageSize: number = NOTES_PAGE_SIZE,
 ): Unsubscribe {
   const notesCol = collection(db, ORDERS_COL, orderId, ORDER_NOTES_SUB);
-  // Subscribe to the most recent `pageSize` notes.
-  // Note: orderBy + limit require a composite index on createdAt if not already present,
-  // so we fall back to client-side sort + slice if the query fails.
-  return onSnapshot(notesCol, (snap) => {
+  // FIX-M1: Subscribe to the most recent pageSize notes server-side with orderBy + limit.
+  const q = query(notesCol, orderBy('createdAt', 'desc'), firestoreLimit(pageSize));
+  return onSnapshot(q, (snap) => {
     const results = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderNote));
-    results.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
-      return aTime - bTime; // chronological order (oldest first)
-    });
-    // FIX-M1: Only return the most recent pageSize notes to prevent performance degradation
-    const paginated = results.length > pageSize ? results.slice(-pageSize) : results;
-    callback(paginated);
+    // Reverse to chronological order (oldest first) since we fetched newest-first
+    results.reverse();
+    callback(results);
   }, (err) => {
     console.warn('subscribeToOrderNotes error:', err);
     callback([]);
@@ -908,17 +929,17 @@ export async function fetchOlderOrderNotes(
   const snap = await getDocs(notesCol);
   const allNotes = snap.docs.map((d) => ({ id: d.id, ...d.data() } as OrderNote));
 
-  const oldestMs = oldestNoteTimestamp?.toMillis?.() || (oldestNoteTimestamp?.seconds ? oldestNoteTimestamp.seconds * 1000 : 0);
+  const oldestMs = toEpochMs(oldestNoteTimestamp);
 
   // Filter to notes older than the oldest displayed note, sort descending, take pageSize
   const older = allNotes
     .filter((n) => {
-      const nMs = n.createdAt?.toMillis?.() || (n.createdAt?.seconds ? n.createdAt.seconds * 1000 : 0);
+      const nMs = toEpochMs(n.createdAt);
       return nMs > 0 && nMs < oldestMs;
     })
     .sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+      const aTime = toEpochMs(a.createdAt);
+      const bTime = toEpochMs(b.createdAt);
       return bTime - aTime; // newest-first for slicing
     })
     .slice(0, pageSize);
@@ -976,7 +997,7 @@ export async function editOrderNote(
     throw new Error('You can only edit your own messages');
   }
 
-  const createdMs = data.createdAt?.toMillis?.() || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+  const createdMs = toEpochMs(data.createdAt);
   if (createdMs && Date.now() - createdMs > MESSAGE_EDIT_WINDOW_MS) {
     throw new Error('Edit window (5 minutes) has expired');
   }
@@ -1006,7 +1027,7 @@ export async function deleteOrderNote(
     throw new Error('You can only delete your own messages');
   }
 
-  const createdMs = data.createdAt?.toMillis?.() || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 : 0);
+  const createdMs = toEpochMs(data.createdAt);
   if (createdMs && Date.now() - createdMs > MESSAGE_EDIT_WINDOW_MS) {
     throw new Error('Delete window (5 minutes) has expired');
   }
@@ -1027,14 +1048,21 @@ export async function deleteOrderNote(
 export function validateDeliveryETA(
   eta: string | Date,
   eventDate?: string | any,
+  userTimezone?: string,
 ): { valid: boolean; error?: string } {
   const etaDate = typeof eta === 'string' ? new Date(eta) : eta;
   if (Number.isNaN(etaDate.getTime())) {
     return { valid: false, error: 'Invalid date/time format for ETA' };
   }
 
+  // Get user timezone for accurate comparison. Default to system timezone.
+  const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
   // Must be in the future
-  if (etaDate.getTime() <= Date.now()) {
+  // Use toLocaleString with timezone context for accurate comparison
+  const nowInTz = new Date().toLocaleString('en-US', { timeZone: timezone });
+  const etaInTz = etaDate.toLocaleString('en-US', { timeZone: timezone });
+  if (new Date(etaInTz).getTime() <= new Date(nowInTz).getTime()) {
     return { valid: false, error: 'ETA must be in the future' };
   }
 
@@ -1042,13 +1070,13 @@ export function validateDeliveryETA(
   if (eventDate) {
     let eventMs: number;
     if (typeof eventDate === 'string') {
-      eventMs = new Date(eventDate + 'T23:59:59').getTime();
-    } else if (eventDate?.toMillis) {
-      eventMs = eventDate.toMillis();
-    } else if (eventDate?.seconds) {
-      eventMs = eventDate.seconds * 1000;
+      // Create event date end-of-day in the user's timezone
+      const [y, m, d] = eventDate.split('-').map(Number);
+      const eventDateObj = new Date(y, m - 1, d, 23, 59, 59);
+      const eventInTz = eventDateObj.toLocaleString('en-US', { timeZone: timezone });
+      eventMs = new Date(eventInTz).getTime();
     } else {
-      eventMs = 0;
+      eventMs = toEpochMs(eventDate);
     }
     if (eventMs > 0 && etaDate.getTime() > eventMs) {
       return { valid: false, error: 'ETA cannot be after the event date' };
@@ -1130,16 +1158,25 @@ export async function createReviewWithDedup(
 
 // ── FIX-M7: Modification timeout check (called client-side on dashboard load) ──
 
+let _lastExpiredModCheck = 0;
+const EXPIRED_MOD_CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
 /**
  * FIX-M7: Check for and auto-reject expired vendor modifications.
  * Should be called when the vendor or customer dashboard loads.
  * Any order with pendingModification=true and modificationExpiresAt < now
  * will have its modification auto-rejected (reverted to original items).
+ *
+ * Uses a session guard to skip if called within the last 5 minutes,
+ * preventing redundant queries on rapid re-renders.
  */
 export async function checkAndRejectExpiredModifications(
   businessIdOrCustomerId: string,
   role: 'vendor' | 'customer',
 ): Promise<number> {
+  // Skip if called within the same session within the last 5 minutes
+  if (Date.now() - _lastExpiredModCheck < EXPIRED_MOD_CHECK_INTERVAL_MS) return 0;
+  _lastExpiredModCheck = Date.now();
   const fieldName = role === 'vendor' ? 'businessId' : 'customerId';
   const q = query(
     collection(db, ORDERS_COL),
@@ -1156,8 +1193,7 @@ export async function checkAndRejectExpiredModifications(
       _version?: number;
     };
 
-    const expiresMs = data.modificationExpiresAt?.toMillis?.()
-      || (data.modificationExpiresAt?.seconds ? data.modificationExpiresAt.seconds * 1000 : 0);
+    const expiresMs = toEpochMs(data.modificationExpiresAt);
 
     if (expiresMs > 0 && Date.now() > expiresMs && data.originalItems) {
       // Auto-reject: revert to original items
@@ -1199,24 +1235,24 @@ export function calculateStatusDurations(
 
   const durations: Record<string, number> = {};
   const sorted = [...statusHistory].sort((a, b) => {
-    const aMs = a.timestamp?.toMillis?.() || (a.timestamp?.seconds ? a.timestamp.seconds * 1000 : 0);
-    const bMs = b.timestamp?.toMillis?.() || (b.timestamp?.seconds ? b.timestamp.seconds * 1000 : 0);
+    const aMs = toEpochMs(a.timestamp);
+    const bMs = toEpochMs(b.timestamp);
     return aMs - bMs;
   });
 
   for (let i = 0; i < sorted.length - 1; i++) {
     const current = sorted[i];
     const next = sorted[i + 1];
-    const startMs = current.timestamp?.toMillis?.() || (current.timestamp?.seconds ? current.timestamp.seconds * 1000 : 0);
-    const endMs = next.timestamp?.toMillis?.() || (next.timestamp?.seconds ? next.timestamp.seconds * 1000 : 0);
+    const startMs = toEpochMs(current.timestamp);
+    const endMs = toEpochMs(next.timestamp);
     if (startMs && endMs) {
       durations[current.status] = (durations[current.status] || 0) + (endMs - startMs);
     }
   }
 
   // Total time from first status to last
-  const firstMs = sorted[0]?.timestamp?.toMillis?.() || (sorted[0]?.timestamp?.seconds ? sorted[0].timestamp.seconds * 1000 : 0);
-  const lastMs = sorted[sorted.length - 1]?.timestamp?.toMillis?.() || (sorted[sorted.length - 1]?.timestamp?.seconds ? sorted[sorted.length - 1].timestamp.seconds * 1000 : 0);
+  const firstMs = toEpochMs(sorted[0]?.timestamp);
+  const lastMs = toEpochMs(sorted[sorted.length - 1]?.timestamp);
   if (firstMs && lastMs) {
     durations._totalDeliveryTime = lastMs - firstMs;
   }

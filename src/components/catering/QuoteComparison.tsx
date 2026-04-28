@@ -17,6 +17,8 @@ import {
   formatPrice,
   requestReprice,
   resolveCounterOffer,
+  toEpochMs,
+  toDate,
 } from '@/services/cateringService';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/services/firebase';
@@ -104,8 +106,12 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   ];
 
   useEffect(() => {
-    const unsub = subscribeToQuoteResponses(quoteRequest.id, setResponses);
-    return unsub;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const unsub = subscribeToQuoteResponses(quoteRequest.id, (newResponses) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => setResponses(newResponses), 300);
+    });
+    return () => { clearTimeout(timeoutId); unsub(); };
   }, [quoteRequest.id]);
 
   // ── Check if orders already exist for this quote (survives page refresh) ──
@@ -249,9 +255,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
     // SB-38: Check quote expiry
     if (response.validUntil) {
-      const expiryMs = response.validUntil?.toMillis?.()
-        || (response.validUntil?.seconds ? response.validUntil.seconds * 1000 : 0)
-        || (typeof response.validUntil === 'string' ? new Date(response.validUntil).getTime() : 0);
+      const expiryMs = toEpochMs(response.validUntil);
       if (expiryMs && expiryMs < Date.now()) {
         setExpiredQuoteId(response.id);
         return;
@@ -380,7 +384,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   }, []);
 
   const getCountdown = (expiresAt: any): { timeLeft: string; isExpired: boolean; isUrgent: boolean } => {
-    const expiresMs = expiresAt?.toMillis?.() || (expiresAt?.seconds ? expiresAt.seconds * 1000 : 0);
+    const expiresMs = toEpochMs(expiresAt);
     const remainingMs = Math.max(0, expiresMs - Date.now());
     const isExpired = remainingMs <= 0;
     const hrs = Math.floor(remainingMs / (60 * 60 * 1000));
@@ -710,6 +714,15 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
             {/* Card header */}
             <button
               onClick={() => setExpandedId(isExpanded ? null : response.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setExpandedId(isExpanded ? null : response.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-expanded={expandedId === response.id}
               className="w-full flex items-center justify-between p-4 text-left"
             >
               <div className="flex items-center gap-3 flex-1">
@@ -743,7 +756,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   )}
                   {/* SB-38: Quote expiry status indicator */}
                   {response.validUntil && (() => {
-                    const expiryMs = response.validUntil?.toMillis?.() || (response.validUntil?.seconds ? response.validUntil.seconds * 1000 : 0) || 0;
+                    const expiryMs = toEpochMs(response.validUntil);
                     const isExpired = expiryMs > 0 && expiryMs < Date.now();
                     const expiryDate = expiryMs > 0 ? new Date(expiryMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
                     return isExpired ? (
@@ -758,7 +771,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   })()}
                   {/* SB-05: Quote expiry countdown */}
                   {response.validUntil && response.status === 'submitted' && (() => {
-                    const expiryDate = response.validUntil?.toDate?.() || new Date(response.validUntil);
+                    const expiryDate = toDate(response.validUntil);
                     const msLeft = expiryDate.getTime() - Date.now();
                     if (msLeft <= 0) return <p className="text-[10px] mt-0.5 font-medium" style={{ color: '#DC2626' }}>Quote expired</p>;
                     const hoursLeft = Math.floor(msLeft / (1000 * 60 * 60));

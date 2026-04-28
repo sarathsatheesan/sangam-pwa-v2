@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { memo, useState } from 'react';
 import {
   ChevronDown, ChevronUp, User, MapPin, Phone, Users, Square, CheckSquare,
   Pencil, Loader2, CheckCircle2, XCircle,
@@ -28,7 +28,7 @@ interface OrderCardProps {
   showCancelButton?: boolean;
 }
 
-export function OrderCard({
+function OrderCardInner({
   order,
   isExpanded,
   isActionLoading,
@@ -446,3 +446,5 @@ export function OrderCard({
     </div>
   );
 }
+
+export const OrderCard = memo(OrderCardInner);

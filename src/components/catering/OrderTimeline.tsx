@@ -4,6 +4,7 @@ import {
   Clock, AlertTriangle, Edit3, MessageSquare,
 } from 'lucide-react';
 import type { CateringOrder } from '@/services/cateringService';
+import { toEpochMs, toDate } from '@/services/cateringService';
 
 interface OrderTimelineProps {
   order: CateringOrder;
@@ -22,7 +23,7 @@ const STATUS_CONFIG: Record<string, { icon: React.ElementType; color: string; la
 
 function formatTimelineDate(ts: any): string {
   if (!ts) return '';
-  const d = ts.toDate ? ts.toDate() : new Date(ts.seconds ? ts.seconds * 1000 : ts);
+  const d = toDate(ts);
   return d.toLocaleString('en-US', {
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
   });
@@ -70,8 +71,8 @@ export default function OrderTimeline({ order, perspective }: OrderTimelineProps
 
   // Sort chronologically
   events.sort((a, b) => {
-    const aMs = a.timestamp?.toMillis?.() || a.timestamp?.seconds * 1000 || 0;
-    const bMs = b.timestamp?.toMillis?.() || b.timestamp?.seconds * 1000 || 0;
+    const aMs = toEpochMs(a.timestamp);
+    const bMs = toEpochMs(b.timestamp);
     return aMs - bMs;
   });
 
@@ -80,7 +81,7 @@ export default function OrderTimeline({ order, perspective }: OrderTimelineProps
       <h4 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--aurora-text-muted)' }}>
         Order Timeline
       </h4>
-      <div className="relative">
+      <div className="relative" role="list" aria-label="Order timeline">
         {/* Vertical line */}
         <div className="absolute left-3 top-2 bottom-2 w-0.5" style={{ backgroundColor: 'var(--aurora-border)' }} />
 
@@ -93,7 +94,7 @@ export default function OrderTimeline({ order, perspective }: OrderTimelineProps
           const isLast = idx === events.length - 1;
 
           return (
-            <div key={idx} className="relative flex items-start gap-3 pb-4">
+            <div key={idx} className="relative flex items-start gap-3 pb-4" role="listitem" aria-current={isLast ? 'step' : undefined}>
               {/* Dot */}
               <div
                 className="relative z-10 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full"
@@ -107,6 +108,7 @@ export default function OrderTimeline({ order, perspective }: OrderTimelineProps
                   <span className="text-sm font-medium" style={{ color: isLast ? 'var(--aurora-text)' : 'var(--aurora-text-secondary)' }}>
                     {config.label}
                   </span>
+                  <span className="sr-only">{isLast ? 'Current step:' : 'Step:'} {config.label}</span>
                 </div>
                 <span className="text-xs" style={{ color: 'var(--aurora-text-muted)' }}>{formatTimelineDate(event.timestamp)}</span>
                 {event.note && (
