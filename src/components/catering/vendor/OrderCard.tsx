@@ -9,6 +9,7 @@ import { formatPrice, vendorModifyOrder } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 import OrderTimeline from '../OrderTimeline';
 import OrderMessages from '../OrderMessages';
+import { SafeText } from '../SafeText';
 
 interface OrderCardProps {
   order: CateringOrder;
@@ -392,7 +393,7 @@ function OrderCardInner({
           {order.specialInstructions && (
             <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-surface-variant, #EDF0F7)' }}>
               <span className="font-medium">Note: </span>
-              {order.specialInstructions}
+              <SafeText text={order.specialInstructions} />
             </div>
           )}
 

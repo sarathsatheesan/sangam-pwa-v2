@@ -82,6 +82,7 @@ import {
   toDate,
 } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
+import { SafeText } from './SafeText';
 
 interface VendorQuoteResponseProps {
   businessId: string;
@@ -790,7 +791,7 @@ export default function VendorQuoteResponse({
                         })}
                         {request.specialInstructions && (
                           <p className="text-xs mt-2 p-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-secondary)' }}>
-                            Note: {request.specialInstructions}
+                            Note: <SafeText text={request.specialInstructions} />
                           </p>
                         )}
                       </div>

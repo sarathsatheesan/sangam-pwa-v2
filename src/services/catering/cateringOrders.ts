@@ -38,6 +38,7 @@ import type { CateringOrder, OrderItem, OrderNote, CateringQuoteRequest, Caterin
 import { toEpochMs } from './cateringUtils';
 import { notifyCustomerStatusChange, notifyCustomerOrderModified, notifyOrderCancelled } from './cateringNotifications';
 import { notifyOrderCancelledMultiChannel } from '../notificationService';
+import { logger } from '@/utils/logger';
 
 const ORDERS_COL = 'cateringOrders';
 
@@ -751,6 +752,11 @@ export async function createOrdersFromQuote(
     const requestSnap = await transaction.get(requestRef);
     if (requestSnap.exists() && requestSnap.data()?.ordersCreated) {
       // Another concurrent call already created orders — abort to prevent duplicates.
+      // Alert on duplicate order creation attempt
+      logger.alert('Duplicate order creation attempted', {
+        quoteRequestId: quoteRequest.id,
+        existingOrdersCreated: true,
+      });
       // Caller can query existing orders separately if needed.
       return [] as string[];
     }

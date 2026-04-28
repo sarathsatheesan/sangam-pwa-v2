@@ -47,6 +47,25 @@ const QUOTE_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 /** Minimum lead time: event must be more than 2 days away to allow edits */
 const MIN_EVENT_LEAD_MS = 2 * 24 * 60 * 60 * 1000;
 
+// ─────────────────────────────────────────────────────────────────────────
+// Rate limiting for RFP submissions
+// ─────────────────────────────────────────────────────────────────────────
+const rfpSubmissionTimestamps: number[] = [];
+const RFP_RATE_LIMIT = 5; // max 5 submissions
+const RFP_RATE_WINDOW_MS = 60 * 60 * 1000; // per hour
+
+function checkRfpRateLimit(): void {
+  const now = Date.now();
+  // Remove expired entries
+  while (rfpSubmissionTimestamps.length > 0 && now - rfpSubmissionTimestamps[0] > RFP_RATE_WINDOW_MS) {
+    rfpSubmissionTimestamps.shift();
+  }
+  if (rfpSubmissionTimestamps.length >= RFP_RATE_LIMIT) {
+    throw new Error('Rate limit exceeded: maximum 5 quote requests per hour. Please try again later.');
+  }
+  rfpSubmissionTimestamps.push(now);
+}
+
 /** Parse eventDate (YYYY-MM-DD string or Firestore timestamp) to epoch ms */
 function parseEventDateMs(eventDate: any): number {
   if (!eventDate) return 0;
@@ -60,6 +79,9 @@ function parseEventDateMs(eventDate: any): number {
 }
 
 export async function createQuoteRequest(request: Omit<CateringQuoteRequest, 'id' | 'responseCount'>): Promise<string> {
+  // Check rate limit first
+  checkRfpRateLimit();
+
   // Build payload explicitly to avoid undefined fields (Firestore rejects them)
   // and to avoid corrupting Firebase sentinel values like serverTimestamp()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

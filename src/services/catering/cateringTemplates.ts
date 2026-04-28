@@ -29,15 +29,13 @@ import { toEpochMs, toDate } from './cateringUtils';
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Generate a short unique share code.
+ * Generate a short unique share code using cryptographically secure random values.
  */
 function generateShareCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let code = '';
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
+  const array = new Uint8Array(8);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => chars.charAt(byte % chars.length)).join('');
 }
 
 function dedupeTemplates(templates: OrderTemplate[]): OrderTemplate[] {

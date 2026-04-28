@@ -17,9 +17,11 @@
     "crypto-js": "^4.2.0",
     "firebase": "^12.9.0",
     "framer-motion": "^12.34.3",
+    "i18next": "^26.0.8",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-i18next": "^17.0.6",
     "react-router-dom": "^7.13.0",
     "recharts": "^3.8.1",
     "zod": "^3.25.76"

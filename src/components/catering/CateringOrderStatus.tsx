@@ -21,6 +21,7 @@ import { useToast } from '@/contexts/ToastContext';
 import CateringReviewForm from './CateringReviewForm';
 import OrderTimeline from './OrderTimeline';
 import OrderMessages from './OrderMessages';
+import { SafeText } from './SafeText';
 import { doc, getDoc, updateDoc, serverTimestamp, collection, addDoc, query, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { STATUS_THEME, CUSTOMER_STATUS_LABELS } from '@/constants/cateringStatusTheme';
@@ -485,7 +486,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                       {order.specialInstructions && (
                         <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)' }}>
                           <span className="font-medium" style={{ color: 'var(--aurora-text)' }}>Note: </span>
-                          <span style={{ color: 'var(--aurora-text-secondary)' }}>{order.specialInstructions}</span>
+                          <SafeText text={order.specialInstructions} style={{ color: 'var(--aurora-text-secondary)' }} />
                         </div>
                       )}
 
