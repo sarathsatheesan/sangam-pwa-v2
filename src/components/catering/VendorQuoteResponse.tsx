@@ -1417,23 +1417,28 @@ export default function VendorQuoteResponse({
                                   <p className="text-sm font-semibold" style={{ color: '#92400E' }}>Price Negotiation Request</p>
                                 </div>
                                 <p className="text-sm" style={{ color: '#92400E' }}>
-                                  Customer proposes: <strong>{formatPrice(response.repriceRequestedPrice || 0)}</strong>
-                                  <span className="text-xs ml-1">(your quote: {formatPrice(response.total)})</span>
+                                  Customer proposes: <strong>{formatPrice(response.repriceRequestedPrice || 0)}</strong> for items
+                                  <span className="text-xs ml-1">(your quote: {formatPrice(response.subtotal)})</span>
                                 </p>
                                 {/* Items included in this reprice request */}
-                                {response.quotedItems && response.quotedItems.length > 0 && (
-                                  <div className="mt-1">
-                                    <p className="text-xs font-medium mb-0.5" style={{ color: '#92400E' }}>Items in request:</p>
-                                    <ul className="space-y-0.5">
-                                      {response.quotedItems.map((item, idx) => (
-                                        <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#92400E' }}>
-                                          <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#D97706' }} />
-                                          {item.name} × {item.qty} — {formatPrice(item.unitPrice * item.qty)}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
+                                {(() => {
+                                  const repriceItems = response.repriceItemNames && response.repriceItemNames.length > 0
+                                    ? response.quotedItems.filter(qi => response.repriceItemNames!.includes(qi.name))
+                                    : response.quotedItems;
+                                  return repriceItems.length > 0 ? (
+                                    <div className="mt-1">
+                                      <p className="text-xs font-medium mb-0.5" style={{ color: '#92400E' }}>Items in request ({repriceItems.length}):</p>
+                                      <ul className="space-y-0.5">
+                                        {repriceItems.map((item, idx) => (
+                                          <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#92400E' }}>
+                                            <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#D97706' }} />
+                                            {item.name} × {item.qty} — {formatPrice(item.unitPrice * item.qty)}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ) : null;
+                                })()}
                                 {response.repriceReason && (
                                   <p className="text-xs" style={{ color: '#92400E' }}>Reason: &ldquo;{response.repriceReason}&rdquo;</p>
                                 )}
@@ -1545,7 +1550,7 @@ export default function VendorQuoteResponse({
                           {response.repriceStatus === 'vendor_accepted' && (
                             <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#D1FAE5' }}>
                               <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#059669' }}>
-                                <CheckCircle2 size={12} /> You accepted the customer&apos;s price of {formatPrice(response.repriceRequestedPrice || 0)}
+                                <CheckCircle2 size={12} /> You accepted the customer&apos;s item price of {formatPrice(response.repriceRequestedPrice || 0)}
                               </p>
                             </div>
                           )}
@@ -1559,14 +1564,14 @@ export default function VendorQuoteResponse({
                           {response.repriceStatus === 'vendor_countered' && (
                             <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#EFF6FF' }}>
                               <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#1E40AF' }}>
-                                <RefreshCw size={12} /> Counter-offer of {formatPrice(response.repriceCounterPrice || 0)} sent. Waiting for customer response.
+                                <RefreshCw size={12} /> Counter-offer of {formatPrice(response.repriceCounterPrice || 0)} (items) sent. Waiting for customer response.
                               </p>
                             </div>
                           )}
                           {response.repriceStatus === 'counter_accepted' && (
                             <div className="mt-2 p-2 rounded-lg" style={{ backgroundColor: '#D1FAE5' }}>
                               <p className="text-xs font-medium flex items-center gap-1" style={{ color: '#059669' }}>
-                                <CheckCircle2 size={12} /> Customer accepted your counter-offer of {formatPrice(response.repriceCounterPrice || 0)}
+                                <CheckCircle2 size={12} /> Customer accepted your counter-offer of {formatPrice(response.repriceCounterPrice || 0)} (items)
                               </p>
                             </div>
                           )}

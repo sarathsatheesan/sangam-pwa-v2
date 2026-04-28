@@ -836,7 +836,8 @@ export async function createOrdersFromQuote(
 
       // If a reprice was accepted (vendor_accepted or counter_accepted), use the negotiated total
       // instead of recalculating from individual item prices.
-      // response.total in Firestore = repriceRequestedPrice or repriceCounterPrice (includes delivery fee)
+      // response.total = repriceRequestedPrice + deliveryFee (or repriceCounterPrice + deliveryFee)
+      // So subtracting deliveryFee gives us the negotiated item subtotal.
       const isRepriceAccepted = response.repriceStatus === 'vendor_accepted' || response.repriceStatus === 'counter_accepted';
       const subtotal = isRepriceAccepted
         ? Math.max(0, (response.total || itemSubtotal + deliveryFee) - deliveryFee)

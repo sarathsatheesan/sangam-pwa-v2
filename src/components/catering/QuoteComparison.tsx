@@ -316,14 +316,22 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       addToast('Please enter a valid price', 'error');
       return;
     }
-    if (priceCents >= response.total) {
-      addToast('Proposed price must be lower than the current quote', 'error');
+    // Validate against item subtotal (NOT total which includes delivery fee)
+    const selected = selectedItems[response.id] || new Set<string>();
+    const repriceItemNames = selected.size > 0
+      ? Array.from(selected)
+      : response.quotedItems.map(qi => qi.name);
+    const itemSubtotal = response.quotedItems
+      .filter(qi => repriceItemNames.includes(qi.name))
+      .reduce((sum, qi) => sum + qi.unitPrice * qi.qty, 0);
+    if (priceCents >= itemSubtotal) {
+      addToast('Proposed price must be lower than the current item subtotal', 'error');
       return;
     }
 
     setRepricingId(response.id);
     try {
-      await requestReprice(response.id, priceCents, repriceReason);
+      await requestReprice(response.id, priceCents, repriceReason, repriceItemNames);
       addToast('Reprice request sent! The vendor has 24 hours to respond.', 'success', 5000);
       setRepriceResponseId(null);
       setRepriceAmount('');
@@ -350,9 +358,11 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     setResolvingCounterId(response.id);
     try {
       await resolveCounterOffer(response.id, accept ? 'accept' : 'decline');
+      const counterItemTotal = response.repriceCounterPrice || 0;
+      const counterDelivFee = response.deliveryFee || 0;
       addToast(
         accept
-          ? `Counter-offer accepted! The new price of ${formatPrice(response.repriceCounterPrice || 0)} is now active.`
+          ? `Counter-offer accepted! New total: ${formatPrice(counterItemTotal + counterDelivFee)} (items ${formatPrice(counterItemTotal)} + delivery ${formatPrice(counterDelivFee)}).`
           : 'Counter-offer declined. The original quote price stands.',
         accept ? 'success' : 'info',
         5000,
@@ -792,9 +802,32 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   )}
                 </div>
                 <div className="text-right flex-shrink-0 ml-2">
-                  <p className="text-lg font-bold" style={{ color: '#6366F1' }}>
-                    {formatPrice(response.subtotal + (response.deliveryFee || 0))}
-                  </p>
+                  {(() => {
+                    const originalTotal = response.subtotal + (response.deliveryFee || 0);
+                    const isRepriced = response.repriceStatus === 'vendor_accepted' || response.repriceStatus === 'counter_accepted';
+                    // negotiatedItemSubtotal = items-only price after negotiation
+                    const negotiatedItemSubtotal = response.repriceStatus === 'counter_accepted'
+                      ? (response.repriceCounterPrice || response.subtotal)
+                      : (response.repriceRequestedPrice || response.subtotal);
+                    const negotiatedTotal = negotiatedItemSubtotal + (response.deliveryFee || 0);
+                    if (isRepriced && negotiatedTotal !== originalTotal) {
+                      return (
+                        <>
+                          <p className="text-xs line-through" style={{ color: 'var(--aurora-text-muted)' }}>
+                            {formatPrice(originalTotal)}
+                          </p>
+                          <p className="text-lg font-bold" style={{ color: '#059669' }}>
+                            {formatPrice(negotiatedTotal)}
+                          </p>
+                        </>
+                      );
+                    }
+                    return (
+                      <p className="text-lg font-bold" style={{ color: '#6366F1' }}>
+                        {formatPrice(originalTotal)}
+                      </p>
+                    );
+                  })()}
                   {response.estimatedPrepTime && (
                     <p className="text-[10px] flex items-center gap-1 justify-end" style={{ color: 'var(--aurora-text-secondary)' }}>
                       <Clock size={10} /> {response.estimatedPrepTime}
@@ -902,24 +935,62 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   const isPartialSelection = selected.size > 0 && selected.size < response.quotedItems.length;
                   const selectedTotal = selectedSubtotal + (response.deliveryFee || 0);
 
+                  // Reprice-aware totals — prices are items-only, delivery is always separate
+                  const isRepriced = response.repriceStatus === 'vendor_accepted' || response.repriceStatus === 'counter_accepted';
+                  const negotiatedItemSubtotal = isRepriced
+                    ? (response.repriceStatus === 'counter_accepted'
+                        ? (response.repriceCounterPrice || response.subtotal)
+                        : (response.repriceRequestedPrice || response.subtotal))
+                    : 0;
+                  const deliveryFee = response.deliveryFee || 0;
+                  const negotiatedTotal = negotiatedItemSubtotal + deliveryFee;
+
                   return (
                     <div className="pt-2 border-t space-y-1" style={{ borderColor: 'var(--aurora-border)' }}>
-                      <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                        <span>Subtotal ({response.quotedItems.length} items)</span>
-                        <span>{formatPrice(response.subtotal)}</span>
-                      </div>
-                      {response.deliveryFee != null && response.deliveryFee > 0 && (
-                        <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                          <span>Delivery fee</span>
-                          <span>{formatPrice(response.deliveryFee)}</span>
-                        </div>
+                      {isRepriced ? (
+                        <>
+                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-muted)' }}>
+                            <span>Original items ({response.quotedItems.length})</span>
+                            <span className="line-through">{formatPrice(response.subtotal)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs font-semibold" style={{ color: '#059669' }}>
+                            <span>Negotiated items{response.repriceItemNames && response.repriceItemNames.length > 0 && response.repriceItemNames.length < response.quotedItems.length ? ` (${response.repriceItemNames.length})` : ''}</span>
+                            <span>{formatPrice(negotiatedItemSubtotal)}</span>
+                          </div>
+                          {deliveryFee > 0 && (
+                            <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                              <span>Delivery fee</span>
+                              <span>{formatPrice(deliveryFee)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm font-bold pt-1 border-t" style={{ borderColor: 'var(--aurora-border)', color: '#059669' }}>
+                            <span>Total</span>
+                            <span>{formatPrice(negotiatedTotal)}</span>
+                          </div>
+                          <p className="text-[10px] pt-0.5" style={{ color: '#059669' }}>
+                            You save {formatPrice(displayTotal - negotiatedTotal)} on this quote
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>Subtotal ({response.quotedItems.length} items)</span>
+                            <span>{formatPrice(response.subtotal)}</span>
+                          </div>
+                          {deliveryFee > 0 && (
+                            <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                              <span>Delivery fee</span>
+                              <span>{formatPrice(deliveryFee)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm font-bold pt-1" style={{ color: 'var(--aurora-text)' }}>
+                            <span>Total</span>
+                            <span style={{ color: '#6366F1' }}>{formatPrice(displayTotal)}</span>
+                          </div>
+                        </>
                       )}
-                      <div className="flex justify-between text-sm font-bold pt-1" style={{ color: 'var(--aurora-text)' }}>
-                        <span>Total</span>
-                        <span style={{ color: '#6366F1' }}>{formatPrice(displayTotal)}</span>
-                      </div>
-                      {/* Dynamic selection total — shown when user selects a subset of items */}
-                      {isPartialSelection && (
+                      {/* Dynamic selection total — shown when user selects a subset of items (non-repriced only) */}
+                      {isPartialSelection && !isRepriced && (
                         <div className="mt-1.5 pt-1.5 border-t border-dashed" style={{ borderColor: 'var(--aurora-border)' }}>
                           <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
                             <span>Selected items ({selected.size})</span>
@@ -956,28 +1027,77 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
                   // Vendor accepted the customer's proposed price
                   if (rs === 'vendor_accepted') {
+                    const acceptedItemPrice = response.repriceRequestedPrice || response.subtotal;
+                    const delivFee = response.deliveryFee || 0;
+                    const newTotal = acceptedItemPrice + delivFee;
+                    const originalTotal = response.subtotal + delivFee;
+                    // Determine which items were part of this reprice
+                    const repriceItems = response.repriceItemNames && response.repriceItemNames.length > 0
+                      ? response.repriceItemNames
+                      : response.quotedItems.map(qi => qi.name);
                     return (
-                      <div className="p-3 rounded-xl space-y-1" style={{ backgroundColor: '#D1FAE5' }}>
+                      <div className="p-3 rounded-xl space-y-2" style={{ backgroundColor: '#D1FAE5' }}>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 size={16} style={{ color: '#059669' }} />
                           <p className="text-sm font-medium" style={{ color: '#059669' }}>
-                            Price request accepted! New total: {formatPrice(response.repriceRequestedPrice || response.total)}
+                            Price request accepted!
                           </p>
                         </div>
-                        {response.quotedItems && response.quotedItems.length > 0 && (
-                          <div className="ml-6 mt-0.5">
-                            <ul className="space-y-0.5">
-                              {response.quotedItems.map((item, idx) => (
-                                <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#047857' }}>
-                                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#059669' }} />
-                                  {item.name} × {item.qty}
-                                </li>
-                              ))}
-                            </ul>
+                        {/* Negotiated items list */}
+                        <div className="ml-6 mt-0.5">
+                          <p className="text-[10px] font-medium mb-1" style={{ color: '#047857' }}>
+                            Negotiated items ({repriceItems.length}):
+                          </p>
+                          <ul className="space-y-0.5">
+                            {response.quotedItems.filter(qi => repriceItems.includes(qi.name)).map((item, idx) => (
+                              <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#047857' }}>
+                                <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#059669' }} />
+                                {item.name} × {item.qty}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        {/* Price breakdown: items + delivery = total */}
+                        <div className="ml-6 mt-1 space-y-0.5">
+                          <div className="flex justify-between text-xs" style={{ color: '#047857' }}>
+                            <span>Items</span>
+                            <span>{formatPrice(acceptedItemPrice)}</span>
                           </div>
-                        )}
+                          {delivFee > 0 && (
+                            <div className="flex justify-between text-xs" style={{ color: '#047857' }}>
+                              <span>Delivery fee</span>
+                              <span>{formatPrice(delivFee)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-xs font-bold pt-0.5 border-t" style={{ borderColor: 'rgba(5,150,105,0.2)', color: '#047857' }}>
+                            <span>Total</span>
+                            <span>{formatPrice(newTotal)}</span>
+                          </div>
+                        </div>
                         {response.repriceVendorNote && (
                           <p className="text-xs ml-6" style={{ color: '#047857' }}>&ldquo;{response.repriceVendorNote}&rdquo;</p>
+                        )}
+                        {originalTotal > newTotal && (
+                          <p className="text-[10px] ml-6 font-medium" style={{ color: '#047857' }}>
+                            Saving {formatPrice(originalTotal - newTotal)} from the original quote
+                          </p>
+                        )}
+                        {/* CTA: Accept repriced items — scoped to repriceItemNames */}
+                        {isSubmitted && !isFullyAccepted && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedItems(prev => ({ ...prev, [response.id]: new Set(repriceItems) }));
+                              setPendingAcceptance({ response, itemNames: repriceItems });
+                              setShowAddressForm(true);
+                            }}
+                            disabled={finalizingOrder}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                            style={{ backgroundColor: '#059669' }}
+                          >
+                            <CheckCircle2 size={14} />
+                            Accept {repriceItems.length} Item{repriceItems.length > 1 ? 's' : ''} at {formatPrice(newTotal)}
+                          </button>
                         )}
                       </div>
                     );
@@ -1003,27 +1123,51 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   // Vendor sent a counter-offer — customer must respond
                   if (rs === 'vendor_countered') {
                     const counterExpiry = getCountdown(response.repriceCounterExpiresAt);
+                    const counterItemPrice = response.repriceCounterPrice || 0;
+                    const delivFee = response.deliveryFee || 0;
+                    const counterTotal = counterItemPrice + delivFee;
+                    const repriceItems = response.repriceItemNames && response.repriceItemNames.length > 0
+                      ? response.repriceItemNames
+                      : response.quotedItems.map(qi => qi.name);
                     return (
                       <div className="p-3 rounded-xl space-y-2" style={{ backgroundColor: '#EFF6FF' }}>
                         <div className="flex items-center gap-2">
                           <RefreshCw size={16} style={{ color: '#3B82F6' }} />
                           <p className="text-sm font-medium" style={{ color: '#1E40AF' }}>
-                            Counter-offer: {formatPrice(response.repriceCounterPrice || 0)}
-                            <span className="font-normal text-xs ml-1">(was {formatPrice(response.total)})</span>
+                            Counter-offer received
                           </p>
                         </div>
-                        {response.quotedItems && response.quotedItems.length > 0 && (
-                          <div className="ml-6">
-                            <ul className="space-y-0.5">
-                              {response.quotedItems.map((item, idx) => (
-                                <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#1E40AF' }}>
-                                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#3B82F6' }} />
-                                  {item.name} × {item.qty} — {formatPrice(item.unitPrice * item.qty)}
-                                </li>
-                              ))}
-                            </ul>
+                        {/* Counter-offer items */}
+                        <div className="ml-6">
+                          <p className="text-[10px] font-medium mb-0.5" style={{ color: '#1E40AF' }}>
+                            Items ({repriceItems.length}):
+                          </p>
+                          <ul className="space-y-0.5">
+                            {response.quotedItems.filter(qi => repriceItems.includes(qi.name)).map((item, idx) => (
+                              <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#1E40AF' }}>
+                                <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#3B82F6' }} />
+                                {item.name} × {item.qty}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        {/* Price breakdown */}
+                        <div className="ml-6 space-y-0.5">
+                          <div className="flex justify-between text-xs" style={{ color: '#1E40AF' }}>
+                            <span>Items</span>
+                            <span>{formatPrice(counterItemPrice)}</span>
                           </div>
-                        )}
+                          {delivFee > 0 && (
+                            <div className="flex justify-between text-xs" style={{ color: '#1E40AF' }}>
+                              <span>Delivery fee</span>
+                              <span>{formatPrice(delivFee)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-xs font-bold pt-0.5 border-t" style={{ borderColor: 'rgba(59,130,246,0.2)', color: '#1E40AF' }}>
+                            <span>Total</span>
+                            <span>{formatPrice(counterTotal)}</span>
+                          </div>
+                        </div>
                         {response.repriceVendorNote && (
                           <p className="text-xs ml-6" style={{ color: '#1E40AF' }}>&ldquo;{response.repriceVendorNote}&rdquo;</p>
                         )}
@@ -1065,14 +1209,60 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
 
                   // Customer accepted counter
                   if (rs === 'counter_accepted') {
+                    const counterItemPrice = response.repriceCounterPrice || response.subtotal;
+                    const delivFee = response.deliveryFee || 0;
+                    const newTotal = counterItemPrice + delivFee;
+                    const originalTotal = response.subtotal + delivFee;
+                    const repriceItems = response.repriceItemNames && response.repriceItemNames.length > 0
+                      ? response.repriceItemNames
+                      : response.quotedItems.map(qi => qi.name);
                     return (
-                      <div className="p-3 rounded-xl" style={{ backgroundColor: '#D1FAE5' }}>
+                      <div className="p-3 rounded-xl space-y-2" style={{ backgroundColor: '#D1FAE5' }}>
                         <div className="flex items-center gap-2">
                           <CheckCircle2 size={16} style={{ color: '#059669' }} />
                           <p className="text-sm font-medium" style={{ color: '#059669' }}>
-                            Counter-offer accepted! New total: {formatPrice(response.repriceCounterPrice || response.total)}
+                            Counter-offer accepted!
                           </p>
                         </div>
+                        {/* Price breakdown: items + delivery = total */}
+                        <div className="ml-6 space-y-0.5">
+                          <div className="flex justify-between text-xs" style={{ color: '#047857' }}>
+                            <span>Items ({repriceItems.length})</span>
+                            <span>{formatPrice(counterItemPrice)}</span>
+                          </div>
+                          {delivFee > 0 && (
+                            <div className="flex justify-between text-xs" style={{ color: '#047857' }}>
+                              <span>Delivery fee</span>
+                              <span>{formatPrice(delivFee)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-xs font-bold pt-0.5 border-t" style={{ borderColor: 'rgba(5,150,105,0.2)', color: '#047857' }}>
+                            <span>Total</span>
+                            <span>{formatPrice(newTotal)}</span>
+                          </div>
+                        </div>
+                        {originalTotal > newTotal && (
+                          <p className="text-[10px] ml-6 font-medium" style={{ color: '#047857' }}>
+                            Saving {formatPrice(originalTotal - newTotal)} from the original quote
+                          </p>
+                        )}
+                        {/* CTA: Accept at counter-offer price — scoped to repriceItemNames */}
+                        {isSubmitted && !isFullyAccepted && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedItems(prev => ({ ...prev, [response.id]: new Set(repriceItems) }));
+                              setPendingAcceptance({ response, itemNames: repriceItems });
+                              setShowAddressForm(true);
+                            }}
+                            disabled={finalizingOrder}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                            style={{ backgroundColor: '#059669' }}
+                          >
+                            <CheckCircle2 size={14} />
+                            Accept {repriceItems.length} Item{repriceItems.length > 1 ? 's' : ''} at {formatPrice(newTotal)}
+                          </button>
+                        )}
                       </div>
                     );
                   }
@@ -1094,28 +1284,49 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   // Reprice request pending vendor response
                   if (rs === 'requested') {
                     const reqExpiry = getCountdown(response.repriceExpiresAt);
+                    const requestedItemPrice = response.repriceRequestedPrice || 0;
+                    const delivFee = response.deliveryFee || 0;
+                    const requestedTotal = requestedItemPrice + delivFee;
+                    const repriceItems = response.repriceItemNames && response.repriceItemNames.length > 0
+                      ? response.repriceItemNames
+                      : response.quotedItems.map(qi => qi.name);
                     return (
                       <div className="p-3 rounded-xl space-y-1" style={{ backgroundColor: '#FFF7ED' }}>
                         <div className="flex items-center gap-2">
                           <Clock size={16} style={{ color: '#EA580C' }} />
                           <p className="text-sm font-medium" style={{ color: '#9A3412' }}>
-                            Reprice request sent — proposed {formatPrice(response.repriceRequestedPrice || 0)}
+                            Reprice request sent
                           </p>
                         </div>
                         {/* Items included in this reprice */}
-                        {response.quotedItems && response.quotedItems.length > 0 && (
-                          <div className="ml-6 mt-1">
-                            <p className="text-xs font-medium mb-0.5" style={{ color: '#9A3412' }}>Items:</p>
-                            <ul className="space-y-0.5">
-                              {response.quotedItems.map((item, idx) => (
-                                <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#92400E' }}>
-                                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#EA580C' }} />
-                                  {item.name} × {item.qty} — {formatPrice(item.unitPrice * item.qty)}
-                                </li>
-                              ))}
-                            </ul>
+                        <div className="ml-6 mt-1">
+                          <p className="text-[10px] font-medium mb-0.5" style={{ color: '#9A3412' }}>Items ({repriceItems.length}):</p>
+                          <ul className="space-y-0.5">
+                            {response.quotedItems.filter(qi => repriceItems.includes(qi.name)).map((item, idx) => (
+                              <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#92400E' }}>
+                                <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#EA580C' }} />
+                                {item.name} × {item.qty}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        {/* Price breakdown */}
+                        <div className="ml-6 mt-1 space-y-0.5">
+                          <div className="flex justify-between text-xs" style={{ color: '#92400E' }}>
+                            <span>Proposed items</span>
+                            <span>{formatPrice(requestedItemPrice)}</span>
                           </div>
-                        )}
+                          {delivFee > 0 && (
+                            <div className="flex justify-between text-xs" style={{ color: '#92400E' }}>
+                              <span>Delivery fee</span>
+                              <span>{formatPrice(delivFee)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-xs font-semibold pt-0.5" style={{ color: '#9A3412' }}>
+                            <span>Proposed total</span>
+                            <span>{formatPrice(requestedTotal)}</span>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-1 ml-6">
                           <Timer size={12} style={{ color: reqExpiry.isUrgent ? '#D97706' : '#6B7280' }} />
                           <span className={`text-xs ${reqExpiry.isUrgent ? 'font-medium' : ''}`} style={{ color: reqExpiry.isUrgent ? '#D97706' : '#6B7280' }}>
@@ -1155,9 +1366,20 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                         style={{ backgroundColor: '#059669' }}
                       >
                         <CheckCircle2 size={14} />
-                        {selected.size > 0
-                          ? `Accept ${selected.size} Item${selected.size > 1 ? 's' : ''}`
-                          : 'Select Items to Accept'}
+                        {(() => {
+                          if (selected.size === 0) return 'Select Items to Accept';
+                          const isRepriced = response.repriceStatus === 'vendor_accepted' || response.repriceStatus === 'counter_accepted';
+                          const itemLabel = `${selected.size} Item${selected.size > 1 ? 's' : ''}`;
+                          if (isRepriced) {
+                            // Show total = negotiated items + delivery fee
+                            const negotiatedItemPrice = response.repriceStatus === 'counter_accepted'
+                              ? (response.repriceCounterPrice || response.subtotal)
+                              : (response.repriceRequestedPrice || response.subtotal);
+                            const delivFee = response.deliveryFee || 0;
+                            return `Accept ${itemLabel} at ${formatPrice(negotiatedItemPrice + delivFee)}`;
+                          }
+                          return `Accept ${itemLabel}`;
+                        })()}
                       </button>
                       <button
                         type="button"
@@ -1280,37 +1502,106 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       {repriceResponseId && (() => {
         const targetResp = responses.find((r) => r.id === repriceResponseId);
         if (!targetResp) return null;
+        // Determine which items are selected for repricing
+        const repriceSelected = selectedItems[targetResp.id] || new Set<string>();
+        const repriceItemsList = repriceSelected.size > 0
+          ? targetResp.quotedItems.filter(qi => repriceSelected.has(qi.name))
+          : targetResp.quotedItems;
+        const repriceItemSubtotal = repriceItemsList.reduce((sum, qi) => sum + qi.unitPrice * qi.qty, 0);
+        const repriceDelivFee = targetResp.deliveryFee || 0;
+        // Compute preview total when user enters an amount
+        const previewItemCents = repriceAmount ? Math.round(parseFloat(repriceAmount) * 100) : 0;
+        const previewTotal = previewItemCents > 0 ? previewItemCents + repriceDelivFee : 0;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
-            <div className="w-full max-w-md rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
+            <div
+              className="w-full max-w-md rounded-xl p-6 shadow-xl"
+              style={{
+                backgroundColor: 'var(--aurora-surface)',
+                maxHeight: '90vh',
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
               <div className="flex items-center gap-2 mb-3">
                 <RefreshCw size={20} style={{ color: '#6366F1' }} />
                 <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Request New Price</h3>
               </div>
-              <p className="text-sm mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
-                Current quote from <strong>{targetResp.businessName}</strong>: <strong>{formatPrice(targetResp.total)}</strong>
+              <p className="text-sm mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+                Negotiate item prices with <strong>{targetResp.businessName}</strong>
               </p>
-              <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-muted)' }}>
+
+              {/* Items being repriced */}
+              <div className="mb-3 p-3 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--aurora-text-muted)' }}>
+                  {repriceSelected.size > 0 ? `Selected items (${repriceItemsList.length})` : `All items (${repriceItemsList.length})`}
+                </p>
+                <ul className="space-y-1">
+                  {repriceItemsList.map((qi, idx) => (
+                    <li key={idx} className="flex justify-between text-xs" style={{ color: 'var(--aurora-text)' }}>
+                      <span>{qi.name} × {qi.qty}</span>
+                      <span className="font-medium">{formatPrice(qi.unitPrice * qi.qty)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-between text-xs font-semibold mt-1.5 pt-1.5 border-t" style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}>
+                  <span>Current item subtotal</span>
+                  <span>{formatPrice(repriceItemSubtotal)}</span>
+                </div>
+                {repriceDelivFee > 0 && (
+                  <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
+                    <span>Delivery fee <span className="text-[10px]">(non-negotiable)</span></span>
+                    <span>{formatPrice(repriceDelivFee)}</span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[10px] mb-3 px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(99,102,241,0.05)', color: 'var(--aurora-text-muted)' }}>
                 This is a one-time request. The vendor can accept your price, decline, or send a counter-offer. You&apos;ll have 24 hours to respond to any counter.
               </p>
+
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
-                    Your proposed total price <span className="text-red-500">*</span>
+                    Your proposed item price <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium" style={{ color: 'var(--aurora-text-muted)' }}>$</span>
                     <input
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       min="0"
                       value={repriceAmount}
                       onChange={(e) => setRepriceAmount(e.target.value)}
                       placeholder="0.00"
-                      className="w-full rounded-lg border pl-7 pr-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      style={{ borderColor: 'var(--aurora-border)' }}
+                      className="w-full rounded-lg border pl-7 pr-3 py-2.5 text-sm outline-none transition-colors"
+                      style={{
+                        borderColor: 'var(--aurora-border)',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'textfield' as any,
+                      }}
                     />
                   </div>
+                  {/* Live preview of total */}
+                  {previewTotal > 0 && (
+                    <div className="mt-1.5 p-2 rounded-lg" style={{ backgroundColor: 'rgba(5,150,105,0.05)' }}>
+                      <div className="flex justify-between text-xs" style={{ color: '#059669' }}>
+                        <span>Items</span>
+                        <span>{formatPrice(previewItemCents)}</span>
+                      </div>
+                      {repriceDelivFee > 0 && (
+                        <div className="flex justify-between text-xs" style={{ color: '#059669' }}>
+                          <span>Delivery fee</span>
+                          <span>{formatPrice(repriceDelivFee)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs font-bold pt-0.5 border-t mt-0.5" style={{ borderColor: 'rgba(5,150,105,0.15)', color: '#059669' }}>
+                        <span>Your proposed total</span>
+                        <span>{formatPrice(previewTotal)}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
@@ -1321,7 +1612,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                     onChange={(e) => setRepriceReason(e.target.value)}
                     placeholder="e.g. Budget constraint, competing offer..."
                     rows={2}
-                    className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                    className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition-colors resize-none"
                     style={{ borderColor: 'var(--aurora-border)' }}
                   />
                 </div>
@@ -1361,11 +1652,46 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                 {pendingAcceptance ? 'Accept & Finalize Order' : 'Delivery Address'}
               </h3>
             </div>
-            <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
-              {pendingAcceptance
-                ? `Provide the delivery address to accept ${pendingAcceptance.itemNames.length} item${pendingAcceptance.itemNames.length > 1 ? 's' : ''} and finalize your order.`
-                : 'Please provide the full delivery address for your event.'}
+            <p className="text-sm mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
+              {(() => {
+                if (!pendingAcceptance) return 'Please provide the full delivery address for your event.';
+                const { response: paResp, itemNames } = pendingAcceptance;
+                const count = itemNames.length;
+                const isRepriced = paResp.repriceStatus === 'vendor_accepted' || paResp.repriceStatus === 'counter_accepted';
+                if (isRepriced) {
+                  return `Provide the delivery address to accept ${count} item${count > 1 ? 's' : ''} and finalize your order.`;
+                }
+                return `Provide the delivery address to accept ${count} item${count > 1 ? 's' : ''} and finalize your order.`;
+              })()}
             </p>
+            {/* Order summary for repriced orders */}
+            {pendingAcceptance && (() => {
+              const { response: paResp } = pendingAcceptance;
+              const isRepriced = paResp.repriceStatus === 'vendor_accepted' || paResp.repriceStatus === 'counter_accepted';
+              if (!isRepriced) return null;
+              const negotiatedItemPrice = paResp.repriceStatus === 'counter_accepted'
+                ? (paResp.repriceCounterPrice || paResp.subtotal)
+                : (paResp.repriceRequestedPrice || paResp.subtotal);
+              const delivFee = paResp.deliveryFee || 0;
+              return (
+                <div className="mb-4 p-3 rounded-lg space-y-0.5" style={{ backgroundColor: 'rgba(5,150,105,0.05)' }}>
+                  <div className="flex justify-between text-xs" style={{ color: '#059669' }}>
+                    <span>Negotiated items</span>
+                    <span>{formatPrice(negotiatedItemPrice)}</span>
+                  </div>
+                  {delivFee > 0 && (
+                    <div className="flex justify-between text-xs" style={{ color: '#059669' }}>
+                      <span>Delivery fee</span>
+                      <span>{formatPrice(delivFee)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold pt-1 border-t" style={{ borderColor: 'rgba(5,150,105,0.15)', color: '#059669' }}>
+                    <span>Order total</span>
+                    <span>{formatPrice(negotiatedItemPrice + delivFee)}</span>
+                  </div>
+                </div>
+              );
+            })()}
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: 'var(--aurora-text-secondary)' }}>
@@ -1547,7 +1873,20 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                 style={{ backgroundColor: '#059669' }}
               >
                 {finalizingOrder && <Loader2 size={14} className="animate-spin" />}
-                {pendingAcceptance ? `Accept ${pendingAcceptance.itemNames.length} Item${pendingAcceptance.itemNames.length > 1 ? 's' : ''} & Finalize` : 'Finalize Order'}
+                {(() => {
+                  if (!pendingAcceptance) return 'Finalize Order';
+                  const { response: paResp, itemNames } = pendingAcceptance;
+                  const itemLabel = `${itemNames.length} Item${itemNames.length > 1 ? 's' : ''}`;
+                  const isRepriced = paResp.repriceStatus === 'vendor_accepted' || paResp.repriceStatus === 'counter_accepted';
+                  if (isRepriced) {
+                    const negotiatedItemPrice = paResp.repriceStatus === 'counter_accepted'
+                      ? (paResp.repriceCounterPrice || paResp.subtotal)
+                      : (paResp.repriceRequestedPrice || paResp.subtotal);
+                    const delivFee = paResp.deliveryFee || 0;
+                    return `Accept ${itemLabel} at ${formatPrice(negotiatedItemPrice + delivFee)} & Finalize`;
+                  }
+                  return `Accept ${itemLabel} & Finalize`;
+                })()}
               </button>
             </div>
           </div>

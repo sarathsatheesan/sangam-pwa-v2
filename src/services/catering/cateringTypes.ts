@@ -268,12 +268,13 @@ export interface CateringQuoteResponse {
   // ── Reprice negotiation (one-shot) ──
   // Customer requests a new price → vendor responds (accept/deny/counter) → customer accepts or declines
   repriceStatus?: 'none' | 'requested' | 'vendor_accepted' | 'vendor_denied' | 'vendor_countered' | 'counter_accepted' | 'counter_declined' | 'expired';
-  repriceRequestedPrice?: number;  // cents — the total the customer proposed
+  repriceRequestedPrice?: number;  // cents — item subtotal only (excludes delivery fee)
+  repriceItemNames?: string[];     // which specific items the reprice covers (scoped negotiation)
   repriceReason?: string;          // optional customer note explaining the ask
   repriceRequestedAt?: any;        // Timestamp — starts the 24h vendor response window
   repriceExpiresAt?: any;          // Timestamp — when the vendor's response window closes
   repriceVendorNote?: string;      // vendor's note when responding
-  repriceCounterPrice?: number;    // cents — vendor's counter-offer total (when status='vendor_countered')
+  repriceCounterPrice?: number;    // cents — vendor's counter-offer for items only, excludes delivery fee (when status='vendor_countered')
   repriceRespondedAt?: any;        // Timestamp — when vendor responded
   repriceCounterExpiresAt?: any;   // Timestamp — when the customer's acceptance window closes (24h after vendor counter)
   repriceResolvedAt?: any;         // Timestamp — when customer accepted/declined the counter

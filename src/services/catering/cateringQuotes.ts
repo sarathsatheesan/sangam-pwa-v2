@@ -934,6 +934,7 @@ export async function requestReprice(
   responseId: string,
   requestedPrice: number,
   reason?: string,
+  repriceItemNames?: string[],
 ): Promise<void> {
   const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
   const snap = await getDoc(responseRef);
@@ -954,6 +955,7 @@ export async function requestReprice(
   await updateDoc(responseRef, {
     repriceStatus: 'requested',
     repriceRequestedPrice: requestedPrice,
+    repriceItemNames: repriceItemNames || [],
     repriceReason: reason || '',
     repriceRequestedAt: now,
     repriceExpiresAt: expiresAt,
@@ -995,9 +997,9 @@ export async function respondToReprice(
   };
 
   if (action === 'accept') {
-    // Vendor accepts the customer's proposed price — update the quote total
+    // Vendor accepts the customer's proposed item price — total = item subtotal + delivery fee
     update.repriceStatus = 'vendor_accepted';
-    update.total = data.repriceRequestedPrice;
+    update.total = (data.repriceRequestedPrice || 0) + (data.deliveryFee || 0);
   } else if (action === 'deny') {
     // Vendor refuses — original price stands, negotiation over
     update.repriceStatus = 'vendor_denied';
@@ -1046,7 +1048,8 @@ export async function resolveCounterOffer(
 
   if (action === 'accept') {
     update.repriceStatus = 'counter_accepted';
-    update.total = data.repriceCounterPrice;
+    // Counter price is items-only — total = counter item subtotal + delivery fee
+    update.total = (data.repriceCounterPrice || 0) + (data.deliveryFee || 0);
   } else {
     update.repriceStatus = 'counter_declined';
     // Total stays at original value
