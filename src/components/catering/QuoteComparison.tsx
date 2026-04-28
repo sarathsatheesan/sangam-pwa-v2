@@ -1509,13 +1509,18 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                     }
 
                     setPendingAcceptance(null);
-                    addToast(
-                      orderIds.length === 1
-                        ? 'Order accepted and created! Track it in your orders tab.'
-                        : `${orderIds.length} orders accepted and created. Track them in your orders tab.`,
-                      'success',
-                      5000,
-                    );
+                    if (orderIds.length === 0) {
+                      // Race condition: another tab/session already created orders
+                      addToast('Orders were already created for this request. Check your orders tab.', 'info', 5000);
+                    } else {
+                      addToast(
+                        orderIds.length === 1
+                          ? 'Order accepted and created! Track it in your orders tab.'
+                          : `${orderIds.length} orders accepted and created. Track them in your orders tab.`,
+                        'success',
+                        5000,
+                      );
+                    }
                     if (onViewOrders) onViewOrders();
                   } catch (err: any) {
                     console.error('[QuoteComparison] Accept & Finalize error:', err);

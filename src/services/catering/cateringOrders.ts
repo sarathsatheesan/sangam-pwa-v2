@@ -723,12 +723,9 @@ export async function createOrdersFromQuote(
     // Re-check inside transaction: has another call already created orders?
     const requestSnap = await transaction.get(requestRef);
     if (requestSnap.exists() && requestSnap.data()?.ordersCreated) {
-      // Another concurrent call already created orders — fetch and return them
-      const existing = await getDocs(query(
-        collection(db, ORDERS_COL),
-        where('quoteRequestId', '==', quoteRequest.id),
-      ));
-      return existing.docs.map((d) => d.id);
+      // Another concurrent call already created orders — abort to prevent duplicates.
+      // Caller can query existing orders separately if needed.
+      return [] as string[];
     }
 
     // Mark the request as having orders created (inside transaction for atomicity)
