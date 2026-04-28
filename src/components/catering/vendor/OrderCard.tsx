@@ -1,15 +1,26 @@
 import React, { memo, useState } from 'react';
 import {
   ChevronDown, ChevronUp, User, MapPin, Phone, Users, Square, CheckSquare,
-  Pencil, Loader2, CheckCircle2, XCircle,
+  Pencil, Loader2, CheckCircle2, XCircle, Package, Truck, Clock, Ban,
 } from 'lucide-react';
-import { calculateOrderTotal, getTaxRate } from '@/services/cateringService';
+import { getTaxRate } from '@/services/cateringService';
 import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import { formatPrice, vendorModifyOrder } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 import OrderTimeline from '../OrderTimeline';
 import OrderMessages from '../OrderMessages';
 import { SafeText } from '../SafeText';
+
+// SB-31: Format ETA value based on mode (time or duration)
+function formatEtaValue(value: string, mode: string): string {
+  if (!value) return '';
+  if (mode === 'duration') return `~${value} min`;
+  // Convert 24h to 12h format
+  const [h, m] = value.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+}
 
 interface OrderCardProps {
   order: CateringOrder;
@@ -47,10 +58,15 @@ function OrderCardInner({
   showCancelButton = false,
 }: OrderCardProps) {
   const { addToast } = useToast();
+
+  // Order modification state (managed internally)
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [editItems, setEditItems] = useState<OrderItem[]>([]);
   const [editNote, setEditNote] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+
+  // ETA inputs state (managed internally)
+  const [etaInputs, setEtaInputs] = useState<Record<string, string>>({});
 
   const startEditOrder = () => {
     setEditingOrderId(order.id);
@@ -376,6 +392,14 @@ function OrderCardInner({
                   </div>
                 </div>
               )}
+
+              {/* Revert to original items if modification was rejected */}
+              {(order as any).modificationRejected && order.originalItems && ['confirmed', 'preparing'].includes(order.status) && (
+                <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: '#DBEAFE' }}>
+                  <span className="font-medium" style={{ color: '#1E40AF' }}>Original items restored</span>
+                </div>
+              )}
+
               {/* Edit order button for confirmed/preparing */}
               {['confirmed', 'preparing'].includes(order.status) && (
                 <button
@@ -397,16 +421,6 @@ function OrderCardInner({
             </div>
           )}
 
-          {/* Cancellation reason display */}
-          {order.status === 'cancelled' && (order.cancellationReason || order.declinedReason) && (
-            <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
-              <span className="font-medium" style={{ color: '#991B1B' }}>
-                {order.cancelledBy === 'customer' ? 'Cancelled by customer: ' : 'Reason: '}
-              </span>
-              <span style={{ color: '#DC2626' }}>{order.cancellationReason || order.declinedReason}</span>
-            </div>
-          )}
-
           {/* In-order messages */}
           {!['cancelled'].includes(order.status) && currentUserId && (
             <OrderMessages
@@ -419,7 +433,11 @@ function OrderCardInner({
             />
           )}
 
-          {/* Action buttons for pending orders */}
+          {/* ══════════════════════════════════════════════════════════════════════
+             ACTION BUTTONS — Status progression for vendor order management
+             ══════════════════════════════════════════════════════════════════════ */}
+
+          {/* PENDING: Accept / Decline */}
           {order.status === 'pending' && (
             <div className="flex gap-2 pt-2">
               <button
@@ -440,6 +458,162 @@ function OrderCardInner({
                 {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
                 Decline
               </button>
+            </div>
+          )}
+
+          {/* CONFIRMED → PREPARING */}
+          {order.status === 'confirmed' && (
+            <button
+              onClick={() => onStatusChange(order.id, 'preparing')}
+              disabled={isActionLoading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+              style={{ backgroundColor: 'var(--aurora-accent)' }}
+            >
+              {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+              Mark as Preparing
+            </button>
+          )}
+
+          {/* PREPARING → READY (with optional prep time estimate) */}
+          {order.status === 'preparing' && (
+            <div className="space-y-2">
+              {/* SB-17 & SB-31: Prep time estimate input */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={etaInputs[`prep_${order.id}`] || ''}
+                  onChange={(e) => setEtaInputs(prev => ({ ...prev, [`prep_${order.id}`]: e.target.value }))}
+                  onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
+                  className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-purple-500/30"
+                  style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)', appearance: 'auto' } as React.CSSProperties}
+                  aria-label="Estimated ready time"
+                />
+                {etaInputs[`prep_${order.id}`]?.trim() && (
+                  <button
+                    onClick={() => {
+                      const eta = etaInputs[`prep_${order.id}`]?.trim();
+                      if (eta) {
+                        const formattedEta = formatEtaValue(eta, 'time');
+                        onStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: formattedEta }).catch(() => {});
+                        addToast('Prep time estimate shared with customer', 'success');
+                      }
+                    }}
+                    className="px-3 py-2 rounded-lg text-xs font-medium text-white"
+                    style={{ backgroundColor: '#8B5CF6' }}
+                  >
+                    Share
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => onStatusChange(order.id, 'ready')}
+                disabled={isActionLoading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: '#10B981' }}
+              >
+                {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                Mark as Ready
+              </button>
+            </div>
+          )}
+
+          {/* READY → OUT FOR DELIVERY (with ETA time/duration toggle) */}
+          {order.status === 'ready' && (
+            <div className="space-y-2">
+              {/* SB-31: Delivery ETA with time/duration toggle */}
+              <div className="flex items-center gap-2">
+                <select
+                  value={etaInputs[`mode_${order.id}`] || 'time'}
+                  onChange={(e) => setEtaInputs(prev => ({ ...prev, [`mode_${order.id}`]: e.target.value, [order.id]: '' }))}
+                  className="rounded-lg border px-2 py-2 text-xs outline-none focus:ring-2 focus:ring-sky-500/30"
+                  style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                >
+                  <option value="time">Specific time</option>
+                  <option value="duration">Duration (minutes)</option>
+                </select>
+                {(etaInputs[`mode_${order.id}`] || 'time') === 'time' ? (
+                  <input
+                    type="time"
+                    value={etaInputs[order.id] || ''}
+                    onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                    onClick={(e) => { try { (e.currentTarget as any).showPicker(); } catch {} }}
+                    className="flex-1 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
+                    style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)', appearance: 'auto' } as React.CSSProperties}
+                  />
+                ) : (
+                  <div className="flex items-center gap-1 flex-1">
+                    <input
+                      type="number"
+                      min="5"
+                      max="480"
+                      step="5"
+                      placeholder="30"
+                      value={etaInputs[order.id] || ''}
+                      onChange={(e) => setEtaInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                      className="w-20 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-sky-500/30"
+                      style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
+                    />
+                    <span className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>minutes</span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  const eta = etaInputs[order.id]?.trim();
+                  const mode = etaInputs[`mode_${order.id}`] || 'time';
+                  const formattedEta = eta ? formatEtaValue(eta, mode) : undefined;
+                  onStatusChange(order.id, 'out_for_delivery', formattedEta ? { estimatedDeliveryTime: formattedEta } : undefined);
+                }}
+                disabled={isActionLoading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: '#0EA5E9' }}
+              >
+                {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+                Dispatch for Delivery
+              </button>
+            </div>
+          )}
+
+          {/* OUT FOR DELIVERY → DELIVERED */}
+          {order.status === 'out_for_delivery' && (
+            <div className="space-y-2">
+              {order.estimatedDeliveryTime && (
+                <div className="flex items-center gap-1.5 text-xs p-2 rounded-lg" style={{ backgroundColor: '#E0F2FE', color: '#0369A1' }}>
+                  <Clock size={12} />
+                  <span className="font-medium">ETA: {order.estimatedDeliveryTime}</span>
+                </div>
+              )}
+              <button
+                onClick={() => onStatusChange(order.id, 'delivered')}
+                disabled={isActionLoading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
+                style={{ backgroundColor: '#059669' }}
+              >
+                {isActionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                Mark as Delivered
+              </button>
+            </div>
+          )}
+
+          {/* Cancel button for non-pending active orders */}
+          {['confirmed', 'preparing', 'ready'].includes(order.status) && onCancel && (
+            <button
+              onClick={() => onCancel(order.id)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors border mt-2"
+              style={{ borderColor: '#FCA5A5', color: '#DC2626', backgroundColor: '#FEF2F2' }}
+            >
+              <Ban size={14} />
+              Cancel Order
+            </button>
+          )}
+
+          {/* Cancellation reason display */}
+          {order.status === 'cancelled' && (order.cancellationReason || order.declinedReason) && (
+            <div className="text-sm p-2 rounded-lg" style={{ backgroundColor: '#FEE2E2' }}>
+              <span className="font-medium" style={{ color: '#991B1B' }}>
+                {order.cancelledBy === 'customer' ? 'Cancelled by customer: ' : 'Reason: '}
+              </span>
+              <span style={{ color: '#DC2626' }}>{order.cancellationReason || order.declinedReason}</span>
             </div>
           )}
         </div>
