@@ -50,6 +50,14 @@
       ]
     },
     {
+      "collectionGroup": "cateringOrders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customerId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "cateringNotifications",
       "queryScope": "COLLECTION",
       "fields": [

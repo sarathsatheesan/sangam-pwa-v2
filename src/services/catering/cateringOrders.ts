@@ -90,19 +90,44 @@ export function subscribeToCustomerOrders(
   callback: (orders: CateringOrder[]) => void,
   pageSize: number = 25,
 ): Unsubscribe {
-  const q = query(
+  // Try indexed query first (requires composite index: customerId + createdAt desc)
+  let fallbackUnsub: Unsubscribe | null = null;
+  const indexedQuery = query(
     collection(db, ORDERS_COL),
     where('customerId', '==', customerId),
     orderBy('createdAt', 'desc'),
     firestoreLimit(pageSize),
   );
-  return onSnapshot(q, (snap) => {
+  const unsub = onSnapshot(indexedQuery, (snap) => {
     const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
     callback(results);
   }, (err) => {
-    console.warn('subscribeToCustomerOrders error:', err);
-    callback([]);
+    // Composite index likely missing — fall back to simple query with client-side sort
+    console.warn('subscribeToCustomerOrders: indexed query failed, falling back to simple query:', err.message);
+    const simpleQuery = query(
+      collection(db, ORDERS_COL),
+      where('customerId', '==', customerId),
+    );
+    fallbackUnsub = onSnapshot(simpleQuery, (snap) => {
+      const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
+      // Client-side sort by createdAt descending
+      results.sort((a, b) => {
+        const aMs = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+        const bMs = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+        return bMs - aMs;
+      });
+      callback(results);
+    }, (innerErr) => {
+      console.error('subscribeToCustomerOrders: fallback query also failed:', innerErr);
+      callback([]);
+    });
   });
+
+  // Return cleanup that tears down whichever listener is active
+  return () => {
+    unsub();
+    if (fallbackUnsub) fallbackUnsub();
+  };
 }
 
 export async function fetchMoreCustomerOrders(
@@ -126,20 +151,41 @@ export function subscribeToBusinessOrders(
   callback: (orders: CateringOrder[]) => void,
   pageSize: number = 25,
 ): Unsubscribe {
-  // Use orderBy + limit for server-side pagination
-  const q = query(
+  // Use orderBy + limit for server-side pagination (requires composite index: businessId + createdAt desc)
+  let fallbackUnsub: Unsubscribe | null = null;
+  const indexedQuery = query(
     collection(db, ORDERS_COL),
     where('businessId', '==', businessId),
     orderBy('createdAt', 'desc'),
     firestoreLimit(pageSize),
   );
-  return onSnapshot(q, (snap) => {
+  const unsub = onSnapshot(indexedQuery, (snap) => {
     const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
     callback(results);
   }, (err) => {
-    console.warn('subscribeToBusinessOrders error:', err);
-    callback([]);
+    console.warn('subscribeToBusinessOrders: indexed query failed, falling back:', err.message);
+    const simpleQuery = query(
+      collection(db, ORDERS_COL),
+      where('businessId', '==', businessId),
+    );
+    fallbackUnsub = onSnapshot(simpleQuery, (snap) => {
+      const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as CateringOrder));
+      results.sort((a, b) => {
+        const aMs = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+        const bMs = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+        return bMs - aMs;
+      });
+      callback(results);
+    }, (innerErr) => {
+      console.error('subscribeToBusinessOrders: fallback also failed:', innerErr);
+      callback([]);
+    });
   });
+
+  return () => {
+    unsub();
+    if (fallbackUnsub) fallbackUnsub();
+  };
 }
 
 export async function fetchMoreBusinessOrders(
