@@ -97,12 +97,23 @@ export function subscribeToFavorites(
 }
 
 /**
+ * Verify document ownership before mutation. Throws if doc doesn't exist or userId doesn't match.
+ */
+async function verifyOwnership(collectionName: string, docId: string, userId: string): Promise<void> {
+  const snap = await getDoc(doc(db, collectionName, docId));
+  if (!snap.exists()) throw new Error(`Document ${docId} not found`);
+  if (snap.data().userId !== userId) throw new Error('Unauthorized: you do not own this document');
+}
+
+/**
  * Update a favorite (rename, update items, etc.).
  */
 export async function updateFavoriteOrder(
   favId: string,
   updates: Partial<FavoriteOrder>,
+  userId: string,
 ): Promise<void> {
+  await verifyOwnership('cateringFavorites', favId, userId);
   const { id, ...data } = updates as any;
   await updateDoc(doc(db, 'cateringFavorites', favId), data);
 }
@@ -110,7 +121,8 @@ export async function updateFavoriteOrder(
 /**
  * Delete a favorite.
  */
-export async function deleteFavoriteOrder(favId: string): Promise<void> {
+export async function deleteFavoriteOrder(favId: string, userId: string): Promise<void> {
+  await verifyOwnership('cateringFavorites', favId, userId);
   await deleteDoc(doc(db, 'cateringFavorites', favId));
 }
 
@@ -300,7 +312,9 @@ export function subscribeToRecurringOrders(
 export async function updateRecurringOrder(
   recId: string,
   updates: Partial<RecurringOrder>,
+  userId: string,
 ): Promise<void> {
+  await verifyOwnership('cateringRecurring', recId, userId);
   const { id, ...data } = updates as any;
   await updateDoc(doc(db, 'cateringRecurring', recId), {
     ...data,
@@ -311,14 +325,16 @@ export async function updateRecurringOrder(
 /**
  * Delete a recurring order.
  */
-export async function deleteRecurringOrder(recId: string): Promise<void> {
+export async function deleteRecurringOrder(recId: string, userId: string): Promise<void> {
+  await verifyOwnership('cateringRecurring', recId, userId);
   await deleteDoc(doc(db, 'cateringRecurring', recId));
 }
 
 /**
  * Toggle a recurring order active/paused.
  */
-export async function toggleRecurringOrder(recId: string, active: boolean): Promise<void> {
+export async function toggleRecurringOrder(recId: string, active: boolean, userId: string): Promise<void> {
+  await verifyOwnership('cateringRecurring', recId, userId);
   await updateDoc(doc(db, 'cateringRecurring', recId), {
     active,
     updatedAt: serverTimestamp(),
@@ -332,7 +348,9 @@ export async function toggleRecurringOrder(recId: string, active: boolean): Prom
 export async function setOccurrenceOverride(
   recId: string,
   override: OccurrenceOverride,
+  userId: string,
 ): Promise<void> {
+  await verifyOwnership('cateringRecurring', recId, userId);
   await updateDoc(doc(db, 'cateringRecurring', recId), {
     nextOccurrenceOverride: override,
     updatedAt: serverTimestamp(),
@@ -342,7 +360,8 @@ export async function setOccurrenceOverride(
 /**
  * Clear the per-occurrence override (revert next run to default template).
  */
-export async function clearOccurrenceOverride(recId: string): Promise<void> {
+export async function clearOccurrenceOverride(recId: string, userId: string): Promise<void> {
+  await verifyOwnership('cateringRecurring', recId, userId);
   await updateDoc(doc(db, 'cateringRecurring', recId), {
     nextOccurrenceOverride: deleteField(),
     updatedAt: serverTimestamp(),

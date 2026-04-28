@@ -558,7 +558,7 @@ export default function CateringPage() {
           userProfile?.name || user.email || 'Customer',
           cart.businessName || 'Business',
           total,
-        ).catch(console.warn);
+        ).catch((err) => console.error('[Catering] Notification failed:', err));
       }
 
       // Auto-save as favorite for quick reorder

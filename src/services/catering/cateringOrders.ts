@@ -195,7 +195,7 @@ export async function updateOrderStatus(
 
   // Fire notification (non-blocking, outside transaction)
   if (status !== 'pending') {
-    notifyCustomerStatusChange(orderData.customerId, orderId, status, orderData.businessName).catch(console.warn);
+    notifyCustomerStatusChange(orderData.customerId, orderId, status, orderData.businessName).catch((err) => console.error('[CateringOrders] Notification failed:', err));
   }
 }
 
@@ -260,11 +260,13 @@ export async function cancelOrder(
         notifyOrderCancelled(ownerId, orderId, orderData.businessName, cancelledBy, reason);
         notifyOrderCancelledMultiChannel(ownerId, orderId, orderData.businessName, cancelledBy, reason);
       }
-    }).catch(console.warn);
+    }).catch((err) => console.error('[CateringOrders] Failed to notify vendor of cancellation:', orderId, err));
   } else if (cancelledBy === 'vendor') {
     // Vendor cancelled → notify customer
-    notifyOrderCancelled(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason).catch(console.warn);
-    notifyOrderCancelledMultiChannel(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason).catch(console.warn);
+    notifyOrderCancelled(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason)
+      .catch((err) => console.error('[CateringOrders] Failed to notify customer of cancellation:', orderId, err));
+    notifyOrderCancelledMultiChannel(orderData.customerId, orderId, orderData.businessName, cancelledBy, reason)
+      .catch((err) => console.error('[CateringOrders] Failed to send multi-channel cancellation:', orderId, err));
   }
 }
 
@@ -343,7 +345,7 @@ export async function batchUpdateOrderStatus(
 
       // Fire notification for this order (non-blocking)
       if (newStatus !== 'pending') {
-        notifyCustomerStatusChange(orderData.customerId, id, newStatus, orderData.businessName).catch(console.warn);
+        notifyCustomerStatusChange(orderData.customerId, id, newStatus, orderData.businessName).catch((err) => console.error('[CateringOrders] Notification failed:', err));
       }
     } catch (err: any) {
       results.push({ orderId: id, ok: false, error: err.message || 'Unknown error' });
@@ -409,7 +411,7 @@ export async function vendorModifyOrder(
   });
 
   // Notify customer of modification (non-blocking, outside transaction)
-  notifyCustomerOrderModified(orderData.customerId, orderId, orderData.businessName, updates.note).catch(console.warn);
+  notifyCustomerOrderModified(orderData.customerId, orderId, orderData.businessName, updates.note).catch((err) => console.error('[CateringOrders] Notification failed:', err));
 }
 
 /**

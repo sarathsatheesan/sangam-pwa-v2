@@ -78,7 +78,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
     setFavorites(prev => prev.filter(f => f.id !== favId));
 
     try {
-      await deleteFavoriteOrder(favId);
+      await deleteFavoriteOrder(favId, user!.uid);
       addToast('Favorite removed', 'success', 2000);
     } catch (err: any) {
       // Revert on error: restore the deleted favorite
@@ -97,7 +97,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
     setEditingId(null);
 
     try {
-      await updateFavoriteOrder(favId, { label: newLabel });
+      await updateFavoriteOrder(favId, { label: newLabel }, user!.uid);
       addToast('Favorite renamed', 'success', 2000);
     } catch (err: any) {
       // Revert on error: restore previous state and reopen edit UI
@@ -120,7 +120,7 @@ export default function FavoriteOrders({ onBack, onSetupRecurring, onCreateTempl
     setEditingAddressId(null);
 
     try {
-      await updateFavoriteOrder(favId, { deliveryAddress: newAddress });
+      await updateFavoriteOrder(favId, { deliveryAddress: newAddress }, user!.uid);
       addToast('Address updated', 'success', 2000);
     } catch (err: any) {
       // Revert on error: restore previous state and reopen edit form

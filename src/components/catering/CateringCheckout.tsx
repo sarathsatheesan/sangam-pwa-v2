@@ -76,6 +76,8 @@ function validateForm(form: CateringCheckoutProps['orderForm']): FieldError {
 
   if (!form.headcount || form.headcount < 1) {
     errors.headcount = 'Headcount must be at least 1';
+  } else if (form.headcount > 10000) {
+    errors.headcount = 'Headcount cannot exceed 10,000';
   }
 
   if (!form.contactName.trim()) {
@@ -379,6 +381,7 @@ export default function CateringCheckout({
                       id="headcount"
                       type="number"
                       min="1"
+                      max="10000"
                       value={orderForm.headcount || ''}
                       onChange={(e) => onUpdateForm({ headcount: parseInt(e.target.value) || 0 })}
                       onBlur={() => handleBlur('headcount')}

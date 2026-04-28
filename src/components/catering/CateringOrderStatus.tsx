@@ -569,7 +569,7 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                                         order.id,
                                         order.contactName || 'Customer',
                                         order.businessName,
-                                      ).catch(console.warn);
+                                      ).catch((err) => console.error('[CateringOrderStatus] Notification failed:', err));
                                     }
                                     addToast('Modification rejected — vendor has been notified', 'success');
                                   } catch { addToast('Failed to respond', 'error'); }

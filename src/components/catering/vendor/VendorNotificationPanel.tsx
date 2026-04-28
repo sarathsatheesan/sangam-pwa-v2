@@ -65,7 +65,7 @@ export function VendorNotificationPanel({
               <button
                 onClick={() => {
                   if (!userId) return;
-                  markAllNotificationsRead(userId).catch(console.warn);
+                  markAllNotificationsRead(userId).catch((err) => console.error('[VendorNotifications] Failed:', err));
                 }}
                 className="text-xs text-indigo-600 hover:text-indigo-800"
               >
@@ -84,7 +84,7 @@ export function VendorNotificationPanel({
                 onClick={() => {
                   // Mark this notification as read
                   if (!n.read) {
-                    markNotificationRead(n.id).catch(console.warn);
+                    markNotificationRead(n.id).catch((err) => console.error('[VendorNotifications] Failed:', err));
                   }
                   onToggle(false);
                   onNotificationClick(n);

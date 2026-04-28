@@ -184,7 +184,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
     );
 
     try {
-      await toggleRecurringOrder(rec.id, newActive);
+      await toggleRecurringOrder(rec.id, newActive, user!.uid);
       addToast(rec.active ? 'Schedule paused' : 'Schedule resumed', 'success', 2000);
     } catch (err: any) {
       // Revert on error
@@ -202,7 +202,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
     setRecurringOrders((prev) => prev.filter((r) => r.id !== recId));
 
     try {
-      await deleteRecurringOrder(recId);
+      await deleteRecurringOrder(recId, user!.uid);
       addToast('Recurring order deleted', 'success', 2000);
     } catch (err: any) {
       // Revert on error by re-adding the deleted order
@@ -244,7 +244,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
 
     setSavingOcc(true);
     try {
-      await setOccurrenceOverride(rec.id, optimisticOverride);
+      await setOccurrenceOverride(rec.id, optimisticOverride, user!.uid);
       addToast('Next order modified. Changes apply only to this occurrence.', 'success', 4000);
     } catch (err: any) {
       // Revert on error
@@ -274,7 +274,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
     );
 
     try {
-      await setOccurrenceOverride(rec.id, optimisticOverride);
+      await setOccurrenceOverride(rec.id, optimisticOverride, user!.uid);
       addToast(`Next order on ${rec.nextRunDate} will be skipped.`, 'success', 3000);
     } catch (err: any) {
       // Revert on error
@@ -299,7 +299,7 @@ export default function RecurringOrderManager({ onBack, prefillFromFavorite }: R
     );
 
     try {
-      await clearOccurrenceOverride(recId);
+      await clearOccurrenceOverride(recId, user!.uid);
       addToast('Next order reverted to default.', 'success', 2000);
       setEditingOccurrenceId(null);
     } catch (err: any) {

@@ -193,7 +193,7 @@ export async function updateQuoteRequest(
   if (data.responseCount > 0) {
     const editedFields = Object.keys(updates).filter((k) => updates[k as keyof typeof updates] !== undefined);
     const editSummary = editedFields.join(', ') + ' updated';
-    notifyVendorsOfRfpEdit(requestId, editSummary).catch(console.warn);
+    notifyVendorsOfRfpEdit(requestId, editSummary).catch((err) => console.error('[CateringQuotes] Notification failed:', err));
   }
 }
 
@@ -661,7 +661,7 @@ export async function acceptQuoteResponseItems(
           lostResponse.businessName,
           itemNames,
           requestId,
-        ).catch(console.warn);
+        ).catch((err) => console.error('[CateringQuotes] Notification failed:', err));
       }
     }
   }
@@ -757,15 +757,15 @@ export async function closeQuoteRequest(requestId: string): Promise<void> {
   }
 
   // Notify customer their RFP was cancelled (in-app, fire-and-forget)
-  notifyCustomerRfpCancelled(data.customerId, requestId).catch(console.warn);
+  notifyCustomerRfpCancelled(data.customerId, requestId).catch((err) => console.error('[CateringQuotes] Notification failed:', err));
 
   // Notify all vendors who had responded (in-app + multi-channel, fire-and-forget)
   const vendorOwnerIdsList = vendorOwnerIdsToNotify.map(v => v.ownerId);
   for (const { ownerId, businessName } of vendorOwnerIdsToNotify) {
-    notifyVendorRfpCancelled(ownerId, requestId, businessName).catch(console.warn);
+    notifyVendorRfpCancelled(ownerId, requestId, businessName).catch((err) => console.error('[CateringQuotes] Notification failed:', err));
   }
   if (vendorOwnerIdsList.length > 0) {
-    notifyVendorsRfpCancelledMultiChannel(vendorOwnerIdsList, requestId).catch(console.warn);
+    notifyVendorsRfpCancelledMultiChannel(vendorOwnerIdsList, requestId).catch((err) => console.error('[CateringQuotes] Notification failed:', err));
   }
 }
 
@@ -829,10 +829,18 @@ export async function expireStaleQuoteRequests(): Promise<number> {
     const createdMs = data.createdAt?.toMillis?.() || data.createdAt?.seconds * 1000 || 0;
 
     if (createdMs > 0 && createdMs < sevenDaysAgo.toMillis()) {
-      await updateDoc(requestDoc.ref, {
-        status: 'expired',
-        expiredAt: serverTimestamp(),
+      // Use transaction to re-check status hasn't changed (e.g. accepted) since our query
+      const didExpire = await runTransaction(db, async (transaction) => {
+        const freshSnap = await transaction.get(requestDoc.ref);
+        if (!freshSnap.exists() || freshSnap.data().status !== 'open') return false;
+        transaction.update(requestDoc.ref, {
+          status: 'expired',
+          expiredAt: serverTimestamp(),
+        });
+        return true;
       });
+
+      if (!didExpire) continue;
 
       // Decline any submitted responses
       const responses = await fetchQuoteResponsesByRequest(requestDoc.id);
@@ -844,7 +852,7 @@ export async function expireStaleQuoteRequests(): Promise<number> {
 
       // Notify customer their RFP expired (in-app, fire-and-forget)
       const itemCount = (data.items || []).length;
-      notifyCustomerRfpExpired(data.customerId, requestDoc.id, itemCount).catch(console.warn);
+      notifyCustomerRfpExpired(data.customerId, requestDoc.id, itemCount).catch((err) => console.error('[CateringQuotes] Notification failed:', err));
 
       expiredCount++;
     }
