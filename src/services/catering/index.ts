@@ -73,6 +73,8 @@ export {
   addOrderNote,
   subscribeToOrderNotes,
   markOrderNotesRead,
+  getTaxRate,
+  calculateTax,
 } from './cateringOrders';
 
 // Quote requests & responses

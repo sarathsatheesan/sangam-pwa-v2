@@ -39,6 +39,7 @@ import {
   subscribeToCustomerQuoteRequests,
   saveFavoriteOrder,
   notifyVendorNewOrder,
+  getTaxRate,
 } from '@/services/cateringService';
 import {
   notifyQuoteRequestSubmitted,
@@ -523,8 +524,7 @@ export default function CateringPage() {
     try {
       const subtotal = calculateOrderTotal(cart.items);
       // SB-02: Include estimated tax in the order total so cart and order match
-      const ESTIMATED_TAX_RATE = 0.0825;
-      const estimatedTax = Math.round(subtotal * ESTIMATED_TAX_RATE);
+      const estimatedTax = Math.round(subtotal * getTaxRate(orderForm.deliveryAddress?.state));
       const total = subtotal + estimatedTax;
       const orderId = await createOrder({
         customerId: user.uid,

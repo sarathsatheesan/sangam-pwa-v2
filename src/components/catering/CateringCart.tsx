@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, ShoppingCart, Trash2, Minus, Plus } from 'lucide-react';
 import type { OrderItem } from '@/services/cateringService';
-import { calculateOrderTotal, formatPrice } from '@/services/cateringService';
+import { calculateOrderTotal, formatPrice, getTaxRate } from '@/services/cateringService';
 import { useModalA11y } from '@/hooks/useModalA11y';
 
 /** Editable quantity input — lets users clear the field, type freely, and commits on blur/Enter */
@@ -301,7 +301,7 @@ export default function CateringCart({
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span style={{ color: 'var(--aurora-text-muted)' }}>Est. tax (8.25%)</span>
-                    <span style={{ color: 'var(--aurora-text)' }}>{formatPrice(Math.round(total * 0.0825))}</span>
+                    <span style={{ color: 'var(--aurora-text)' }}>{formatPrice(Math.round(total * getTaxRate()))}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span style={{ color: 'var(--aurora-text-muted)' }}>Delivery</span>
@@ -310,7 +310,7 @@ export default function CateringCart({
                   <div className="flex justify-between items-center pt-1 border-t" style={{ borderColor: 'var(--aurora-border)' }}>
                     <span className="font-semibold" style={{ color: 'var(--aurora-text)' }}>Est. Total</span>
                     <span className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>
-                      {formatPrice(total + Math.round(total * 0.0825))}
+                      {formatPrice(total + Math.round(total * getTaxRate()))}
                     </span>
                   </div>
                   <p className="text-[10px] italic mt-1" style={{ color: 'var(--aurora-text-muted)' }}>

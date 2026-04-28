@@ -978,9 +978,14 @@ export default function RequestForPriceForm({
         </h2>
         <textarea
           value={rfpForm.specialInstructions}
-          onChange={(e) => onUpdateForm({ specialInstructions: e.target.value })}
+          onChange={(e) => {
+            if (e.target.value.length <= 2000) {
+              onUpdateForm({ specialInstructions: e.target.value });
+            }
+          }}
           placeholder="Any special requests, allergies, setup needs..."
           rows={3}
+          maxLength={2000}
           className="w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-colors resize-none focus:ring-2 focus:ring-indigo-500/30"
           style={{
             backgroundColor: 'var(--aurora-bg)',
@@ -988,6 +993,9 @@ export default function RequestForPriceForm({
             color: 'var(--aurora-text)',
           }}
         />
+        <p className="text-xs text-right mt-1" style={{ color: 'var(--aurora-text-muted)' }}>
+          {rfpForm.specialInstructions.length}/2000
+        </p>
       </section>
 
       {/* Qty warning dialog */}

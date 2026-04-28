@@ -442,7 +442,7 @@ export async function respondToModification(
       // Revert to original items
       updates.items = data.originalItems;
       updates.subtotal = data.originalItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
-      updates.tax = Math.round(updates.subtotal * 0.0825);
+      updates.tax = calculateTax(updates.subtotal, data.deliveryAddress?.state);
       updates.total = updates.subtotal + updates.tax;
       updates.vendorModificationNote = null;
     }
@@ -763,7 +763,7 @@ export async function createOrdersFromQuote(
       const subtotal = isRepriceAccepted
         ? Math.max(0, (response.total || itemSubtotal + deliveryFee) - deliveryFee)
         : itemSubtotal;
-      const tax = Math.round((subtotal + deliveryFee) * 0.0825);
+      const tax = calculateTax(subtotal + deliveryFee, deliveryAddress.state);
       const total = subtotal + deliveryFee + tax;
 
       const order: Record<string, any> = {
@@ -1163,7 +1163,7 @@ export async function checkAndRejectExpiredModifications(
     if (expiresMs > 0 && Date.now() > expiresMs && data.originalItems) {
       // Auto-reject: revert to original items
       const subtotal = data.originalItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
-      const tax = Math.round(subtotal * 0.0825);
+      const tax = calculateTax(subtotal, data.deliveryAddress?.state);
       await updateDoc(orderDoc.ref, {
         items: data.originalItems,
         subtotal,

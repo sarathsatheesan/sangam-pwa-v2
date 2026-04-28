@@ -15,6 +15,7 @@ import {
   where,
   serverTimestamp,
   arrayUnion,
+  writeBatch,
   QueryConstraint,
 } from 'firebase/firestore';
 import type { Unsubscribe } from 'firebase/firestore';
@@ -164,11 +165,13 @@ export async function updateOrderTemplate(
         const toArchive = currentData.versionHistory.slice(0, currentData.versionHistory.length - 20); // keep last 20 in doc
         const keepRecent = currentData.versionHistory.slice(currentData.versionHistory.length - 20);
 
-        // Archive to subcollection
-        const archiveBatch = toArchive.map((entry: Record<string, any>) =>
-          addDoc(collection(db, 'cateringTemplates', tmplId, 'versionArchive'), entry)
-        );
-        await Promise.all(archiveBatch);
+        // Archive to subcollection using writeBatch for atomic commit (max 500 ops)
+        const batch = writeBatch(db);
+        const archiveCol = collection(db, 'cateringTemplates', tmplId, 'versionArchive');
+        for (const entry of toArchive) {
+          batch.set(doc(archiveCol), entry);
+        }
+        await batch.commit();
 
         // Replace versionHistory with only recent entries
         updatePayload.versionHistory = keepRecent;

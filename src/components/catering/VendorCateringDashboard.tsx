@@ -23,6 +23,7 @@ import {
   deferPaymentSetup,
   formatPrice,
   calculateOrderTotal,
+  getTaxRate,
   subscribeToCateringNotifications,
   markNotificationRead,
   markAllNotificationsRead,
@@ -148,6 +149,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
   const [newOrderBanner, setNewOrderBanner] = useState<{ orderId: string; customerName: string; total: number } | null>(null);
   const prevOrderIdsRef = React.useRef<Set<string>>(new Set());
   const isFirstLoadRef = React.useRef(true);
+  const audioCtxRef = React.useRef<AudioContext | null>(null);
 
   // ── Vendor messaging state (H-04) ──
   // messaging modal state removed — now using inline OrderMessages component
@@ -165,11 +167,13 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
           const newest = newPendingOrders[0];
           setNewOrderBanner({ orderId: newest.id, customerName: newest.customerName || 'Customer', total: newest.total });
           // SB-33: Play audio chime (guarded by audioMuted)
-          // Web Audio API — no external dependency
-          // Cross-browser: resume() required for iOS Safari & Chrome autoplay policy
+          // Web Audio API — reuse a single AudioContext to prevent Safari memory leaks
           if (!audioMuted) {
             try {
-              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+                audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+              }
+              const audioCtx = audioCtxRef.current;
               // iOS Safari / Chrome require explicit resume after user gesture
               if (audioCtx.state === 'suspended') {
                 await audioCtx.resume();
@@ -186,8 +190,6 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
               gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
               osc.start(audioCtx.currentTime);
               osc.stop(audioCtx.currentTime + 0.5);
-              // Clean up audio context after playback to free resources (Safari memory)
-              setTimeout(() => { audioCtx.close().catch(() => {}); }, 1000);
             } catch { /* audio not available — silent fallback */ }
           }
           // Auto-dismiss banner after 15 seconds
@@ -200,6 +202,16 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
     });
     return unsub;
   }, [businessId]);
+
+  // Cleanup AudioContext on unmount to prevent Safari memory leak
+  useEffect(() => {
+    return () => {
+      if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
 
   // ETA inputs per order (vendor enters before dispatching for delivery)
   const [etaInputs, setEtaInputs] = useState<Record<string, string>>({});
@@ -352,7 +364,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
 
     // Calculate new totals
     const subtotal = editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0);
-    const tax = Math.round(subtotal * 0.0825);
+    const tax = Math.round(subtotal * getTaxRate(order.deliveryAddress?.state));
     const total = subtotal + tax;
 
     // Capture previous state for rollback
@@ -1195,7 +1207,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                           onClick={async () => {
                                             try {
                                               const origSubtotal = calculateOrderTotal(order.originalItems!);
-                                              const origTax = Math.round(origSubtotal * 0.0825);
+                                              const origTax = Math.round(origSubtotal * getTaxRate(order.deliveryAddress?.state));
                                               await vendorModifyOrder(order.id, {
                                                 items: order.originalItems!,
                                                 subtotal: origSubtotal,
@@ -1548,7 +1560,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
                                           onClick={async () => {
                                             try {
                                               const origSubtotal = calculateOrderTotal(order.originalItems!);
-                                              const origTax = Math.round(origSubtotal * 0.0825);
+                                              const origTax = Math.round(origSubtotal * getTaxRate(order.deliveryAddress?.state));
                                               await vendorModifyOrder(order.id, {
                                                 items: order.originalItems!,
                                                 subtotal: origSubtotal,

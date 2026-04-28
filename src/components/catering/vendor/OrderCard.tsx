@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronUp, User, MapPin, Phone, Users, Square, CheckSquare,
   Pencil, Loader2, CheckCircle2, XCircle,
 } from 'lucide-react';
-import { calculateOrderTotal } from '@/services/cateringService';
+import { calculateOrderTotal, getTaxRate } from '@/services/cateringService';
 import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import { formatPrice, vendorModifyOrder } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
@@ -65,7 +65,7 @@ export function OrderCard({
     setEditSaving(true);
 
     const subtotal = editItems.reduce((s, it) => s + it.unitPrice * it.qty, 0);
-    const tax = Math.round(subtotal * 0.0825);
+    const tax = Math.round(subtotal * getTaxRate(order.deliveryAddress?.state));
     const total = subtotal + tax;
 
     try {
