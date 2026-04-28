@@ -1184,7 +1184,23 @@ export default function CateringPage() {
         {/* Categories view */}
         {state.view === 'categories' && !state.loading && (
           <div>
-            {/* UI-01: Hero banner with featured caterers */}
+            {/* UI-01: Hero banner with featured caterers — skeleton placeholder when loading */}
+            {allCateringBusinesses.length === 0 && !state.error && (
+              <div
+                className="relative overflow-hidden rounded-2xl mb-6"
+                style={{ background: 'var(--aurora-surface)', border: '1px solid var(--aurora-border)' }}
+              >
+                <div className="px-6 py-8 sm:py-10 sm:px-8 space-y-3">
+                  <div className="shimmer h-7 w-64 rounded-lg" />
+                  <div className="shimmer h-4 w-80 max-w-full rounded" />
+                  <div className="flex gap-2 pt-2">
+                    {[96, 80, 72, 88, 64].map((w, i) => (
+                      <div key={i} className="shimmer h-8 rounded-full shrink-0" style={{ width: w }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             {allCateringBusinesses.length > 0 && (
               <div className="relative overflow-hidden rounded-2xl mb-6" style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #EC4899 100%)' }}>
                 <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 50%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
@@ -1334,6 +1350,8 @@ export default function CateringPage() {
               onUpdateForm={(updates) => dispatch({ type: 'UPDATE_ORDER_FORM', payload: updates })}
               onPlaceOrder={handleCheckoutSubmit}
               onBack={handleBackToItems}
+              onUpdateCartItem={(itemId, qty) => dispatch({ type: 'UPDATE_CART_ITEM', payload: { itemId, qty } })}
+              onRemoveCartItem={(itemId) => dispatch({ type: 'REMOVE_FROM_CART', payload: itemId })}
               loading={submitting}
             />
           </React.Suspense>

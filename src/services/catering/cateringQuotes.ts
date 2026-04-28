@@ -326,7 +326,7 @@ export async function createQuoteResponse(response: Omit<CateringQuoteResponse, 
   };
   if (response.businessRating != null) payload.businessRating = response.businessRating;
   if (response.businessHeritage) payload.businessHeritage = response.businessHeritage;
-  if (response.serviceFee != null) payload.serviceFee = response.serviceFee;
+  // serviceFee removed from RFP module — field kept in type for backward compat
   if (response.deliveryFee != null) payload.deliveryFee = response.deliveryFee;
   if (response.estimatedPrepTime) payload.estimatedPrepTime = response.estimatedPrepTime;
   if (response.message) payload.message = response.message;
@@ -565,68 +565,94 @@ export async function acceptQuoteResponseItems(
   selectedItemNames: string[],
   customerDetails: { customerName: string; customerEmail: string; customerPhone: string },
 ): Promise<{ allItemsAssigned: boolean }> {
-  // Check expiry before accepting
   const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
-  const responseSnap = await getDoc(responseRef);
-  if (!responseSnap.exists()) throw new Error('Quote response not found');
-  const responseData = responseSnap.data();
+  const requestRef = doc(db, QUOTE_REQUESTS_COL, requestId);
 
-  if (responseData.validUntil) {
-    const expiryMs = responseData.validUntil.toMillis?.() || responseData.validUntil.seconds * 1000;
-    if (Date.now() > expiryMs) {
-      throw new Error('This quote has expired. Please request a new quote from the vendor.');
+  // FIX-RACE: Wrap the entire accept flow in a transaction to prevent concurrent
+  // calls from overwriting each other's item assignments.
+  const { allItemsAssigned, reassignedItems } = await runTransaction(db, async (transaction) => {
+    // 1. Read both documents inside the transaction (Firestore tracks these reads
+    //    and will retry if either doc changes before commit)
+    const responseSnap = await transaction.get(responseRef);
+    if (!responseSnap.exists()) throw new Error('Quote response not found');
+    const responseData = responseSnap.data();
+
+    const requestSnap = await transaction.get(requestRef);
+    if (!requestSnap.exists()) throw new Error('Quote request not found');
+    const requestData = requestSnap.data();
+
+    // 2. Check expiry
+    if (responseData.validUntil) {
+      const expiryMs = responseData.validUntil.toMillis?.() || responseData.validUntil.seconds * 1000;
+      if (Date.now() > expiryMs) {
+        throw new Error('This quote has expired. Please request a new quote from the vendor.');
+      }
     }
-  }
 
-  // 2. Determine if this is a full or partial accept of THIS vendor's quote
-  const allQuotedItemNames = (responseData.quotedItems || []).map((qi: any) => qi.name);
-  const isFullVendorAccept = selectedItemNames.length >= allQuotedItemNames.length;
-  const vendorStatus = isFullVendorAccept ? 'accepted' : 'partially_accepted';
+    // 3. Determine if this is a full or partial accept of THIS vendor's quote
+    const allQuotedItemNames = (responseData.quotedItems || []).map((qi: any) => qi.name);
+    const isFullVendorAccept = selectedItemNames.length >= allQuotedItemNames.length;
+    const vendorStatus = isFullVendorAccept ? 'accepted' : 'partially_accepted';
 
-  // 3. Mark this response with accepted items + customer details
-  await updateDoc(responseRef, {
-    status: vendorStatus,
-    acceptedItemNames: selectedItemNames,
-    ...customerDetails,
+    // 4. Mark this response with accepted items + customer details
+    transaction.update(responseRef, {
+      status: vendorStatus,
+      acceptedItemNames: selectedItemNames,
+      ...customerDetails,
+    });
+
+    // 5. Compute new item assignments atomically
+    const existingAssignments: ItemAssignment[] = requestData.itemAssignments || [];
+
+    // Identify items being reassigned away from other vendors
+    const reassigned = existingAssignments.filter(
+      (a) => selectedItemNames.includes(a.itemName) && a.businessId !== responseData.businessId,
+    );
+
+    // Remove any previous assignments for these items (in case of re-assignment)
+    const filteredAssignments = existingAssignments.filter(
+      (a) => !selectedItemNames.includes(a.itemName)
+    );
+    // Add new assignments
+    const newAssignments: ItemAssignment[] = selectedItemNames.map((name) => ({
+      itemName: name,
+      responseId,
+      businessId: responseData.businessId,
+      businessName: responseData.businessName,
+      assignedAt: Timestamp.now(),
+    }));
+    const allAssignments = [...filteredAssignments, ...newAssignments];
+
+    // 6. Check if all request items are now assigned
+    const requestItemNames = (requestData.items || []).map((i: any) => i.name);
+    const assignedItemNameSet = new Set(allAssignments.map((a) => a.itemName));
+    const allAssigned = requestItemNames.every((name: string) => assignedItemNameSet.has(name));
+
+    // 7. Update the request — always 'partially_accepted' until explicit finalization
+    // FIX-LOCK: The customer must explicitly confirm finalization via the UI before
+    // we set status to 'accepted' and auto-decline remaining vendors.
+    transaction.update(requestRef, {
+      itemAssignments: allAssignments.map((a) => ({
+        itemName: a.itemName,
+        responseId: a.responseId,
+        businessId: a.businessId,
+        businessName: a.businessName,
+        assignedAt: a.assignedAt,
+      })),
+      status: 'partially_accepted',
+    });
+
+    return { allItemsAssigned: allAssigned, reassignedItems: reassigned };
   });
 
-  // 4. Update the request's item assignments
-  const requestRef = doc(db, QUOTE_REQUESTS_COL, requestId);
-  const requestSnap = await getDoc(requestRef);
-  if (!requestSnap.exists()) throw new Error('Quote request not found');
-  const requestData = requestSnap.data();
-
-  const existingAssignments: ItemAssignment[] = requestData.itemAssignments || [];
-
-  // FIX-C3: Identify items being reassigned away from other vendors
-  const reassignedItems = existingAssignments.filter(
-    (a) => selectedItemNames.includes(a.itemName) && a.businessId !== responseData.businessId,
-  );
-
-  // Remove any previous assignments for these items (in case of re-assignment)
-  const filteredAssignments = existingAssignments.filter(
-    (a) => !selectedItemNames.includes(a.itemName)
-  );
-  // Add new assignments
-  const newAssignments: ItemAssignment[] = selectedItemNames.map((name) => ({
-    itemName: name,
-    responseId,
-    businessId: responseData.businessId,
-    businessName: responseData.businessName,
-    assignedAt: Timestamp.now(),          // Timestamp.now() — not serverTimestamp() which Firestore forbids inside arrays
-  }));
-  const allAssignments = [...filteredAssignments, ...newAssignments];
-
-  // FIX-C3: Notify vendors who lost items due to reassignment (non-blocking)
+  // Post-transaction: notify vendors who lost items (non-blocking, outside transaction)
   if (reassignedItems.length > 0) {
-    // Group reassigned items by the vendor who lost them
     const lostByVendor = new Map<string, string[]>();
     for (const item of reassignedItems) {
       if (!lostByVendor.has(item.businessId)) lostByVendor.set(item.businessId, []);
       lostByVendor.get(item.businessId)!.push(item.itemName);
     }
     for (const [lostBusinessId, itemNames] of lostByVendor) {
-      // Find the vendor's response to get their owner ID for notification
       const allResponses = await fetchQuoteResponsesByRequest(requestId);
       const lostResponse = allResponses.find((r: any) => r.businessId === lostBusinessId);
       if (lostResponse?.vendorOwnerId) {
@@ -639,31 +665,6 @@ export async function acceptQuoteResponseItems(
       }
     }
   }
-
-  // 5. Check if all request items are now assigned
-  const requestItemNames = (requestData.items || []).map((i: any) => i.name);
-  const assignedItemNames = new Set(allAssignments.map((a) => a.itemName));
-  const allItemsAssigned = requestItemNames.every((name: string) => assignedItemNames.has(name));
-
-  // 6. Update the request status
-  const requestUpdate: Record<string, any> = {
-    itemAssignments: allAssignments.map((a) => ({
-      itemName: a.itemName,
-      responseId: a.responseId,
-      businessId: a.businessId,
-      businessName: a.businessName,
-      assignedAt: a.assignedAt,
-    })),
-  };
-
-  // FIX-LOCK: Always keep status as 'partially_accepted' here.
-  // The customer must explicitly confirm finalization via the UI before
-  // we set status to 'accepted' and auto-decline remaining vendors.
-  // This prevents the "lock bug" where accepting items from one vendor
-  // auto-finalizes and blocks selecting from other vendors.
-  requestUpdate.status = 'partially_accepted';
-
-  await updateDoc(requestRef, requestUpdate);
 
   return { allItemsAssigned };
 }

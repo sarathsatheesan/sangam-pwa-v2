@@ -112,6 +112,9 @@ export default function RequestForPriceForm({
   // Phase 3: Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Validation error modal state
+  const [showValidationModal, setShowValidationModal] = useState(false);
+
   // Date validation — same constraint as CateringCheckout
   const tomorrow = useMemo(() => getTomorrow(), []);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -274,7 +277,10 @@ export default function RequestForPriceForm({
   // Handle submit with qty validation
   const handleSubmitWithQtyCheck = () => {
     setSubmitAttempted(true);
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      setShowValidationModal(true);
+      return;
+    }
 
     const itemsWithDefaultQty = rfpForm.items.filter(i => i.qty === 1);
     if (itemsWithDefaultQty.length > 0 && !confirmedDefaultQty) {
@@ -1011,24 +1017,12 @@ export default function RequestForPriceForm({
         </div>
       )}
 
-      {/* Validation summary on submit attempt */}
-      {submitAttempted && allErrors.length > 0 && (
-        <div
-          className="border border-red-200 rounded-2xl p-4 flex items-start gap-3"
-          style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)' }}
-          role="alert"
-          aria-live="polite"
-        >
-          <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-red-800">Please fix the following before submitting:</p>
-            <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
-              {allErrors.map((msg, i) => (
-                <li key={i}>{msg}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
+      {/* Validation error modal — triggered on submit attempt with errors */}
+      {showValidationModal && allErrors.length > 0 && (
+        <ValidationErrorModal
+          errors={allErrors}
+          onClose={() => setShowValidationModal(false)}
+        />
       )}
 
       {/* Vendor targeting info — shows reachable count when address is set */}
@@ -1108,6 +1102,134 @@ export default function RequestForPriceForm({
 }
 
 // ── Price Guidance Banner Component ──
+// ── Validation Error Modal ──
+// Cross-browser: iOS Safari scroll lock, dvh height, ESC key, backdrop click/touch, prefers-reduced-motion
+function ValidationErrorModal({ errors, onClose }: { errors: string[]; onClose: () => void }) {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Focus trap: focus the modal on mount
+    modalRef.current?.focus();
+
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+
+    // Lock body scroll (iOS Safari fix — position:fixed prevents rubber-banding)
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.overflow = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, [onClose]);
+
+  // Backdrop click/touch — works on both desktop and iOS Safari
+  const handleBackdropInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        backgroundColor: 'rgba(0, 0, 0, 0.45)',
+        height: '100vh',
+        // @ts-ignore — dvh is valid CSS but not in React's CSSProperties type
+        ...(CSS.supports?.('height', '100dvh') ? { height: '100dvh' } : {}),
+        /* Fade-in animation — respects prefers-reduced-motion */
+        animation: 'rfpValidationFadeIn 0.2s ease-out',
+      }}
+      onClick={handleBackdropInteraction}
+      onTouchEnd={handleBackdropInteraction}
+      role="alertdialog"
+      aria-modal="true"
+      aria-label="Validation errors"
+    >
+      <style>{`
+        @keyframes rfpValidationFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes rfpValidationSlideUp {
+          from { opacity: 0; transform: translateY(12px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .rfp-validation-modal-backdrop,
+          .rfp-validation-modal-card {
+            animation: none !important;
+          }
+        }
+      `}</style>
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden outline-none rfp-validation-modal-card"
+        style={{
+          backgroundColor: 'var(--aurora-bg, #fff)',
+          animation: 'rfpValidationSlideUp 0.25s ease-out',
+          /* Prevent iOS text size adjustment */
+          WebkitTextSizeAdjust: '100%',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="px-5 py-4 flex items-center gap-3"
+          style={{ background: 'linear-gradient(135deg, #EF4444, #F87171)' }}
+        >
+          <AlertCircle size={22} style={{ color: 'rgba(255,255,255,0.95)' }} />
+          <h2 className="text-base font-bold text-white" style={{ lineHeight: 1.3 }}>
+            Please fix before submitting
+          </h2>
+        </div>
+
+        {/* Error list */}
+        <div className="px-5 py-4" style={{ maxHeight: '50vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <ul className="space-y-2.5">
+            {errors.map((msg, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-2.5 text-sm"
+                style={{ color: 'var(--aurora-text, #1E2132)' }}
+              >
+                <span
+                  className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}
+                >
+                  {i + 1}
+                </span>
+                <span>{msg}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 pb-4">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+            style={{ backgroundColor: '#6366F1' }}
+          >
+            Got it, I'll fix these
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PriceGuidanceBanner({ cuisineCategory, headcount }: { cuisineCategory: string; headcount: number }) {
   const [dismissed, setDismissed] = useState(false);
   const guidance = PRICE_GUIDANCE[cuisineCategory] || PRICE_GUIDANCE.default;
@@ -1586,8 +1708,8 @@ function RfpMapPreview({ lat, lng, label }: { lat: number; lng: number; label: s
 
   return (
     <div
-      className="rounded-xl overflow-hidden border"
-      style={{ borderColor: 'var(--aurora-border)' }}
+      className="rounded-xl overflow-hidden border relative"
+      style={{ borderColor: 'var(--aurora-border)', zIndex: 0, isolation: 'isolate' }}
     >
       <div ref={containerRef} className="h-32 w-full" />
       <div

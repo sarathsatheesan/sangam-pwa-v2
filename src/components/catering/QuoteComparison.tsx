@@ -11,7 +11,6 @@ import type { CateringQuoteRequest, CateringQuoteResponse, ItemAssignment } from
 import {
   subscribeToQuoteResponses,
   acceptQuoteResponseItems,
-  acceptQuoteResponse,
   declineQuoteResponse,
   finalizeQuoteRequest,
   createOrdersFromQuote,
@@ -35,7 +34,6 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   const { addToast } = useToast();
   const [responses, setResponses] = useState<CateringQuoteResponse[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [finalizingOrder, setFinalizingOrder] = useState(false);
   const [ordersCreated, setOrdersCreated] = useState(false);
@@ -72,9 +70,12 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     existingAssignments: Array<{itemName: string; businessName: string}>;
   } | null>(null);
 
-  // FIX-LOCK: Finalization confirmation modal — shown when all items are assigned
-  // to give the customer the choice to finalize or continue selecting from other vendors
-  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+  // Pending acceptance — stores the response and items selected for the combined
+  // "Accept & Finalize" flow so we can chain accept → finalize → create orders
+  const [pendingAcceptance, setPendingAcceptance] = useState<{
+    response: CateringQuoteResponse;
+    itemNames: string[];
+  } | null>(null);
 
   // ── Reprice negotiation state ──
   const [repriceResponseId, setRepriceResponseId] = useState<string | null>(null); // which response is being repriced
@@ -197,10 +198,10 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
   const grandTotal = useMemo(() => {
     let total = 0;
     vendorSummary.forEach(v => { total += v.subtotal; });
-    // Add service/delivery fees from accepted responses
+    // Add delivery fees from accepted responses
     responses.forEach(r => {
       if (r.status === 'accepted' || r.status === 'partially_accepted') {
-        total += (r.serviceFee || 0) + (r.deliveryFee || 0);
+        total += (r.deliveryFee || 0);
       }
     });
     return total;
@@ -235,7 +236,9 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
     }));
   };
 
-  // ── Accept selected items from a vendor ──
+  // ── Accept & Finalize — single-step flow ──
+  // Validates selection, stores pending data, and opens the address form.
+  // The address form submit handler chains: accept → finalize → create orders → notify.
   const handleAcceptItems = async (response: CateringQuoteResponse) => {
     if (!user || !userProfile) return;
     const selected = selectedItems[response.id];
@@ -268,100 +271,14 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
       .filter((x): x is {itemName: string; businessName: string} => x !== null);
 
     if (existingAssignments.length > 0) {
-      // Show confirmation dialog
+      // Show confirmation dialog — reassignConfirm handler will also set pendingAcceptance
       setReassignConfirm({ responseId: response.id, itemNames: selectedItemNames, existingAssignments });
       return;
     }
 
-    // No conflicts, proceed with acceptance
-    await proceedWithAcceptance(response, selectedItemNames);
-  };
-
-  const proceedWithAcceptance = async (response: CateringQuoteResponse, itemNames: string[]) => {
-    if (!user || !userProfile) return;
-
-    setAcceptingId(response.id);
-    try {
-      const result = await acceptQuoteResponseItems(
-        response.id,
-        quoteRequest.id,
-        itemNames,
-        {
-          customerName: userProfile?.name || '',
-          customerEmail: userProfile?.email || user.email || '',
-          customerPhone: (userProfile as any)?.phone || '',
-        },
-      );
-
-      if (result.allItemsAssigned) {
-        // FIX-LOCK: Instead of auto-finalizing (which locks the session and
-        // auto-declines other vendors), show a confirmation modal so the
-        // customer can choose to finalize or continue selecting from others.
-        setShowFinalizeConfirm(true);
-        addToast(`All items are now assigned! Confirm when you're ready to finalize.`, 'success', 5000);
-      } else {
-        addToast(`${itemNames.length} item${itemNames.length > 1 ? 's' : ''} accepted from ${response.businessName}. Your contact details have been shared.`, 'success', 5000);
-      }
-
-      // Notify vendor their quote was accepted (fire-and-forget, look up owner via businessId)
-      getDoc(doc(db, 'businesses', response.businessId)).then((bizSnap) => {
-        if (!bizSnap.exists()) return;
-        const bizData = bizSnap.data();
-        const ownerId = bizData?.ownerId;
-        if (ownerId) {
-          // Multi-channel (email/SMS/push)
-          notifyQuoteAccepted(ownerId, quoteRequest.id, userProfile?.name || '', response.total);
-          // In-app bell notification
-          notifyVendorQuoteAccepted(
-            ownerId, quoteRequest.id, response.businessName,
-            userProfile?.name || '', itemNames.length,
-          );
-        }
-      }).catch(() => {});
-
-      // Clear selection for this response
-      setSelectedItems((prev) => ({ ...prev, [response.id]: new Set() }));
-    } catch (err: any) {
-      addToast(err.message || 'Failed to accept items', 'error');
-    } finally {
-      setAcceptingId(null);
-    }
-  };
-
-  // ── Finalize order (close remaining) ──
-  // SB-37: This is now handled in the address form modal's finalization button
-  // The button click now shows the address form first (setShowAddressForm(true))
-  // and the form collects the address before calling finalizeQuoteRequest
-  // This function is kept for reference but is no longer directly called
-  const handleFinalizeOrder = async () => {
-    setFinalizingOrder(true);
-    try {
-      await finalizeQuoteRequest(quoteRequest.id);
-      // Re-fetch fresh data to avoid stale closure
-      const freshSnap = await getDoc(doc(db, 'cateringQuoteRequests', quoteRequest.id));
-      const freshQR = freshSnap.exists()
-        ? { id: freshSnap.id, ...freshSnap.data() } as CateringQuoteRequest
-        : quoteRequest;
-      // Auto-create orders (fallback path without address — uses deliveryCity only)
-      const fallbackAddress = { street: '', city: freshQR.deliveryCity || '', state: '', zip: '' };
-      const orderIds = await createOrdersFromQuote(freshQR, responses, fallbackAddress);
-      setOrdersCreated(true);
-      addToast(
-        orderIds.length === 1
-          ? 'Order created! Track it below.'
-          : `${orderIds.length} orders created — one per vendor.`,
-        'success',
-        5000,
-      );
-      if (onViewOrders) {
-        setTimeout(() => onViewOrders(), 1500);
-      }
-    } catch (err: any) {
-      console.error('[QuoteComparison] handleFinalizeOrder error:', err);
-      addToast(err.message || 'Failed to finalize order', 'error');
-    } finally {
-      setFinalizingOrder(false);
-    }
+    // No conflicts — store pending acceptance and show address form directly
+    setPendingAcceptance({ response, itemNames: selectedItemNames });
+    setShowAddressForm(true);
   };
 
   const handleDecline = async (response: CateringQuoteResponse) => {
@@ -672,7 +589,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
               wasn't updated to 'partially_accepted'. */}
           {assignedCount > 0 && !ordersCreated && !allAssigned && !isFullyAccepted && (
             <button
-              onClick={() => setShowAddressForm(true)}
+              onClick={() => { setPendingAcceptance(null); setShowAddressForm(true); }}
               disabled={finalizingOrder}
               className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
               style={{ backgroundColor: '#059669' }}
@@ -682,13 +599,13 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
               ) : (
                 <CheckCircle2 size={14} />
               )}
-              {allAssigned ? 'Finalize Order & Create Orders' : `Finalize Order (${assignedCount} items)`}
+              Finalize Order ({assignedCount} item{assignedCount > 1 ? 's' : ''})
             </button>
           )}
         </div>
       )}
 
-      {/* Status banner for fully accepted — show finalize confirmation or address form prompt.
+      {/* Status banner for fully accepted — go directly to address form for finalization.
           Use allAssigned || isFullyAccepted to handle both computed and Firestore-based states. */}
       {(allAssigned || isFullyAccepted) && !ordersCreated && (
         <div
@@ -698,20 +615,18 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
           <div className="flex items-center gap-2">
             <CheckCircle2 size={18} style={{ color: '#D97706' }} />
             <p className="text-sm font-medium" style={{ color: '#92400E' }}>
-              {isFullyAccepted
-                ? 'All items assigned! Provide a delivery address to create your orders.'
-                : 'All items are now assigned. Ready to finalize?'}
+              All items assigned! Provide a delivery address to finalize your order.
             </p>
           </div>
           <button
             type="button"
-            onClick={() => isFullyAccepted ? setShowAddressForm(true) : setShowFinalizeConfirm(true)}
+            onClick={() => { setPendingAcceptance(null); setShowAddressForm(true); }}
             disabled={finalizingOrder}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
             style={{ backgroundColor: '#059669' }}
           >
             {finalizingOrder ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-            {isFullyAccepted ? 'Provide Address & Create Orders' : 'Finalize & Create Orders'}
+            Finalize & Create Orders
           </button>
         </div>
       )}
@@ -865,7 +780,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                 </div>
                 <div className="text-right flex-shrink-0 ml-2">
                   <p className="text-lg font-bold" style={{ color: '#6366F1' }}>
-                    {formatPrice(response.total)}
+                    {formatPrice(response.subtotal + (response.deliveryFee || 0))}
                   </p>
                   {response.estimatedPrepTime && (
                     <p className="text-[10px] flex items-center gap-1 justify-end" style={{ color: 'var(--aurora-text-secondary)' }}>
@@ -964,29 +879,54 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   </div>
                 </div>
 
-                {/* Fee breakdown */}
-                <div className="pt-2 border-t space-y-1" style={{ borderColor: 'var(--aurora-border)' }}>
-                  <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                    <span>Subtotal</span>
-                    <span>{formatPrice(response.subtotal)}</span>
-                  </div>
-                  {response.serviceFee != null && response.serviceFee > 0 && (
-                    <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                      <span>Service fee</span>
-                      <span>{formatPrice(response.serviceFee)}</span>
+                {/* Fee breakdown — dynamic totaling for partial selections */}
+                {(() => {
+                  // Compute display total excluding legacy serviceFee (backward compat)
+                  const displayTotal = response.subtotal + (response.deliveryFee || 0);
+                  const selectedSubtotal = response.quotedItems
+                    .filter(qi => selected.has(qi.name))
+                    .reduce((sum, qi) => sum + qi.unitPrice * qi.qty, 0);
+                  const isPartialSelection = selected.size > 0 && selected.size < response.quotedItems.length;
+                  const selectedTotal = selectedSubtotal + (response.deliveryFee || 0);
+
+                  return (
+                    <div className="pt-2 border-t space-y-1" style={{ borderColor: 'var(--aurora-border)' }}>
+                      <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                        <span>Subtotal ({response.quotedItems.length} items)</span>
+                        <span>{formatPrice(response.subtotal)}</span>
+                      </div>
+                      {response.deliveryFee != null && response.deliveryFee > 0 && (
+                        <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                          <span>Delivery fee</span>
+                          <span>{formatPrice(response.deliveryFee)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm font-bold pt-1" style={{ color: 'var(--aurora-text)' }}>
+                        <span>Total</span>
+                        <span style={{ color: '#6366F1' }}>{formatPrice(displayTotal)}</span>
+                      </div>
+                      {/* Dynamic selection total — shown when user selects a subset of items */}
+                      {isPartialSelection && (
+                        <div className="mt-1.5 pt-1.5 border-t border-dashed" style={{ borderColor: 'var(--aurora-border)' }}>
+                          <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                            <span>Selected items ({selected.size})</span>
+                            <span>{formatPrice(selectedSubtotal)}</span>
+                          </div>
+                          {response.deliveryFee != null && response.deliveryFee > 0 && (
+                            <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
+                              <span>Delivery fee</span>
+                              <span>{formatPrice(response.deliveryFee)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm font-semibold pt-0.5" style={{ color: '#059669' }}>
+                            <span>Your Selection</span>
+                            <span>{formatPrice(selectedTotal)}</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {response.deliveryFee != null && response.deliveryFee > 0 && (
-                    <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                      <span>Delivery fee</span>
-                      <span>{formatPrice(response.deliveryFee)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm font-bold pt-1" style={{ color: 'var(--aurora-text)' }}>
-                    <span>Total</span>
-                    <span style={{ color: '#6366F1' }}>{formatPrice(response.total)}</span>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Caterer message */}
                 {response.message && (
@@ -1011,6 +951,18 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                             Price request accepted! New total: {formatPrice(response.repriceRequestedPrice || response.total)}
                           </p>
                         </div>
+                        {response.quotedItems && response.quotedItems.length > 0 && (
+                          <div className="ml-6 mt-0.5">
+                            <ul className="space-y-0.5">
+                              {response.quotedItems.map((item, idx) => (
+                                <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#047857' }}>
+                                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#059669' }} />
+                                  {item.name} × {item.qty}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         {response.repriceVendorNote && (
                           <p className="text-xs ml-6" style={{ color: '#047857' }}>&ldquo;{response.repriceVendorNote}&rdquo;</p>
                         )}
@@ -1047,6 +999,18 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                             <span className="font-normal text-xs ml-1">(was {formatPrice(response.total)})</span>
                           </p>
                         </div>
+                        {response.quotedItems && response.quotedItems.length > 0 && (
+                          <div className="ml-6">
+                            <ul className="space-y-0.5">
+                              {response.quotedItems.map((item, idx) => (
+                                <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#1E40AF' }}>
+                                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#3B82F6' }} />
+                                  {item.name} × {item.qty} — {formatPrice(item.unitPrice * item.qty)}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         {response.repriceVendorNote && (
                           <p className="text-xs ml-6" style={{ color: '#1E40AF' }}>&ldquo;{response.repriceVendorNote}&rdquo;</p>
                         )}
@@ -1125,6 +1089,20 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                             Reprice request sent — proposed {formatPrice(response.repriceRequestedPrice || 0)}
                           </p>
                         </div>
+                        {/* Items included in this reprice */}
+                        {response.quotedItems && response.quotedItems.length > 0 && (
+                          <div className="ml-6 mt-1">
+                            <p className="text-xs font-medium mb-0.5" style={{ color: '#9A3412' }}>Items:</p>
+                            <ul className="space-y-0.5">
+                              {response.quotedItems.map((item, idx) => (
+                                <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#92400E' }}>
+                                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#EA580C' }} />
+                                  {item.name} × {item.qty} — {formatPrice(item.unitPrice * item.qty)}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1 ml-6">
                           <Timer size={12} style={{ color: reqExpiry.isUrgent ? '#D97706' : '#6B7280' }} />
                           <span className={`text-xs ${reqExpiry.isUrgent ? 'font-medium' : ''}`} style={{ color: reqExpiry.isUrgent ? '#D97706' : '#6B7280' }}>
@@ -1159,15 +1137,11 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                       <button
                         type="button"
                         onClick={() => handleAcceptItems(response)}
-                        disabled={acceptingId === response.id || selected.size === 0}
+                        disabled={finalizingOrder || selected.size === 0}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50"
                         style={{ backgroundColor: '#059669' }}
                       >
-                        {acceptingId === response.id ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <CheckCircle2 size={14} />
-                        )}
+                        <CheckCircle2 size={14} />
                         {selected.size > 0
                           ? `Accept ${selected.size} Item${selected.size > 1 ? 's' : ''}`
                           : 'Select Items to Accept'}
@@ -1267,12 +1241,14 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                 Cancel
               </button>
               <button
-                onClick={async () => {
+                onClick={() => {
                   const { responseId, itemNames } = reassignConfirm;
                   setReassignConfirm(null);
                   const response = responses.find(r => r.id === responseId);
                   if (response) {
-                    await proceedWithAcceptance(response, itemNames);
+                    // Store pending acceptance and go to address form
+                    setPendingAcceptance({ response, itemNames });
+                    setShowAddressForm(true);
                   }
                 }}
                 className="px-4 py-2 text-sm rounded-lg text-white font-medium transition-colors"
@@ -1362,59 +1338,20 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
         );
       })()}
 
-      {showFinalizeConfirm && !showAddressForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
-          <div className="w-full max-w-md rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
-            <div className="flex items-center gap-2 mb-3">
-              <CheckCircle2 size={22} style={{ color: '#059669' }} />
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>All Items Assigned</h3>
-            </div>
-            <p className="text-sm mb-2" style={{ color: 'var(--aurora-text-secondary)' }}>
-              Every item on your request has been assigned to a vendor. What would you like to do?
-            </p>
-            <p className="text-xs mb-4 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--aurora-bg)', color: 'var(--aurora-text-muted)' }}>
-              <strong>Note:</strong> Finalizing will decline any vendors you haven&apos;t selected items from and lock in your choices. You can still reassign items before finalizing.
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFinalizeConfirm(false);
-                  setShowAddressForm(true);
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
-                style={{ backgroundColor: '#059669' }}
-              >
-                <CheckCircle2 size={14} />
-                I&apos;m Done — Finalize Order
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowFinalizeConfirm(false);
-                  addToast('You can continue selecting items from other vendors.', 'info', 4000);
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors"
-                style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-              >
-                <ArrowLeft size={14} />
-                Continue Selecting from Other Vendors
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SB-37: Delivery Address Form — required before finalization */}
+      {/* SB-37: Delivery Address Form + Accept & Finalize — single-step flow */}
       {showAddressForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <div className="w-full max-w-md rounded-xl p-6 shadow-xl" style={{ backgroundColor: 'var(--aurora-surface)' }}>
             <div className="flex items-center gap-2 mb-4">
-              <MapPin size={20} style={{ color: '#6366F1' }} />
-              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>Delivery Address</h3>
+              <MapPin size={20} style={{ color: pendingAcceptance ? '#059669' : '#6366F1' }} />
+              <h3 className="text-lg font-semibold" style={{ color: 'var(--aurora-text)' }}>
+                {pendingAcceptance ? 'Accept & Finalize Order' : 'Delivery Address'}
+              </h3>
             </div>
             <p className="text-sm mb-4" style={{ color: 'var(--aurora-text-secondary)' }}>
-              Please provide the full delivery address for your event.
+              {pendingAcceptance
+                ? `Provide the delivery address to accept ${pendingAcceptance.itemNames.length} item${pendingAcceptance.itemNames.length > 1 ? 's' : ''} and finalize your order.`
+                : 'Please provide the full delivery address for your event.'}
             </p>
             <div className="space-y-3">
               <div>
@@ -1484,7 +1421,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
             </div>
             <div className="flex gap-3 justify-end mt-5">
               <button
-                onClick={() => { setShowAddressForm(false); setAddressErrors({}); }}
+                onClick={() => { setShowAddressForm(false); setAddressErrors({}); setPendingAcceptance(null); }}
                 className="px-4 py-2.5 text-sm rounded-lg border font-medium transition-colors"
                 style={{ borderColor: 'var(--aurora-border)', color: 'var(--aurora-text-secondary)' }}
               >
@@ -1492,7 +1429,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
               </button>
               <button
                 onClick={async () => {
-                  // Validate
+                  // Validate address
                   const errs: Record<string, string> = {};
                   if (!deliveryAddress.street.trim()) errs.street = 'Required';
                   if (!deliveryAddress.city.trim()) errs.city = 'Required';
@@ -1504,43 +1441,95 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   if (Object.keys(errs).length > 0) { setAddressErrors(errs); return; }
                   setAddressErrors({});
                   setShowAddressForm(false);
-                  // Proceed with finalization, passing address
+
+                  // ── Combined Accept → Finalize → Create Orders → Notify ──
                   setFinalizingOrder(true);
                   try {
+                    // Step 1: Accept items (if pending from the single-step flow)
+                    if (pendingAcceptance && user && userProfile) {
+                      const { response: pendingResponse, itemNames } = pendingAcceptance;
+                      await acceptQuoteResponseItems(
+                        pendingResponse.id,
+                        quoteRequest.id,
+                        itemNames,
+                        {
+                          customerName: userProfile?.name || '',
+                          customerEmail: userProfile?.email || user.email || '',
+                          customerPhone: (userProfile as any)?.phone || '',
+                        },
+                      );
+                      // Clear selection for this response
+                      setSelectedItems((prev) => ({ ...prev, [pendingResponse.id]: new Set() }));
+                    }
+
+                    // Step 2: Finalize the quote request (declines remaining vendors, locks assignments)
                     await finalizeQuoteRequest(quoteRequest.id, deliveryAddress);
-                    // Re-fetch the latest quoteRequest from Firestore to avoid stale closure data
-                    // (the subscription may not have propagated the itemAssignments update yet)
+
+                    // Step 3: Re-fetch fresh quoteRequest from Firestore to get updated itemAssignments
                     const freshSnap = await getDoc(doc(db, 'cateringQuoteRequests', quoteRequest.id));
                     const freshQuoteRequest = freshSnap.exists()
                       ? { id: freshSnap.id, ...freshSnap.data() } as CateringQuoteRequest
                       : quoteRequest;
-                    console.log('[QuoteComparison] Finalize: itemAssignments count =', (freshQuoteRequest.itemAssignments || []).length);
-                    console.log('[QuoteComparison] Finalize: responses count =', responses.length);
-                    // Auto-create orders for each accepted vendor
-                    const orderIds = await createOrdersFromQuote(freshQuoteRequest, responses, deliveryAddress);
-                    console.log('[QuoteComparison] Orders created:', orderIds);
+
+                    // Step 4: Create orders for each accepted vendor
+                    // Patch responses with customer details + status that were just written to Firestore
+                    // (the local `responses` array is stale — it doesn't have customerName/status yet)
+                    const patchedResponses = pendingAcceptance
+                      ? responses.map((r) =>
+                          r.id === pendingAcceptance.response.id
+                            ? {
+                                ...r,
+                                status: (pendingAcceptance.itemNames.length >= (r.quotedItems?.length || 0)
+                                  ? 'accepted' : 'partially_accepted') as 'accepted' | 'partially_accepted',
+                                customerName: userProfile?.name || '',
+                                customerEmail: userProfile?.email || user?.email || '',
+                                customerPhone: (userProfile as any)?.phone || '',
+                              }
+                            : r,
+                        )
+                      : responses;
+                    const orderIds = await createOrdersFromQuote(freshQuoteRequest, patchedResponses, deliveryAddress);
                     setOrdersCreated(true);
+
+                    // Step 5: Notify vendor(s) — fire-and-forget after orders are created
+                    if (pendingAcceptance && userProfile) {
+                      const { response: pendingResponse, itemNames } = pendingAcceptance;
+                      getDoc(doc(db, 'businesses', pendingResponse.businessId)).then((bizSnap) => {
+                        if (!bizSnap.exists()) return;
+                        const bizData = bizSnap.data();
+                        const ownerId = bizData?.ownerId;
+                        if (ownerId) {
+                          notifyQuoteAccepted(ownerId, quoteRequest.id, userProfile?.name || '', pendingResponse.total);
+                          notifyVendorQuoteAccepted(
+                            ownerId, quoteRequest.id, pendingResponse.businessName,
+                            userProfile?.name || '', itemNames.length,
+                          );
+                        }
+                      }).catch(() => {});
+                    }
+
+                    setPendingAcceptance(null);
                     addToast(
                       orderIds.length === 1
-                        ? 'Order created! Track it in your orders tab.'
-                        : `${orderIds.length} orders created — one per vendor. Track them in your orders tab.`,
+                        ? 'Order accepted and created! Track it in your orders tab.'
+                        : `${orderIds.length} orders accepted and created. Track them in your orders tab.`,
                       'success',
                       5000,
                     );
                     if (onViewOrders) onViewOrders();
                   } catch (err: any) {
-                    console.error('[QuoteComparison] Finalize error:', err);
-                    addToast(err.message || 'Failed to finalize order', 'error');
+                    console.error('[QuoteComparison] Accept & Finalize error:', err);
+                    addToast(err.message || 'Failed to accept and finalize order', 'error');
                   } finally {
                     setFinalizingOrder(false);
                   }
                 }}
                 disabled={finalizingOrder}
                 className="px-4 py-2.5 text-sm rounded-lg text-white font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-                style={{ backgroundColor: '#6366F1' }}
+                style={{ backgroundColor: '#059669' }}
               >
                 {finalizingOrder && <Loader2 size={14} className="animate-spin" />}
-                Finalize Order
+                {pendingAcceptance ? `Accept ${pendingAcceptance.itemNames.length} Item${pendingAcceptance.itemNames.length > 1 ? 's' : ''} & Finalize` : 'Finalize Order'}
               </button>
             </div>
           </div>
@@ -1573,7 +1562,8 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                   const response = responses.find(r => r.id === expiredQuoteId);
                   if (response) {
                     const selectedItemNames = Array.from(selectedItems[response.id] || []);
-                    proceedWithAcceptance(response, selectedItemNames);
+                    setPendingAcceptance({ response, itemNames: selectedItemNames });
+                    setShowAddressForm(true);
                   }
                   setExpiredQuoteId(null);
                 }}

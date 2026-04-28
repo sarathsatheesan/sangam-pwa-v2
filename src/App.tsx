@@ -108,25 +108,26 @@ const NotificationSettingsPage = lazyRetry(() => import('./components/shared/Not
 const NotificationAnalyticsPage = lazyRetry(() => import('./components/shared/NotificationAnalytics'));
 
 // Loading spinner component (full-page for auth routes)
+// Themed to Aurora design system with dark-mode support
 const LoadingSpinner = () => (
   <div style={{
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     height: '100vh',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'var(--aurora-bg, #f5f5f5)',
   }}>
     <div style={{ textAlign: 'center' }}>
       <div style={{
-        width: '50px',
-        height: '50px',
-        border: '4px solid #ddd',
-        borderTop: '4px solid #007AFF',
+        width: '44px',
+        height: '44px',
+        border: '3.5px solid var(--aurora-border, #ddd)',
+        borderTopColor: 'var(--aurora-accent, #6366F1)',
         borderRadius: '50%',
-        animation: 'spin 1s linear infinite',
-        margin: '0 auto 20px',
+        animation: 'spin 0.9s linear infinite',
+        margin: '0 auto 16px',
       }} />
-      <p style={{ color: '#666', fontSize: '14px' }}>Loading...</p>
+      <p style={{ color: 'var(--aurora-text-secondary, #666)', fontSize: '14px', fontWeight: 500 }}>Loading...</p>
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }

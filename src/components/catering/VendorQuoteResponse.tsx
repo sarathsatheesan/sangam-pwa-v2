@@ -38,8 +38,14 @@ function PriceInput({
 
   const pushValue = useCallback(
     (raw: string) => {
-      const parsed = parseFloat(raw || '0');
-      const newCents = Math.round(parsed * 100);
+      // FIX-CURRENCY: Avoid floating-point precision loss (e.g. 10.005 * 100 = 1000.499...)
+      // by parsing whole and fractional parts as integers via string splitting.
+      const trimmed = (raw || '0').trim();
+      const parts = trimmed.split('.');
+      const whole = parseInt(parts[0] || '0', 10) || 0;
+      const fracStr = (parts[1] || '').padEnd(2, '0').slice(0, 2); // exactly 2 digits
+      const frac = parseInt(fracStr, 10) || 0;
+      const newCents = Math.abs(whole) * 100 + frac;
       lastPushedCents.current = newCents;
       onCentsChange(newCents);
     },
@@ -146,7 +152,6 @@ export default function VendorQuoteResponse({
   // Quote form state per request
   const [quoteForms, setQuoteForms] = useState<Record<string, {
     items: QuotedItem[];
-    serviceFee: number;
     deliveryFee: number;
     estimatedPrepTime: string;
     message: string;
@@ -213,13 +218,12 @@ export default function VendorQuoteResponse({
         ...prev,
         [requestId]: {
           items,
-          serviceFee: 0,
           deliveryFee: 0,
           estimatedPrepTime: '',
           message: '',
         },
       }));
-      return { items, serviceFee: 0, deliveryFee: 0, estimatedPrepTime: '', message: '' };
+      return { items, deliveryFee: 0, estimatedPrepTime: '', message: '' };
     }
     return quoteForms[requestId];
   };
@@ -263,7 +267,7 @@ export default function VendorQuoteResponse({
       return;
     }
 
-    const total = subtotal + (form.serviceFee || 0) + (form.deliveryFee || 0);
+    const total = subtotal + (form.deliveryFee || 0);
 
     setSubmittingId(request.id);
     try {
@@ -275,7 +279,6 @@ export default function VendorQuoteResponse({
         businessHeritage,
         quotedItems: form.items.filter((i) => i.unitPrice > 0),
         subtotal,
-        serviceFee: form.serviceFee || undefined,
         deliveryFee: form.deliveryFee || undefined,
         total,
         estimatedPrepTime: form.estimatedPrepTime || undefined,
@@ -302,7 +305,6 @@ export default function VendorQuoteResponse({
       ...prev,
       [response.id]: {
         items: response.quotedItems || [],
-        serviceFee: response.serviceFee || 0,
         deliveryFee: response.deliveryFee || 0,
         estimatedPrepTime: response.estimatedPrepTime || '',
         message: response.message || '',
@@ -333,14 +335,13 @@ export default function VendorQuoteResponse({
       return;
     }
 
-    const total = subtotal + (form.serviceFee || 0) + (form.deliveryFee || 0);
+    const total = subtotal + (form.deliveryFee || 0);
 
     setSubmittingId(response.id);
     try {
       await updateQuoteResponse(response.id, {
         quotedItems: form.items.filter((i) => i.unitPrice > 0),
         subtotal,
-        serviceFee: form.serviceFee || undefined,
         deliveryFee: form.deliveryFee || undefined,
         total,
         estimatedPrepTime: form.estimatedPrepTime || undefined,
@@ -713,7 +714,7 @@ export default function VendorQuoteResponse({
               const isExpanded = expandedId === request.id;
               const form = getFormForRequest(request.id, request);
               const formSubtotal = form.items.reduce((s, i) => s + i.unitPrice * i.qty, 0);
-              const formTotal = formSubtotal + (form.serviceFee || 0) + (form.deliveryFee || 0);
+              const formTotal = formSubtotal + (form.deliveryFee || 0);
 
               return (
                 <div
@@ -857,16 +858,7 @@ export default function VendorQuoteResponse({
                         })}
 
                         {/* Fees */}
-                        <div className="grid grid-cols-2 gap-3 pt-2">
-                          <div>
-                            <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Service fee ($)</label>
-                            <PriceInput
-                              cents={form.serviceFee}
-                              onCentsChange={(c) => updateQuoteForm(request.id, { serviceFee: c })}
-                              className="w-full rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 mt-1"
-                              style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                            />
-                          </div>
+                        <div className="pt-2">
                           <div>
                             <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Delivery fee ($)</label>
                             <PriceInput
@@ -1056,11 +1048,6 @@ export default function VendorQuoteResponse({
                                 <span>{formatPrice(qi.unitPrice * qi.qty)}</span>
                               </div>
                             ))}
-                            {response.serviceFee != null && response.serviceFee > 0 && (
-                              <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-                                <span>Service fee</span><span>{formatPrice(response.serviceFee)}</span>
-                              </div>
-                            )}
                             {response.deliveryFee != null && response.deliveryFee > 0 && (
                               <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
                                 <span>Delivery fee</span><span>{formatPrice(response.deliveryFee)}</span>
@@ -1181,7 +1168,7 @@ export default function VendorQuoteResponse({
               const canEdit = isQuoteResponseEditable(response);
               const form = isEditing && quoteForms[response.id] ? quoteForms[response.id] : null;
               const formSubtotal = form ? form.items.reduce((s, i) => s + i.unitPrice * i.qty, 0) : 0;
-              const formTotal = form ? formSubtotal + (form.serviceFee || 0) + (form.deliveryFee || 0) : 0;
+              const formTotal = form ? formSubtotal + (form.deliveryFee || 0) : 0;
 
               return (
                 <div
@@ -1276,16 +1263,7 @@ export default function VendorQuoteResponse({
                           })}
 
                           {/* Fees in edit mode */}
-                          <div className="grid grid-cols-2 gap-3 pt-2">
-                            <div>
-                              <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Service fee ($)</label>
-                              <PriceInput
-                                cents={form.serviceFee}
-                                onCentsChange={(c) => updateQuoteForm(response.id, { serviceFee: c })}
-                                className="w-full rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 mt-1"
-                                style={{ backgroundColor: 'var(--aurora-bg)', borderColor: 'var(--aurora-border)', color: 'var(--aurora-text)' }}
-                              />
-                            </div>
+                          <div className="pt-2">
                             <div>
                               <label className="text-xs font-medium" style={{ color: 'var(--aurora-text-secondary)' }}>Delivery fee ($)</label>
                               <PriceInput
@@ -1387,11 +1365,6 @@ export default function VendorQuoteResponse({
                                 <span>{formatPrice(qi.unitPrice * qi.qty)}</span>
                               </div>
                             ))}
-                            {response.serviceFee != null && response.serviceFee > 0 && (
-                              <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--aurora-text-secondary)' }}>
-                                <span>Service fee</span><span>{formatPrice(response.serviceFee)}</span>
-                              </div>
-                            )}
                             {response.deliveryFee != null && response.deliveryFee > 0 && (
                               <div className="flex justify-between text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
                                 <span>Delivery fee</span><span>{formatPrice(response.deliveryFee)}</span>
@@ -1432,6 +1405,20 @@ export default function VendorQuoteResponse({
                                   Customer proposes: <strong>{formatPrice(response.repriceRequestedPrice || 0)}</strong>
                                   <span className="text-xs ml-1">(your quote: {formatPrice(response.total)})</span>
                                 </p>
+                                {/* Items included in this reprice request */}
+                                {response.quotedItems && response.quotedItems.length > 0 && (
+                                  <div className="mt-1">
+                                    <p className="text-xs font-medium mb-0.5" style={{ color: '#92400E' }}>Items in request:</p>
+                                    <ul className="space-y-0.5">
+                                      {response.quotedItems.map((item, idx) => (
+                                        <li key={idx} className="text-xs flex items-center gap-1.5" style={{ color: '#92400E' }}>
+                                          <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: '#D97706' }} />
+                                          {item.name} × {item.qty} — {formatPrice(item.unitPrice * item.qty)}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
                                 {response.repriceReason && (
                                   <p className="text-xs" style={{ color: '#92400E' }}>Reason: &ldquo;{response.repriceReason}&rdquo;</p>
                                 )}

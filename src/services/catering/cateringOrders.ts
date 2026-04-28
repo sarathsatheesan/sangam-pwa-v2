@@ -30,7 +30,6 @@ import {
   increment,
   Timestamp,
   runTransaction,
-  writeBatch,
   type Unsubscribe,
   type DocumentSnapshot,
 } from 'firebase/firestore';
@@ -695,14 +694,24 @@ export async function createOrdersFromQuote(
   const acceptedResponse = responses.find(
     (r) => r.status === 'accepted' || r.status === 'partially_accepted',
   );
-  const customerName = acceptedResponse?.customerName || '';
-  const customerEmail = acceptedResponse?.customerEmail || '';
-  const customerPhone = acceptedResponse?.customerPhone || '';
+  let customerName = acceptedResponse?.customerName || '';
+  let customerEmail = acceptedResponse?.customerEmail || '';
+  let customerPhone = acceptedResponse?.customerPhone || '';
 
-  // FIX-C1: Use a Firestore writeBatch to create all orders atomically.
-  // We also set a marker on the quote request doc to prevent concurrent creation.
-  const batch = writeBatch(db);
-  const orderIds: string[] = [];
+  // Fallback: if no customer details found on responses, look up from user profile
+  if (!customerName && quoteRequest.customerId) {
+    try {
+      const userSnap = await getDoc(doc(db, 'users', quoteRequest.customerId));
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        customerName = userData?.name || userData?.displayName || '';
+        customerEmail = customerEmail || userData?.email || '';
+        customerPhone = customerPhone || userData?.phone || '';
+      }
+    } catch {
+      // Non-critical — proceed with empty name rather than failing order creation
+    }
+  }
 
   // Atomic marker: set ordersCreated = true on the quote request to block concurrent calls
   const requestRef = doc(db, 'cateringQuoteRequests', quoteRequest.id);
@@ -744,11 +753,18 @@ export async function createOrdersFromQuote(
 
       if (orderItems.length === 0) continue;
 
-      const subtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
-      const serviceFee = response.serviceFee || 0;
+      const itemSubtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
       const deliveryFee = response.deliveryFee || 0;
-      const tax = Math.round((subtotal + serviceFee + deliveryFee) * 0.0825);
-      const total = subtotal + serviceFee + deliveryFee + tax;
+
+      // If a reprice was accepted (vendor_accepted or counter_accepted), use the negotiated total
+      // instead of recalculating from individual item prices.
+      // response.total in Firestore = repriceRequestedPrice or repriceCounterPrice (includes delivery fee)
+      const isRepriceAccepted = response.repriceStatus === 'vendor_accepted' || response.repriceStatus === 'counter_accepted';
+      const subtotal = isRepriceAccepted
+        ? Math.max(0, (response.total || itemSubtotal + deliveryFee) - deliveryFee)
+        : itemSubtotal;
+      const tax = Math.round((subtotal + deliveryFee) * 0.0825);
+      const total = subtotal + deliveryFee + tax;
 
       const order: Record<string, any> = {
         customerId: quoteRequest.customerId,
@@ -759,7 +775,6 @@ export async function createOrdersFromQuote(
         businessName,
         items: orderItems,
         subtotal,
-        serviceFee,
         deliveryFee,
         tax,
         total,
@@ -780,6 +795,11 @@ export async function createOrdersFromQuote(
         quoteRequestId: quoteRequest.id,
         quoteResponseId: response.id,
         rfpOrigin: true,
+        // Track reprice discount if negotiated price was accepted
+        ...(isRepriceAccepted && itemSubtotal !== subtotal ? {
+          repriceDiscount: itemSubtotal - subtotal,
+          originalSubtotal: itemSubtotal,
+        } : {}),
         _version: 1,
         createdAt: serverTimestamp(),
         confirmedAt: serverTimestamp(),

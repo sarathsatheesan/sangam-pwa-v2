@@ -443,12 +443,18 @@ export default function CateringOrderStatus({ onBack }: CateringOrderStatusProps
                               </span>
                             </div>
                           ))}
-                          {/* Fee breakdown: subtotal, service fee, delivery fee, tax */}
+                          {/* Fee breakdown: subtotal, negotiated discount, delivery fee, tax */}
                           <div className="pt-1 border-t space-y-0.5" style={{ borderColor: 'var(--aurora-border)' }}>
                             <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                               <span>Subtotal</span>
-                              <span>{formatPrice(order.subtotal)}</span>
+                              <span>{formatPrice((order as any).originalSubtotal || order.subtotal)}</span>
                             </div>
+                            {((order as any).repriceDiscount != null && (order as any).repriceDiscount > 0) && (
+                              <div className="flex justify-between text-sm" style={{ color: '#059669' }}>
+                                <span>Negotiated Discount</span>
+                                <span>-{formatPrice((order as any).repriceDiscount)}</span>
+                              </div>
+                            )}
                             {(order.serviceFee != null && order.serviceFee > 0) && (
                               <div className="flex justify-between text-sm" style={{ color: 'var(--aurora-text-secondary)' }}>
                                 <span>Service Fee</span>

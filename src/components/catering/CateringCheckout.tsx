@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { ArrowLeft, Loader2, AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Plus, Minus, Trash2 } from 'lucide-react';
 import type {
   OrderItem,
   DeliveryAddress,
@@ -31,6 +31,8 @@ interface CateringCheckoutProps {
   ) => void;
   onPlaceOrder: () => void;
   onBack: () => void;
+  onUpdateCartItem: (itemId: string, qty: number) => void;
+  onRemoveCartItem: (itemId: string) => void;
   loading: boolean;
 }
 
@@ -150,6 +152,8 @@ export default function CateringCheckout({
   onUpdateForm,
   onPlaceOrder,
   onBack,
+  onUpdateCartItem,
+  onRemoveCartItem,
   loading,
 }: CateringCheckoutProps) {
   const subtotal = calculateOrderTotal(cart.items);
@@ -159,6 +163,7 @@ export default function CateringCheckout({
   const tomorrow = useMemo(() => getTomorrow(), []);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
   const [openSections, setOpenSections] = useState<Set<number>>(new Set([1, 2, 3]));
 
   const errors = useMemo(() => validateForm(orderForm), [orderForm]);
@@ -182,6 +187,11 @@ export default function CateringCheckout({
       return newSet;
     });
   };
+
+  // Guard: if cart becomes empty during inline editing, navigate back
+  useEffect(() => {
+    if (cart.items.length === 0) onBack();
+  }, [cart.items.length, onBack]);
 
   // SB-20: Restore saved checkout form on mount
   useEffect(() => {
@@ -241,7 +251,10 @@ export default function CateringCheckout({
 
   const handleSubmit = () => {
     setSubmitAttempted(true);
-    if (hasErrors) return;
+    if (hasErrors) {
+      setShowValidationModal(true);
+      return;
+    }
     // SB-20: Clear sessionStorage when order is successfully placed
     sessionStorage.removeItem(CHECKOUT_FORM_KEY);
     onPlaceOrder();
@@ -257,6 +270,14 @@ export default function CateringCheckout({
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--aurora-bg)' }}>
+      {/* Cross-browser: hide number input spinners for qty stepper */}
+      <style>{`
+        input[type="number"].co-qty-input::-webkit-outer-spin-button,
+        input[type="number"].co-qty-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+      `}</style>
       {/* UI-16: checkPop keyframe now in global index.css (BUG-005) */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
@@ -618,24 +639,12 @@ export default function CateringCheckout({
             )}
           </section>
 
-          {/* Validation summary on submit (BUG-003: placed in left form column) */}
-          {submitAttempted && hasErrors && (
-            <div
-              className="border border-red-200 rounded-lg p-4 flex items-start gap-3"
-              style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)' }}
-              role="alert"
-              aria-live="polite"
-            >
-              <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-800">Please fix the following before placing your order:</p>
-                <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
-                  {Object.values(errors).map((msg, i) => (
-                    <li key={i}>{msg}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+          {/* Validation error modal — triggered on submit attempt with errors */}
+          {showValidationModal && hasErrors && (
+            <CheckoutValidationModal
+              errors={Object.values(errors).filter(Boolean) as string[]}
+              onClose={() => setShowValidationModal(false)}
+            />
           )}
 
         </div>
@@ -657,14 +666,79 @@ export default function CateringCheckout({
               {cart.items.map((item) => (
                 <div
                   key={item.menuItemId}
-                  className="flex justify-between items-center"
+                  className="flex items-center gap-2"
                   style={{ color: 'var(--aurora-text)' }}
                   role="listitem"
                 >
-                  <span>
-                    {item.name} &times; {item.qty}
+                  {/* Item name — truncated on narrow screens */}
+                  <span className="flex-1 text-sm truncate" title={item.name}>
+                    {item.name}
                   </span>
-                  <span className="font-medium">
+
+                  {/* Inline qty stepper */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {item.qty <= 1 ? (
+                      <button
+                        onClick={() => onRemoveCartItem(item.menuItemId)}
+                        className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}
+                        aria-label={`Remove ${item.name}`}
+                        type="button"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onUpdateCartItem(item.menuItemId, item.qty - 1)}
+                        className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                        style={{ backgroundColor: 'var(--aurora-bg, #F5F6FA)', color: 'var(--aurora-text-secondary)' }}
+                        aria-label={`Decrease ${item.name} quantity`}
+                        type="button"
+                      >
+                        <Minus size={13} />
+                      </button>
+                    )}
+
+                    <input
+                      type="number"
+                      min={item.minOrderQty || 1}
+                      max={item.maxOrderQty || 9999}
+                      value={item.qty}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        if (val <= 0) {
+                          onRemoveCartItem(item.menuItemId);
+                        } else {
+                          onUpdateCartItem(item.menuItemId, val);
+                        }
+                      }}
+                      className="w-10 h-7 text-center text-sm font-medium rounded-md border outline-none co-qty-input"
+                      style={{
+                        borderColor: 'var(--aurora-border)',
+                        backgroundColor: 'var(--aurora-bg)',
+                        color: 'var(--aurora-text)',
+                        /* Cross-browser: hide number spinners */
+                        MozAppearance: 'textfield',
+                        WebkitAppearance: 'none',
+                        appearance: 'textfield',
+                      } as React.CSSProperties}
+                      aria-label={`${item.name} quantity`}
+                    />
+
+                    <button
+                      onClick={() => onUpdateCartItem(item.menuItemId, item.qty + 1)}
+                      disabled={(item.maxOrderQty || 9999) <= item.qty}
+                      className="w-7 h-7 rounded-full flex items-center justify-center transition-colors disabled:opacity-40"
+                      style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1' }}
+                      aria-label={`Increase ${item.name} quantity`}
+                      type="button"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+
+                  {/* Line total */}
+                  <span className="font-medium text-sm w-16 text-right flex-shrink-0">
                     {formatPrice(item.unitPrice * item.qty)}
                   </span>
                 </div>
@@ -736,6 +810,135 @@ export default function CateringCheckout({
           </div>
           </div>
         </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Checkout Validation Error Modal ──
+// Cross-browser: iOS Safari scroll lock, dvh height, ESC key, backdrop click/touch, prefers-reduced-motion
+function CheckoutValidationModal({ errors, onClose }: { errors: string[]; onClose: () => void }) {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    modalRef.current?.focus();
+
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handleKey);
+
+    // Lock body scroll (iOS Safari fix — position:fixed prevents rubber-banding)
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.overflow = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, [onClose]);
+
+  const handleBackdropInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        backgroundColor: 'rgba(0, 0, 0, 0.45)',
+        height: '100vh',
+        // @ts-ignore — dvh is valid CSS but not in React's CSSProperties type
+        ...(CSS.supports?.('height', '100dvh') ? { height: '100dvh' } : {}),
+        animation: 'coValidationFadeIn 0.2s ease-out',
+      }}
+      onClick={handleBackdropInteraction}
+      onTouchEnd={handleBackdropInteraction}
+      role="alertdialog"
+      aria-modal="true"
+      aria-label="Validation errors"
+    >
+      <style>{`
+        @keyframes coValidationFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes coValidationSlideUp {
+          from { opacity: 0; transform: translateY(12px) scale(0.97); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .co-validation-modal-card {
+            animation: none !important;
+          }
+        }
+        /* Cross-browser: hide number input spinners */
+        input[type="number"].co-qty-input::-webkit-outer-spin-button,
+        input[type="number"].co-qty-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+      `}</style>
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden outline-none co-validation-modal-card"
+        style={{
+          backgroundColor: 'var(--aurora-bg, #fff)',
+          animation: 'coValidationSlideUp 0.25s ease-out',
+          WebkitTextSizeAdjust: '100%',
+        }}
+      >
+        {/* Header */}
+        <div
+          className="px-5 py-4 flex items-center gap-3"
+          style={{ background: 'linear-gradient(135deg, #EF4444, #F87171)' }}
+        >
+          <AlertCircle size={22} style={{ color: 'rgba(255,255,255,0.95)' }} />
+          <h2 className="text-base font-bold text-white" style={{ lineHeight: 1.3 }}>
+            Please fix before placing order
+          </h2>
+        </div>
+
+        {/* Error list */}
+        <div className="px-5 py-4" style={{ maxHeight: '50vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <ul className="space-y-2.5">
+            {errors.map((msg, i) => (
+              <li
+                key={i}
+                className="flex items-start gap-2.5 text-sm"
+                style={{ color: 'var(--aurora-text, #1E2132)' }}
+              >
+                <span
+                  className="flex-shrink-0 mt-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}
+                >
+                  {i + 1}
+                </span>
+                <span>{msg}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 pb-4">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+            style={{ backgroundColor: '#6366F1' }}
+          >
+            Got it, I'll fix these
+          </button>
         </div>
       </div>
     </div>
