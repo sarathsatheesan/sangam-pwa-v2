@@ -74,7 +74,7 @@ const HomePage: React.FC = () => {
             WebkitTextFillColor: 'transparent',
             letterSpacing: '-0.5px',
           }}>
-            EthniZity
+            eNoVo
           </span>
         </div>
         <h1 className="text-lg sm:text-xl font-bold text-[var(--aurora-text,#1E2132)] mb-1">

@@ -1339,7 +1339,7 @@ export default function MarketplacePage() {
               )}
             </div>
 
-            {/* EthniZity Dropdown - New Component */}
+            {/* eNoVo Heritage Dropdown */}
             <EthnicityFilterDropdown
               selected={selectedHeritage}
               onChange={setSelectedHeritage}
@@ -1671,9 +1671,9 @@ export default function MarketplacePage() {
                     </select>
                   </div>
                 </div>
-                {/* Heritage / EthniZity — shared component (same as Profile & Onboarding) */}
+                {/* Heritage / eNoVo — shared component (same as Profile & Onboarding) */}
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-[var(--aurora-text)] mb-2">Heritage / EthniZity</label>
+                  <label className="block text-sm font-medium text-[var(--aurora-text)] mb-2">Heritage / eNoVo</label>
                   <CountryEthnicitySelector
                     selected={formHeritage}
                     onChange={setFormHeritage}

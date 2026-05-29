@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Group WebRTC Mesh Calling Service for ethniCity Messages
+// Group WebRTC Mesh Calling Service for eNoVo Messages
 // ═══════════════════════════════════════════════════════════════════════
 // Extends the WebRTC architecture for multi-party (up to 8 participants)
 // using mesh topology — each participant maintains a peer connection to

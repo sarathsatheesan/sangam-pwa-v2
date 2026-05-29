@@ -261,11 +261,11 @@ const generateICS = (event: Event): string => {
 
   const ics = `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//EthniZity//Events//EN
+PRODID:-//eNoVo//Events//EN
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
 BEGIN:VEVENT
-UID:${event.id}@ethnicity.local
+UID:${event.id}@enovoapp.com
 DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z
 DTSTART:${startDate}T${startTime}00Z
 DTEND:${endDate}T${endTime}00Z
@@ -899,7 +899,7 @@ export default function EventsPage() {
         if (range) matchesDate = isDateInRange(event.fullDate, range);
       }
 
-      // Heritage/EthniZity filter
+      // Heritage/eNoVo filter
       const matchesHeritage = selectedHeritage.length === 0 || (event.heritage && event.heritage.some((h) => selectedHeritage.includes(h)));
 
       return matchesSearch && matchesFilter && matchesDate && matchesHeritage;
@@ -1328,7 +1328,7 @@ export default function EventsPage() {
       {/* ── Search & Filter Bar ── */}
       <div className="relative bg-gradient-to-br from-aurora-indigo/8 via-aurora-surface to-orange-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 pt-4 pb-3">
-          {/* Search + EthniZity Filter on same row */}
+          {/* Search + eNoVo Filter on same row */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-aurora-text-muted" />
@@ -1351,7 +1351,7 @@ export default function EventsPage() {
               )}
             </div>
 
-            {/* EthniZity Filter Dropdown */}
+            {/* eNoVo Filter Dropdown */}
             <div className="relative shrink-0">
               <EthnicityFilterDropdown
                 selected={selectedHeritage}

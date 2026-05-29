@@ -978,7 +978,7 @@ export default function ProfilePage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `ethnizity-data-export-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `enovo-data-export-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1117,7 +1117,7 @@ export default function ProfilePage() {
                 <button
                   onClick={() => {
                     if (navigator.share) {
-                      navigator.share({ title: `${userProfile?.name} on EthniZity`, url: window.location.href });
+                      navigator.share({ title: `${userProfile?.name} on eNoVo`, url: window.location.href });
                     }
                   }}
                   className="px-3 py-1.5 bg-[var(--aurora-surface-variant)] rounded-lg font-semibold text-xs text-[var(--aurora-text)] hover:bg-[var(--aurora-border)] transition-colors flex items-center gap-1.5"
@@ -2054,7 +2054,7 @@ export default function ProfilePage() {
 
             {/* Heritage */}
             <div>
-              <label className="block text-xs font-bold text-[var(--aurora-text-muted)] mb-2 uppercase tracking-wider">Heritage / EthniZity</label>
+              <label className="block text-xs font-bold text-[var(--aurora-text-muted)] mb-2 uppercase tracking-wider">Heritage / eNoVo</label>
               <CountryEthnicitySelector
                 selected={editForm.heritage}
                 onChange={(val) => setEditForm((prev) => ({ ...prev, heritage: val }))}

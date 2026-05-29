@@ -460,7 +460,7 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'ethniCity_business_import_template.csv';
+    a.download = 'enovo_business_import_template.csv';
     a.click();
     URL.revokeObjectURL(url);
   }, []);

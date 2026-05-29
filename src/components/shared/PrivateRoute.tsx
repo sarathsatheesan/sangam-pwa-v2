@@ -28,12 +28,12 @@ function BannedScreen() {
         <h1 className="text-2xl font-bold text-red-700 dark:text-red-400">Account Banned</h1>
         <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
           Your account has been permanently banned for violating our community guidelines.
-          You are no longer able to access EthniZity.
+          You are no longer able to access eNoVo.
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           If you believe this was a mistake, please contact our support team at{' '}
-          <a href="mailto:support@ethnicity.com" className="text-blue-600 dark:text-blue-400 underline">
-            support@ethnicity.com
+          <a href="mailto:support@enovoapp.com" className="text-blue-600 dark:text-blue-400 underline">
+            support@enovoapp.com
           </a>
         </p>
         <button
@@ -74,8 +74,8 @@ function DisabledScreen() {
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           If you have questions, please reach out to our support team at{' '}
-          <a href="mailto:support@ethnicity.com" className="text-blue-600 dark:text-blue-400 underline">
-            support@ethnicity.com
+          <a href="mailto:support@enovoapp.com" className="text-blue-600 dark:text-blue-400 underline">
+            support@enovoapp.com
           </a>
         </p>
         <button

@@ -213,7 +213,7 @@ const StepReview: React.FC<StepReviewProps> = ({
         <span className="text-sm mt-0.5">📋</span>
         <p className="text-[10px]" style={{ color: 'var(--aurora-text-secondary)' }}>
           By submitting, you confirm that all information provided is accurate and that you are
-          authorized to register this business on ethniCity. Your listing will be subject to our
+          authorized to register this business on eNoVo. Your listing will be subject to our
           community guidelines and terms of service.
         </p>
       </div>

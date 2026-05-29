@@ -121,7 +121,7 @@ export const AppHeader: React.FC = () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'EthniZity',
+          title: 'eNoVo',
           text: 'Our culture, connected. Discover diverse communities near you!',
           url: window.location.href,
         });
@@ -176,7 +176,7 @@ export const AppHeader: React.FC = () => {
           {/* Left: Logo + App Name + Avatar + Greeting */}
           <div className="flex items-center gap-2 shrink-0 min-w-0">
             <Link to="/feed" className="flex items-center gap-1.5 shrink-0">
-              <img src="/ethnicity-logo.svg" alt="EthniZity" className="w-7 h-7 sm:w-8 sm:h-8" />
+              <img src="/enovo-logo.svg" alt="eNoVo" className="w-7 h-7 sm:w-8 sm:h-8" />
               <span className="text-lg sm:text-xl font-extrabold tracking-tight leading-none">
                 <span style={{ color: '#c96830' }}>Ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">Zity</span>
               </span>
@@ -391,7 +391,7 @@ export const AppHeader: React.FC = () => {
 
                 {/* Feedback */}
                 <a
-                  href="mailto:feedback@ethnicity.com"
+                  href="mailto:feedback@enovoapp.com"
                   className="px-4 py-2.5 flex items-center gap-3 text-aurora-text-secondary hover:bg-gray-50 transition-colors"
                   onClick={() => setMenuOpen(false)}
                 >

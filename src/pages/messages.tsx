@@ -2082,12 +2082,12 @@ export default function MessagesPage() {
         if (m.starred) content = `⭐ ${content}`;
         return `[${time}] ${sender}: ${content}`;
       });
-    const header = `EthniZity Chat Export — ${chatName}\nExported: ${new Date().toLocaleString()}\nMessages: ${lines.length}\n${'─'.repeat(40)}\n`;
+    const header = `eNoVo Chat Export — ${chatName}\nExported: ${new Date().toLocaleString()}\nMessages: ${lines.length}\n${'─'.repeat(40)}\n`;
     const blob = new Blob([header + lines.join('\n')], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ethnizity-chat-${chatName?.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.download = `enovo-chat-${chatName?.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
     showNotif('Chat exported', 'success');
@@ -3799,7 +3799,7 @@ export default function MessagesPage() {
         <div className="w-[200px] h-[200px] mx-auto mb-6 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--msg-own-bubble-hover)' }}>
           <MessageSquare size={80} style={{ color: 'var(--aurora-accent)' }} />
         </div>
-        <h2 className="text-2xl font-light mb-3" style={{ color: '#41525D' }}>EthniZity Messages</h2>
+        <h2 className="text-2xl font-light mb-3" style={{ color: '#41525D' }}>eNoVo Messages</h2>
         <p className="text-sm max-w-[340px] mx-auto" style={{ color: 'var(--msg-secondary)' }}>
           Send and receive messages with your community members. Select a conversation to start chatting.
         </p>

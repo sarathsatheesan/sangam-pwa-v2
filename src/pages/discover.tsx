@@ -913,7 +913,7 @@ export default function DiscoverPage() {
       {/* Sticky Tab Navigation + Search — -webkit-sticky for iOS Safari */}
       <div className="sticky top-0 z-20 bg-white dark:bg-gray-900 shadow-sm">
         <div className="max-w-6xl mx-auto px-4">
-          {/* Search + EthniZity + Tabs row */}
+          {/* Search + eNoVo + Tabs row */}
           <div className="flex items-center gap-2 py-3 border-b border-aurora-border">
             {/* Search */}
             <div className="relative flex-1">
@@ -932,7 +932,7 @@ export default function DiscoverPage() {
               )}
             </div>
 
-            {/* EthniZity Filter Dropdown */}
+            {/* eNoVo Filter Dropdown */}
             <EthnicityFilterDropdown
               selected={selectedHeritage}
               onChange={(h) => dispatchFilter({ type: "SET_HERITAGE", payload: h })}
@@ -1717,7 +1717,7 @@ export default function DiscoverPage() {
 
               {selectedPerson.profession && <p className="text-gray-600 dark:text-gray-300 text-center mb-1">{selectedPerson.profession}</p>}
 
-              {/* Heritage / EthniZity */}
+              {/* Heritage / eNoVo */}
               <div className="flex items-center justify-center mb-1">
                 {renderHeritage(selectedPerson)}
               </div>

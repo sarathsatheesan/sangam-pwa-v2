@@ -1,4 +1,4 @@
-// Content Moderation Utility for ethniCity Community Platform
+// Content Moderation Utility for eNoVo Community Platform
 // Client-side content scanning with keyword-based detection + Smart Filter AI
 // TODO: This moderation runs client-side only and can be bypassed.
 // Implement server-side moderation via Firebase Cloud Functions for production use.

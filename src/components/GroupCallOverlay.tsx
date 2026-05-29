@@ -461,7 +461,7 @@ export default function GroupCallOverlay() {
             const link = `${baseUrl}/messages?joinCall=${callState.roomId}&conv=${callState.conversationId}`;
             try {
               if (navigator.share) {
-                await navigator.share({ title: 'Join Group Call', text: 'Join the group call on ethniCity', url: link });
+                await navigator.share({ title: 'Join Group Call', text: 'Join the group call on eNoVo', url: link });
               } else {
                 await copyToClipboard(link);
                 setLinkCopied(true);
@@ -482,7 +482,7 @@ export default function GroupCallOverlay() {
             const baseUrl = window.location.origin;
             const link = `${baseUrl}/messages?joinCall=${callState.roomId}&conv=${callState.conversationId}`;
             if (navigator.share) {
-              navigator.share({ title: 'Join Group Call', text: 'Join the group call on ethniCity', url: link }).catch(() => {});
+              navigator.share({ title: 'Join Group Call', text: 'Join the group call on eNoVo', url: link }).catch(() => {});
             } else {
               copyToClipboard(link).then(() => {
                 setLinkCopied(true);

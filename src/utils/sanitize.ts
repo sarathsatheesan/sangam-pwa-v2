@@ -1,5 +1,5 @@
 /**
- * Robust input sanitization for ethniCity App
+ * Robust input sanitization for eNoVo App
  * Provides XSS prevention without external dependencies
  */
 

@@ -31,14 +31,14 @@ const TikTokIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const AppFooter: React.FC = () => {
   const handleFeedback = () => {
-    window.location.href = 'mailto:feedback@ethnicity.com';
+    window.location.href = 'mailto:feedback@enovoapp.com';
   };
 
   const handleShare = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'EthniZity',
+          title: 'eNoVo',
           text: 'Our culture, connected. Discover diverse communities near you!',
           url: window.location.href,
         });

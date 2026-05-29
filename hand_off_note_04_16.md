@@ -1,4 +1,4 @@
-# Sangam PWA v2 (ethniCity) — Session Handoff Note
+# Sangam PWA v2 (eNoVo, formerly ethniCity) — Session Handoff Note
 
 <!--
   HOW TO USE THIS FILE
@@ -17,14 +17,14 @@
   previously-fixed bugs.
 -->
 
-**Date:** April 16, 2026 (Last updated: Session 35 — Service Radius + Google Places Autocomplete Across All Modules + Race Condition Fix + Establishment Search)
+**Date:** April 16, 2026 (Last updated: Session 39 — Domain Setup + Full Rebrand EthniZity → eNoVo)
 **Repo:** https://github.com/sarathsatheesan/sangam-pwa-v2
-**Latest Commit:** `5e76d3d` (Session 35) — fix: include establishment type in Places autocomplete for business name search
-**Uncommitted:** `hand_off_note_04_16.md` (this file). All code changes committed. Needs `git push && npm run build && firebase deploy --only hosting` from macOS.
+**Latest Commit:** `e7a022c` (Session 38) — fix: rework reprice UX — scoped items, delivery fee always visible
+**Uncommitted:** Rebrand changes across 32+ files (EthniZity → eNoVo) + `hand_off_note_04_16.md`. Needs commit + deploy from macOS: `rm -rf node_modules package-lock.json && npm install && npm run build && firebase deploy --only hosting`.
 **Deployed to:** Firebase Hosting (site: `mithr-1e5f4`) + Cloud Functions (2nd Gen, Cloud Run)
-**Live bundle:** Deployed and live at `https://mithr-1e5f4.web.app`
+**Live bundle:** Deployed and live at `https://mithr-1e5f4.web.app` + `https://enovoapp.com` + `https://ethnizity.com` + `https://enovoapp.online` + `https://enovoapp.org` + `https://enovoapp.store`
 **Local project path on Mac:** `/Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2`
-**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix), Session 28 (RFP-to-Order conversion + in-order messaging + Firestore rules fix), Session 28b (Live testing of quote-to-order pipeline + 19 TypeScript error fixes + RFP badge on active/pending orders), Session 29 (Vendor Storefront Builder: grocery templates + TemplateSelector rebuild + 10 critical bug fixes across Add Item / Delete / Smart Paste / Edit flows), Session 30 (Multi-Business Architecture: global business switcher + vendor dashboard per-business routing + business registration fixes + Add Another Business flow from Settings + 6 UX bug fixes + QA Test Execution Report (48 tests) + 4 additional QA bug fixes + UI flicker elimination), Session 30b (Vendor Dashboard Header Refactor: BusinessSwitcher breadcrumb placement + Dashboard CTA + dual-role navigation fix with suppressVendorAutoSwitchRef + "My Orders" rename), Session 31 (Notification Deep-Link Routing: role field on CateringNotification + 3-tier fallback routing + vendor dashboard inline bell routing + background push handler + race condition fix), Session 32 (Handoff Note Consolidation + White-Page QA Audit + ErrorBoundary + Null Guard Fixes), Session 32+ (Profile Page Enhancements + Admin Avatar Fix + Contextual CTAs + Deep-Link Creation Forms + Heritage Selector Standardization + Karpathy Coding Skill + Full-App Karpathy Code Review), Session 32++ (Karpathy Code Review Implementation — 30 findings across 4 sprints: Sprint 1 reliability fixes, Sprint 2 type safety/dedup, Sprint 3 structural improvements, Sprint 4 polish — all validated with tsc + vite build), Session 33 (God-Component Decomposition: 3 god-components decomposed into 48 new files — messages.tsx 5,744→4,207 lines, admin.tsx 3,325→1,647 lines, VendorCateringDashboard.tsx 2,719→2,175 lines + cross-browser patches + Phase 2 panel wiring + feature audit + 2 critical fixes: ModerationPanel missing actions + RegistrationPanel missing reject modal), Session 34 (Catering Event Time field + Cross-Browser Audit for Safari/Firefox + showPicker() on all 23 date/time inputs + Notification API Safari fix + Cart UX simplification + esbuild build target fix), Session 35 (Service Radius field on signup pages + Google Places address autocomplete across all modules + race condition fix for loading=async + establishment type for business name search)
+**Session history:** `docs/handoff/SESSION_01.md`, `docs/handoff/SESSION_02.md`, Session 3, Session 4, Session 5 (Batch 4), Session 6 (Pinned Messages + UI fixes), Session 7 (Batch 5 — Disappearing Messages), Session 8 (Voice-to-Text + Timer Picker fix + Undo removal + Group Calls), Session 9 (Duplicate call event fix + Share call link + Draggable PiP), Session 10 (Admin toggles for all 23 messaging features + live Chrome testing + cross-browser audit), Session 11 (Business Phase 2 Steps 1-6: useReducer migration + 4 custom hooks), Session 12 (Business Phase 2 Steps 7-8: extract 6 JSX components + memoize handlers), Session 13 (Business Phase 3: UX Polish & Accessibility — ARIA labels, keyboard nav, focus trapping, lazy loading, photo lightbox, empty states, share functionality), Sessions 14-16 (Business Phase 4: Map view with Leaflet/OpenStreetMap + Owner Analytics Dashboard + map marker UX redesign + Firestore analytics rules fix), Session 17 (Business Phase 4 continued: Admin verification toggle, Q&A system, Booking/Reservation, Open Now indicator, carousel/deals/Q&A fixes, details/summary refactor), Session 18 (Business Phase 4 completion: all 42 roadmap items done — filter chips, CSV import, distance sorting, onSnapshot, virtualization, parallel compression, autocomplete), Session 19 (Discover Page Phase 1: Critical Fixes & Quick Wins — 10 items, pending tab, mutual pre-compute, search ranking, accessibility, dead code removal, cross-browser fixes), Session 20 (Discover Phases 2-4: Performance & Data Layer + UX Polish + Architecture & Accessibility — pill gradients, cross-browser audit, useConnections/usePYMK/useFocusTrap hooks, PersonCard component, useReducer, keyboard nav, aria-live, focus trapping, cp sync elimination), Session 21 (Business Sign-Up Wizard — 5-step wizard with Google Places, Leaflet map, KYC verification, Firestore backend, admin review queue, 10 feature flags), Session 22 (Catering Module — Phase 1 Place Order + Phase 2 Request for Price RFP + cuisine picker + Firestore bug fixes + vendor UX improvements), Session 23 (Catering Phases 3-6: Vendor Dashboard, Order Tracking, Reviews, Favorites, Recurring Orders, Templates + Cloud Functions scheduler + Firestore rules + undefined field fixes), Session 24 (UX Audit + Critical Fixes: vendor switch confirmation dialog, checkout form validation, accessibility ARIA labels, regenerated audit report + this handoff note), Session 25 (Catering Medium+Large Effort: architecture refactor — split cateringService.ts into 7 domain modules, optimistic updates across 4 components, template marketplace/versioning/analytics, vendor analytics drill-down/best sellers/peak times/comparison/retention, payment info, messaging, batch ops, inventory manager, review enhancements), Session 26 (Round 2 Service Blueprint Audit: 30 findings SB-18 through SB-47 across 4 priority tiers — inline qty stepper, collapsible checkout, form persistence, undo cart removal, half-star reviews, search clear, accessibility radio groups, state-based tax, two-step payment, batch decline, ETA time picker, vendor pause, audio mute, quote edit window, vendor assignment badges, vendor modification alerts, rejection rollback, multi-vendor RFP summary, role-based Firestore rules, reduced motion, status badges with icons, deep linking, inline messaging, category-level reviews, review moderation panel, recurring order overrides), Session 27 (Catering UI Phases 1-3: 20-item UI overhaul across 3 phases + QA audit finding 21 bugs + all 21 bug fixes verified + cart scroll fix), Session 28 (RFP-to-Order conversion + in-order messaging + Firestore rules fix), Session 28b (Live testing of quote-to-order pipeline + 19 TypeScript error fixes + RFP badge on active/pending orders), Session 29 (Vendor Storefront Builder: grocery templates + TemplateSelector rebuild + 10 critical bug fixes across Add Item / Delete / Smart Paste / Edit flows), Session 30 (Multi-Business Architecture: global business switcher + vendor dashboard per-business routing + business registration fixes + Add Another Business flow from Settings + 6 UX bug fixes + QA Test Execution Report (48 tests) + 4 additional QA bug fixes + UI flicker elimination), Session 30b (Vendor Dashboard Header Refactor: BusinessSwitcher breadcrumb placement + Dashboard CTA + dual-role navigation fix with suppressVendorAutoSwitchRef + "My Orders" rename), Session 31 (Notification Deep-Link Routing: role field on CateringNotification + 3-tier fallback routing + vendor dashboard inline bell routing + background push handler + race condition fix), Session 32 (Handoff Note Consolidation + White-Page QA Audit + ErrorBoundary + Null Guard Fixes), Session 32+ (Profile Page Enhancements + Admin Avatar Fix + Contextual CTAs + Deep-Link Creation Forms + Heritage Selector Standardization + Karpathy Coding Skill + Full-App Karpathy Code Review), Session 32++ (Karpathy Code Review Implementation — 30 findings across 4 sprints: Sprint 1 reliability fixes, Sprint 2 type safety/dedup, Sprint 3 structural improvements, Sprint 4 polish — all validated with tsc + vite build), Session 33 (God-Component Decomposition: 3 god-components decomposed into 48 new files — messages.tsx 5,744→4,207 lines, admin.tsx 3,325→1,647 lines, VendorCateringDashboard.tsx 2,719→2,175 lines + cross-browser patches + Phase 2 panel wiring + feature audit + 2 critical fixes: ModerationPanel missing actions + RegistrationPanel missing reject modal), Session 34 (Catering Event Time field + Cross-Browser Audit for Safari/Firefox + showPicker() on all 23 date/time inputs + Notification API Safari fix + Cart UX simplification + esbuild build target fix), Session 35 (Service Radius field on signup pages + Google Places address autocomplete across all modules + race condition fix for loading=async + establishment type for business name search), Session 36 (QA Bug Fix Verification + Cuisine Dropdown Live Testing + RFP Confirmation Modal + Price Guidance — B1 CSV template fix + B2 dead category condition fix + all 3 implementation phases confirmed complete), Session 37 (Phase 4 Code Review Completion — i18n + component extraction + security + tests + monitoring; Missing Firestore Composite Index Fix — customer order subscription fallback; Vendor Order Status Flow Restoration — OrderCard rewrite with full status progression), Session 38 (Reprice UX Rework — scoped repriceItemNames + delivery fee separation + vendor view updates + cross-browser patches), Session 39 (Domain Setup — 5 custom domains on Firebase via IONOS DNS + Full Rebrand EthniZity → eNoVo across 32+ files)
 
 ---
 
@@ -342,6 +342,64 @@ TypeScript check and Vite build both pass clean after all fixes. Changes are unc
 
 - **Establishment Type for Business Name Search:** Users couldn't find businesses by name in the Location/Address field (e.g., typing "India Cultural Center" returned only 2 street results). Root cause: `includedPrimaryTypes` was restricted to `['street_address', 'premise', 'subpremise', 'route']`. Added `'establishment'` to the types array in all 4 call sites (hook default, AddressAutocomplete, auth/signup, StepLocation). For the legacy API, removed the `types: ['address']` restriction entirely since the legacy API only accepts a single type value.
 
+**Session 37 focused on:** Phase 4 Code Review Completion + Missing Firestore Composite Index Fix + Vendor Order Status Flow Restoration. Three distinct sub-tasks:
+
+- **Phase 4 Code Review Completion (commit `0f5ec3d`):** Finished the remaining Phase 4 items from the Karpathy code review — i18n setup (i18next), VendorCateringDashboard component extraction (PendingOrdersSection, ActiveOrdersSection rewrites to match OrderCardProps interface), security improvements (crypto RNG, rate limiting, input sanitization), snapshot tests, and monitoring/alerting service. Fixed TypeScript errors caused by the component extraction: both section components were passing props (isEditing, editItems, editNote, editSaving, etaInputs, onStartEdit, etc.) that don't exist on OrderCard's interface — OrderCard manages edit state internally. Changed `user={user ?? undefined}` to `currentUserId={user?.uid}` to match OrderCardProps.
+
+- **Missing Firestore Composite Index Fix (commit `d216dd7`):** User reported "When RFP is accepted by the user, I don't see the order." Root cause: Phase 3 had added `orderBy('createdAt', 'desc')` + `firestoreLimit(pageSize)` to `subscribeToCustomerOrders`, which requires a Firestore composite index on `cateringOrders` (customerId ASC + createdAt DESC). This index was missing from `firestore.indexes.json`. The vendor side worked because the `businessId + createdAt` index already existed. The `onSnapshot` error handler silently returned `callback([])`, making it appear that zero orders existed. Fix: (a) Added the missing composite index to `firestore.indexes.json`, (b) Added fallback query logic in both `subscribeToCustomerOrders` and `subscribeToBusinessOrders` — if the indexed query fails, retry with simple `where()` + client-side sort.
+
+- **Vendor Order Status Flow Restoration (commit `376ba5f`):** User reported the entire vendor order status progression (confirmed → preparing → ready → out_for_delivery → delivered) was missing. Root cause: the pre-Phase 4 VendorCateringDashboard had inline rendering with status progression buttons (lines 1625-1763). When Phase 4 extracted OrderCard as a component, these buttons were never included — OrderCard only had Accept/Decline for pending orders. Fix: Completely rewrote OrderCard (~490 lines) to include all 5 status progression steps with appropriate action buttons, ETA inputs (time picker + duration mode toggle), cancel button for confirmed/preparing/ready statuses, and internal `formatEtaValue()` function for 24h→12h AM/PM conversion. OrderCard now manages ETA state internally via `useState`.
+
+**Session 38 focused on:** Reprice UX Rework — Scoped Items + Delivery Fee Separation. The prior session's reprice implementation was rejected by the user because (a) delivery fee was hidden inside the negotiated price, making it appear vendors were repricing delivery too, and (b) the accept CTA applied to ALL items even when the user had only requested repricing for specific items. This session reworked the entire reprice flow:
+
+- **Semantic change to `repriceRequestedPrice` and `repriceCounterPrice` (commit `e7a022c`):** These fields now store ITEMS-ONLY subtotals (excludes delivery fee). Previously they stored the total including delivery. The service functions `respondToReprice()` and `resolveCounterOffer()` were updated to add `deliveryFee` when computing `total` on accept. The downstream `createOrdersFromQuote()` in `cateringOrders.ts` required NO logic change — its existing math `subtotal = total - deliveryFee` already yields the correct items-only result with the new semantics.
+
+- **New `repriceItemNames?: string[]` field on `CateringQuoteResponse`:** Tracks which specific items the customer selected for repricing. When a user selects 1 of 3 items for repricing, only that item appears in accept CTAs and banners — not all items. Stored in Firestore via `requestReprice()`.
+
+- **`QuoteComparison.tsx` rewrite (~452 insertions, 103 deletions):** Complete rework of all reprice banners (vendor_accepted, vendor_countered, counter_accepted, requested), fee breakdown display, reprice request modal, and accept buttons. Every price display now shows: negotiated items subtotal + delivery fee (non-negotiable) = total. The modal shows selected items being repriced, their subtotal, delivery fee labeled as non-negotiable, and a live preview as the user types. Cross-browser patches: `inputMode="decimal"` for mobile keyboards, `WebkitAppearance: 'none'` / `MozAppearance: 'textfield'` for number input spinners, `-webkit-overflow-scrolling: touch` for iOS Safari scroll.
+
+- **`VendorQuoteResponse.tsx` updates (41 lines):** Vendor-side price negotiation view now filters items by `repriceItemNames`, shows "for items" label, and uses `response.subtotal` (not `response.total`) for comparison. Accept/counter messages updated with "(items)" suffix for clarity.
+
+- **TypeScript compilation:** Zero errors after all changes. Build succeeded (8.98s, 181 precache entries). Commit `e7a022c` pushed to GitHub. Deploy requires running from macOS due to rollup platform binary mismatch (Linux sandbox installed `@rollup/rollup-linux-x64-gnu`, Mac needs `@rollup/rollup-darwin-arm64`). Fix: `rm -rf node_modules package-lock.json && npm install && npm run build && firebase deploy --only hosting`.
+
+**Session 39 focused on:** Two major workstreams — (A) Custom Domain Setup for Firebase Hosting, and (B) Full App Rebrand from EthniZity/ethniCity to eNoVo.
+
+- **Custom Domain Setup (5 domains on Firebase Hosting via IONOS DNS):** Added `enovoapp.com`, `enovoapp.online`, `enovoapp.org`, `enovoapp.store` as new custom domains alongside the existing `ethnizity.com`. All 5 custom domains now show "Connected" status in Firebase Console. Required DNS configuration: A record pointing to `199.36.158.100` + TXT record with `hosting-site=mithr-1e5f4` for domain ownership verification + `_acme-challenge` TXT record for Let's Encrypt SSL certificate issuance. Key issues resolved: (1) IONOS DNSSEC was blocking Firebase's ACME challenge — had to deactivate DNSSEC, (2) old AAAA record pointing to IONOS IPv6 (`2607:f1c0:100f:f000::200`) was intercepting HTTP verification requests — needed removal, (3) "Site not found" after Connected status required fresh deploy from Mac.
+
+- **Full Rebrand: EthniZity → eNoVo (32+ files, ~200+ occurrences):** Systematic replacement of all user-facing brand references. The brand name displays as `eNoVo` (stylized with mixed case). Tagline preserved: "Our culture, connected." Email addresses changed to `@enovoapp.com` (support@, feedback@). Asset files duplicated: `ethnicity-logo.svg` → `enovo-logo.svg`, `ethnicity-hero.jpg` → `enovo-hero.jpg`, `ethnicity-banner.jpg` → `enovo-banner.jpg` (originals kept for backward compatibility). Key distinction: the word "ethnicity" as a DATA CONCEPT (e.g., in content moderation rules, heritage selectors) was preserved; only the BRAND NAME references were changed. Where the app previously said "EthniZity" or "ethniCity" as a label for the heritage filter concept, it now says "Heritage" or "eNoVo" depending on context.
+
+- **Files updated in rebrand:**
+  - `index.html` — title, meta tags, icon href, apple-mobile-web-app-title
+  - `public/manifest.json` — name, short_name
+  - `functions/package.json` — package name, description
+  - `src/pages/settings.tsx` — 20+ changes: brand text, emails, logo path, styled brand display, version string, download filename, about section, ToS, privacy policy
+  - `src/pages/messages.tsx` — chat export header, download filename
+  - `src/pages/profile.tsx` — data export filename, share title
+  - `src/pages/feed.tsx` — empty state text
+  - `src/pages/marketplace.tsx` — labels
+  - `src/pages/events.tsx` — PRODID, UID domain (→ enovoapp.com)
+  - `src/components/layout/AppHeader.tsx` — share title, logo path/alt, feedback email
+  - `src/components/layout/AppFooter.tsx` — feedback email, share title
+  - `src/components/shared/PrivateRoute.tsx` — banned message, support emails
+  - `src/pages/auth/login.tsx` + `src/pages/main/auth/login.tsx` — hero image, logos, alt text
+  - `src/pages/auth/signup.tsx` + `src/pages/main/signup.tsx` — "Select your country and EthniZity" → "Select your country and heritage"
+  - `src/components/EthnicityFilterDropdown.tsx` — button text → "Heritage"
+  - `src/components/CountryEthnicitySelector.tsx` — search placeholder
+  - `src/contexts/FeatureSettingsContext.tsx` — 6 description strings
+  - `src/contexts/LocationContext.tsx` — User-Agent string → "eNoVoApp/1.0"
+  - `src/components/GroupCallOverlay.tsx` — share text
+  - `src/components/business/registration/StepReview.tsx` — platform reference
+  - `src/constants/config.ts` — "Other / EthniZity not listed" → "Other / Heritage not listed"
+  - 6 utils files — comments only
+
+- **Deliberately NOT changed (data safety):**
+  - All localStorage keys (`ethniCity_selected_business_`, `ethniCity_catering_cart`, `ethniCity_recent_business_searches`, `ethnicity_rfq_walkthrough_seen`, `ethnicity_checkout_form`, `ethnicity_vendor_reminders_`, `ethnicity_vendor_audio_muted`)
+  - IndexedDB name (`ethnicity_e2ee`) and crypto salt strings (`ethnicity_e2ee_v2`)
+  - All component names, variable names, function names, route paths
+  - The word "ethnicity" in content moderation context (referring to actual concept)
+
+- **TypeScript compilation:** Zero errors after all rebrand changes. Build cannot run in Linux sandbox due to rollup platform binary mismatch (same as Session 38).
+
 **Key architectural change in Session 20:** The `cp` sync pattern for `discover.tsx` was ELIMINATED. Unlike `messages.tsx` and `business.tsx` which still require `cp` sync, `discover.tsx` was verified to only be imported from `src/pages/discover.tsx` (not `main/`). The duplicate `src/pages/main/discover.tsx` was deleted. This is the first page to break free of the duplicate architecture.
 
 - **Bug fixes across Sessions 14-16**:
@@ -358,6 +416,54 @@ TypeScript check and Vite build both pass clean after all fixes. Changes are unc
      accidentally revert something that was done intentionally.
      ================================================================ -->
 ## 2. Decisions Made and Why
+
+### Session 37: Phase 4 Completion + Index Fix + Status Flow Restoration
+
+- **OrderCard manages edit/ETA state internally (not via props)** — During Phase 4 component extraction, the section components (PendingOrdersSection, ActiveOrdersSection) were incorrectly passing edit-related props (isEditing, editItems, editNote, etc.) that don't exist on OrderCard's interface. OrderCard was designed to manage its own edit state and ETA inputs via internal `useState` hooks. This is the correct pattern because edit state is local to each card and doesn't need to be lifted to the parent dashboard.
+
+- **Fallback query pattern for missing Firestore indexes** — Rather than just adding the missing composite index (which requires deployment), also added runtime fallback logic: if the indexed `where() + orderBy()` query fails, retry with a simple `where()` query and sort client-side. This ensures the app works even before indexes are deployed, and is resilient to future index issues. Applied to both `subscribeToCustomerOrders` and `subscribeToBusinessOrders`.
+
+- **`formatEtaValue()` moved inside OrderCard (not a shared utility)** — The function that converts 24h time strings to 12h AM/PM format and formats duration estimates is only used by OrderCard's ETA display. Rather than keeping it in the parent dashboard (where it became dead code after extraction), it was moved into OrderCard as a module-level function. This keeps the component self-contained.
+
+- **Vendor order status progression is a linear flow** — The status buttons follow a strict linear progression: pending → confirmed → preparing → ready → out_for_delivery → delivered. Each status shows only the button for the next status (not a dropdown). Cancel is available for confirmed/preparing/ready (not pending, which has decline instead, and not out_for_delivery/delivered which are past the point of no return).
+
+### Session 38: Reprice UX Rework — Scoped Items + Delivery Fee Separation
+
+- **Delivery fee ALWAYS separate and visible (not a style choice — semantic requirement)** — The user explicitly rejected the prior implementation because `repriceRequestedPrice` included delivery fee, making it look like the vendor was repricing delivery too. Delivery fee is non-negotiable and must always appear as a separate line item in every price display: banners, modals, accept buttons, and fee breakdowns. The formula is always: `negotiated item subtotal + delivery fee = total`.
+
+- **`repriceRequestedPrice` / `repriceCounterPrice` = items-only subtotal (not total)** — This was a semantic breaking change to the field meaning. Previously these stored totals including delivery. Now they store items-only subtotals. The service layer adds `deliveryFee` when computing `total` on accept. This change propagated correctly to `createOrdersFromQuote()` without logic changes because `subtotal = total - deliveryFee` still yields items-only.
+
+- **`repriceItemNames` enables scoped negotiation (not all-or-nothing)** — When a customer selects specific items for repricing (e.g., 1 of 3 items), only those items appear in accept CTAs. Without this field, the accept button would say "Accept All Items at $X" which is misleading when only one item was negotiated. The field is an array of item name strings stored on the `CateringQuoteResponse` document.
+
+- **Cross-browser patches are mandatory on all new UI** — Every new interactive element gets: `inputMode="decimal"` on number inputs (mobile numeric keyboard), `WebkitAppearance: 'none'` + `MozAppearance: 'textfield'` (remove spinners), `-webkit-overflow-scrolling: touch` (iOS Safari smooth scroll), `overscrollBehavior: 'contain'` (prevent scroll chaining). These are not optional polish — they're baseline for the target browsers (Chrome, Safari, Firefox desktop + iOS Safari + Android Chrome).
+
+- **`response.subtotal` for vendor comparison (not `response.total`)** — In `VendorQuoteResponse.tsx`, the vendor sees the customer's requested price compared against the original item subtotal, not the total. This prevents confusion where delivery fee inflates the comparison baseline.
+
+### Session 39: Domain Setup + Full Rebrand (EthniZity → eNoVo)
+
+- **Brand name is "eNoVo" (mixed-case stylization, not "Enovo" or "ENOVO")** — Displayed in UI as `<span>e</span><span>NoVo</span>` with the "e" in one color and "NoVo" in another (matching the old `<span>Ethni</span><span>Zity</span>` pattern). The manifest `short_name` is "eNoVo". All user-facing text uses this exact casing.
+
+- **Tagline preserved: "Our culture, connected."** — User explicitly confirmed keeping the existing tagline. It appears in the manifest `name` field, page title, and about sections.
+
+- **Email domain: @enovoapp.com (not @enovo.com)** — User chose `enovoapp.com` as the primary domain. All support/feedback email addresses updated to this domain: `support@enovoapp.com`, `feedback@enovoapp.com`.
+
+- **localStorage/IndexedDB keys NEVER renamed during rebrand** — Changing storage keys would wipe all existing user data (business selections, carts, checkout forms, E2EE encryption keys, walkthrough flags). The cost of data loss far outweighs the cosmetic benefit of consistent naming. These keys are internal implementation details users never see.
+
+- **Component/variable/route names preserved** — `CountryEthnicitySelector`, `EthnicityFilterDropdown`, `SelectEthnicityPage`, `/auth/select-ethnicity`, `ETHNICITY_HIERARCHY`, `selectedEthnicity` etc. all kept as-is. Renaming these would be a massive refactor with high regression risk and zero user benefit. The word "ethnicity" in code refers to the data concept, not the brand.
+
+- **"Heritage" replaces "EthniZity" as the user-facing label for the concept** — Where the old brand name was used as a synonym for "ethnic heritage" in UI labels (e.g., filter dropdowns, selector placeholders, config descriptions), the neutral word "Heritage" is now used. This decouples the brand name from the data concept.
+
+- **Asset files duplicated, not renamed** — `enovo-logo.svg` is a copy of `ethnicity-logo.svg`, not a rename. This preserves backward compatibility for any cached references to the old filename. Both files exist in `/public/`.
+
+- **5 custom domains all pointing to same Firebase Hosting site** — `enovoapp.com`, `ethnizity.com`, `enovoapp.online`, `enovoapp.org`, `enovoapp.store` all serve identical content from Firebase site `mithr-1e5f4`. No domain-specific routing or content. Firebase handles SSL for all via Let's Encrypt ACME challenges.
+
+- **DNSSEC must be OFF on IONOS for Firebase domains** — IONOS DNSSEC interfered with Firebase's ACME challenge HTTP validation. Had to deactivate DNSSEC on the domain settings. This is a known Firebase/IONOS incompatibility.
+
+- **www subdomains need separate Firebase custom domain entries** — Firebase treats `www.enovoapp.com` and `enovoapp.com` as completely separate domains. The www variant shows SSL privacy error until added as its own custom domain in Firebase Console with its own DNS records (CNAME or A record).
+
+- **Design/color palette unchanged** — The rebrand only affected text/naming. The Aurora theme (light: #F5F6FA/#FFFFFF, dark: #1A1B2E/#232438), primary color (#6366F1 indigo), and all CSS variables remain identical. No visual redesign was part of this rebrand.
+
+- **Tech stack unchanged** — React 19 + TypeScript (strict) + Vite PWA + Firebase/Firestore + Cloud Functions (2nd Gen). No dependencies added or removed during this session.
 
 ### Session 32+: Profile Enhancements + Heritage Standardization + Full-App Code Review
 
@@ -2294,6 +2400,11 @@ b315613 fix(css): wrap Firefox scrollbar properties in selector to fix build war
 
 **Commits (15 total):**
 ```
+0d276de fix: add cuisineTypes to CSV template and expand food category check (Session 36 verified)
+c6e8c70 feat: filter RFP cuisine dropdown by reachable vendors' cuisine types (Session 36 verified)
+be3bef1 fix: confirmation modal skipped after qty warning due to React 18 batched state
+a2150db fix: cross-browser compatibility for RFP confirmation modal
+654bcda feat: add RFP confirmation modal with summary card and price guidance
 5e76d3d fix: include establishment type in Places autocomplete for business name search
 d0f715b fix: resolve race condition in Google Places initialization on signup page
 4f61d62 fix: resolve race condition in Google Places initialization on signup page (TS fixes)
@@ -2312,6 +2423,148 @@ ef85ac3 feat: add RFQ interception modal during checkout for large/advance order
 ```
 
 <!-- END Session 35 -->
+
+### Session 37 (April 27, 2026) — Phase 4 Code Review Completion + Missing Index Fix + Vendor Order Status Flow Restoration
+
+**What we did:** Completed Phase 4 of the Karpathy code review (i18n, component extraction, security, tests, monitoring), fixed a critical Firestore composite index issue that prevented customer orders from displaying after RFP acceptance, and restored the full vendor order status progression flow that was lost during the Phase 4 component extraction.
+
+**Commits:**
+
+| Commit | Description |
+|--------|------------|
+| `0f5ec3d` | feat: Phase 4 — i18n, component extraction, security, tests, monitoring |
+| `d216dd7` | fix: add missing composite index for customer order subscription |
+| `376ba5f` | fix: restore full vendor order status progression flow in OrderCard |
+
+**Phase 4 Code Review Completion (commit `0f5ec3d`):**
+
+| Task | Status |
+|------|--------|
+| 4.1 Install i18next + extract hardcoded strings | ✅ |
+| 4.2 Extract VendorCateringDashboard subcomponents (PendingOrdersSection, ActiveOrdersSection) | ✅ |
+| 4.3 Security — crypto RNG, rate limiting, input sanitization | ✅ |
+| 4.4 Snapshot tests + timezone edge case tests | ✅ (completed earlier) |
+| 4.5 Monitoring — performance metrics + alerting service | ✅ |
+| TypeScript compilation (`tsc -b`) | ✅ |
+
+Key fix: Both `PendingOrdersSection.tsx` and `ActiveOrdersSection.tsx` were rewritten to match `OrderCardProps` interface — removed 12+ props that don't exist on OrderCard (isEditing, editItems, editNote, editSaving, etaInputs, onStartEdit, onEditItemsChange, onEditNoteChange, onSaveModification, onEtaInputChange, formatEtaValue). Changed `user={user ?? undefined}` to `currentUserId={user?.uid}`.
+
+**Missing Composite Index Fix (commit `d216dd7`):**
+
+Problem: After RFP acceptance and order creation, customer couldn't see their orders (empty list). Traced through the full flow: `QuoteComparison.tsx` → `acceptQuoteResponseItems` → `finalizeQuoteRequest` → `createOrdersFromQuote` → `subscribeToCustomerOrders`. Orders WERE being created in Firestore, but the customer subscription query failed silently.
+
+Root cause: `subscribeToCustomerOrders` uses `where('customerId', '==', id) + orderBy('createdAt', 'desc') + limit(25)`, which requires a Firestore composite index on `cateringOrders` (customerId ASC + createdAt DESC). This index was missing from `firestore.indexes.json`. The error handler in `onSnapshot` was calling `callback([])`, silently showing zero orders. The vendor side worked because `businessId + createdAt` index already existed.
+
+Files changed:
+- `firestore.indexes.json` — Added `cateringOrders` composite index (customerId ASC + createdAt DESC)
+- `src/services/catering/cateringOrders.ts` — Added fallback query pattern to both `subscribeToCustomerOrders` and `subscribeToBusinessOrders`: try indexed query first, on error fall back to simple `where()` with client-side sort
+
+**Vendor Order Status Flow Restoration (commit `376ba5f`):**
+
+Problem: After Phase 4 component extraction, OrderCard only had Accept/Decline buttons for pending orders. The entire status progression (confirmed → preparing → ready → out_for_delivery → delivered) was missing.
+
+Root cause: The pre-Phase 4 `VendorCateringDashboard.tsx` had inline rendering with status progression buttons (lines 1625-1763). When OrderCard was extracted as a component, these buttons were never included. OrderCard was noted as "dead code" in Session 36 handoff because inline rendering was still used — but after Phase 4 wired it up, the missing buttons became a real bug.
+
+Fix: Complete rewrite of `src/components/catering/vendor/OrderCard.tsx` (~490 lines):
+- 5 status progression button sections: pending (accept/decline), confirmed→preparing, preparing→ready (with prep time estimate), ready→out_for_delivery (with ETA mode toggle: specific time vs duration), out_for_delivery→delivered (with ETA display badge)
+- Internal `formatEtaValue()` function for 24h→12h AM/PM conversion + duration formatting
+- Internal ETA state via `useState<Record<string, string>>({})`
+- Cancel button for confirmed/preparing/ready statuses
+- Added imports: `Package, Truck, Clock, Ban` from lucide-react
+
+**Important Context & Constraints (Session 37):**
+
+- Firestore requires composite indexes for `where()` + `orderBy()` on *different* fields — single-field auto-indexes are NOT sufficient
+- `onSnapshot` error callbacks that return empty arrays create silent failures — always log errors and implement fallback queries
+- OrderCard is now the ACTIVE component used by both PendingOrdersSection and ActiveOrdersSection (no longer dead code)
+- `etaInputs` and `formatEtaValue` are still defined in VendorCateringDashboard but are now dead code there (harmless, can be cleaned up later)
+- The fallback query pattern uses `results.sort()` with `toMillis?.()` and `.seconds` fallback for Firestore Timestamp compatibility
+- After deploy, `firebase deploy` will also deploy `firestore:indexes` automatically — or run `firebase deploy --only firestore:indexes` separately
+
+<!-- END Session 37 -->
+
+### Session 36 (April 26, 2026) — QA Bug Fix Verification + Cuisine Dropdown Live Testing + RFP Confirmation Modal + Price Guidance
+
+**What we did:** Live browser-tested all bug fixes (B1: CSV template missing cuisineTypes, B2: dead "Restaurant & Food Catering" category condition) and the cuisine dropdown filtering feature on the deployed site. Confirmed all 3 implementation phases complete (Phase 1: address/radius/RFQ/distance, Phase 2: cuisine types, Phase 3: confirmation modal + price guidance). Ran a comprehensive QA audit — 7/7 tests passed. This was a pure QA and verification session with no new code written.
+
+**Decisions Made and Why:**
+
+1. **Graceful degradation for cuisine filtering** — If no reachable businesses have `cuisineTypes` set, the dropdown shows all 17 cuisines rather than an empty list. This was chosen because the feature is being deployed before any businesses have tagged their cuisines, so it must degrade gracefully until data is populated.
+
+2. **Expanded food category condition** — Changed `formData.category === 'Restaurant & Food Catering'` (dead condition — no such category exists in CATEGORIES) to `formData.category === 'Restaurant & Food' || formData.category === 'Tiffin' || formData.category === 'Grocery & Market'`. All three are food-related categories that should show the cuisine selector. The old condition never matched because the canonical category name is "Restaurant & Food", not "Restaurant & Food Catering".
+
+3. **No new commits this session** — All code changes were committed in the preceding session (Session 35b/continuation). Session 36 was purely verification and handoff documentation.
+
+**QA Test Results (7/7 Passed):**
+
+| # | Test | Result | Notes |
+|---|------|--------|-------|
+| 1 | B2: Cuisine chips visible for "Tiffin" category | ✅ Pass | All 17 cuisine chips render in BusinessCreateModal |
+| 2 | B2: Cuisine chips visible for "Grocery & Market" category | ✅ Pass | Same fix, both food categories now show selector |
+| 3 | B2: Cuisine chips visible for "Restaurant & Food" category | ✅ Pass | Original category still works |
+| 4 | RFP cuisine dropdown shows all 17 cuisines (graceful fallback) | ✅ Pass | No businesses have cuisineTypes set yet → shows all |
+| 5 | Vendor distance badge shows "no caterers cover your area" correctly | ✅ Pass | Haversine filtering active |
+| 6 | Phase 3 confirmation modal with summary card renders | ✅ Pass | Confirmed from prior session |
+| 7 | Phase 3 enhanced price guidance displays | ✅ Pass | Confirmed from prior session |
+
+**B1 (CSV template) was verified via code review** — the CSV download template in `BusinessCSVImport.tsx` now includes `cuisineTypes` in both headers and example row. Not browser-tested because CSV import requires admin file upload flow.
+
+**Files Changed (from preceding commit, verified this session):**
+
+| File | Change |
+|------|--------|
+| `src/components/business/registration/StepIdentity.tsx` (line 201) | Expanded category condition for cuisine selector |
+| `src/components/business/BusinessCreateModal.tsx` (line 331) | Same category condition fix |
+| `src/components/business/BusinessEditModal.tsx` (line 293) | Same category condition fix |
+| `src/components/business/BusinessCSVImport.tsx` | Added cuisineTypes to CSV template headers + example row |
+| `src/components/catering/RequestForPriceForm.tsx` (lines 244-265) | `availableCuisineKeys` useMemo with graceful degradation |
+
+**Commits from preceding push (verified this session):**
+```
+0d276de fix: add cuisineTypes to CSV template and expand food category check
+c6e8c70 feat: filter RFP cuisine dropdown by reachable vendors' cuisine types
+be3bef1 fix: confirmation modal skipped after qty warning due to React 18 batched state
+a2150db fix: cross-browser compatibility for RFP confirmation modal
+654bcda feat: add RFP confirmation modal with summary card and price guidance
+```
+
+**All 3 Implementation Phases — CONFIRMED COMPLETE:**
+
+- **Phase 1** (Session 35): Delivery address with Google Places autocomplete + Leaflet map preview + serviceRadius field + vendor distance badge + Haversine-based RFP broadcast filtering
+- **Phase 2** (Session 35 cont.): cuisineTypes field on data model + cuisine selector on all business entry points (Create/Edit/CSV/Registration) + RFP dropdown filtered by reachable vendors + graceful fallback
+- **Phase 3** (Session 35 cont.): RFP confirmation modal with full summary card (items, date, guests, address, cuisine, distance badge) + enhanced price guidance (avg price per head, vendor count, tips)
+
+**What's In Progress / Half-Done:**
+
+- **No businesses have `cuisineTypes` set yet** — the filtering logic works but is in fallback mode (showing all 17 cuisines). Once businesses start tagging their cuisines, the dropdown will narrow to only those offered by reachable vendors.
+- **Handoff note** — this file, updated as part of this session.
+
+**Design Context (carried forward):**
+
+- **Color palette:** Aurora theme — primary `#6366F1` (indigo), success `#22c55e`/`#10B981`, error `#EF4444`, surfaces `#F5F6FA` light / `#1A1B2E` dark. All via `var(--aurora-*)` CSS variables.
+- **Tone:** Clean, modern, accessibility-first. ARIA labels on all interactive elements. Focus trapping in modals. `prefers-reduced-motion` respected.
+- **Tech stack:** React 19 + TypeScript (strict, `tsc -b`) + Vite PWA + Firebase Hosting/Functions (2nd Gen). Build target `safari15`. Leaflet for maps. Google Places API (New + Legacy fallback) for autocomplete.
+- **Build constraint:** Rollup arm64 binary mismatch in Cowork VM — must `npm run build && firebase deploy` from macOS local machine.
+
+**Exact Next Steps:**
+
+1. `git push && npm run build && firebase deploy --only hosting` from macOS (deploy latest commits including B1/B2 fixes)
+2. Set `cuisineTypes` on existing businesses in Firestore to activate real cuisine filtering (currently all in fallback mode)
+3. End-to-end test: submit an RFP with a cuisine filter active and verify only matching vendors receive it
+4. Phase 4 or next feature work (TBD — vendor notification improvements, payment integration, multi-vendor cart, driver tracking, recommendation engine)
+5. Wire `OrderCard` component to replace inline rendering in `VendorCateringDashboard` (tech debt from Session 29)
+6. Test all admin panels (moderation + registrations) post-deployment
+
+**Important Context & Constraints:**
+
+- `CUISINE_CATEGORY_KEYS` — 17 hardcoded cuisine keys: `north-indian`, `south-indian`, `indo-chinese`, `street-food`, `biryani-rice`, `tandoori-grill`, `vegetarian-pure`, `vegan`, `desserts-sweets`, `beverages`, `breakfast-tiffin`, `thali-meals`, `seafood`, `fast-food`, `healthy-diet`, `fusion`, `bakery-snacks`
+- `CATEGORIES` array in `businessConstants.ts` — canonical category names (Title Case). "Restaurant & Food Catering" does NOT exist; correct name is "Restaurant & Food"
+- `getDistanceMiles()` in `businessUtils.ts` — Haversine formula for geo-filtering
+- `serviceRadius` defaults to 25 miles if not set on a business
+- `availableCuisineKeys` in `RequestForPriceForm.tsx` uses `useMemo` to filter by reachable vendors' cuisines, with graceful fallback to all 17 if none set
+- Auto-clear `useEffect` in RFP form (lines 268-272) removes selected cuisines that become unavailable when address changes
+
+<!-- END Session 36 -->
 
 ### Session 34 (April 24, 2026) — Catering Event Time + Cross-Browser Audit + Cart UX + Build Fix
 
@@ -2631,9 +2884,10 @@ bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules
 - **All code committed, needs push** — From macOS terminal:
   ```bash
   cd /Users/sarathsatheesan/ethniCity_03_19_2026/sangam-pwa-v2
-  git push && npm run build && firebase deploy --only hosting
+  npm run build && firebase deploy
   ```
   CRITICAL: Must run `npm run build` before deploy or stale bundle gets deployed.
+  CRITICAL: This deploy MUST include `firestore:indexes` to create the new `cateringOrders` (customerId + createdAt) composite index added in Session 37. Using `firebase deploy` (without `--only`) will deploy everything including indexes. Alternatively: `firebase deploy --only hosting,firestore:indexes`.
   NOTE: Build target is now `safari15` (changed from `safari14` in Session 34). If build still fails, check esbuild version with `npx esbuild --version` (should be 0.27.x).
 
 ### Next — Post-Session 35 Testing
@@ -2642,7 +2896,9 @@ bcc9259 fix(catering): quote-to-order conversion and Firestore vendor rules
 - **Service radius test**: Verify the "Max Service Radius (Miles)" field appears during business registration (both signup pages), business create modal, and business edit modal. Test min/max validation (1–100).
 - **God-component decomposition COMPLETE** (Session 33) — messages.tsx, admin.tsx, VendorCateringDashboard.tsx all decomposed. Feature audit passed. See `docs/god-component-decomposition-plan.md` for original plan.
 - **Previous Session 34 tests still valid**: catering event time, showPicker on date/time inputs, cart-to-checkout, admin panels, Safari notification permission.
-- **Optional: Wire OrderCard component** in VendorCateringDashboard — currently 448 lines of dead code in `src/components/catering/vendor/OrderCard.tsx`. Would need to refactor edit state (currently duplicated between main component and OrderCard). Low priority since inline rendering works.
+- **~~Optional: Wire OrderCard component~~** ✅ COMPLETE (Session 37) — OrderCard is now the ACTIVE component used by both PendingOrdersSection and ActiveOrdersSection. Full status progression flow restored (pending → confirmed → preparing → ready → out_for_delivery → delivered). No longer dead code.
+- **Karpathy Code Review — Phase 4 (All Items):** ✅ COMPLETE (Session 37) — i18n (4.1), component extraction (4.2), security (4.3), tests (4.4), monitoring (4.5) all done. 3 commits: `0f5ec3d`, `d216dd7`, `376ba5f`.
+- **Missing Firestore Composite Index for Customer Orders:** ✅ FIXED (Session 37) — Added `cateringOrders` (customerId ASC + createdAt DESC) index to `firestore.indexes.json` + fallback query pattern in `cateringOrders.ts`.
 - **Incrementally replace `any` casts with Firestore interfaces** from `src/types/firestore.ts` — start with the most-used: UserProfile, BusinessListing, CateringOrder
 - **Replace remaining Tailwind hardcoded hex** (`bg-[#6366F1]`) with Aurora variable-based classes
 - **Backfill existing Firestore notifications (optional)** — Existing notifications lack role field. Body-text heuristic handles legacy data, but a migration script could set role on all existing docs.
@@ -3122,7 +3378,7 @@ d5bea05 Remove Linux-specific rollup dependency, rebuild for macOS
   2. At the end of the session, update this file AND create a new docs/handoff/SESSION_XX.md
   3. The session file should include inline comments explaining WHY, not just WHAT
   4. Update the session list in the header comment and the "Session history" field
-  Last updated: Session 35 (April 26, 2026)
+  Last updated: Session 39 (May 24, 2026)
 -->
 
-*Updated April 24, 2026 (Session 34) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phases 1-6 ALL COMPLETE (Sessions 22-23). UX Audit + Critical Fixes COMPLETE (Session 24). Medium+Large Effort Features + Architecture Refactor ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit ALL 30 findings COMPLETE (Session 26). UI Overhaul + QA + 21 Bug Fixes ALL COMPLETE (Session 27). RFP-to-Order + In-Order Messaging ALL COMPLETE (Session 28/28b). Vendor Storefront Builder + 10 Bug Fixes ALL COMPLETE (Session 29). Multi-Business Architecture + QA Audit (48 tests) + UI Flicker Fix ALL COMPLETE (Session 30). Vendor Dashboard Header Refactor + Dual-Role Nav Fix + "My Orders" Rename ALL COMPLETE (Session 30b). Notification Deep-Link Routing ALL COMPLETE (Session 31). Handoff Note Consolidation + White-Page QA Audit + ErrorBoundary & Null Guard Fixes ALL COMPLETE (Session 32). Profile Page Enhancements + Admin Avatar Fix + Contextual CTAs + Deep-Link Creation Forms + Heritage Selector Standardization + Karpathy Coding Skill + Full-App Karpathy Code Review ALL COMPLETE (Session 32+). Karpathy Code Review Implementation — all 4 sprints COMPLETE (Session 32++). God-Component Decomposition — 3 components decomposed + cross-browser patches + feature audit + 2 critical fixes ALL COMPLETE (Session 33). Catering Event Time + Cross-Browser Audit (23 date/time inputs, showPicker API) + Cart UX Fix + esbuild Build Target Fix ALL COMPLETE (Session 34). All code committed. Needs `git push && npm run build && firebase deploy --only hosting` from macOS. Critical context: ToastContext exposes `addToast` NOT `showToast`; Firestore rejects `undefined` — always strip; aurora CSS vars that DON'T exist: --aurora-primary, --aurora-green, --aurora-bg-secondary, --aurora-text-primary, --aurora-accent; useBusinessSwitcher() API: { businesses, selectedBusiness, selectBusiness, loading, isMultiBusiness }; CateringNotification now has `role?: 'vendor' | 'customer'` field; VENDOR_TYPE_FALLBACK set: new_order, modification_rejected, quote_accepted, item_reassigned, rfp_edited, reprice_requested; BOTH_PARTY_TYPES: order_cancelled, reprice_resolved (use body-text heuristic for legacy); App.tsx has `AppErrorBoundary` wrapping Routes + `lazyRetry()` on all 24 lazy imports (Session 32); always use `(field || '').substring()` for Firestore text and `(array || []).map()` for Firestore arrays; dietary tags snake_case; categories Title Case; `archived` not `isArchived`; ParsedMenuItem.price in cents; PWA SW cache can serve stale bundles — must build before deploy; `ctaConfig` record in profile.tsx maps listingsFilter → CTA label/route (Session 32+); `isImageUrl()` + `AvatarImg` helper in admin.tsx for safe avatar rendering (Session 32+); `CountryEthnicitySelector` is single source of truth for heritage — uses `"Country - Ethnicity"` scoped key format; `?action=add` deep-link pattern on business, marketplace, events pages triggers creation modal auto-open; Karpathy coding skill at `.claude/skills/karpathy-coding/SKILL.md` — auto-loads in Cowork sessions; God-component decomposition plan at `docs/god-component-decomposition-plan.md`; admin panels in `src/components/admin/panels/` receive state+callbacks as props from `admin.tsx`; message components in `src/components/messages/` are self-contained UI-only; catering sub-components in `src/components/catering/vendor/` — OrderCard exists but is dead code (inline rendering still used); `verbatimModuleSyntax` in tsconfig requires `import type` for type-only imports; build target is `safari15` (raised from safari14 in Session 34 — esbuild can't transform destructuring for safari14); `showPicker()` API used on all 23 date/time inputs for cross-browser native picker popup; `eventTime` stored as HH:MM 24h, displayed as 12h AM/PM — optional in Firestore types but required at checkout; Notification.requestPermission() uses Promise wrapper for Safari < 16.4 callback API compat. Design tokens: primary #6366F1, error #EF4444, success #22c55e. Next: (1) git push + build + deploy, (2) test catering event time end-to-end, (3) test date/time pickers in Safari/Firefox, (4) test all admin panels (especially moderation + registrations), (5) Phase 7 UX improvements, (6) sort/filter controls on marketplace item list, (7) consider wiring OrderCard component to replace inline rendering in VendorCateringDashboard. Long-term: payment integration, multi-vendor cart, driver tracking, recommendation engine.*
+*Updated May 24, 2026 (Session 39) — for continuing development in a new session. Business Module ALL 42 roadmap items COMPLETE (Sessions 11-18). Discover Page ALL 38 items COMPLETE (Sessions 19-20). Business Sign-Up Wizard ALL 5 phases COMPLETE (Session 21). Catering Module Phases 1-6 ALL COMPLETE (Sessions 22-23). UX Audit + Critical Fixes COMPLETE (Session 24). Medium+Large Effort Features + Architecture Refactor ALL COMPLETE (Session 25). Round 2 Service Blueprint Audit ALL 30 findings COMPLETE (Session 26). UI Overhaul + QA + 21 Bug Fixes ALL COMPLETE (Session 27). RFP-to-Order + In-Order Messaging ALL COMPLETE (Session 28/28b). Vendor Storefront Builder + 10 Bug Fixes ALL COMPLETE (Session 29). Multi-Business Architecture + QA Audit (48 tests) + UI Flicker Fix ALL COMPLETE (Session 30). Vendor Dashboard Header Refactor + Dual-Role Nav Fix + "My Orders" Rename ALL COMPLETE (Session 30b). Notification Deep-Link Routing ALL COMPLETE (Session 31). Handoff Note Consolidation + White-Page QA Audit + ErrorBoundary & Null Guard Fixes ALL COMPLETE (Session 32). Profile Page Enhancements + Admin Avatar Fix + Contextual CTAs + Deep-Link Creation Forms + Heritage Selector Standardization + Karpathy Coding Skill + Full-App Karpathy Code Review ALL COMPLETE (Session 32+). Karpathy Code Review Implementation — all 4 sprints COMPLETE (Session 32++). God-Component Decomposition — 3 components decomposed + cross-browser patches + feature audit + 2 critical fixes ALL COMPLETE (Session 33). Catering Event Time + Cross-Browser Audit (23 date/time inputs, showPicker API) + Cart UX Fix + esbuild Build Target Fix ALL COMPLETE (Session 34). Service Radius + Google Places Autocomplete + Race Condition Fix + Establishment Search ALL COMPLETE (Session 35). QA Bug Fix Verification (B1 CSV template + B2 dead category condition) + Cuisine Dropdown Live Testing + RFP Confirmation Modal + Price Guidance — all 3 implementation phases VERIFIED COMPLETE (Session 36). Phase 4 Code Review (i18n + component extraction + security + tests + monitoring) ALL COMPLETE + Missing Firestore Composite Index Fixed + Vendor Order Status Flow Restored (Session 37). Reprice UX Rework — scoped repriceItemNames + delivery fee separation + vendor view updates + cross-browser patches ALL COMPLETE (Session 38). Custom Domain Setup (5 domains on Firebase via IONOS) + Full Rebrand EthniZity → eNoVo (32+ files, ~200+ occurrences) ALL COMPLETE (Session 39). Rebrand changes uncommitted — needs commit + deploy from macOS: `rm -rf node_modules package-lock.json && npm install && npm run build && firebase deploy --only hosting` (rollup platform binary mismatch — Linux sandbox installed linux-x64-gnu, Mac needs darwin-arm64). Critical context: **Brand is now "eNoVo" (mixed-case stylization)** — tagline "Our culture, connected." — email domain @enovoapp.com; localStorage/IndexedDB keys still use old names (intentional — data preservation); component/variable/route names unchanged; "Heritage" replaces "EthniZity" as user-facing label for the ethnicity filter concept; 5 custom domains active: enovoapp.com, ethnizity.com, enovoapp.online, enovoapp.org, enovoapp.store; www.enovoapp.com needs separate Firebase custom domain entry (shows SSL error without it); DNSSEC must stay OFF on IONOS domains for Firebase ACME challenges; ToastContext exposes `addToast` NOT `showToast`; Firestore rejects `undefined` — always strip; aurora CSS vars that DON'T exist: --aurora-primary, --aurora-green, --aurora-bg-secondary, --aurora-text-primary, --aurora-accent; useBusinessSwitcher() API: { businesses, selectedBusiness, selectBusiness, loading, isMultiBusiness }; CateringNotification now has `role?: 'vendor' | 'customer'` field; VENDOR_TYPE_FALLBACK set: new_order, modification_rejected, quote_accepted, item_reassigned, rfp_edited, reprice_requested; BOTH_PARTY_TYPES: order_cancelled, reprice_resolved (use body-text heuristic for legacy); App.tsx has `AppErrorBoundary` wrapping Routes + `lazyRetry()` on all 24 lazy imports (Session 32); always use `(field || '').substring()` for Firestore text and `(array || []).map()` for Firestore arrays; dietary tags snake_case; categories Title Case; `archived` not `isArchived`; ParsedMenuItem.price in cents; PWA SW cache can serve stale bundles — must build before deploy; `ctaConfig` record in profile.tsx maps listingsFilter → CTA label/route (Session 32+); `isImageUrl()` + `AvatarImg` helper in admin.tsx for safe avatar rendering (Session 32+); `CountryEthnicitySelector` is single source of truth for heritage — uses `"Country - Ethnicity"` scoped key format; `?action=add` deep-link pattern on business, marketplace, events pages triggers creation modal auto-open; Karpathy coding skill at `.claude/skills/karpathy-coding/SKILL.md` — auto-loads in Cowork sessions; God-component decomposition plan at `docs/god-component-decomposition-plan.md`; admin panels in `src/components/admin/panels/` receive state+callbacks as props from `admin.tsx`; message components in `src/components/messages/` are self-contained UI-only; catering sub-components in `src/components/catering/vendor/` — OrderCard is NOW ACTIVE (Session 37, no longer dead code), PendingOrdersSection and ActiveOrdersSection pass OrderCardProps; OrderCard manages edit state + ETA state internally via useState (not props); `formatEtaValue()` lives inside OrderCard; vendor status progression: pending → confirmed → preparing → ready → out_for_delivery → delivered; Firestore composite indexes: cateringOrders needs BOTH (businessId+createdAt) AND (customerId+createdAt) — missing index causes silent subscription failure; fallback query pattern in cateringOrders.ts retries with simple where() + client-side sort if indexed query fails; `verbatimModuleSyntax` in tsconfig requires `import type` for type-only imports; build target is `safari15` (raised from safari14 in Session 34 — esbuild can't transform destructuring for safari14); `showPicker()` API used on all 23 date/time inputs for cross-browser native picker popup; `eventTime` stored as HH:MM 24h, displayed as 12h AM/PM — optional in Firestore types but required at checkout; Notification.requestPermission() uses Promise wrapper for Safari < 16.4 callback API compat; CUISINE_CATEGORY_KEYS — 17 hardcoded cuisine types; `availableCuisineKeys` in RequestForPriceForm.tsx filters by reachable vendors with graceful fallback to all 17; food category condition: `'Restaurant & Food' || 'Tiffin' || 'Grocery & Market'` (NOT "Restaurant & Food Catering" — that category doesn't exist); `getDistanceMiles()` Haversine formula in businessUtils.ts; `serviceRadius` defaults to 25 miles; `repriceRequestedPrice` and `repriceCounterPrice` are ITEMS-ONLY subtotals (excludes delivery fee); `repriceItemNames?: string[]` tracks which items were repriced; `respondToReprice()` and `resolveCounterOffer()` add `deliveryFee` to compute `total`; all reprice UI shows items + delivery = total; `requestReprice()` accepts optional `repriceItemNames` parameter; cross-browser: `inputMode="decimal"`, `WebkitAppearance: 'none'`, `MozAppearance: 'textfield'`, `-webkit-overflow-scrolling: touch` on all reprice inputs/modals. Design tokens: primary #6366F1, error #EF4444, success #22c55e. Aurora theme: light surfaces #F5F6FA/#FFFFFF, dark surfaces #1A1B2E/#232438. Next: (1) commit rebrand changes to git, (2) `rm -rf node_modules package-lock.json && npm install && npm run build && firebase deploy --only hosting` from macOS, (3) add `www.enovoapp.com` as separate custom domain in Firebase Console, (4) end-to-end test reprice flow with scoped items (select 1 of 3 items, verify only that item in accept CTA), (5) end-to-end test vendor order status progression (confirmed→preparing→ready→dispatch→delivered), (6) test customer order visibility after RFP acceptance, (7) set cuisineTypes on existing businesses to activate real filtering, (8) end-to-end test RFP with active cuisine filter, (9) test all admin panels (moderation + registrations), (10) clean up dead etaInputs/formatEtaValue in VendorCateringDashboard, (11) Phase 7 UX improvements / sort-filter controls on marketplace. Long-term: payment integration, multi-vendor cart, driver tracking, recommendation engine.*

@@ -601,7 +601,7 @@ export default function BusinessPage() {
                 )}
               </div>
 
-              {/* EthniZity Dropdown */}
+              {/* eNoVo Heritage Dropdown */}
               <EthnicityFilterDropdown
                 selected={state.selectedHeritage}
                 onChange={(heritage) => dispatch({ type: 'SET_SELECTED_HERITAGE', payload: heritage })}

@@ -1,6 +1,6 @@
 {
-  "name": "ethnicity-functions",
-  "description": "Cloud Functions for ethniCity push notifications",
+  "name": "enovo-functions",
+  "description": "Cloud Functions for eNoVo push notifications",
   "scripts": {
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",

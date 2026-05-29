@@ -226,7 +226,7 @@ export default function TravelPage() {
       {/* ─── Sticky Header: Search + Filter ─── */}
       <div className="sticky top-0 z-20 bg-aurora-surface shadow-sm">
 
-      {/* Search + EthniZity Header */}
+      {/* Search + eNoVo Header */}
       <div className="relative bg-gradient-to-br from-teal-500/8 via-aurora-surface to-emerald-500/8 border-b border-aurora-border z-30">
         <div className="max-w-6xl mx-auto px-4 py-3">
           <div className="flex items-center gap-2">
@@ -246,7 +246,7 @@ export default function TravelPage() {
               )}
             </div>
 
-            {/* EthniZity Dropdown */}
+            {/* eNoVo Heritage Dropdown */}
             <EthnicityFilterDropdown
               selected={selectedHeritage}
               onChange={setSelectedHeritage}

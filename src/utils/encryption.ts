@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════
-// End-to-End Encryption (E2EE) for ethniCity Messages
+// End-to-End Encryption (E2EE) for eNoVo Messages
 // ═══════════════════════════════════════════════════════════════════════
 // Uses ECDH P-256 key exchange + AES-256-GCM (authenticated encryption)
 // via the Web Crypto API. Key pairs are synced across devices via Firestore

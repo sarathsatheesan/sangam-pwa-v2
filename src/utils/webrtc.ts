@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════
-// WebRTC Peer-to-Peer Calling Service for ethniCity Messages
+// WebRTC Peer-to-Peer Calling Service for eNoVo Messages
 // ═══════════════════════════════════════════════════════════════════════
 // Uses WebRTC with Firestore signaling for 1:1 audio & video calls.
 // All media streams are encrypted via SRTP (built into WebRTC).
