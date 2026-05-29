@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════
-// SANGAM — Modern Aurora Design System (Light)
+// eNoVo — Modern Aurora Design System (Light)
 // ══════════════════════════════════════════════════════════════
 
 export const Theme = {

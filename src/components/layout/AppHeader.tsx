@@ -178,7 +178,7 @@ export const AppHeader: React.FC = () => {
             <Link to="/feed" className="flex items-center gap-1.5 shrink-0">
               <img src="/enovo-logo.svg" alt="eNoVo" className="w-7 h-7 sm:w-8 sm:h-8" />
               <span className="text-lg sm:text-xl font-extrabold tracking-tight leading-none">
-                <span style={{ color: '#c96830' }}>Ethni</span><span style={{ color: '#0d4f5a' }} className="font-black">Zity</span>
+                <span style={{ color: '#c96830' }}>e</span><span style={{ color: '#0d4f5a' }} className="font-black">NoVo</span>
               </span>
             </Link>
 
@@ -401,7 +401,7 @@ export const AppHeader: React.FC = () => {
 
                 {/* Call */}
                 <a
-                  href="tel:+1-800-SANGAM"
+                  href="tel:+1-800-ENOVO"
                   className="px-4 py-2.5 flex items-center gap-3 text-aurora-text-secondary hover:bg-gray-50 transition-colors"
                   onClick={() => setMenuOpen(false)}
                 >

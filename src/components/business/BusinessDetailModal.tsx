@@ -133,7 +133,7 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({
     const shareUrl = `${window.location.origin}/business?open=${business.id}`;
     const shareData = {
       title: business.name,
-      text: `Check out ${business.name} — ${business.category} on Sangam`,
+      text: `Check out ${business.name} — ${business.category} on eNoVo`,
       url: shareUrl,
     };
 

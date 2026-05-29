@@ -56,7 +56,7 @@ export const AppFooter: React.FC = () => {
   };
 
   const handlePhone = () => {
-    window.location.href = 'tel:+1-800-SANGAM';
+    window.location.href = 'tel:+1-800-ENOVO';
   };
 
   // Placeholder links — will be updated with real URLs later

@@ -1287,7 +1287,7 @@ export default function AdminPage() {
                 <BarChart3 size={18} className="text-white" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-[var(--aurora-text)] leading-tight">Sangam Admin</h1>
+                <h1 className="text-lg font-bold text-[var(--aurora-text)] leading-tight">eNoVo Admin</h1>
                 <p className="text-[10px] text-[var(--aurora-text-secondary)] leading-tight">Management Portal</p>
               </div>
             </div>
