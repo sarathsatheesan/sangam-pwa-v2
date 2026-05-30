@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">eNoVo</string>
+    <string name="title_activity_main">eNoVo</string>
+    <string name="package_name">enovoapp.app</string>
+    <string name="custom_url_scheme">enovoapp.app</string>
+</resources>

@@ -12,43 +12,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
-      manifest: {
-        name: 'ethniCity — Our culture, connected.',
-        short_name: 'ethniCity',
-        description: 'Our culture, connected. Discover diverse communities near you.',
-        theme_color: '#F5F6FA',
-        background_color: '#FFFFFF',
-        display: 'standalone',
-        orientation: 'any',
-        start_url: '/',
-        scope: '/',
-        icons: [
-          {
-            src: '/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: '/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-          {
-            src: '/apple-touch-icon.png',
-            sizes: '180x180',
-            type: 'image/png',
-            purpose: 'any',
-          },
-        ],
-      },
+      // Single source of truth is the static, eNoVo-branded public/manifest.json
+      // (linked in index.html). Disable plugin-generated manifest so there is no
+      // second, conflicting "ethniCity" manifest emitted at build time.
+      manifest: false,
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,ttf,eot}'],
         skipWaiting: true,

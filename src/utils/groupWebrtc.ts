@@ -19,28 +19,12 @@ import {
   arrayUnion, arrayRemove,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { ICE_SERVERS } from '@/utils/iceConfig';
 
 // ─── Configuration ───────────────────────────────────────────────────
 
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-];
+// ICE/TURN servers are centralized in src/utils/iceConfig.ts (env-driven TURN
+// with a public dev fallback). Imported as ICE_SERVERS above.
 
 const MAX_PARTICIPANTS = 8;
 const RING_TIMEOUT_MS = 45_000;

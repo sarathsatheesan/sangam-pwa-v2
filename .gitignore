@@ -4,3 +4,8 @@ dist
 .DS_Store
 serviceAccountKey.json
 **/serviceAccountKey.json
+
+# Android signing secrets — NEVER commit
+android-keys/
+android/keystore.properties
+android/app/google-services.json

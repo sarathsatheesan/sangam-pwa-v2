@@ -16,29 +16,12 @@ import {
   addDoc, getDoc, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { ICE_SERVERS } from '@/utils/iceConfig';
 
 // ─── Configuration ───────────────────────────────────────────────────
 
-const ICE_SERVERS: RTCIceServer[] = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  // Free TURN servers for NAT traversal (needed for symmetric NATs / mobile networks)
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-];
+// ICE/TURN servers are centralized in src/utils/iceConfig.ts (env-driven TURN
+// with a public dev fallback). Imported as ICE_SERVERS above.
 
 const CALL_TIMEOUT_MS = 45_000; // 45 seconds to answer
 

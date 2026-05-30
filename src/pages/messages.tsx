@@ -1058,8 +1058,13 @@ export default function MessagesPage() {
         }
         // Wait for the service worker to be ready (important for Firefox first-load)
         await navigator.serviceWorker.ready;
+        const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY as string | undefined;
+        if (!vapidKey) {
+          console.warn('[PushNotif] VITE_FIREBASE_VAPID_KEY not set — web push disabled until configured');
+          return;
+        }
         const token = await getToken(messaging, {
-          vapidKey: 'PENDING_VAPID_KEY',
+          vapidKey,
           serviceWorkerRegistration: swRegistration,
         });
         if (token) {
