@@ -91,6 +91,16 @@ export class CallManager {
   private bitrateIntervalId: ReturnType<typeof setInterval> | null = null;
   private lastBytesReceived = 0;
   private lastTimestamp = 0;
+  // ── Connection-recovery state (Bug 5: call drops after a threshold) ──
+  // True once the call has reached 'connected' at least once. Used to tell
+  // setup churn apart from a real mid-call disconnect.
+  private connectionEstablished = false;
+  // Grace timer: if a disconnect doesn't recover within the window, end the call.
+  private disconnectGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  // Guards re-entrant ICE restarts.
+  private iceRestartInProgress = false;
+  // Dedup guard for the callee processing the same restart offer twice.
+  private lastHandledRestartSdp: string | null = null;
 
   private state: CallState = {
     status: 'idle',
@@ -208,6 +218,14 @@ export class CallManager {
     // Reset ICE buffer for new connection
     this.pendingIceCandidates = [];
     this.remoteDescriptionSet = false;
+    // Reset connection-recovery state (Bug 5)
+    this.connectionEstablished = false;
+    this.iceRestartInProgress = false;
+    this.lastHandledRestartSdp = null;
+    if (this.disconnectGraceTimer) {
+      clearTimeout(this.disconnectGraceTimer);
+      this.disconnectGraceTimer = null;
+    }
 
     // Set up remote stream — use event.track directly (more reliable than event.streams)
     this.remoteStream = new MediaStream();
@@ -255,44 +273,28 @@ export class CallManager {
       console.log('[WebRTC] ICE gathering state:', pc.iceGatheringState);
     };
 
-    // Track connection state
+    // Track connection state. Both connectionState and iceConnectionState feed
+    // the same recovery logic (Safari fires one but not the other reliably).
     pc.onconnectionstatechange = () => {
       console.log('[WebRTC] Connection state:', pc.connectionState);
       if (pc.connectionState === 'connected') {
-        this.setState({ status: 'connected' });
-        this.startDurationTimer();
-        this.startAdaptiveBitrate();
-        this.stopRingtone();
-      } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-        this.endCall('connection_lost');
+        this.handleConnected();
+      } else if (pc.connectionState === 'failed') {
+        this.handleConnectionTrouble('failed');
+      } else if (pc.connectionState === 'disconnected') {
+        this.handleConnectionTrouble('disconnected');
       }
     };
 
     pc.oniceconnectionstatechange = () => {
       console.log('[WebRTC] ICE connection state:', pc.iceConnectionState);
-      // Fallback for browsers (especially Safari) where onconnectionstatechange
-      // doesn't reliably fire 'connected'. ICE 'connected' or 'completed' means
-      // media is flowing — treat it the same as peer connection 'connected'.
-      if (
-        (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') &&
-        this.state.status !== 'connected'
-      ) {
-        console.log('[WebRTC] ICE connected/completed — promoting to connected status');
-        this.setState({ status: 'connected' });
-        this.startDurationTimer();
-        this.startAdaptiveBitrate();
-        this.stopRingtone();
-      } else if (pc.iceConnectionState === 'failed') {
-        // ICE failed — try to restart
-        console.warn('[WebRTC] ICE failed, ending call');
-        this.endCall('connection_lost');
-      } else if (pc.iceConnectionState === 'disconnected') {
-        // Give it a moment to recover
-        setTimeout(() => {
-          if (this.pc && this.pc.iceConnectionState === 'disconnected') {
-            this.endCall('connection_lost');
-          }
-        }, 5000);
+      const s = pc.iceConnectionState;
+      if (s === 'connected' || s === 'completed') {
+        this.handleConnected();
+      } else if (s === 'failed') {
+        this.handleConnectionTrouble('failed');
+      } else if (s === 'disconnected') {
+        this.handleConnectionTrouble('disconnected');
       }
     };
 
@@ -301,6 +303,83 @@ export class CallManager {
     };
 
     return pc;
+  }
+
+  // ── Connection Recovery (Bug 5) ──────────────────────────────────
+
+  /** Media is flowing — promote to connected and cancel any pending teardown. */
+  private handleConnected(): void {
+    if (this.disconnectGraceTimer) {
+      clearTimeout(this.disconnectGraceTimer);
+      this.disconnectGraceTimer = null;
+    }
+    this.iceRestartInProgress = false;
+    this.connectionEstablished = true;
+    if (this.state.status !== 'connected') {
+      console.log('[WebRTC] Connected — media flowing');
+      this.setState({ status: 'connected' });
+      this.startDurationTimer();
+      this.startAdaptiveBitrate();
+      this.stopRingtone();
+    }
+  }
+
+  /**
+   * A disconnect/failure occurred. Instead of dropping the call immediately,
+   * attempt an ICE restart (re-allocates TURN relays / re-gathers candidates)
+   * and only end the call if it doesn't recover within a grace window.
+   */
+  private handleConnectionTrouble(kind: 'disconnected' | 'failed'): void {
+    // Ignore churn before we ever connected — except a hard 'failed' during
+    // setup, which won't fix itself.
+    if (!this.connectionEstablished) {
+      if (kind === 'failed') this.scheduleEndIfStillBroken(6000);
+      return;
+    }
+    console.warn('[WebRTC]', kind, 'after connect — attempting recovery (no immediate drop)');
+    void this.attemptIceRestart();
+    // 'failed' is more severe than 'disconnected'; give disconnected longer to self-heal.
+    this.scheduleEndIfStillBroken(kind === 'failed' ? 12_000 : 15_000);
+  }
+
+  /** End the call after `ms` unless the connection has recovered by then. */
+  private scheduleEndIfStillBroken(ms: number): void {
+    if (this.disconnectGraceTimer) return; // already counting down
+    this.disconnectGraceTimer = setTimeout(() => {
+      this.disconnectGraceTimer = null;
+      const ice = this.pc?.iceConnectionState;
+      const conn = this.pc?.connectionState;
+      const healthy = ice === 'connected' || ice === 'completed' || conn === 'connected';
+      if (!healthy) {
+        console.warn('[WebRTC] Recovery window elapsed, still unhealthy — ending call');
+        this.endCall('connection_lost');
+      }
+    }, ms);
+  }
+
+  /**
+   * Caller-initiated ICE restart over the existing Firestore signaling channel.
+   * Writes a `restartOffer`; the callee answers with `restartAnswer` (handled in
+   * the call-doc listeners). Only the caller initiates to avoid glare.
+   */
+  private async attemptIceRestart(): Promise<void> {
+    if (!this.pc || !this.state.isCaller || !this.state.callId) return;
+    if (this.iceRestartInProgress) return;
+    this.iceRestartInProgress = true;
+    try {
+      console.log('[WebRTC] Initiating ICE restart (caller)');
+      const offer = await this.pc.createOffer({ iceRestart: true });
+      await this.pc.setLocalDescription(offer);
+      // Remote description will be re-applied from restartAnswer; buffer ICE until then.
+      this.remoteDescriptionSet = false;
+      await updateDoc(doc(db, 'calls', this.state.callId), {
+        restartOffer: { type: offer.type, sdp: offer.sdp },
+        restartAnswer: null,
+      });
+    } catch (err) {
+      console.error('[WebRTC] ICE restart offer failed:', err);
+      this.iceRestartInProgress = false;
+    }
   }
 
   // ── Initiate Call (Caller) ───────────────────────────────────────
@@ -390,6 +469,19 @@ export class CallManager {
             console.error('[WebRTC] Failed to set remote description:', err);
           }
         }
+
+        // ICE restart answer from the callee (Bug 5 recovery)
+        if (data.restartAnswer && this.pc && this.iceRestartInProgress) {
+          try {
+            console.log('[WebRTC] Received restart answer — re-establishing media');
+            await this.pc.setRemoteDescription(data.restartAnswer);
+            await this.flushIceCandidates();
+            this.iceRestartInProgress = false;
+          } catch (err) {
+            console.error('[WebRTC] Failed to apply restart answer:', err);
+            this.iceRestartInProgress = false;
+          }
+        }
       }, (error) => {
         console.error('[WebRTC] Call listener error:', error);
       });
@@ -467,12 +559,34 @@ export class CallManager {
       );
       this.unsubscribers.push(unsubCandidates);
 
-      // Listen for call status changes (ended by caller)
-      const unsubCall = onSnapshot(doc(db, 'calls', callId), (snap) => {
+      // Listen for call status changes (ended by caller) + ICE-restart offers
+      const unsubCall = onSnapshot(doc(db, 'calls', callId), async (snap) => {
         const data = snap.data();
         if (!data) return;
         if (data.status === 'ended') {
           this.endCall(data.endReason || 'ended');
+          return;
+        }
+        // Caller initiated an ICE restart (Bug 5 recovery) — answer the new offer.
+        const restartOffer = data.restartOffer as RTCSessionDescriptionInit | undefined;
+        if (
+          restartOffer && this.pc &&
+          restartOffer.sdp && restartOffer.sdp !== this.lastHandledRestartSdp
+        ) {
+          this.lastHandledRestartSdp = restartOffer.sdp;
+          try {
+            console.log('[WebRTC] Applying ICE restart offer (callee)');
+            this.remoteDescriptionSet = false;
+            await this.pc.setRemoteDescription(restartOffer);
+            await this.flushIceCandidates();
+            const answer = await this.pc.createAnswer();
+            await this.pc.setLocalDescription(answer);
+            await updateDoc(doc(db, 'calls', callId), {
+              restartAnswer: { type: answer.type, sdp: answer.sdp },
+            });
+          } catch (err) {
+            console.error('[WebRTC] Failed to apply restart offer:', err);
+          }
         }
       });
       this.unsubscribers.push(unsubCall);
@@ -740,6 +854,12 @@ export class CallManager {
       clearInterval(this.bitrateIntervalId);
       this.bitrateIntervalId = null;
     }
+    if (this.disconnectGraceTimer) {
+      clearTimeout(this.disconnectGraceTimer);
+      this.disconnectGraceTimer = null;
+    }
+    this.connectionEstablished = false;
+    this.iceRestartInProgress = false;
 
     this.stopRingtone();
   }
