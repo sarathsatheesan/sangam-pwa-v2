@@ -344,6 +344,11 @@ const GlobalCallOverlay: React.FC = () => {
 
   // ── PiP gesture handlers (Bug 8) ──
   // Double-tap → expand to fullscreen. Drag → reposition the PiP window.
+  //
+  // NOTE: Uses explicit TOUCH + MOUSE events rather than Pointer Events. Pointer
+  // Events work in desktop Safari but are unreliable inside Android's System
+  // WebView (Capacitor), where touch sequences get reinterpreted/cancelled.
+  // Touch + mouse is the WebView-safe path.
   const expandFromPip = useCallback(() => {
     setCallMinimized(false);
     setPipPos(null);
@@ -351,29 +356,17 @@ const GlobalCallOverlay: React.FC = () => {
     setTimeout(retryMediaPlayback, 300);
   }, [retryMediaPlayback]);
 
-  const handlePipPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const now = Date.now();
-    if (now - pipLastTapRef.current < 300) {
-      // Second tap within 300ms → double-tap → expand
-      pipLastTapRef.current = 0;
-      expandFromPip();
-      return;
-    }
-    pipLastTapRef.current = now;
+  // Shared drag math (coordinate-source agnostic)
+  const beginDrag = useCallback((x: number, y: number) => {
     const origin = pipPosRenderRef.current;
-    pipDragRef.current = {
-      active: true, moved: false,
-      startX: e.clientX, startY: e.clientY,
-      originX: origin.x, originY: origin.y,
-    };
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
-  }, [expandFromPip]);
+    pipDragRef.current = { active: true, moved: false, startX: x, startY: y, originX: origin.x, originY: origin.y };
+  }, []);
 
-  const handlePipPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  const updateDrag = useCallback((x: number, y: number) => {
     const d = pipDragRef.current;
     if (!d.active) return;
-    const dx = e.clientX - d.startX;
-    const dy = e.clientY - d.startY;
+    const dx = x - d.startX;
+    const dy = y - d.startY;
     if (!d.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
       d.moved = true;
       setPipDragging(true);
@@ -388,13 +381,54 @@ const GlobalCallOverlay: React.FC = () => {
     });
   }, []);
 
-  const handlePipPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+  const finishDrag = useCallback(() => {
     if (pipDragRef.current.active) {
       pipDragRef.current.active = false;
       setPipDragging(false);
-      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
     }
   }, []);
+
+  // Detect double-tap; otherwise begin a potential drag. Returns true if it was
+  // a double-tap (caller should not start a drag).
+  const registerTapAndMaybeExpand = useCallback((): boolean => {
+    const now = Date.now();
+    if (now - pipLastTapRef.current < 300) {
+      pipLastTapRef.current = 0;
+      expandFromPip();
+      return true;
+    }
+    pipLastTapRef.current = now;
+    return false;
+  }, [expandFromPip]);
+
+  // Touch (Android WebView + iOS). touch-action:none on the element prevents the
+  // WebView from hijacking the gesture for scrolling.
+  const handlePipTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (registerTapAndMaybeExpand()) return;
+    const t = e.touches[0];
+    if (t) beginDrag(t.clientX, t.clientY);
+  }, [registerTapAndMaybeExpand, beginDrag]);
+
+  const handlePipTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    const t = e.touches[0];
+    if (t) updateDrag(t.clientX, t.clientY);
+  }, [updateDrag]);
+
+  const handlePipTouchEnd = useCallback(() => { finishDrag(); }, [finishDrag]);
+
+  // Mouse (desktop). Window-level listeners so the drag survives leaving the box.
+  const handlePipMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (registerTapAndMaybeExpand()) return;
+    beginDrag(e.clientX, e.clientY);
+    const onMove = (ev: MouseEvent) => updateDrag(ev.clientX, ev.clientY);
+    const onUp = () => {
+      finishDrag();
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [registerTapAndMaybeExpand, beginDrag, updateDrag, finishDrag]);
 
   const handleAnswerCall = async () => {
     if (!callState.callId) return;
@@ -513,10 +547,11 @@ const GlobalCallOverlay: React.FC = () => {
             backfaceVisibility: 'hidden',
             WebkitTapHighlightColor: 'transparent',
           }}
-          onPointerDown={handlePipPointerDown}
-          onPointerMove={handlePipPointerMove}
-          onPointerUp={handlePipPointerUp}
-          onPointerCancel={handlePipPointerUp}
+          onTouchStart={handlePipTouchStart}
+          onTouchMove={handlePipTouchMove}
+          onTouchEnd={handlePipTouchEnd}
+          onTouchCancel={handlePipTouchEnd}
+          onMouseDown={handlePipMouseDown}
         >
           {/* VIDEO: avatar fallback + indicators overlay the (transparent) frame */}
           {isVideoCall && (
@@ -568,7 +603,8 @@ const GlobalCallOverlay: React.FC = () => {
               {callState.status === 'connected' ? formatCallDuration(callState.duration) : 'double-tap to expand'}
             </span>
             <button
-              onPointerDown={(e) => { e.stopPropagation(); }}
+              onTouchStart={(e) => { e.stopPropagation(); }}
+              onMouseDown={(e) => { e.stopPropagation(); }}
               onClick={(e) => { e.stopPropagation(); handleEndCall(); }}
               className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center"
               aria-label="End call"
