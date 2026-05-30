@@ -57,6 +57,25 @@ const formatMessageTime = (ts: Timestamp | null | undefined): string => {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 };
 
+// ─── Minimized (PiP) window geometry ───────────────────────────────
+// Shared by the persistent <video> element and the controls overlay so they
+// stay perfectly aligned (Bug 3). Default position is raised above the message
+// composer so the PiP never covers the "send" control (Bug 6).
+const PIP_MARGIN = 12;
+const PIP_COMPOSER_CLEARANCE = 120; // px above the viewport bottom (clears composer)
+const getPipDims = (isVideo: boolean): { w: number; h: number } =>
+  isVideo ? { w: 144, h: 200 } : { w: 224, h: 76 };
+const clampPip = (v: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, v));
+const defaultPipPosition = (isVideo: boolean): { x: number; y: number } => {
+  if (typeof window === 'undefined') return { x: PIP_MARGIN, y: PIP_MARGIN };
+  const { w, h } = getPipDims(isVideo);
+  return {
+    x: Math.max(PIP_MARGIN, window.innerWidth - w - PIP_MARGIN),
+    y: Math.max(PIP_MARGIN, window.innerHeight - h - PIP_COMPOSER_CLEARANCE),
+  };
+};
+
 // ─── Component ─────────────────────────────────────────────────────
 
 const GlobalCallOverlay: React.FC = () => {
@@ -65,6 +84,15 @@ const GlobalCallOverlay: React.FC = () => {
 
   const [callState, setCallState] = useState<CallState>(getCallManager().getState());
   const [callMinimized, setCallMinimized] = useState(false);
+
+  // Draggable PiP position (Bug 8). null → use the computed default corner.
+  const [pipPos, setPipPos] = useState<{ x: number; y: number } | null>(null);
+  const [pipDragging, setPipDragging] = useState(false);
+  const pipDragRef = useRef({ active: false, moved: false, startX: 0, startY: 0, originX: 0, originY: 0 });
+  const pipLastTapRef = useRef(0);
+  // Holds the currently-rendered PiP position so pointer handlers read a fresh
+  // origin without re-subscribing on every drag frame.
+  const pipPosRenderRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Deduplication guard — prevents writing the same call event twice
   const writtenCallIdsRef = useRef<Set<string>>(new Set());
@@ -253,8 +281,17 @@ const GlobalCallOverlay: React.FC = () => {
   useEffect(() => {
     if (callState.status === 'idle' || callState.status === 'ended') {
       setCallMinimized(false);
+      setPipPos(null);
     }
   }, [callState.status]);
+
+  // Seed the PiP position to the default corner the first time we minimize, so
+  // dragging has a concrete starting point (and it clears the composer — Bug 6).
+  useEffect(() => {
+    if (callMinimized && pipPos === null) {
+      setPipPos(defaultPipPosition(callState.callType === 'video'));
+    }
+  }, [callMinimized, pipPos, callState.callType]);
 
   // Intercept browser/hardware back button during active calls → minimize to PiP
   useEffect(() => {
@@ -305,6 +342,60 @@ const GlobalCallOverlay: React.FC = () => {
     }
   }, []);
 
+  // ── PiP gesture handlers (Bug 8) ──
+  // Double-tap → expand to fullscreen. Drag → reposition the PiP window.
+  const expandFromPip = useCallback(() => {
+    setCallMinimized(false);
+    setPipPos(null);
+    retryMediaPlayback();
+    setTimeout(retryMediaPlayback, 300);
+  }, [retryMediaPlayback]);
+
+  const handlePipPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const now = Date.now();
+    if (now - pipLastTapRef.current < 300) {
+      // Second tap within 300ms → double-tap → expand
+      pipLastTapRef.current = 0;
+      expandFromPip();
+      return;
+    }
+    pipLastTapRef.current = now;
+    const origin = pipPosRenderRef.current;
+    pipDragRef.current = {
+      active: true, moved: false,
+      startX: e.clientX, startY: e.clientY,
+      originX: origin.x, originY: origin.y,
+    };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* unsupported */ }
+  }, [expandFromPip]);
+
+  const handlePipPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = pipDragRef.current;
+    if (!d.active) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+      d.moved = true;
+      setPipDragging(true);
+    }
+    if (!d.moved) return;
+    const { w, h } = getPipDims(callManagerRef.current.getState().callType === 'video');
+    const maxX = (typeof window !== 'undefined' ? window.innerWidth : 360) - w - PIP_MARGIN;
+    const maxY = (typeof window !== 'undefined' ? window.innerHeight : 640) - h - PIP_MARGIN;
+    setPipPos({
+      x: clampPip(d.originX + dx, PIP_MARGIN, maxX),
+      y: clampPip(d.originY + dy, PIP_MARGIN, maxY),
+    });
+  }, []);
+
+  const handlePipPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (pipDragRef.current.active) {
+      pipDragRef.current.active = false;
+      setPipDragging(false);
+      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    }
+  }, []);
+
   const handleAnswerCall = async () => {
     if (!callState.callId) return;
     try {
@@ -331,6 +422,12 @@ const GlobalCallOverlay: React.FC = () => {
     : false;
   const showRemoteVideo = callState.status === 'connected' || hasRemoteVideoTrack;
   const isVideoCall = callState.callType === 'video';
+
+  // Shared PiP geometry — the persistent <video> and the controls overlay both
+  // use this so they stay perfectly aligned (Bug 3).
+  const pipDims = getPipDims(isVideoCall);
+  const pipPosition = pipPos ?? defaultPipPosition(isVideoCall);
+  pipPosRenderRef.current = pipPosition;
 
   // Don't render anything when idle
   if (callState.status === 'idle') return null;
@@ -365,16 +462,18 @@ const GlobalCallOverlay: React.FC = () => {
             objectFit: 'cover',
             opacity: showRemoteVideo ? 1 : 0,
             pointerEvents: 'none', // let clicks pass through to buttons below
-            // Smooth transition when switching between PiP and fullscreen
-            transition: 'all 0.3s ease-in-out',
+            // Smooth transition when switching between PiP and fullscreen,
+            // but disabled mid-drag so the window tracks the finger 1:1 (Bug 8).
+            transition: pipDragging ? 'none' : 'all 0.3s ease-in-out',
             willChange: 'transform, width, height, opacity',
             WebkitTransform: 'translateZ(0)',
             ...(callMinimized ? {
-              // PiP position
-              bottom: '100px',
-              right: '16px',
-              width: '140px',
-              height: '180px',
+              // PiP position — fills the minimized frame exactly; the controls
+              // overlay (transparent) renders above so the video is never hidden.
+              left: `${pipPosition.x}px`,
+              top: `${pipPosition.y}px`,
+              width: `${pipDims.w}px`,
+              height: `${pipDims.h}px`,
               borderRadius: '16px',
             } : {
               // Fullscreen position
@@ -388,14 +487,25 @@ const GlobalCallOverlay: React.FC = () => {
         />
       )}
 
-      {/* ── MINIMIZED PiP MODE ── */}
+      {/* ── MINIMIZED PiP MODE ──
+          Drag to move (Bug 8). Double-tap to expand. The frame is TRANSPARENT
+          for video calls so the persistent <video> behind it shows through
+          (Bug 3); position is seeded above the composer so it never blocks the
+          "send" control (Bug 6). */}
       {callMinimized ? (
         <div
-          className="fixed bottom-20 right-4 z-[10001] rounded-2xl overflow-hidden shadow-2xl cursor-pointer"
+          className="fixed z-[10001] rounded-2xl overflow-hidden shadow-2xl select-none"
           style={{
-            width: isVideoCall ? '140px' : '200px',
-            backgroundColor: '#1a1a2e',
+            left: `${pipPosition.x}px`,
+            top: `${pipPosition.y}px`,
+            width: `${pipDims.w}px`,
+            height: `${pipDims.h}px`,
+            // Video: transparent so the <video> behind shows. Audio: solid card.
+            backgroundColor: isVideoCall ? 'transparent' : '#1a1a2e',
             border: '2px solid rgba(99,102,241,0.5)',
+            touchAction: 'none',
+            cursor: pipDragging ? 'grabbing' : 'grab',
+            transition: pipDragging ? 'none' : 'all 0.3s ease-in-out',
             willChange: 'transform',
             WebkitTransform: 'translateZ(0)',
             transform: 'translateZ(0)',
@@ -403,28 +513,20 @@ const GlobalCallOverlay: React.FC = () => {
             backfaceVisibility: 'hidden',
             WebkitTapHighlightColor: 'transparent',
           }}
-          onClick={() => {
-            setCallMinimized(false);
-            retryMediaPlayback();
-            setTimeout(retryMediaPlayback, 300);
-          }}
-          onTouchStart={() => {
-            setCallMinimized(false);
-            retryMediaPlayback();
-            setTimeout(retryMediaPlayback, 300);
-          }}
+          onPointerDown={handlePipPointerDown}
+          onPointerMove={handlePipPointerMove}
+          onPointerUp={handlePipPointerUp}
+          onPointerCancel={handlePipPointerUp}
         >
-          {/* PiP video placeholder / avatar fallback */}
+          {/* VIDEO: avatar fallback + indicators overlay the (transparent) frame */}
           {isVideoCall && (
-            <div className="relative" style={{ height: '180px' }}>
-              {/* The actual video is the persistent element above — this div is just the container */}
+            <>
               {!showRemoteVideo && (
-                <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: '#6366F1' }}>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ backgroundColor: '#6366F1' }}>
                   <span className="text-white text-2xl font-bold">{callState.peerName?.[0]?.toUpperCase() || '?'}</span>
                 </div>
               )}
-              {/* Mute/video-off indicators on PiP */}
-              <div className="absolute top-1.5 left-1.5 flex gap-1 z-10">
+              <div className="absolute top-1.5 left-1.5 flex gap-1 z-10 pointer-events-none">
                 {callState.isMuted && (
                   <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
                     <MicOff size={12} className="text-white" />
@@ -436,11 +538,11 @@ const GlobalCallOverlay: React.FC = () => {
                   </div>
                 )}
               </div>
-            </div>
+            </>
           )}
-          {/* PiP audio call info */}
-          {callState.callType === 'audio' && (
-            <div className="px-3 py-3 flex items-center gap-2">
+          {/* AUDIO: caller info card */}
+          {!isVideoCall && (
+            <div className="px-3 pt-3 flex items-center gap-2 pointer-events-none">
               <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
                 <span className="text-white text-sm font-bold">{callState.peerName?.[0]?.toUpperCase() || '?'}</span>
               </div>
@@ -457,14 +559,19 @@ const GlobalCallOverlay: React.FC = () => {
               )}
             </div>
           )}
-          {/* PiP bottom bar */}
-          <div className="flex items-center justify-between px-2 py-1.5" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <span className="text-white/70 text-[10px]">
-              {callState.status === 'connected' && isVideoCall ? formatCallDuration(callState.duration) : 'Tap to expand'}
+          {/* Bottom overlay bar (always above the video): duration + end button */}
+          <div
+            className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2 py-1.5"
+            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0))' }}
+          >
+            <span className="text-white/80 text-[10px] font-medium pointer-events-none">
+              {callState.status === 'connected' ? formatCallDuration(callState.duration) : 'double-tap to expand'}
             </span>
             <button
+              onPointerDown={(e) => { e.stopPropagation(); }}
               onClick={(e) => { e.stopPropagation(); handleEndCall(); }}
               className="w-7 h-7 rounded-full bg-red-500 flex items-center justify-center"
+              aria-label="End call"
             >
               <PhoneOff size={12} className="text-white" />
             </button>
