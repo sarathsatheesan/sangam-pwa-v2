@@ -20,6 +20,9 @@ type NavigateFn = (pathOrUrl: string) => void;
 /** Build a deep-link path from FCM data, matching the web service worker logic. */
 function resolveClickUrl(data: Record<string, unknown> | undefined): string {
   if (!data) return '/messages';
+  // Incoming-call taps go to /messages, where the in-app call listener picks up
+  // the still-ringing call doc and shows the call UI (Bug 1).
+  if (data.type === 'incoming_call') return '/messages';
   const url = (data.click_action as string) || (data.url as string) || '';
   if (url) return url;
 
@@ -72,6 +75,24 @@ export async function registerNativePush(navigate: NavigateFn): Promise<void> {
     return;
   }
 
+  // Android 8+ requires notification CHANNELS. These ids must match the
+  // channelId values sent by the Cloud Functions (Bug 7). Importance 5 = HIGH
+  // → heads-up banners. No-op on iOS.
+  try {
+    await PushNotifications.createChannel({
+      id: 'messages', name: 'Messages',
+      description: 'Direct and group messages',
+      importance: 5, visibility: 1, vibration: true,
+    });
+    await PushNotifications.createChannel({
+      id: 'calls', name: 'Calls',
+      description: 'Incoming voice and video calls',
+      importance: 5, visibility: 1, vibration: true,
+    });
+  } catch (err) {
+    console.warn('[native/push] createChannel skipped (non-Android or unsupported):', err);
+  }
+
   // Register the device with FCM (token arrives on the "registration" event).
   await PushNotifications.register();
 
@@ -83,10 +104,18 @@ export async function registerNativePush(navigate: NavigateFn): Promise<void> {
     console.error('[native/push] Registration error:', err);
   });
 
-  // Foreground receipt — the OS heads-up banner is handled by presentationOptions
-  // in capacitor.config.ts, so we only log here. (Hook your in-app toast if desired.)
+  // Foreground receipt — Android does NOT show a banner while the app is open;
+  // it hands the notification to us. Broadcast it so the in-app toast bridge
+  // (mounted in MainLayout) can surface what arrived.
   await PushNotifications.addListener('pushNotificationReceived', (notif: PushNotificationSchema) => {
     console.log('[native/push] Foreground push:', notif.title);
+    window.dispatchEvent(new CustomEvent('enovo:push-foreground', {
+      detail: {
+        title: notif.title || 'New notification',
+        body: notif.body || '',
+        data: (notif.data as Record<string, unknown>) || {},
+      },
+    }));
   });
 
   // Tap on a notification → route into the SPA.

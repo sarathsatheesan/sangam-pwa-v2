@@ -4,6 +4,7 @@ import AppHeader from '../components/layout/AppHeader';
 import ModuleSelector from '../components/layout/ModuleSelector';
 import AppFooter from '../components/layout/AppFooter';
 import { ToastContainer } from '../components/shared/Toast';
+import NativePushToast from '../components/NativePushToast';
 import GlobalCallOverlay from '../components/GlobalCallOverlay';
 import GroupCallOverlay from '../components/GroupCallOverlay';
 
@@ -30,6 +31,9 @@ export const MainLayout: React.FC = () => {
 
       {/* Toast notifications */}
       <ToastContainer />
+
+      {/* Surfaces native foreground push notifications as in-app toasts */}
+      <NativePushToast />
 
       {/* Global call overlay — persists across all route changes */}
       <GlobalCallOverlay />

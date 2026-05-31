@@ -2160,7 +2160,7 @@ export default function MessagesPage() {
     });
 
     if (activeFilter === 'unread') {
-      result = result.filter((conv) => (conv.unreadCount || 0) > 0 && conv.lastMessageSenderId !== user?.uid);
+      result = result.filter((conv) => conv.lastMessageRead === false && conv.lastMessageSenderId !== user?.uid);
     } else if (activeFilter === 'connects') {
       // Show only group conversations
       result = result.filter((conv) => conv.isGroup === true);
@@ -2266,7 +2266,7 @@ export default function MessagesPage() {
             // Group conversation
             if (conv.isGroup) {
               const isSelected = selectedConvId === conv.id;
-              const hasUnread = (conv.unreadCount || 0) > 0 && conv.lastMessageSenderId !== user?.uid;
+              const hasUnread = conv.lastMessageRead === false && conv.lastMessageSenderId !== user?.uid;
               return (
                 <button
                   key={conv.id}
@@ -2301,9 +2301,7 @@ export default function MessagesPage() {
                           {conv.lastMessage || 'No messages'}
                         </div>
                         {hasUnread && (
-                          <span className="ml-2 min-w-[20px] h-5 flex items-center justify-center rounded-full text-white text-xs font-bold px-1.5 flex-shrink-0" style={{ backgroundColor: 'var(--aurora-accent)' }}>
-                            {conv.unreadCount}
-                          </span>
+                          <span className="ml-2 w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--aurora-accent)' }} aria-label="Unread" />
                         )}
                       </div>
                     </div>
@@ -2316,7 +2314,7 @@ export default function MessagesPage() {
             const otherUser = users.find((u) => u.id === otherParticipant);
             if (!otherUser) return null;
             const isTyping = conv.typing && Object.entries(conv.typing).some(([uid, typing]) => uid !== user?.uid && typing);
-            const hasUnread = (conv.unreadCount || 0) > 0 && conv.lastMessageSenderId !== user?.uid;
+            const hasUnread = conv.lastMessageRead === false && conv.lastMessageSenderId !== user?.uid;
             const isSelected = selectedUser?.id === otherUser.id;
             return (
               <button
@@ -2361,9 +2359,7 @@ export default function MessagesPage() {
                         )}
                       </div>
                       {hasUnread && (
-                        <span className="ml-2 min-w-[20px] h-5 flex items-center justify-center rounded-full text-white text-xs font-bold px-1.5 flex-shrink-0" style={{ backgroundColor: '#6366F1' }}>
-                          {conv.unreadCount}
-                        </span>
+                        <span className="ml-2 w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: '#6366F1' }} aria-label="Unread" />
                       )}
                     </div>
                   </div>

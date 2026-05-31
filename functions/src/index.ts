@@ -112,17 +112,29 @@ export const sendNewMessageNotification = onDocumentCreated(
       conversationId,
       senderId,
       senderName,
-      click_action: `https://mithr-1e5f4.web.app/messages`,
+      click_action: `https://enovoapp.com/messages`,
     };
 
-    // Send to all tokens
+    // Send to all tokens.
+    // android.* is REQUIRED for heads-up + reliable background delivery on
+    // Android 8+ — without a high-importance channelId + priority, the native
+    // app shows nothing or a silent low-priority notification (Bug 7).
     const response = await admin.messaging().sendEachForMulticast({
       tokens,
       notification,
       data,
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "messages",
+          priority: "high",
+          defaultSound: true,
+          tag: `msg-${conversationId}`,
+        },
+      },
       webpush: {
         fcmOptions: {
-          link: `https://mithr-1e5f4.web.app/messages`,
+          link: `https://enovoapp.com/messages`,
         },
         notification: {
           icon: "/icon-192.png",
@@ -157,6 +169,101 @@ export const sendNewMessageNotification = onDocumentCreated(
           .update({
             fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
           });
+      }
+    }
+  }
+);
+
+/**
+ * Cloud Function: sendIncomingCallNotification
+ *
+ * Triggers when a new 1:1 call document is created (calls/{callId}). Sends a
+ * HIGH-priority FCM to the callee so their device rings / shows an incoming-call
+ * heads-up even when the eNoVo app isn't focused.
+ *
+ * Before this existed, incoming calls relied solely on an in-app Firestore
+ * listener — which only fires if the callee already has the app open on a screen
+ * that mounts the call overlay. That's why call notifications "didn't fire" (Bug 1).
+ *
+ * Firestore path: /calls/{callId}
+ */
+export const sendIncomingCallNotification = onDocumentCreated(
+  "calls/{callId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const call = snap.data();
+    // Only the initial ringing state should notify (ignore later writes).
+    if (!call || call.status !== "ringing") return;
+
+    const calleeId = call.calleeId as string | undefined;
+    const callerId = (call.callerId as string) || "";
+    const callerName = (call.callerName as string) || "Someone";
+    const callType = (call.callType as string) === "video" ? "video" : "voice";
+    if (!calleeId) return;
+
+    const calleeDoc = await db.collection("users").doc(calleeId).get();
+    if (!calleeDoc.exists) return;
+    const tokens = (calleeDoc.data()?.fcmTokens as string[] | undefined) || [];
+    if (tokens.length === 0) return;
+
+    const callId = event.params.callId;
+
+    const response = await admin.messaging().sendEachForMulticast({
+      tokens,
+      notification: {
+        title: callerName,
+        body: `Incoming ${callType} call`,
+      },
+      data: {
+        type: "incoming_call",
+        callId,
+        callerId,
+        callerName,
+        callType,
+        click_action: "https://enovoapp.com/messages",
+      },
+      android: {
+        priority: "high",
+        // Expire with the client-side 45s ring timeout — a stale call push is useless.
+        ttl: 45_000,
+        notification: {
+          channelId: "calls",
+          priority: "max",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          tag: `call-${callId}`,
+          visibility: "public",
+        },
+      },
+      webpush: {
+        fcmOptions: { link: "https://enovoapp.com/messages" },
+        notification: {
+          icon: "/icon-192.png",
+          badge: "/icon-192.png",
+          tag: `call-${callId}`,
+          renotify: true,
+          requireInteraction: true,
+        },
+      },
+    });
+
+    // Clean up stale tokens
+    if (response.failureCount > 0) {
+      const toRemove: string[] = [];
+      response.responses.forEach((resp, idx) => {
+        if (
+          !resp.success &&
+          resp.error?.code === "messaging/registration-token-not-registered"
+        ) {
+          toRemove.push(tokens[idx]);
+        }
+      });
+      for (const token of toRemove) {
+        await db.collection("users").doc(calleeId).update({
+          fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
+        });
       }
     }
   }

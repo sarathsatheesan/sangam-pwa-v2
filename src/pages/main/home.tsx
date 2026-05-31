@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useFeatureSettings } from '../../contexts/FeatureSettingsContext';
 import { useIncomingRequestCount } from '../../hooks/useIncomingRequests';
+import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
 
 interface ModuleTile {
   path: string;
@@ -54,6 +55,7 @@ const HomePage: React.FC = () => {
   const { user, userProfile, isAdmin } = useAuth();
   const { isFeatureEnabled } = useFeatureSettings();
   const incomingRequestCount = useIncomingRequestCount();
+  const unreadMessageCount = useUnreadMessageCount();
 
   const enabledTiles = tiles.filter((t) => {
     if (t.feature === 'always') return true;
@@ -111,6 +113,11 @@ const HomePage: React.FC = () => {
                   {tile.path === '/discover' && incomingRequestCount > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 animate-pulse shadow-sm">
                       {incomingRequestCount > 9 ? '9+' : incomingRequestCount}
+                    </span>
+                  )}
+                  {tile.path === '/messages' && unreadMessageCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] flex items-center justify-center rounded-full px-1 animate-pulse shadow-sm">
+                      {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
                     </span>
                   )}
                 </div>
