@@ -643,8 +643,10 @@ export class CallManager {
     );
     const unsub = onSnapshot(q, (snap) => {
       snap.docChanges().forEach((change) => {
+        const data = change.doc.data();
+        const docId = change.doc.id;
+
         if (change.type === 'added') {
-          const data = change.doc.data();
           if (data.status === 'ringing' && this.state.status === 'idle') {
             // Check if call is still fresh (not older than timeout)
             const createdAt = data.createdAt as Timestamp | null;
@@ -655,7 +657,7 @@ export class CallManager {
 
             this.setState({
               status: 'ringing',
-              callId: change.doc.id,
+              callId: docId,
               callType: data.callType,
               peerId: data.callerId,
               peerName: data.callerName,
@@ -667,7 +669,40 @@ export class CallManager {
             });
 
             this.playRingtone();
-            onIncoming(change.doc.id, data.callerName, data.callType);
+            onIncoming(docId, data.callerName, data.callType);
+          }
+        } else if (change.type === 'modified') {
+          // Only react to the call THIS session is currently showing. Before the
+          // callee answers, this global listener is the ONLY thing watching the
+          // call doc, so it must handle terminal transitions (Bug 9).
+          if (this.state.callId !== docId) return;
+          const status = data.status;
+
+          if (status === 'ended' || status === 'rejected' || status === 'missed') {
+            // Caller hung up / cancelled / call was declined → tear down here too.
+            // endCall safely handles both a ringing-only session and an active one.
+            if (this.state.status !== 'idle' && this.state.status !== 'ended') {
+              this.endCall(data.endReason || status);
+            }
+          } else if (status === 'connected' && this.state.status === 'ringing') {
+            // The call was answered on ANOTHER of this user's sessions/devices.
+            // Stop ringing here and clear the incoming UI — but do NOT call
+            // endCall (that would mark the live call ended for the real answerer).
+            this.stopRingtone();
+            this.setState({
+              status: 'idle',
+              callId: null,
+              peerId: null,
+              peerName: null,
+              duration: 0,
+              error: null,
+            });
+          }
+        } else if (change.type === 'removed') {
+          // Call doc deleted while we were showing it → tear down.
+          if (this.state.callId === docId &&
+              this.state.status !== 'idle' && this.state.status !== 'ended') {
+            this.endCall('ended');
           }
         }
       });
