@@ -12,8 +12,11 @@ import {
 } from '@/utils/webrtc';
 import {
   Phone, PhoneOff, Mic, MicOff, Video, VideoOff, SwitchCamera,
-  PhoneIncoming, X, Shield, Minimize2,
+  PhoneIncoming, X, Shield, Minimize2, Volume2, VolumeX,
 } from 'lucide-react';
+import {
+  startCallAudioRouting, stopCallAudioRouting, setCallSpeaker, callAudioControlsAvailable,
+} from '@/native/callAudio';
 
 // ─── Safari Compatibility Helpers ─────────────────────────────────
 const isSafari = (): boolean => {
@@ -93,6 +96,10 @@ const GlobalCallOverlay: React.FC = () => {
   // Holds the currently-rendered PiP position so pointer handlers read a fresh
   // origin without re-subscribing on every drag frame.
   const pipPosRenderRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Native call-audio routing (Android): speaker toggle + lifecycle guard.
+  const [speakerOn, setSpeakerOn] = useState(false);
+  const audioRoutingActiveRef = useRef(false);
 
   // Deduplication guard — prevents writing the same call event twice
   const writtenCallIdsRef = useRef<Set<string>>(new Set());
@@ -298,6 +305,21 @@ const GlobalCallOverlay: React.FC = () => {
       setPipPos(defaultPipPosition(callState.callType === 'video'));
     }
   }, [callMinimized, pipPos, callState.callType]);
+
+  // Native call-audio routing: enter communication mode + auto-route to a
+  // connected Bluetooth headset/car when the call becomes active; restore the
+  // normal audio mode when it ends. No-op on web (handled inside the bridge).
+  useEffect(() => {
+    const active = callState.status === 'connecting' || callState.status === 'connected';
+    if (active && !audioRoutingActiveRef.current) {
+      audioRoutingActiveRef.current = true;
+      void startCallAudioRouting();
+    } else if (!active && audioRoutingActiveRef.current) {
+      audioRoutingActiveRef.current = false;
+      void stopCallAudioRouting();
+      setSpeakerOn(false);
+    }
+  }, [callState.status]);
 
   // Intercept browser/hardware back button during active calls → minimize to PiP
   useEffect(() => {
@@ -807,6 +829,27 @@ const GlobalCallOverlay: React.FC = () => {
                         <SwitchCamera size={22} />
                       </button>
                       <span className="text-white/50 text-xs">Flip</span>
+                    </div>
+                  )}
+
+                  {/* Speaker / audio output (Android — auto-routes to Bluetooth/car when connected) */}
+                  {callAudioControlsAvailable() && (
+                    <div className="flex flex-col items-center gap-1">
+                      <button
+                        onClick={async () => {
+                          const applied = await setCallSpeaker(!speakerOn);
+                          setSpeakerOn(applied);
+                        }}
+                        className={`w-12 h-12 rounded-full flex items-center justify-center transition-all shadow-lg ${
+                          speakerOn
+                            ? 'bg-white text-indigo-600 ring-2 ring-white'
+                            : 'bg-white/20 text-white hover:bg-white/30'
+                        }`}
+                        aria-label="Toggle speaker"
+                      >
+                        {speakerOn ? <Volume2 size={22} /> : <VolumeX size={22} />}
+                      </button>
+                      <span className="text-white/50 text-xs">Speaker</span>
                     </div>
                   )}
 
