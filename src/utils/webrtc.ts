@@ -823,20 +823,19 @@ export class CallManager {
     if (this.endingCall) return;
     this.endingCall = true;
 
-    // Update Firestore call status
+    // Signal the peer FIRST and do NOT await it. Awaiting the Firestore write
+    // delayed local teardown AND pushed back when the other side learns the call
+    // ended — adding visible hang-up latency on both ends. Fire-and-forget so the
+    // peer's listener triggers as soon as possible.
     if (callId) {
-      try {
-        const endStatus = reason === 'rejected' ? 'rejected'
-          : reason === 'timeout' ? 'missed'
-          : 'ended';
-        await updateDoc(doc(db, 'calls', callId), {
-          status: endStatus,
-          endedAt: serverTimestamp(),
-          endReason: reason,
-        });
-      } catch (err) {
-        console.error('[WebRTC] Failed to update call status:', err);
-      }
+      const endStatus = reason === 'rejected' ? 'rejected'
+        : reason === 'timeout' ? 'missed'
+        : 'ended';
+      updateDoc(doc(db, 'calls', callId), {
+        status: endStatus,
+        endedAt: serverTimestamp(),
+        endReason: reason,
+      }).catch((err) => console.error('[WebRTC] Failed to update call status:', err));
     }
 
     // Fire call-ended event for chat message logging (ONCE per callId)
@@ -865,7 +864,8 @@ export class CallManager {
       remoteStream: null,
     });
 
-    // Reset to idle after brief delay
+    // Clear the "Call ended" screen quickly. Was 2000ms, which felt laggy on
+    // teardown (especially on the receiver, on top of Firestore propagation).
     setTimeout(() => {
       this.endingCall = false;
       this.setState({
@@ -876,7 +876,7 @@ export class CallManager {
         duration: 0,
         error: null,
       });
-    }, 2000);
+    }, 700);
   }
 
   async rejectCall(): Promise<void> {
