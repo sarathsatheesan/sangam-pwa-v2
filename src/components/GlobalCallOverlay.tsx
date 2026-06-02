@@ -190,14 +190,20 @@ const GlobalCallOverlay: React.FC = () => {
     return unsub;
   }, [user?.uid]);
 
-  // Attach local media stream to video element
+  // Attach local media stream to the self-view <video>.
+  // IMPORTANT: the self-view element is only rendered in FULLSCREEN mode, so it
+  // unmounts when minimized to PiP and REMOUNTS on expand. The stream reference
+  // doesn't change across that, so this effect must also depend on `callMinimized`
+  // — otherwise the remounted element keeps a null srcObject and the self-view
+  // goes black after maximizing (Bug 4).
   useEffect(() => {
+    if (callMinimized) return; // self-view not mounted while minimized
     if (localVideoRef.current && callState.localStream) {
       localVideoRef.current.setAttribute('webkit-playsinline', '');
       localVideoRef.current.srcObject = callState.localStream;
       safariSafePlay(localVideoRef.current);
     }
-  }, [callState.localStream]);
+  }, [callState.localStream, callMinimized]);
 
   // Attach remote stream to media elements.
   //

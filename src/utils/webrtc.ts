@@ -731,64 +731,86 @@ export class CallManager {
 
   async switchCamera(): Promise<void> {
     if (!this.localStream || !this.pc) return;
-    const videoTrack = this.localStream.getVideoTracks()[0];
-    if (!videoTrack) return;
+    const oldTrack = this.localStream.getVideoTracks()[0];
+    if (!oldTrack) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      console.warn('[WebRTC] Camera switching not supported in this browser');
+      return;
+    }
 
     // Use tracked facing mode (getSettings().facingMode is unreliable on many devices)
-    const newFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
-    console.log('[WebRTC] Switching camera from', this.currentFacingMode, 'to', newFacingMode);
+    const prevFacingMode = this.currentFacingMode;
+    const newFacingMode: 'user' | 'environment' = prevFacingMode === 'user' ? 'environment' : 'user';
+    console.log('[WebRTC] Switching camera from', prevFacingMode, 'to', newFacingMode);
 
-    try {
-      // Cross-browser: Verify mediaDevices is still available
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Camera switching not supported in your browser');
-      }
-      const newStream = await navigator.mediaDevices.getUserMedia({
+    // CROSS-PLATFORM FIX (Bug 2): most ANDROID devices cannot open a second
+    // camera while the first is still active — getUserMedia throws
+    // NotReadableError ("Could not start video source"). iOS Safari and desktop
+    // allow concurrent access, which is why flip worked there but not on Android
+    // browsers. So we STOP and release the current camera BEFORE requesting the
+    // new one. The brief freeze during the switch is expected and acceptable.
+    this.localStream.removeTrack(oldTrack);
+    oldTrack.stop();
+
+    const acquire = (facing: 'user' | 'environment', exact: boolean): Promise<MediaStream> =>
+      navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { exact: newFacingMode },
+          facingMode: exact ? { exact: facing } : facing,
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
       });
-      const newVideoTrack = newStream.getVideoTracks()[0];
 
-      // Replace the track on the RTCPeerConnection sender
-      const sender = this.pc.getSenders().find((s) => s.track?.kind === 'video');
-      if (sender) {
-        await sender.replaceTrack(newVideoTrack);
-      }
-
-      // Update the local stream
-      this.localStream.removeTrack(videoTrack);
-      videoTrack.stop();
-      this.localStream.addTrack(newVideoTrack);
-      this.currentFacingMode = newFacingMode;
-
-      // Create new reference so React detects the change
-      const updatedStream = new MediaStream(this.localStream.getTracks());
-      this.localStream = updatedStream;
-      this.setState({ localStream: updatedStream });
-    } catch (err) {
-      console.error('[WebRTC] Failed to switch camera:', err);
-      // If { exact } fails (device has only one camera), try without exact
+    try {
+      let stream: MediaStream;
       try {
-        const fallback = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: newFacingMode },
-        });
-        const newVideoTrack = fallback.getVideoTracks()[0];
-        const sender = this.pc!.getSenders().find((s) => s.track?.kind === 'video');
-        if (sender) await sender.replaceTrack(newVideoTrack);
-        this.localStream!.removeTrack(videoTrack);
-        videoTrack.stop();
-        this.localStream!.addTrack(newVideoTrack);
-        this.currentFacingMode = newFacingMode;
-        const updatedStream = new MediaStream(this.localStream!.getTracks());
-        this.localStream = updatedStream;
-        this.setState({ localStream: updatedStream });
-      } catch {
-        console.warn('[WebRTC] Device may only have one camera');
+        stream = await acquire(newFacingMode, true);
+      } catch (exactErr) {
+        // Some devices reject { exact } — retry with a soft facingMode preference.
+        console.warn('[WebRTC] exact facingMode failed, retrying soft:', exactErr);
+        stream = await acquire(newFacingMode, false);
+      }
+      await this.attachNewVideoTrack(stream.getVideoTracks()[0], newFacingMode);
+    } catch (err) {
+      // The other camera couldn't be opened (e.g. single-camera device). Restore
+      // the ORIGINAL camera so the user isn't left with a dead/black video.
+      console.error('[WebRTC] Failed to open the other camera, restoring original:', err);
+      try {
+        const restored = await acquire(prevFacingMode, false);
+        await this.attachNewVideoTrack(restored.getVideoTracks()[0], prevFacingMode);
+      } catch (restoreErr) {
+        console.error('[WebRTC] Could not restore camera after failed switch:', restoreErr);
       }
     }
+  }
+
+  /** Wire a freshly-acquired video track into the peer connection + local stream. */
+  private async attachNewVideoTrack(
+    track: MediaStreamTrack | undefined,
+    facing: 'user' | 'environment'
+  ): Promise<void> {
+    if (!track || !this.pc || !this.localStream) {
+      track?.stop();
+      return;
+    }
+    // Respect a currently-toggled-off camera.
+    track.enabled = !this.state.isVideoOff;
+
+    const sender = this.pc.getSenders().find((s) => s.track?.kind === 'video') ||
+      this.pc.getSenders().find((s) => s.track === null);
+    if (sender) {
+      await sender.replaceTrack(track);
+    } else {
+      this.pc.addTrack(track, this.localStream);
+    }
+
+    this.localStream.addTrack(track);
+    this.currentFacingMode = facing;
+
+    // New MediaStream reference so React re-attaches the self-view (Bug 2/4).
+    const updatedStream = new MediaStream(this.localStream.getTracks());
+    this.localStream = updatedStream;
+    this.setState({ localStream: updatedStream });
   }
 
   // ── End Call ─────────────────────────────────────────────────────
