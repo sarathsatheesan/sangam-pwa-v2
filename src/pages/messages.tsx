@@ -617,7 +617,11 @@ export default function MessagesPage() {
     const unsubscribe = onSnapshot(
       query(collection(db, 'conversations', convId, 'messages'), orderBy('createdAt', 'asc')),
       async (snap) => {
-        const rawMsgs = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+        // serverTimestamps: 'estimate' makes a just-sent message's pending
+        // `createdAt` resolve to a local estimate instead of null — otherwise the
+        // sender's own message has no timestamp for ordering/date-grouping and
+        // doesn't render until the next snapshot (i.e. the next message).
+        const rawMsgs = snap.docs.map((d) => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }));
         const msgs: Message[] = [];
         for (const rawMsg of rawMsgs) {
           let text = (rawMsg as Record<string, unknown>).text as string || '';
