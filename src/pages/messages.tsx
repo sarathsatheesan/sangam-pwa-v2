@@ -144,6 +144,9 @@ export default function MessagesPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  // Monotonic guard so a slow/older async snapshot handler can't overwrite the
+  // message list produced by a newer snapshot (prevents messages vanishing).
+  const msgSnapshotSeqRef = useRef(0);
   const unsubscribersRef = useRef<Array<() => void>>([]);
 
   // UI State
@@ -614,9 +617,13 @@ export default function MessagesPage() {
     }
     if (!convId) return;
     setMessagesLoading(true);
+    // Reset per-subscription: the first snapshot of this thread is the initial load.
+    let didInitialScroll = false;
     const unsubscribe = onSnapshot(
       query(collection(db, 'conversations', convId, 'messages'), orderBy('createdAt', 'asc')),
       async (snap) => {
+        // Monotonic guard against out-of-order async handlers (Issue 1).
+        const mySeq = ++msgSnapshotSeqRef.current;
         // serverTimestamps: 'estimate' makes a just-sent message's pending
         // `createdAt` resolve to a local estimate instead of null — otherwise the
         // sender's own message has no timestamp for ordering/date-grouping and
@@ -782,10 +789,24 @@ export default function MessagesPage() {
 
           msgs.push({ ...(rawMsg as Record<string, unknown>), id: (rawMsg as Record<string, unknown>).id as string, text, image, voiceMessage } as Message);
         }
+        // If a newer snapshot started while we were decrypting, drop this stale
+        // result — applying it would overwrite the newer list and make recent
+        // messages disappear (Issue 1).
+        if (mySeq !== msgSnapshotSeqRef.current) return;
         setMessages(msgs);
         setPinnedMessages(msgs.filter(m => m.pinned));
         setMessagesLoading(false);
-        setTimeout(() => scrollToBottom(), 100);
+        // Reliable scroll-to-bottom (Issue 2). On a thread's first load, pin to
+        // the bottom and retry to catch late layout (images, wrapped bubbles) so
+        // it lands at the latest message. On later updates, a single pin is enough.
+        if (!didInitialScroll) {
+          didInitialScroll = true;
+          requestAnimationFrame(() => scrollToBottom());
+          setTimeout(() => scrollToBottom(), 200);
+          setTimeout(() => scrollToBottom(), 500);
+        } else {
+          scrollToBottom();
+        }
 
         // Mark unread messages from other user(s) as read
         if (convId && document.visibilityState === 'visible') {
@@ -1154,8 +1175,16 @@ export default function MessagesPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConvId, user?.uid]);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = useCallback((smooth = false) => {
+    const c = messagesContainerRef.current;
+    if (c) {
+      // Pin directly to the bottom — far more reliable than scrollIntoView in the
+      // Android WebView, especially right after a thread opens (Issue 2).
+      if (smooth) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
+      else c.scrollTop = c.scrollHeight;
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
+    }
   }, []);
 
   // ===== MESSAGE FUNCTIONS =====
