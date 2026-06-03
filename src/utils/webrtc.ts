@@ -738,6 +738,23 @@ export class CallManager {
       return;
     }
 
+    // Flip only makes sense with 2+ cameras (mobile front/back). On single-camera
+    // devices — most desktops (Chrome/Safari/Firefox) — skip so we don't pointlessly
+    // stop and restart the only camera (which would flicker/freeze the preview).
+    // enumerateDevices is cross-browser; labels/count are available mid-call.
+    try {
+      if (navigator.mediaDevices.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter((d) => d.kind === 'videoinput');
+        if (cameras.length < 2) {
+          console.log('[WebRTC] Single camera — flip skipped');
+          return;
+        }
+      }
+    } catch {
+      // enumerate failed — proceed; getUserMedia fallbacks below will handle it.
+    }
+
     // Use tracked facing mode (getSettings().facingMode is unreliable on many devices)
     const prevFacingMode = this.currentFacingMode;
     const newFacingMode: 'user' | 'environment' = prevFacingMode === 'user' ? 'environment' : 'user';

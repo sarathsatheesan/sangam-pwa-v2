@@ -93,6 +93,9 @@ const GlobalCallOverlay: React.FC = () => {
   const [pipDragging, setPipDragging] = useState(false);
   const pipDragRef = useRef({ active: false, moved: false, startX: 0, startY: 0, originX: 0, originY: 0 });
   const pipLastTapRef = useRef(0);
+  // Last touch timestamp — used to ignore the mouse events that touch devices
+  // (iOS Safari, Android Chrome) synthesize right after a tap.
+  const lastPipTouchRef = useRef(0);
   // Holds the currently-rendered PiP position so pointer handlers read a fresh
   // origin without re-subscribing on every drag frame.
   const pipPosRenderRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -432,6 +435,7 @@ const GlobalCallOverlay: React.FC = () => {
   // Touch (Android WebView + iOS). touch-action:none on the element prevents the
   // WebView from hijacking the gesture for scrolling.
   const handlePipTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    lastPipTouchRef.current = Date.now();
     if (registerTapAndMaybeExpand()) return;
     const t = e.touches[0];
     if (t) beginDrag(t.clientX, t.clientY);
@@ -446,6 +450,9 @@ const GlobalCallOverlay: React.FC = () => {
 
   // Mouse (desktop). Window-level listeners so the drag survives leaving the box.
   const handlePipMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    // Ignore the synthetic mouse event that touch devices fire after a tap,
+    // otherwise a single tap can be misread as a double-tap (iOS Safari/Android).
+    if (Date.now() - lastPipTouchRef.current < 700) return;
     if (registerTapAndMaybeExpand()) return;
     beginDrag(e.clientX, e.clientY);
     const onMove = (ev: MouseEvent) => updateDrag(ev.clientX, ev.clientY);
