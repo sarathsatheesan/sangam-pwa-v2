@@ -48,17 +48,17 @@ export function LinkPreviewCard({ url }: { url: string }) {
       )}
       <div className="px-2.5 py-1.5">
         {preview.siteName && (
-          <div className="text-[10.5px] uppercase font-semibold tracking-wide mb-0.5" style={{ color: '#6366F1' }}>
+          <div className="chat-meta uppercase font-semibold tracking-wide mb-0.5" style={{ color: '#6366F1' }}>
             {preview.siteName}
           </div>
         )}
         {preview.title && (
-          <div className="text-[13px] font-medium leading-tight line-clamp-2" style={{ color: 'var(--msg-text)' }}>
+          <div className="font-medium leading-tight line-clamp-2" style={{ fontSize: 'clamp(13px, 0.5vw + 10.5px, 14.5px)', color: 'var(--msg-text)' }}>
             {preview.title}
           </div>
         )}
         {preview.description && (
-          <div className="text-[11.5px] leading-snug mt-0.5 line-clamp-2" style={{ color: 'var(--msg-secondary)' }}>
+          <div className="leading-snug mt-0.5 line-clamp-2" style={{ fontSize: 'clamp(11.5px, 0.4vw + 9.5px, 13px)', color: 'var(--msg-secondary)' }}>
             {preview.description}
           </div>
         )}
