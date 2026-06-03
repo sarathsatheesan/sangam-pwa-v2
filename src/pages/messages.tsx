@@ -3339,9 +3339,17 @@ export default function MessagesPage() {
 
       {/* Messages area with WhatsApp wallpaper */}
       <div
-        className="flex-1 overflow-y-auto px-3 sm:px-[5%] py-2"
+        className="flex-1 overflow-y-auto py-2"
         ref={messagesContainerRef}
-        style={WALLPAPER_PRESETS[selectedWallpaper as keyof typeof WALLPAPER_PRESETS]?.style}
+        style={{
+          ...(WALLPAPER_PRESETS[selectedWallpaper as keyof typeof WALLPAPER_PRESETS]?.style || {}),
+          // Fluid side padding — scales continuously with the container width
+          // instead of jumping at a breakpoint. Floor of 16px so incoming bubbles
+          // never sit flush on small screens; ~5% mid-range (matches the previous
+          // tablet feel); capped at 56px so it doesn't get huge on wide displays.
+          paddingLeft: 'clamp(16px, 5%, 56px)',
+          paddingRight: 'clamp(16px, 5%, 56px)',
+        }}
       >
         {messagesLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -3375,7 +3383,11 @@ export default function MessagesPage() {
                   )}
                   <div className={`flex ${msg.senderId === 'system' ? 'justify-center' : isMine ? 'justify-end' : 'justify-start'} ${isFirstInGroup ? 'mt-2' : 'mt-0.5'}`}>
                     <div
-                      className={`relative max-w-[85%] sm:max-w-[65%] ${isSearchMatch ? 'ring-2 ring-amber-400 rounded-lg' : ''}`}
+                      className={`relative ${isSearchMatch ? 'ring-2 ring-amber-400 rounded-lg' : ''}`}
+                      // Fluid bubble width: up to 85% on small screens, capped at
+                      // 480px so bubbles stay readable (and ~tablet-like) as the
+                      // screen grows — no breakpoint jump.
+                      style={{ maxWidth: 'min(85%, 480px)' }}
                     >
                       {/* WhatsApp bubble tail */}
                       {isFirstInGroup && (
