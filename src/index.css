@@ -412,6 +412,13 @@
   .hide-scrollbar,
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+  /* ── Fluid chat typography ──
+     Font sizes scale continuously with the device instead of being fixed, so
+     bigger screens get slightly larger, more readable text (with min/max bounds
+     so it never gets too small or too large). */
+  .chat-text { font-size: clamp(14.2px, 0.6vw + 12px, 15.5px); line-height: 1.35; }
+  .chat-meta { font-size: clamp(10.5px, 0.4vw + 9px, 12px); }
+
   /* ── Safe-area aware fixed overlays ── */
   .safe-inset-overlay {
     padding-top: var(--safe-top, 0px);

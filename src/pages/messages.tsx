@@ -3480,7 +3480,7 @@ export default function MessagesPage() {
                                   <Download size={16} style={{ color: 'var(--msg-secondary)', flexShrink: 0 }} />
                                 </div>
                                 {msg.text && (
-                                  <div className="text-[14.2px] leading-[19px] break-words mt-1" style={{ color: 'var(--msg-text)' }}>
+                                  <div className="chat-text break-words mt-1" style={{ color: 'var(--msg-text)' }}>
                                     {renderFormattedText(msg.text)}
                                   </div>
                                 )}
@@ -3489,8 +3489,8 @@ export default function MessagesPage() {
 
                                     {msg.disappearing === true && <Timer size={11} className="text-emerald-500" />}
                                     {msg.starred && <Star size={11} className="text-amber-500" fill="#f59e0b" />}
-                                    {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
-                                    <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>{formatMessageTime(msg.createdAt)}</span>
+                                    {msg.editedAt && <span className="chat-meta italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
+                                    <span className="chat-meta" style={{ color: 'var(--msg-secondary)' }}>{formatMessageTime(msg.createdAt)}</span>
                                     {isMine && (
                                       msg.read
                                         ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
@@ -3513,8 +3513,8 @@ export default function MessagesPage() {
                                     {/* Overlay timestamp on image-only messages */}
                                     {isImageOnly && (
                                       <div className="absolute bottom-1.5 right-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}>
-                                        {msg.editedAt && <span className="text-[10.5px] italic text-white">edited</span>}
-                                        <span className="text-[10.5px] text-white">{formatMessageTime(msg.createdAt)}</span>
+                                        {msg.editedAt && <span className="chat-meta italic text-white">edited</span>}
+                                        <span className="chat-meta text-white">{formatMessageTime(msg.createdAt)}</span>
                                         {isMine && (
                                           msg.read
                                             ? <CheckCheck size={14} style={{ color: '#53BDEB' }} />
@@ -3526,7 +3526,7 @@ export default function MessagesPage() {
                                 )}
                                 {!isImageOnly && (
                                   <div className={`px-2.5 ${isImageWithText ? 'pt-1' : 'pt-1.5'} pb-1`}>
-                                    <div className={`text-[14.2px] leading-[19px] break-words ${compactMode ? 'text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? 'var(--msg-system-text)' : 'var(--msg-text)' }}>
+                                    <div className={`chat-text break-words ${compactMode ? '!text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? 'var(--msg-system-text)' : 'var(--msg-text)' }}>
                                       {msg.text && renderFormattedText(msg.text)}
                                       {/* Link preview for URLs in message */}
                                       {linkPreviewsEnabled && msg.text && !msg.deleted && (() => {
@@ -3539,8 +3539,8 @@ export default function MessagesPage() {
 
                                         {msg.disappearing === true && <Timer size={11} className="text-emerald-500" />}
                                         {msg.starred && <Star size={11} className="text-amber-500" fill="#f59e0b" />}
-                                        {msg.editedAt && <span className="text-[10.5px] italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
-                                        <span className="text-[10.5px]" style={{ color: 'var(--msg-secondary)' }}>
+                                        {msg.editedAt && <span className="chat-meta italic" style={{ color: 'var(--msg-secondary)' }}>edited</span>}
+                                        <span className="chat-meta" style={{ color: 'var(--msg-secondary)' }}>
                                           {formatMessageTime(msg.createdAt)}
                                         </span>
                                         {readReceiptsEnabled && isMine && (
