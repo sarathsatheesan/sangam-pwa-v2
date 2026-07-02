@@ -16,6 +16,8 @@ import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
 import { HERITAGE_OPTIONS } from '@/constants/config';
+import { useToast } from '@/contexts/ToastContext';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface TravelPost {
   id: string;
@@ -40,6 +42,8 @@ type FilterMode = 'all' | 'assistance' | 'offer';
 
 export default function TravelPage() {
   const { user, userProfile } = useAuth();
+  const { addToast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
   const [travelPosts, setTravelPosts] = useState<TravelPost[]>([]);
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
@@ -133,7 +137,7 @@ export default function TravelPage() {
       !formData.travelDate.trim() ||
       !formData.desc.trim()
     ) {
-      alert('Please fill in all required fields');
+      addToast('Please fill in all required fields', 'error');
       return;
     }
 
@@ -175,12 +179,12 @@ export default function TravelPage() {
       setShowCreateModal(false);
     } catch (error) {
       console.error('Error creating travel post:', error);
-      alert('Failed to create post');
+      addToast('Failed to create post', 'error');
     }
   };
 
   const handleDeletePost = async (postId: string) => {
-    if (!window.confirm('Are you sure you want to delete this post?')) {
+    if (!(await confirm('Are you sure you want to delete this post?', { title: 'Delete Post', confirmLabel: 'Delete', danger: true }))) {
       return;
     }
 
@@ -188,7 +192,7 @@ export default function TravelPage() {
       await deleteDoc(doc(db, 'travelPosts', postId));
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert('Failed to delete post');
+      addToast('Failed to delete post', 'error');
     }
   };
 
@@ -542,6 +546,7 @@ export default function TravelPage() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

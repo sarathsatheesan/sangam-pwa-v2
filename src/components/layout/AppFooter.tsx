@@ -1,6 +1,7 @@
 import React from 'react';
 import { Mail, Share2, Phone } from 'lucide-react';
 import { copyToClipboard } from '@/utils/clipboard';
+import { useToast } from '@/contexts/ToastContext';
 
 // Social media SVG icons
 const InstagramIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
@@ -30,6 +31,7 @@ const TikTokIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 );
 
 export const AppFooter: React.FC = () => {
+  const { addToast } = useToast();
   const handleFeedback = () => {
     window.location.href = 'mailto:feedback@enovoapp.com';
   };
@@ -48,7 +50,7 @@ export const AppFooter: React.FC = () => {
     } else {
       try {
         await copyToClipboard(window.location.href);
-        alert('Link copied to clipboard!');
+        addToast('Link copied to clipboard!', 'success');
       } catch (error) {
         console.error('Error copying to clipboard:', error);
       }

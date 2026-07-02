@@ -6,6 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { db, auth } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 
 type LoginStep = 0 | 1 | 2;
 type LoginMethod = 'phone' | 'email';
@@ -25,6 +26,7 @@ const COUNTRY_CODES = [
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { user: currentUser, loading: authLoading } = useAuth();
+  const { addToast } = useToast();
 
   // Step management
   const [step, setStep] = useState<LoginStep>(0);
@@ -291,7 +293,7 @@ export const LoginPage: React.FC = () => {
       const result = await signInWithEmail(email, password);
 
       if (result.needsVerification && emailVerificationEnabled) {
-        alert('Email Not Verified - Please check your inbox and verify your email for full access.');
+        addToast('Email Not Verified - Please check your inbox and verify your email for full access.', 'warning', 8000);
         navigate('/auth/verify');
         return;
       }
@@ -345,26 +347,26 @@ export const LoginPage: React.FC = () => {
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      alert('Email Required - Please enter your email address');
+      addToast('Email Required - Please enter your email address', 'error');
       return;
     }
 
     if (!validateEmail(email)) {
-      alert('Invalid Email - Please enter a valid email address');
+      addToast('Invalid Email - Please enter a valid email address', 'error');
       return;
     }
 
     setLoading(true);
     try {
       await resetPassword(email);
-      alert('Password Reset Email Sent - Check your email for instructions to reset your password.');
+      addToast('Password Reset Email Sent - Check your email for instructions to reset your password.', 'success', 8000);
     } catch (error: any) {
       const errorMessage =
         error?.code === 'auth/user-not-found'
           ? 'Email not found'
           : error?.message || 'Failed to send reset email';
 
-      alert(`Error - ${errorMessage}`);
+      addToast(`Error - ${errorMessage}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -744,7 +746,7 @@ export const LoginPage: React.FC = () => {
 
       {/* Google Sign In Button */}
       <button
-        onClick={() => alert('Google Sign-in is coming soon!')}
+        onClick={() => addToast('Google Sign-in is coming soon!', 'info')}
         disabled={loading}
         className="w-full bg-aurora-surface text-aurora-indigo py-3 rounded-xl font-semibold border-2 border-aurora-indigo hover:bg-aurora-indigo/10 disabled:opacity-70 transition"
       >

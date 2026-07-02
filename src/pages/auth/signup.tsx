@@ -15,6 +15,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../services/firebase';
+import { useToast } from '@/contexts/ToastContext';
 
 // ── Constants ──
 
@@ -94,6 +95,7 @@ async function checkEmailExists(email: string): Promise<boolean> {
 
 export const SignupPage: React.FC = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   // ── Load KYC feature flags directly from Firestore (works without auth) ──
   const [kycChecks, setKycChecks] = useState<KycEnabledChecks>({
     signupEnabled: false,
@@ -575,7 +577,7 @@ export const SignupPage: React.FC = () => {
       if (emailVerificationEnabled) {
         navigate('/auth/verify');
       } else if (formData.accountType === 'business' && (formData.isRegistered === false || kycChecks.adminReviewRequired)) {
-        alert('Account created! Your business profile is pending admin approval. Please allow 2-3 business days for verification before you can post listings.');
+        addToast('Account created! Your business profile is pending admin approval. Please allow 2-3 business days for verification before you can post listings.', 'success', 10000);
         navigate('/feed');
       } else {
         navigate('/feed');
@@ -587,7 +589,7 @@ export const SignupPage: React.FC = () => {
           : error?.code === 'auth/weak-password'
             ? 'Password is too weak'
             : error?.message || 'Account creation failed';
-      alert(`Sign Up Failed - ${errorMessage}`);
+      addToast(`Sign Up Failed - ${errorMessage}`, 'error');
     } finally {
       setLoading(false);
     }

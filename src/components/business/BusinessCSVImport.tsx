@@ -11,6 +11,7 @@ import {
 import { collection, addDoc, Timestamp, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { CATEGORIES, CATEGORY_EMOJI_MAP, CATEGORY_COLORS } from '@/components/business/businessConstants';
+import { useToast } from '@/contexts/ToastContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -226,6 +227,7 @@ function validateRow(row: CSVRow, rowNum: number): ParsedRow {
 const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
   isOpen, onClose, userId, userName, userRole, userHeritage, onImportComplete,
 }) => {
+  const { addToast } = useToast();
   const [step, setStep] = useState<'upload' | 'preview' | 'importing' | 'done'>('upload');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [unmappedHeaders, setUnmappedHeaders] = useState<string[]>([]);
@@ -267,7 +269,7 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
 
   const processFile = useCallback((file: File) => {
     if (!file.name.endsWith('.csv') && !file.name.endsWith('.tsv') && !file.name.endsWith('.txt')) {
-      alert('Please upload a CSV file (.csv, .tsv, or .txt)');
+      addToast('Please upload a CSV file (.csv, .tsv, or .txt)', 'error');
       return;
     }
     const reader = new FileReader();
@@ -292,7 +294,7 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
       const mappedFields = new Set(Object.values(headerMap));
       const missingRequired = REQUIRED_COLUMNS.filter((r) => !mappedFields.has(r as keyof CSVRow));
       if (missingRequired.length > 0) {
-        alert(`Missing required columns: ${missingRequired.join(', ')}\n\nYour CSV must have columns for: name, category, location`);
+        addToast(`Missing required columns: ${missingRequired.join(', ')}\n\nYour CSV must have columns for: name, category, location`, 'error', 8000);
         return;
       }
 
@@ -316,7 +318,7 @@ const BusinessCSVImport: React.FC<BusinessCSVImportProps> = ({
       setStep('preview');
     };
     reader.readAsText(file);
-  }, []);
+  }, [addToast]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -3688,3 +3688,28 @@ Build + deploy (hosting only): `./node_modules/.bin/tsc -b && ./node_modules/.bi
 **Next (Phase B remainder + C):** alert()/confirm() sweep in profile/settings/admin (~40 left); then Phase C — `services/feed.ts`/`services/forum.ts` with zod + limit(), shared `useModeration`, profile.tsx `as any` burn-down. Phase D unchanged (messages decomposition, media→Storage pending DB decision, E2EE+reprice tests). Carry-forward: APK, production TURN, Play submission, www domain, S42 device tests.
 
 *Updated July 2, 2026 (Session 45) — Phase B of the review remediation: shared <Modal> shell (components/ui/Modal.tsx, full a11y) + useBodyScrollLock hook; 18 bespoke dialogs across events/housing/forum/marketplace migrated with strict feature parity (full-screen takeovers + complex detail modals intentionally kept bespoke with scroll-lock added); 13 alert() calls → toasts (marketplace 11, housing 2); lazy-loading on 3 card images; two review findings (skeletons, CLS) confirmed already-solved and skipped. tsc clean. NOT committed — commit+build+deploy from Mac (with Session 44 changes), then run the 9-point parity checklist. Firebase mithr-1e5f4; builds Mac-only.*
+
+---
+
+### Session 46 (July 2, 2026) — Review Phase B Remainder: alert()/confirm() Purge (30 sites) + useConfirm Dialog + REPORT_CATEGORIES Dedup
+
+**What was done:**
+1. **NEW `src/components/ui/ConfirmDialog.tsx`** — `useConfirm()` hook: promise-based drop-in for `window.confirm()` built on the shared `<Modal>` (ESC resolves false, focus trap, danger variant). Usage: `const { confirm, confirmDialog } = useConfirm(); if (!(await confirm(msg, { title, confirmLabel, danger }))) return;` + render `{confirmDialog}`.
+2. **30 native alert()/confirm() sites replaced** (messages byte-identical): feed.tsx 9 → existing `setToastMessage`; profile.tsx 2 → existing `setToastMessage`; travel.tsx 3 alerts → `addToast` + its 1 window.confirm → `useConfirm` (Delete Post, danger); settings.tsx 5, auth/login.tsx 6, auth/signup.tsx 2, BusinessCSVImport.tsx 2 (its `processFile` useCallback deps gained `addToast` — stable, no behavior change), AppHeader 1, AppFooter 1 → global `useToast` (`addToast` w/ semantic types, longer durations for important notices: signup approval 10s, reset-link/verify 8s).
+3. **DELIBERATELY SKIPPED:** `pages/main/auth/login.tsx` (6) + `pages/main/signup.tsx` (2) — verified DEAD code (zero imports anywhere; only `pages/main/home` is routed). Candidates for deletion in a cleanup pass, flagged not removed (feature-parity rule).
+4. **REPORT_CATEGORIES dedup:** canonical export added to `constants/config.ts` (after REPORT_REASONS); byte-identical copies deleted from feed/events/marketplace/housing pages (now import it); `components/business/businessConstants.ts` re-exports from config so existing business imports keep working. `FORUM_REPORT_CATEGORIES` (forum.tsx) and `MESSAGE_REPORT_CATEGORIES` (constants/messages.ts) are DIFFERENT sets — intentionally left.
+
+**Verified:** tsc exit 0; zero live alert()/window.confirm() outside dead pages/main; exactly one canonical REPORT_CATEGORIES definition; all 5 consumer files still reference it.
+
+**NOT committed — commit from Mac (stacks on Sessions 44+45 if those aren't committed yet):**
+```bash
+git add src/ hand_off_note_04_16.md
+git commit -m "ux: purge native alert/confirm (30 sites), useConfirm dialog, REPORT_CATEGORIES dedup (Session 46 / review Phase B remainder)"
+```
+Build+deploy: `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build && firebase deploy --only hosting`.
+
+**Test checklist:** (1) feed: empty post → toast (not browser alert); share post → 'Link copied' toast; (2) travel: delete post → styled confirm dialog, Cancel aborts, Delete deletes; (3) login: bad email on reset → toast; reset sent → 8s success toast; (4) signup (business): success → 10s toast then normal nav; (5) settings: password reset + export flows → toasts; (6) CSV import: wrong file type → toast; (7) header/footer share → toast; (8) report modals on feed/events/marketplace/housing still show all 7 categories (now from config).
+
+**Next:** Phase C — `services/feed.ts`/`services/forum.ts` (zod + limit()), shared `useModeration`, profile.tsx `as any` burn-down (27); optional cleanup: delete dead `pages/main/auth/` + `pages/main/signup.tsx`. Phase D unchanged. Carry-forwards unchanged.
+
+*Updated July 2, 2026 (Session 46) — Phase B complete: all 30 live native alert()/window.confirm() calls replaced with toasts + a new promise-based useConfirm dialog (built on the Session 45 shared Modal); REPORT_CATEGORIES deduplicated to constants/config.ts (5 copies → 1 canonical + business re-export); dead pages/main auth duplicates identified and skipped (not deleted). tsc clean. NOT committed — commit+build+deploy from Mac along with Sessions 44-45, then run the 8-point checklist. Firebase mithr-1e5f4; builds Mac-only.*

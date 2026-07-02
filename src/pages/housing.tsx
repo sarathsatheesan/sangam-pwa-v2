@@ -22,6 +22,7 @@ import {
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
+import { REPORT_CATEGORIES } from '@/constants/config';
 import {
   Search, X, Heart, MapPin, BedDouble, Bath, Ruler, Home,
   Building2, Users, Key, Plus, ChevronLeft, ChevronRight,
@@ -89,15 +90,7 @@ interface Listing {
   hiddenReason?: string;
 }
 
-const REPORT_CATEGORIES = [
-  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
-  { id: 'hate_speech', label: 'Hate Speech or Bullying', icon: '🛑', description: 'Content targeting race, ethnicity, religion, gender, or personal attacks' },
-  { id: 'inappropriate', label: 'Inappropriate Content', icon: '⚠️', description: 'Sexual, violent, or graphic content not suitable for the community' },
-  { id: 'ip_violation', label: 'Intellectual Property Violation', icon: '©️', description: 'Unauthorized use of copyrighted material or trademarks' },
-  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
-  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
-  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
-];
+// REPORT_CATEGORIES now imported from '@/constants/config' (Session 46 dedup)
 
 interface Comment {
   id: string;

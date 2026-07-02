@@ -1150,6 +1150,21 @@ export const REPORT_REASONS = [
   { id: 'other', label: 'Other', description: 'Something else that violates community guidelines' },
 ];
 
+// Canonical report categories for content-report modals (Session 46).
+// Was duplicated byte-identically in feed/events/marketplace/housing pages
+// and components/business/businessConstants.ts (which now re-exports this).
+// forum.tsx (FORUM_REPORT_CATEGORIES) and constants/messages.ts
+// (MESSAGE_REPORT_CATEGORIES) are intentionally different sets — leave them.
+export const REPORT_CATEGORIES = [
+  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
+  { id: 'hate_speech', label: 'Hate Speech or Bullying', icon: '🛑', description: 'Content targeting race, ethnicity, religion, gender, or personal attacks' },
+  { id: 'inappropriate', label: 'Inappropriate Content', icon: '⚠️', description: 'Sexual, violent, or graphic content not suitable for the community' },
+  { id: 'ip_violation', label: 'Intellectual Property Violation', icon: '©️', description: 'Unauthorized use of copyrighted material or trademarks' },
+  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
+  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
+  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
+];
+
 export const US_STATES_CITIES: Record<string, string[]> = {
   Utah: [
     'Salt Lake City',

@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { LocationPicker } from '../shared/LocationPicker';
 import NotificationBell from '../shared/NotificationBell';
 import { copyToClipboard } from '@/utils/clipboard';
+import { useToast } from '@/contexts/ToastContext';
 
 // Announcement type
 interface Announcement {
@@ -48,6 +49,7 @@ const TikTokIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const AppHeader: React.FC = () => {
   const { user, userProfile, isAdmin } = useAuth();
+  const { addToast } = useToast();
   const { selectedLocation } = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -131,7 +133,7 @@ export const AppHeader: React.FC = () => {
     } else {
       try {
         await copyToClipboard(window.location.href);
-        alert('Link copied to clipboard!');
+        addToast('Link copied to clipboard!', 'success');
       } catch (error) {
         console.error('Error copying to clipboard:', error);
       }

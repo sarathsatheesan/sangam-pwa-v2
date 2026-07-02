@@ -28,6 +28,7 @@ import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import { useCulturalTheme } from '@/contexts/CulturalThemeContext';
 import { CulturalPatternOverlay } from '@/components/CulturalPatterns';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
+import { REPORT_CATEGORIES } from '@/constants/config';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
 import {
   MessageCircle,
@@ -238,15 +239,7 @@ const compressImage = (file: File, maxWidth = 800, quality = 0.7): Promise<strin
 };
 
 
-const REPORT_CATEGORIES = [
-  { id: 'spam', label: 'Spam or Misleading', icon: '🚫', description: 'Unwanted promotional, repetitive, or misleading content' },
-  { id: 'hate_speech', label: 'Hate Speech or Bullying', icon: '🛑', description: 'Content targeting race, ethnicity, religion, gender, or personal attacks' },
-  { id: 'inappropriate', label: 'Inappropriate Content', icon: '⚠️', description: 'Sexual, violent, or graphic content not suitable for the community' },
-  { id: 'ip_violation', label: 'Intellectual Property Violation', icon: '©️', description: 'Unauthorized use of copyrighted material or trademarks' },
-  { id: 'misinformation', label: 'Misinformation', icon: '❌', description: 'False or misleading information that could cause harm' },
-  { id: 'scam', label: 'Scam or Fraud', icon: '🎣', description: 'Phishing, financial fraud, or deceptive schemes' },
-  { id: 'other', label: 'Other', icon: '📋', description: 'Something else that violates community guidelines' },
-];
+// REPORT_CATEGORIES now imported from '@/constants/config' (Session 46 dedup)
 
 export default function FeedPage() {
   const { user, userProfile, userRole } = useAuth();
@@ -612,7 +605,7 @@ export default function FeedPage() {
 
   const handleCreatePost = async () => {
     if ((!postContent.trim() && postImages.length === 0) || !user) {
-      alert('Please enter some content or add an image for your post');
+      setToastMessage('Please enter some content or add an image for your post');
       return;
     }
     try {
@@ -641,7 +634,7 @@ export default function FeedPage() {
       setShowCreateModal(false);
     } catch (error) {
       console.error('Error creating post:', error);
-      alert('Failed to create post. Please try again.');
+      setToastMessage('Failed to create post. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -725,7 +718,7 @@ export default function FeedPage() {
       if (selectedPost?.id === deletePostId) setSelectedPost(null);
     } catch (error) {
       console.error('Error deleting post:', error);
-      alert('Failed to delete post.');
+      setToastMessage('Failed to delete post.');
     } finally {
       setShowDeleteConfirm(false);
       setDeletePostId(null);
@@ -760,7 +753,7 @@ export default function FeedPage() {
       setShowCreateModal(false);
     } catch (error) {
       console.error('Error updating post:', error);
-      alert('Failed to update post. Please try again.');
+      setToastMessage('Failed to update post. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -781,7 +774,7 @@ export default function FeedPage() {
     } else {
       try {
         await copyToClipboard(window.location.href);
-        alert('Link copied to clipboard!');
+        setToastMessage('Link copied to clipboard!');
       } catch (err) {
         console.error('Copy failed:', err);
       }
@@ -845,7 +838,7 @@ export default function FeedPage() {
       setComments(commentsData);
     } catch (error) {
       console.error('Error adding comment:', error);
-      alert('Failed to add comment.');
+      setToastMessage('Failed to add comment.');
     } finally {
       setSubmittingComment(false);
     }
@@ -1062,10 +1055,10 @@ export default function FeedPage() {
       setShowReportModal(false);
       setReportReason('');
       setReportDetails('');
-      alert('Report submitted. The post has been hidden from your feed. Thank you for helping keep the community safe.');
+      setToastMessage('Report submitted. The post has been hidden from your feed. Thank you for helping keep the community safe.');
     } catch (error) {
       console.error('Error submitting report:', error);
-      alert('Failed to submit report.');
+      setToastMessage('Failed to submit report.');
     } finally {
       setReportSubmitting(false);
     }
@@ -1086,7 +1079,7 @@ export default function FeedPage() {
       setTimeout(() => setToastMessage(null), 4000);
     } catch (error) {
       console.error('Error blocking user:', error);
-      alert('Failed to block user. Please try again.');
+      setToastMessage('Failed to block user. Please try again.');
     }
   };
 

@@ -1799,7 +1799,7 @@ export default function ProfilePage() {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   if (file.size > 10 * 1024 * 1024) {
-                    alert('Image too large. Please select an image under 10MB.');
+                    setToastMessage('Image too large. Please select an image under 10MB.');
                     return;
                   }
                   setUploadingImage(true);
@@ -1808,7 +1808,7 @@ export default function ProfilePage() {
                     setEditForm((prev) => ({ ...prev, avatar: dataUrl }));
                   } catch (err) {
                     console.error('[Profile] Failed to process image:', err);
-                    alert('Failed to process image. Please try a different photo.');
+                    setToastMessage('Failed to process image. Please try a different photo.');
                   } finally {
                     setUploadingImage(false);
                     if (fileInputRef.current) fileInputRef.current.value = '';

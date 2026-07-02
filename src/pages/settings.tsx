@@ -38,6 +38,7 @@ import { doc, getDoc, updateDoc, arrayRemove, collection, query, where, getDocs 
 import { signOut, deleteUser } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import { resetPassword } from '../services/auth';
+import { useToast } from '@/contexts/ToastContext';
 
 // Types imported from context
 
@@ -115,6 +116,7 @@ const SectionHeader: React.FC<{ title: string; onBack: () => void }> = ({ title,
 // ─── Main Component ─────────────────────────────────────────────────────
 const SettingsPage: React.FC = () => {
   const { user, userProfile } = useAuth();
+  const { addToast } = useToast();
   const { settings, updateSetting } = useUserSettings();
   const { businesses: ownedBusinesses, selectedBusiness, selectBusiness } = useBusinessSwitcher();
   const navigate = useNavigate();
@@ -204,7 +206,7 @@ const SettingsPage: React.FC = () => {
       navigate('/auth/login');
     } catch (err) {
       console.error('Failed to delete account:', err);
-      alert('Please sign out and sign back in before deleting your account (re-authentication required).');
+      addToast('Please sign out and sign back in before deleting your account (re-authentication required).', 'warning', 8000);
     }
   };
 
@@ -810,7 +812,7 @@ const SettingsPage: React.FC = () => {
               document.body.removeChild(a);
               URL.revokeObjectURL(url);
             } catch (err: any) {
-              alert(`Failed to export data: ${err.message || 'Please try again.'}`);
+              addToast(`Failed to export data: ${err.message || 'Please try again.'}`, 'error');
             }
           }}
         />
@@ -821,14 +823,14 @@ const SettingsPage: React.FC = () => {
           onClick={async () => {
             const email = user?.email;
             if (!email) {
-              alert('No email associated with this account.');
+              addToast('No email associated with this account.', 'error');
               return;
             }
             try {
               await resetPassword(email);
-              alert(`Password reset link sent to ${email}. Please check your inbox.`);
+              addToast(`Password reset link sent to ${email}. Please check your inbox.`, 'success', 8000);
             } catch (err: any) {
-              alert(`Failed to send reset email: ${err.message || 'Please try again.'}`);
+              addToast(`Failed to send reset email: ${err.message || 'Please try again.'}`, 'error');
             }
           }}
         />
