@@ -9,3 +9,5 @@ serviceAccountKey.json
 android-keys/
 android/keystore.properties
 android/app/google-services.json
+.firebase/
+android/.idea/
