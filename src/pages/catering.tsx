@@ -55,6 +55,7 @@ import CateringItemList from '@/components/catering/CateringItemList';
 import CateringCart from '@/components/catering/CateringCart';
 import { BusinessSwitcher } from '@/components/layout/BusinessSwitcher';
 import { CateringErrorBoundary } from '@/components/catering/CateringErrorBoundary';
+import { reportError } from '@/utils/reportError';
 
 // ── Components (lazy: heavy, only loaded when navigated to) ──
 const CateringCheckout = React.lazy(() => import('@/components/catering/CateringCheckout'));
@@ -676,8 +677,13 @@ export default function CateringPage() {
           specialInstructions: rfpForm.specialInstructions || '',
         });
         addToast('Quote request updated successfully!', 'success', 5000);
-        // Fire-and-forget notification
-        notifyQuoteRequestEdited(user.uid, editingQuoteRequestId, false, []).catch(() => {});
+        // Non-blocking, but failures must be visible (vendors miss the edit otherwise)
+        notifyQuoteRequestEdited(user.uid, editingQuoteRequestId, false, []).catch((err) =>
+          reportError(err, {
+            op: 'notify-quote-request-edited',
+            toast: addToast,
+            toastMessage: 'Request updated, but vendor notifications may be delayed.',
+          }));
         setEditingQuoteRequestId(null);
       } else {
         // ── Create new quote request ──
@@ -704,7 +710,7 @@ export default function CateringPage() {
         // Fire-and-forget: notify customer (email/SMS/push)
         notifyQuoteRequestSubmitted(
           user.uid, newRequestId, state.selectedCategory || '', rfpForm.eventDate, rfpForm.headcount,
-        ).catch(() => {});
+        ).catch((err) => reportError(err, { op: 'notify-quote-request-submitted' }));
 
         // Fire-and-forget: notify vendors (in-app + email/SMS/push)
         // For targeted RFPs, notify only those businesses.
@@ -740,13 +746,20 @@ export default function CateringPage() {
                 notifyVendorsNewQuoteRequest(
                   ownerIds, newRequestId, state.selectedCategory || '', rfpForm.deliveryCity,
                   rfpForm.headcount, rfpForm.eventDate,
-                ).catch(() => {});
+                ).catch((err) => reportError(err, {
+                  op: 'notify-vendors-new-quote-request',
+                  toast: addToast,
+                  toastMessage: 'Request sent, but vendor notifications may be delayed.',
+                }));
                 // Multi-channel (email/SMS/push)
                 notifyVendorsNewRFQ(
                   ownerIds, newRequestId, state.selectedCategory || '', rfpForm.deliveryCity, rfpForm.headcount,
-                ).catch(() => {});
+                ).catch((err) => reportError(err, { op: 'notify-vendors-new-rfq' }));
               }
-            } catch { /* non-blocking */ }
+            } catch (err) {
+              // Non-blocking (request itself succeeded), but vendors weren't resolved
+              reportError(err, { op: 'resolve-vendor-owners-for-rfq' });
+            }
           })();
         }
       }

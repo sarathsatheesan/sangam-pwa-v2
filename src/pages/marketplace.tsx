@@ -22,6 +22,7 @@ import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import EthnicityFilterDropdown from '@/components/EthnicityFilterDropdown';
 import CountryEthnicitySelector from '@/components/CountryEthnicitySelector';
+import { Modal } from '@/components/ui/Modal';
 import {
   Search,
   X,
@@ -865,23 +866,28 @@ export default function MarketplacePage() {
   // Handle create listing
   const handleCreateListing = async () => {
     if (!user) {
-      alert('Please sign in to create a listing');
+      setToastMessage('Please sign in to create a listing');
+      setTimeout(() => setToastMessage(null), 4000);
       return;
     }
     if (!formData.title.trim()) {
-      alert('Please enter a title');
+      setToastMessage('Please enter a title');
+      setTimeout(() => setToastMessage(null), 4000);
       return;
     }
     if (formData.price.trim() === '' || (parseFloat(formData.price) < 0)) {
-      alert('Please enter a valid price (0 for free items)');
+      setToastMessage('Please enter a valid price (0 for free items)');
+      setTimeout(() => setToastMessage(null), 4000);
       return;
     }
     if (!formData.description.trim()) {
-      alert('Please enter a description');
+      setToastMessage('Please enter a description');
+      setTimeout(() => setToastMessage(null), 4000);
       return;
     }
     if (!formData.locCity.trim() || !formData.locState.trim()) {
-      alert('Please enter your location (city and state)');
+      setToastMessage('Please enter your location (city and state)');
+      setTimeout(() => setToastMessage(null), 4000);
       return;
     }
 
@@ -927,12 +933,13 @@ export default function MarketplacePage() {
     } catch (error: any) {
       console.error('Error creating listing:', error);
       if (error?.code === 'permission-denied') {
-        alert('Permission denied. Please make sure Firestore rules are deployed for marketplaceListings.');
+        setToastMessage('Permission denied. Please make sure Firestore rules are deployed for marketplaceListings.');
       } else if (error?.message?.includes('exceeds the maximum')) {
-        alert('Photos are too large. Please use fewer or smaller images.');
+        setToastMessage('Photos are too large. Please use fewer or smaller images.');
       } else {
-        alert('Failed to create listing: ' + (error?.message || 'Unknown error'));
+        setToastMessage('Failed to create listing: ' + (error?.message || 'Unknown error'));
       }
+      setTimeout(() => setToastMessage(null), 4000);
     }
   };
 
@@ -1085,7 +1092,8 @@ export default function MarketplacePage() {
       resetForm();
     } catch (error) {
       console.error('Error updating listing:', error);
-      alert('Failed to update listing');
+      setToastMessage('Failed to update listing');
+      setTimeout(() => setToastMessage(null), 4000);
     }
   };
 
@@ -1269,7 +1277,8 @@ export default function MarketplacePage() {
       setTimeout(() => setToastMessage(null), 4000);
     } catch (error) {
       console.error('Error submitting report:', error);
-      alert('Failed to submit report.');
+      setToastMessage('Failed to submit report.');
+      setTimeout(() => setToastMessage(null), 4000);
     } finally {
       setReportSubmitting(false);
     }
@@ -1288,7 +1297,8 @@ export default function MarketplacePage() {
       setTimeout(() => setToastMessage(null), 4000);
     } catch (error) {
       console.error('Error blocking user:', error);
-      alert('Failed to block user. Please try again.');
+      setToastMessage('Failed to block user. Please try again.');
+      setTimeout(() => setToastMessage(null), 4000);
     }
   };
 
@@ -1506,7 +1516,7 @@ export default function MarketplacePage() {
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleViewDetails(item); } }}
                   >
                     {item.photos?.[0] ? (
-                      <img src={item.photos[0]} alt={item.title} className="w-full h-full object-cover" />
+                      <img src={item.photos[0]} alt={item.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     ) : (
                       <div className={`w-full h-full bg-gradient-to-br ${CATEGORY_COLORS[item.category] || 'from-gray-600 to-gray-800'} flex items-center justify-center text-white`}>
                         {CATEGORY_ICONS[item.category] || <Package className="w-6 h-6" />}
@@ -1621,20 +1631,14 @@ export default function MarketplacePage() {
         </button>
       )}
 
-      {/* Create Listing Modal */}
-      {showCreateModal && isFeatureEnabled('marketplace_addListing') && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="marketplace-modal-title">
-          <div className="bg-[var(--aurora-surface)] sm:rounded-lg max-w-2xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center p-4 sm:p-6 border-b border-[var(--aurora-border)] flex-shrink-0">
-              <h2 id="marketplace-modal-title" className="text-lg sm:text-2xl font-bold text-[var(--aurora-text)]">
-                {editingItem ? 'Edit Listing' : 'Add My Listing'}
-              </h2>
-              <button onClick={() => { setShowCreateModal(false); setEditingItem(null); }} className="text-[var(--aurora-text-muted)] hover:text-[var(--aurora-text)]">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto flex-1 overscroll-contain">
+      {/* Create Listing Modal (shared Modal shell, Session 45) */}
+      <Modal
+        open={showCreateModal && isFeatureEnabled('marketplace_addListing')}
+        onClose={() => { setShowCreateModal(false); setEditingItem(null); }}
+        title={editingItem ? 'Edit Listing' : 'Add My Listing'}
+        size="lg"
+      >
+            <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
               {/* Section 1: Basic Info */}
               <div>
                 <h3 className="font-semibold text-[var(--aurora-text)] mb-4">Basic Information</h3>
@@ -1868,7 +1872,7 @@ export default function MarketplacePage() {
               </div>
             </div>
 
-            <div className="border-t border-[var(--aurora-border)] p-4 sm:p-6 flex gap-3 justify-end flex-shrink-0">
+            <div className="sticky bottom-0 bg-[var(--aurora-surface)] border-t border-[var(--aurora-border)] p-4 sm:p-6 flex gap-3 justify-end flex-shrink-0">
               <button
                 onClick={() => { setShowCreateModal(false); setEditingItem(null); }}
                 className="px-6 py-2 rounded-lg border border-[var(--aurora-border)] text-[var(--aurora-text)] hover:bg-[var(--aurora-bg)]"
@@ -1892,22 +1896,19 @@ export default function MarketplacePage() {
                 )}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* Detail Modal */}
-      {showDetailModal && selectedItem && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="marketplace-detail-modal-title">
-          <div className="bg-[var(--aurora-surface)] sm:rounded-lg max-w-3xl w-full h-full sm:h-auto sm:max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center p-4 sm:p-6 border-b border-[var(--aurora-border)] flex-shrink-0">
-              <h2 id="marketplace-detail-modal-title" className="text-lg sm:text-2xl font-bold text-[var(--aurora-text)] truncate pr-2">{selectedItem.title}</h2>
-              <button onClick={() => setShowDetailModal(false)} className="text-[var(--aurora-text-muted)] hover:text-[var(--aurora-text)] flex-shrink-0">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-y-auto flex-1 overscroll-contain">
+      {/* Detail Modal (shared Modal shell, Session 45) */}
+      <Modal
+        open={showDetailModal && !!selectedItem}
+        onClose={() => setShowDetailModal(false)}
+        title={selectedItem?.title ?? 'Listing details'}
+        size="lg"
+        panelClassName="sm:max-w-3xl"
+      >
+        {selectedItem && (
+          <>
+            <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
               {/* Photo Carousel */}
               <PhotoCarousel photos={selectedItem.photos} title={selectedItem.title} onClose={() => setShowDetailModal(false)} />
 
@@ -2194,7 +2195,7 @@ export default function MarketplacePage() {
               </div>
             </div>
 
-            <div className="border-t border-[var(--aurora-border)] p-4 sm:p-6 flex gap-3 justify-between flex-shrink-0">
+            <div className="sticky bottom-0 bg-[var(--aurora-surface)] border-t border-[var(--aurora-border)] p-4 sm:p-6 flex gap-3 justify-between flex-shrink-0">
               <button
                 onClick={() => handleSaveToggle(selectedItem.id)}
                 className={`px-4 sm:px-6 py-2 rounded-lg flex items-center gap-2 transition-colors ${
@@ -2213,18 +2214,24 @@ export default function MarketplacePage() {
                 Close
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="delete-listing-modal-title">
-          <div className="bg-[var(--aurora-surface)] rounded-2xl shadow-xl border border-[var(--aurora-border)] max-w-sm w-full p-6 text-center">
+      {/* Delete Confirmation Modal (shared Modal shell, Session 45) */}
+      <Modal
+        open={showDeleteConfirm}
+        onClose={() => { setShowDeleteConfirm(false); setDeleteItemId(null); }}
+        title="Delete Listing?"
+        size="sm"
+        layer="high"
+        hideHeader
+      >
+        <div className="p-6 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
               <Trash2 className="w-6 h-6 text-red-500" />
             </div>
-            <h3 id="delete-listing-modal-title" className="text-lg font-bold text-[var(--aurora-text)] mb-2">Delete Listing?</h3>
+            <h3 className="text-lg font-bold text-[var(--aurora-text)] mb-2">Delete Listing?</h3>
             <p className="text-sm text-[var(--aurora-text-muted)] mb-6">This action cannot be undone. The listing will be permanently removed.</p>
             <div className="flex gap-3">
               <button
@@ -2240,9 +2247,8 @@ export default function MarketplacePage() {
                 Delete
               </button>
             </div>
-          </div>
         </div>
-      )}
+      </Modal>
 
       {/* ═══════════════════════════════════════════════════════════════════
           SHARED THREE-DOT CONTEXT MENU (fixed-position, escapes all overflow)
@@ -2294,16 +2300,22 @@ export default function MarketplacePage() {
       })()}
 
       {/* ═══════════════════════════════════════════════════════════════════
-          REPORT LISTING MODAL
+          REPORT LISTING MODAL (shared Modal shell, Session 45)
           ═══════════════════════════════════════════════════════════════════ */}
-      {showReportModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-[var(--aurora-surface)] rounded-2xl shadow-xl w-full max-w-md border border-[var(--aurora-border)] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+      <Modal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        title="Report Listing"
+        size="sm"
+        layer="high"
+        hideHeader
+        panelClassName="sm:max-w-md overflow-hidden"
+      >
             {/* Header */}
             <div className="px-5 py-4 border-b border-[var(--aurora-border)] bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 id="report-modal-title" className="text-lg font-bold text-[var(--aurora-text)] flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-[var(--aurora-text)] flex items-center gap-2">
                     <Flag size={18} className="text-red-500" />
                     Report Listing
                   </h3>
@@ -2362,7 +2374,7 @@ export default function MarketplacePage() {
             )}
 
             {/* Actions */}
-            <div className="px-5 py-4 border-t border-[var(--aurora-border)] flex gap-3">
+            <div className="sticky bottom-0 bg-[var(--aurora-surface)] px-5 py-4 border-t border-[var(--aurora-border)] flex gap-3">
               <button
                 onClick={() => { setShowReportModal(false); setReportReason(''); setReportDetails(''); }}
                 className="flex-1 py-2.5 rounded-xl border border-[var(--aurora-border)] text-[var(--aurora-text-secondary)] font-medium hover:bg-[var(--aurora-surface-variant)] transition-colors"
@@ -2381,16 +2393,21 @@ export default function MarketplacePage() {
                 )}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* ═══════════════════════════════════════════════════════════════════
-          BLOCK USER CONFIRMATION MODAL
+          BLOCK USER CONFIRMATION MODAL (shared Modal shell, Session 45)
           ═══════════════════════════════════════════════════════════════════ */}
-      {showBlockConfirm && blockTargetUser && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-[var(--aurora-surface)] rounded-2xl shadow-xl border border-[var(--aurora-border)] max-w-sm w-full p-6 text-center">
+      <Modal
+        open={showBlockConfirm && !!blockTargetUser}
+        onClose={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}
+        title={`Block ${blockTargetUser?.name ?? 'user'}?`}
+        size="sm"
+        layer="high"
+        hideHeader
+      >
+        {blockTargetUser && (
+          <div className="p-6 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
               <Ban size={24} className="text-red-500" />
             </div>
@@ -2413,8 +2430,8 @@ export default function MarketplacePage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Toast Notification */}
       {toastMessage && (

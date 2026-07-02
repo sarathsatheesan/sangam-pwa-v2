@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings, FEATURE_GROUPS } from '@/contexts/FeatureSettingsContext';
 import { db } from '@/services/firebase';
+import { getDashboardStats } from '@/services/adminStats';
 import {
   collection,
   getDocs,
@@ -394,66 +395,13 @@ export default function AdminPage() {
   async function loadDashboardData() {
     try {
       setLoading(true);
-      const [usersSnap, bizSnap, housingSnap, travelSnap, threadsSnap, repliesSnap, eventsSnap, postsSnap, modSnap, annSnap, bannedSnap, disabledSnap, cateringOrdersSnap, cateringBizSnap, cateringRfpSnap] =
-        await Promise.all([
-          getDocs(collection(db, 'users')),
-          getDocs(collection(db, 'businesses')),
-          getDocs(collection(db, 'listings')),
-          getDocs(collection(db, 'travelPosts')),
-          getDocs(collection(db, 'forumThreads')),
-          getDocs(collection(db, 'forumReplies')),
-          getDocs(collection(db, 'events')),
-          getDocs(collection(db, 'posts')),
-          getDocs(collection(db, 'moderationQueue')),
-          getDocs(collection(db, 'announcements')),
-          getDocs(collection(db, 'bannedUsers')),
-          getDocs(collection(db, 'disabledUsers')),
-          getDocs(collection(db, 'cateringOrders')),
-          getDocs(query(collection(db, 'businesses'), where('isCateringEnabled', '==', true))),
-          getDocs(collection(db, 'cateringQuoteRequests')),
-        ]);
-
-      const bannedIds = bannedSnap.docs.map((d) => d.id);
-      const disabledIds = disabledSnap.docs.map((d) => d.id);
-
-      // Build weekly signup approximation (last 7 data points)
-      const now = Date.now();
-      const weekMs = 7 * 24 * 60 * 60 * 1000;
-      const signupBuckets = [0, 0, 0, 0, 0, 0, 0];
-      usersSnap.docs.forEach((d) => {
-        const data = d.data();
-        const ts = data.createdAt?.toMillis?.() || data.createdAt?.seconds * 1000 || 0;
-        if (ts > 0) {
-          const daysAgo = Math.floor((now - ts) / (24 * 60 * 60 * 1000));
-          if (daysAgo >= 0 && daysAgo < 7) {
-            signupBuckets[6 - daysAgo]++;
-          }
-        }
-      });
-
-      setDashStats({
-        totalUsers: usersSnap.size,
-        activeUsers: usersSnap.size - bannedIds.length - disabledIds.length,
-        bannedUsers: bannedIds.length,
-        disabledUsers: disabledIds.length,
-        totalListings: bizSnap.size + housingSnap.size + travelSnap.size,
-        businessCount: bizSnap.size,
-        housingCount: housingSnap.size,
-        travelCount: travelSnap.size,
-        forumThreads: threadsSnap.size,
-        forumReplies: repliesSnap.size,
-        totalEvents: eventsSnap.size,
-        totalPosts: postsSnap.size,
-        modQueueCount: modSnap.size,
-        announcementCount: annSnap.size,
-        cateringOrderCount: cateringOrdersSnap.size,
-        cateringPendingCount: cateringOrdersSnap.docs.filter((d) => d.data().status === 'pending').length,
-        cateringBusinessCount: cateringBizSnap.size,
-        cateringRfpCount: cateringRfpSnap.size,
-        recentSignups: signupBuckets,
-      });
+      // Server-side aggregation (getCountFromServer) — replaces downloading
+      // 15 entire collections just to read .size. See services/adminStats.ts.
+      const stats = await getDashboardStats();
+      setDashStats(stats);
     } catch (error) {
       console.error('Error loading dashboard:', error);
+      setToastMessage('Failed to load dashboard stats');
     } finally {
       setLoading(false);
     }

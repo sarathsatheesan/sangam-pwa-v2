@@ -32,10 +32,13 @@ function lazyRetry<T extends { default: any }>(
 }
 
 // ── ErrorBoundary ────────────────────────────────────────────────────────────
-// Wraps all routes so a crash in any page shows a recovery UI instead of a
-// white page. Users can click "Reload" to recover.
+// Root usage (no `scope`): wraps all routes, full-screen recovery UI.
+// Route usage (`scope` set): wraps a single page so a crash in one module
+// (e.g. Messages) shows an inline recovery card while the app shell — header,
+// navigation, every other module — stays alive. (Session 44)
+interface ErrorBoundaryProps { children: ReactNode; scope?: string }
 interface ErrorBoundaryState { hasError: boolean; error: Error | null }
-class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error) {
@@ -43,8 +46,12 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryS
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[AppErrorBoundary]', error, info.componentStack);
+    console.error(`[AppErrorBoundary${this.props.scope ? `:${this.props.scope}` : ''}]`, error, info.componentStack);
   }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
 
   handleReload = () => {
     this.setState({ hasError: false, error: null });
@@ -53,6 +60,35 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryS
 
   render() {
     if (this.state.hasError) {
+      // Compact in-shell fallback for per-route boundaries
+      if (this.props.scope) {
+        return (
+          <div style={{
+            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            alignItems: 'center', minHeight: '60vh', padding: '20px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: '36px', marginBottom: '12px' }}>😵</p>
+            <h2 style={{ color: 'var(--aurora-text, #333)', marginBottom: '8px' }}>This section hit an error</h2>
+            <p style={{ color: 'var(--aurora-text-secondary, #666)', fontSize: '14px', marginBottom: '20px', maxWidth: '400px' }}>
+              The rest of the app is still running. You can retry this section or reload.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={this.handleRetry} style={{
+                padding: '10px 24px', backgroundColor: '#6366F1', color: '#fff',
+                border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer',
+              }}>
+                Try Again
+              </button>
+              <button onClick={this.handleReload} style={{
+                padding: '10px 24px', backgroundColor: 'transparent', color: 'var(--aurora-text-secondary, #666)',
+                border: '1px solid var(--aurora-border, #ddd)', borderRadius: '8px', fontSize: '14px', cursor: 'pointer',
+              }}>
+                Reload App
+              </button>
+            </div>
+          </div>
+        );
+      }
       return (
         <div style={{
           display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -148,6 +184,15 @@ const PageLoader = () => (
   </div>
 );
 
+// Per-route wrapper: error boundary + suspense. A crash inside one page
+// unmounts only that page; MainLayout, nav, and other routes stay alive.
+// Navigating away unmounts the boundary, so returning to the route retries fresh.
+const Page = ({ scope, children }: { scope: string; children: ReactNode }) => (
+  <AppErrorBoundary scope={scope}>
+    <Suspense fallback={<PageLoader />}>{children}</Suspense>
+  </AppErrorBoundary>
+);
+
 function App() {
   return (
     <BrowserRouter>
@@ -173,37 +218,37 @@ function App() {
                     <Route index element={<Navigate to="/home" replace />} />
 
                     {/* Home & Discovery Routes */}
-                    <Route path="/home" element={<Suspense fallback={<PageLoader />}><HomePage /></Suspense>} />
-                    <Route path="/feed" element={<Suspense fallback={<PageLoader />}><FeedPage /></Suspense>} />
-                    <Route path="/discover" element={<Suspense fallback={<PageLoader />}><DiscoverPage /></Suspense>} />
+                    <Route path="/home" element={<Page scope="home"><HomePage /></Page>} />
+                    <Route path="/feed" element={<Page scope="feed"><FeedPage /></Page>} />
+                    <Route path="/discover" element={<Page scope="discover"><DiscoverPage /></Page>} />
 
                     {/* Commerce Routes (Business, Marketplace, Housing, Events) */}
-                    <Route path="/business" element={<Suspense fallback={<PageLoader />}><BusinessPage /></Suspense>} />
-                    <Route path="/business/register" element={<Suspense fallback={<PageLoader />}><BusinessRegisterPage /></Suspense>} />
-                    <Route path="/marketplace" element={<Suspense fallback={<PageLoader />}><MarketplacePage /></Suspense>} />
-                    <Route path="/housing" element={<Suspense fallback={<PageLoader />}><HousingPage /></Suspense>} />
-                    <Route path="/events" element={<Suspense fallback={<PageLoader />}><EventsPage /></Suspense>} />
+                    <Route path="/business" element={<Page scope="business"><BusinessPage /></Page>} />
+                    <Route path="/business/register" element={<Page scope="business-register"><BusinessRegisterPage /></Page>} />
+                    <Route path="/marketplace" element={<Page scope="marketplace"><MarketplacePage /></Page>} />
+                    <Route path="/housing" element={<Page scope="housing"><HousingPage /></Page>} />
+                    <Route path="/events" element={<Page scope="events"><EventsPage /></Page>} />
 
                     {/* Catering/Vendor Routes */}
-                    <Route path="/catering" element={<Suspense fallback={<PageLoader />}><CateringPage /></Suspense>} />
-                    <Route path="/vendor/:businessId/*" element={<Suspense fallback={<PageLoader />}><CateringPage /></Suspense>} />
+                    <Route path="/catering" element={<Page scope="catering"><CateringPage /></Page>} />
+                    <Route path="/vendor/:businessId/*" element={<Page scope="vendor"><CateringPage /></Page>} />
 
                     {/* Community Routes (Travel, Forum) */}
-                    <Route path="/travel" element={<Suspense fallback={<PageLoader />}><TravelPage /></Suspense>} />
-                    <Route path="/forum" element={<Suspense fallback={<PageLoader />}><ForumPage /></Suspense>} />
+                    <Route path="/travel" element={<Page scope="travel"><TravelPage /></Page>} />
+                    <Route path="/forum" element={<Page scope="forum"><ForumPage /></Page>} />
 
                     {/* User Routes (Messages, Profile, Settings) */}
-                    <Route path="/messages" element={<Suspense fallback={<PageLoader />}><MessagesPage /></Suspense>} />
-                    <Route path="/profile" element={<Suspense fallback={<PageLoader />}><ProfilePage /></Suspense>} />
-                    <Route path="/settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
+                    <Route path="/messages" element={<Page scope="messages"><MessagesPage /></Page>} />
+                    <Route path="/profile" element={<Page scope="profile"><ProfilePage /></Page>} />
+                    <Route path="/settings" element={<Page scope="settings"><SettingsPage /></Page>} />
 
                     {/* Notifications Routes */}
-                    <Route path="/notifications" element={<Suspense fallback={<PageLoader />}><NotificationCenterPage /></Suspense>} />
-                    <Route path="/notifications/settings" element={<Suspense fallback={<PageLoader />}><NotificationSettingsPage /></Suspense>} />
-                    <Route path="/notifications/analytics" element={<Suspense fallback={<PageLoader />}><NotificationAnalyticsPage /></Suspense>} />
+                    <Route path="/notifications" element={<Page scope="notifications"><NotificationCenterPage /></Page>} />
+                    <Route path="/notifications/settings" element={<Page scope="notification-settings"><NotificationSettingsPage /></Page>} />
+                    <Route path="/notifications/analytics" element={<Page scope="notification-analytics"><NotificationAnalyticsPage /></Page>} />
 
                     {/* Admin Routes */}
-                    <Route path="/admin" element={<Suspense fallback={<PageLoader />}><AdminPage /></Suspense>} />
+                    <Route path="/admin" element={<Page scope="admin"><AdminPage /></Page>} />
                   </Route>
                 </Route>
 

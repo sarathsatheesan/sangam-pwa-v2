@@ -74,6 +74,7 @@ import {
   fetchLinkPreview,
   compressImage,
 } from '@/utils/messageHelpers';
+import { reportError } from '@/utils/reportError';
 import {
   LinkPreviewCard,
   ChatAvatar,
@@ -271,7 +272,7 @@ export default function MessagesPage() {
     let cancelled = false;
     GroupCallManager.getActiveCall(selectedConvId).then((roomId) => {
       if (!cancelled) setActiveGroupCallId(roomId);
-    }).catch(() => {});
+    }).catch((err) => reportError(err, { op: 'get-active-group-call' }));
     // Also listen for groupCalls changes for this conversation
     const q = query(
       collection(db, 'groupCalls'),
@@ -1252,7 +1253,10 @@ export default function MessagesPage() {
       await updateDoc(doc(db, 'conversations', convId), {
         [`typing.${user.uid}`]: isTyping,
       });
-    } catch {}
+    } catch (err) {
+      // Typing indicator is cosmetic — no toast, but never invisible
+      reportError(err, { op: 'set-typing-status' });
+    }
   };
 
   const handleFormat = (label: string, wrap: string) => {

@@ -21,6 +21,7 @@ import {
   setDoc,
   getDoc,
   arrayUnion,
+  getCountFromServer,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +32,7 @@ import { moderateContent, smartFilter } from '@/utils/contentModeration';
 import type { ModerationResult } from '@/utils/contentModeration';
 import { sanitizeText, sanitizeURL } from '@/utils/sanitize';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
+import { Modal } from '@/components/ui/Modal';
 import {
   MessageSquare, Heart, Share2, Bookmark,
   MoreHorizontal, ChevronLeft, ChevronDown, ChevronUp, Plus, X,
@@ -439,17 +441,25 @@ export default function ForumScreen() {
       setLoading(true);
       const initialTopics = FORUM_TOPICS.map((topic: ForumTopic) => ({ ...topic, threadCount: 0 }));
       setTopics(initialTopics);
-      const allThreadsSnapshot = await getDocs(query(collection(db, 'forumThreads')));
-      const countMap: Record<string, number> = {};
-      allThreadsSnapshot.docs.forEach((d) => {
-        const data = d.data();
-        if (!data.isRemoved) countMap[data.topicId] = (countMap[data.topicId] || 0) + 1;
-      });
-      const topicsWithCounts = FORUM_TOPICS.map((topic: ForumTopic) => ({
+      // Server-side aggregate counts per topic — replaces downloading the
+      // entire forumThreads collection just to count. `total - removed`
+      // preserves the old `!data.isRemoved` semantics for legacy docs that
+      // lack the isRemoved field (a `== false` filter would skip them).
+      // Equality-only queries need no composite index (index merging).
+      const counts = await Promise.all(
+        FORUM_TOPICS.map(async (topic: ForumTopic) => {
+          const base = query(collection(db, 'forumThreads'), where('topicId', '==', topic.id));
+          const [totalSnap, removedSnap] = await Promise.all([
+            getCountFromServer(base),
+            getCountFromServer(query(base, where('isRemoved', '==', true))),
+          ]);
+          return totalSnap.data().count - removedSnap.data().count;
+        }),
+      );
+      setTopics(FORUM_TOPICS.map((topic: ForumTopic, i: number) => ({
         ...topic,
-        threadCount: countMap[topic.id] || 0,
-      }));
-      setTopics(topicsWithCounts);
+        threadCount: counts[i],
+      })));
     } catch (error) {
       console.error('Error loading topics:', error instanceof Error ? error.message : 'Unknown error');
       setTopics(FORUM_TOPICS.map((topic: ForumTopic) => ({ ...topic, threadCount: 0 })));
@@ -1327,10 +1337,15 @@ export default function ForumScreen() {
   /* ─── Overlay components (modals + toast) ─── */
   const renderOverlays = () => (
     <>
-      {/* Delete Thread Confirm Modal */}
-      {showDeleteThreadConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => { setShowDeleteThreadConfirm(false); setDeleteThreadId(null); }}>
-          <div className="bg-[var(--aurora-surface)] w-full max-w-sm rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      {/* Delete Thread Confirm Modal (shared Modal shell, Session 45) */}
+      <Modal
+        open={showDeleteThreadConfirm}
+        onClose={() => { setShowDeleteThreadConfirm(false); setDeleteThreadId(null); }}
+        title="Delete Thread?"
+        size="sm"
+        layer="high"
+        hideHeader
+      >
             <div className="p-6 text-center">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Trash2 size={24} className="text-red-500" />
@@ -1342,14 +1357,17 @@ export default function ForumScreen() {
                 <button onClick={confirmDeleteThread} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors">Delete</button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* Delete Reply Confirm Modal */}
-      {showDeleteReplyConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => { setShowDeleteReplyConfirm(false); setDeleteReplyInfo(null); }}>
-          <div className="bg-[var(--aurora-surface)] w-full max-w-sm rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      {/* Delete Reply Confirm Modal (shared Modal shell, Session 45) */}
+      <Modal
+        open={showDeleteReplyConfirm}
+        onClose={() => { setShowDeleteReplyConfirm(false); setDeleteReplyInfo(null); }}
+        title="Delete Reply?"
+        size="sm"
+        layer="high"
+        hideHeader
+      >
             <div className="p-6 text-center">
               <div className="w-12 h-12 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
                 <MessageCircle size={24} className="text-red-500" />
@@ -1361,14 +1379,17 @@ export default function ForumScreen() {
                 <button onClick={confirmDeleteReply} className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors">Delete</button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* Content Warning Modal */}
-      {showContentWarning && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => { setShowContentWarning(false); setContentWarningCallback(null); }}>
-          <div className="bg-[var(--aurora-surface)] w-full max-w-sm rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      {/* Content Warning Modal (shared Modal shell, Session 45) */}
+      <Modal
+        open={showContentWarning}
+        onClose={() => { setShowContentWarning(false); setContentWarningCallback(null); }}
+        title="Content Warning"
+        size="sm"
+        layer="high"
+        hideHeader
+      >
             <div className="p-6 text-center">
               <div className="w-12 h-12 bg-amber-100 dark:bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
                 <AlertTriangle size={24} className="text-amber-500" />
@@ -1380,23 +1401,16 @@ export default function ForumScreen() {
                 <button onClick={async () => { setShowContentWarning(false); if (contentWarningCallback) await contentWarningCallback(); setContentWarningCallback(null); }} className="flex-1 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-colors">Post Anyway</button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between rounded-t-2xl">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Report {reportingContent?.contentType === 'thread' ? 'Thread' : 'Reply'}
-              </h3>
-              <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
-                <X size={20} className="text-gray-500" />
-              </button>
-            </div>
+      {/* Report Modal (shared Modal shell, Session 45) */}
+      <Modal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        title={`Report ${reportingContent?.contentType === 'thread' ? 'Thread' : 'Reply'}`}
+        size="md"
+        layer="high"
+      >
             <div className="p-5 space-y-3">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Why are you reporting this {reportingContent?.contentType === 'thread' ? 'thread' : 'reply'}? Your report is confidential.
@@ -1443,15 +1457,19 @@ export default function ForumScreen() {
                 {reportSubmitting ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Flag size={16} /> Submit Report</>}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* Block User Confirmation Modal */}
-      {showBlockConfirm && blockTargetUser && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockConfirm(false)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+      {/* Block User Confirmation Modal (shared Modal shell, Session 45) */}
+      <Modal
+        open={showBlockConfirm && !!blockTargetUser}
+        onClose={() => setShowBlockConfirm(false)}
+        title={`Block ${blockTargetUser?.name ?? 'user'}?`}
+        size="sm"
+        layer="high"
+        hideHeader
+      >
+        {blockTargetUser && (
+          <div className="p-6 text-center">
             <div className="w-14 h-14 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
               <Ban className="w-7 h-7 text-red-600 dark:text-red-400" />
             </div>
@@ -1476,8 +1494,8 @@ export default function ForumScreen() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Toast Notification */}
       {toastMessage && (
@@ -1844,14 +1862,15 @@ export default function ForumScreen() {
           <Plus size={24} />
         </button>
 
-        {/* Create Thread Modal */}
-        {showCreateThread && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center" onClick={() => setShowCreateThread(false)}>
-            <div
-              className="bg-[var(--aurora-surface)] w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] flex flex-col shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-[var(--aurora-border)]">
+        {/* Create Thread Modal (shared Modal shell, Session 45) */}
+        <Modal
+          open={showCreateThread}
+          onClose={() => setShowCreateThread(false)}
+          title="New Thread"
+          size="md"
+          hideHeader
+        >
+              <div className="sticky top-0 z-10 bg-[var(--aurora-surface)] rounded-t-2xl flex items-center justify-between p-4 border-b border-[var(--aurora-border)]">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-[var(--aurora-surface-variant)] flex items-center justify-center text-sm">{selectedTopic.icon}</div>
                   <div>
@@ -1864,7 +1883,7 @@ export default function ForumScreen() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="p-4 space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-[var(--aurora-text-muted)] mb-1.5 uppercase tracking-wider">Title</label>
                   <input
@@ -1911,7 +1930,7 @@ export default function ForumScreen() {
                 </div>
               </div>
 
-              <div className="flex-shrink-0 border-t border-[var(--aurora-border)] p-4">
+              <div className="sticky bottom-0 bg-[var(--aurora-surface)] border-t border-[var(--aurora-border)] p-4">
                 <button
                   onClick={handleCreateThread}
                   disabled={submitting || !threadTitle.trim() || !threadContent.trim()}
@@ -1920,9 +1939,7 @@ export default function ForumScreen() {
                   {submitting ? <><Loader2 size={16} className="animate-spin" /> Posting...</> : <><Send size={16} /> Post Thread</>}
                 </button>
               </div>
-            </div>
-          </div>
-        )}
+        </Modal>
 
       </div>
       </>

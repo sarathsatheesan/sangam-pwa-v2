@@ -37,6 +37,8 @@ import {
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
+import { Modal } from '@/components/ui/Modal';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 /* ─── types ─── */
 interface Listing {
@@ -582,18 +584,9 @@ export default function HousingPage() {
     return () => document.removeEventListener('keydown', handleEscapeKey);
   }, [selectedListing, showCreateModal]);
 
-  /* Body scroll lock when modal is open */
-  useEffect(() => {
-    if (selectedListing || showCreateModal) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [selectedListing, showCreateModal]);
+  /* Body scroll lock: full-screen takeovers (create/edit/photo gallery) and the
+     bespoke detail overlay (not migrated to the shared Modal shell) — Session 45 */
+  useBodyScrollLock(!!selectedListing || showCreateModal || isEditing || photoGalleryOpen);
 
   const toggleSave = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -1213,7 +1206,7 @@ export default function HousingPage() {
       setTimeout(() => setToastMessage(null), 4000);
     } catch (error) {
       console.error('Error submitting report:', error);
-      alert('Failed to submit report.');
+      setToastMessage('Failed to submit report.');
     } finally {
       setReportSubmitting(false);
     }
@@ -1232,7 +1225,7 @@ export default function HousingPage() {
       setTimeout(() => setToastMessage(null), 4000);
     } catch (error) {
       console.error('Error blocking user:', error);
-      alert('Failed to block user. Please try again.');
+      setToastMessage('Failed to block user. Please try again.');
     }
   };
 
@@ -1743,6 +1736,8 @@ export default function HousingPage() {
                         <img
                           src={listing.photos![listing.coverPhotoIndex || 0]}
                           alt={listing.title}
+                          loading="lazy"
+                          decoding="async"
                           className="absolute inset-0 w-full h-full object-cover"
                         />
                       ) : (
@@ -2584,51 +2579,61 @@ export default function HousingPage() {
         </div>
       )}
 
-      {/* ===== Delete Listing Confirmation Modal ===== */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => { setShowDeleteConfirm(false); setDeleteListingId(null); }}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={20} className="text-red-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Delete Listing</h3>
+      {/* ===== Delete Listing Confirmation Modal (shared Modal shell, Session 45) ===== */}
+      <Modal
+        open={showDeleteConfirm}
+        onClose={() => { setShowDeleteConfirm(false); setDeleteListingId(null); }}
+        title="Delete Listing"
+        size="sm"
+        layer="high"
+        hideHeader
+      >
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <Trash2 size={20} className="text-red-600" />
             </div>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete this listing? This action cannot be undone.</p>
-            <div className="flex gap-3">
-              <button onClick={() => { setShowDeleteConfirm(false); setDeleteListingId(null); }} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-200 transition-colors">
-                Cancel
-              </button>
-              <button onClick={confirmDeleteListing} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 transition-colors">
-                Delete
-              </button>
-            </div>
+            <h3 className="text-lg font-bold text-gray-900">Delete Listing</h3>
+          </div>
+          <p className="text-gray-600 mb-6">Are you sure you want to delete this listing? This action cannot be undone.</p>
+          <div className="flex gap-3">
+            <button onClick={() => { setShowDeleteConfirm(false); setDeleteListingId(null); }} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+              Cancel
+            </button>
+            <button onClick={confirmDeleteListing} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 transition-colors">
+              Delete
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
 
-      {/* ===== Delete Comment Confirmation Modal ===== */}
-      {showDeleteCommentConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => { setShowDeleteCommentConfirm(false); setDeleteCommentInfo(null); }}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <MessageCircle size={20} className="text-red-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Delete Comment</h3>
+      {/* ===== Delete Comment Confirmation Modal (shared Modal shell, Session 45) ===== */}
+      <Modal
+        open={showDeleteCommentConfirm}
+        onClose={() => { setShowDeleteCommentConfirm(false); setDeleteCommentInfo(null); }}
+        title="Delete Comment"
+        size="sm"
+        layer="high"
+        hideHeader
+      >
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <MessageCircle size={20} className="text-red-600" />
             </div>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete this comment?</p>
-            <div className="flex gap-3">
-              <button onClick={() => { setShowDeleteCommentConfirm(false); setDeleteCommentInfo(null); }} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-200 transition-colors">
-                Cancel
-              </button>
-              <button onClick={confirmDeleteComment} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 transition-colors">
-                Delete
-              </button>
-            </div>
+            <h3 className="text-lg font-bold text-gray-900">Delete Comment</h3>
+          </div>
+          <p className="text-gray-600 mb-6">Are you sure you want to delete this comment?</p>
+          <div className="flex gap-3">
+            <button onClick={() => { setShowDeleteCommentConfirm(false); setDeleteCommentInfo(null); }} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-200 transition-colors">
+              Cancel
+            </button>
+            <button onClick={confirmDeleteComment} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 transition-colors">
+              Delete
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* ═══════════════════════════════════════════════════════════════════
           SHARED THREE-DOT CONTEXT MENU (fixed-position, escapes all overflow)
@@ -2680,11 +2685,16 @@ export default function HousingPage() {
       })()}
 
       {/* ═══════════════════════════════════════════════════════════════════
-          REPORT LISTING MODAL
+          REPORT LISTING MODAL (shared Modal shell, Session 45)
           ═══════════════════════════════════════════════════════════════════ */}
-      {showReportModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-[var(--aurora-surface)] rounded-2xl shadow-xl w-full max-w-md border border-[var(--aurora-border)] overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
+      <Modal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        title="Report Listing"
+        size="md"
+        layer="high"
+        hideHeader
+      >
             {/* Header */}
             <div className="px-5 py-4 border-b border-[var(--aurora-border)] bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/10 dark:to-orange-900/10">
               <div className="flex items-center justify-between">
@@ -2767,16 +2777,21 @@ export default function HousingPage() {
                 )}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* ═══════════════════════════════════════════════════════════════════
-          BLOCK USER CONFIRMATION MODAL
+          BLOCK USER CONFIRMATION MODAL (shared Modal shell, Session 45)
           ═══════════════════════════════════════════════════════════════════ */}
-      {showBlockConfirm && blockTargetUser && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-[var(--aurora-surface)] rounded-2xl shadow-xl border border-[var(--aurora-border)] max-w-sm w-full p-6 text-center">
+      <Modal
+        open={showBlockConfirm && !!blockTargetUser}
+        onClose={() => { setShowBlockConfirm(false); setBlockTargetUser(null); }}
+        title={`Block ${blockTargetUser?.name ?? 'user'}?`}
+        size="sm"
+        layer="high"
+        hideHeader
+      >
+        {blockTargetUser && (
+          <div className="p-6 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
               <Ban size={24} className="text-red-500" />
             </div>
@@ -2799,8 +2814,8 @@ export default function HousingPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* ===== Toast Notification ===== */}
       {toastMessage && (

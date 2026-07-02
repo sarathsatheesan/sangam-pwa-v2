@@ -411,27 +411,10 @@ export default function FeedPage() {
     return 'Hello';
   }, [userProfile?.heritage]);
 
-  // One-time migration: rename 'social' → 'community' in Firestore posts
-  useEffect(() => {
-    const migrateKey = 'sangam_social_to_community_migrated';
-    if (localStorage.getItem(migrateKey)) return;
-    const migrate = async () => {
-      try {
-        const allPosts = await getDocs(collection(db, 'posts'));
-        const batch: Promise<void>[] = [];
-        allPosts.forEach((d) => {
-          if (d.data().type === 'social') {
-            batch.push(updateDoc(doc(db, 'posts', d.id), { type: 'community' }));
-          }
-        });
-        if (batch.length > 0) await Promise.all(batch);
-        localStorage.setItem(migrateKey, 'true');
-      } catch (err) {
-        console.error('[Migration] Failed:', err);
-      }
-    };
-    migrate();
-  }, []);
+  // NOTE: The one-time 'social' → 'community' posts migration effect was
+  // removed (Session 44). It ran a full posts-collection scan per DEVICE
+  // (localStorage guard) forever after the migration completed in early 2026.
+  // If stragglers are ever found, run migrate-social-to-community.cjs once.
 
   // Close heritage dropdown on outside click
   // ClickOutsideOverlay rendered in JSX instead of useClickOutside hook

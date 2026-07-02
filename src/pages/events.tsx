@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { copyToClipboard } from '@/utils/clipboard';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
+import { Modal } from '@/components/ui/Modal';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import type { AddressResult } from '@/components/shared/AddressAutocomplete';
 import {
@@ -491,6 +493,11 @@ export default function EventsPage() {
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
+
+  // Lock page scroll behind the large bespoke overlays (detail modal +
+  // full-screen create/edit takeovers). The small dialogs (delete/report/
+  // block) use the shared <Modal>, which locks scroll itself. (Session 45)
+  useBodyScrollLock(!!selectedEvent || showCreateModal || isEditing);
   const [saving, setSaving] = useState(false);
   const [editData, setEditData] = useState({
     title: '', type: 'Community', description: '',
@@ -1476,6 +1483,8 @@ export default function EventsPage() {
                         <img
                           src={event.photos[event.coverPhotoIndex || 0] || event.photos[0]}
                           alt={event.title}
+                          loading="lazy"
+                          decoding="async"
                           className="absolute inset-0 w-full h-full object-cover"
                         />
                       )}
@@ -2506,28 +2515,33 @@ export default function EventsPage() {
         </div>
       )}
 
-      {/* ===== Delete Event Confirmation Modal ===== */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => { setShowDeleteConfirm(false); setDeleteEventId(null); }} role="dialog" aria-modal="true" aria-labelledby="delete-event-modal-title">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 size={20} className="text-red-600" />
-              </div>
-              <h3 id="delete-event-modal-title" className="text-lg font-bold text-gray-900">Delete Event</h3>
+      {/* ===== Delete Event Confirmation Modal (shared Modal shell, Session 45) ===== */}
+      <Modal
+        open={showDeleteConfirm}
+        onClose={() => { setShowDeleteConfirm(false); setDeleteEventId(null); }}
+        title="Delete Event"
+        size="sm"
+        layer="high"
+        hideHeader
+      >
+        <div className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-500/15 flex items-center justify-center">
+              <Trash2 size={20} className="text-red-600 dark:text-red-400" />
             </div>
-            <p className="text-gray-600 mb-6">Are you sure you want to delete this event? This action cannot be undone.</p>
-            <div className="flex gap-3">
-              <button onClick={() => { setShowDeleteConfirm(false); setDeleteEventId(null); }} className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl font-medium hover:bg-gray-200 transition-colors">
-                Cancel
-              </button>
-              <button onClick={confirmDeleteEvent} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 transition-colors">
-                Delete
-              </button>
-            </div>
+            <h3 className="text-lg font-bold text-aurora-text">Delete Event</h3>
+          </div>
+          <p className="text-aurora-text-secondary mb-6">Are you sure you want to delete this event? This action cannot be undone.</p>
+          <div className="flex gap-3">
+            <button onClick={() => { setShowDeleteConfirm(false); setDeleteEventId(null); }} className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2.5 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+              Cancel
+            </button>
+            <button onClick={confirmDeleteEvent} className="flex-1 bg-red-500 text-white py-2.5 rounded-xl font-medium hover:bg-red-600 transition-colors">
+              Delete
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* ===== Edit Event Modal ===== */}
       {isEditing && selectedEvent && (
@@ -2760,17 +2774,14 @@ export default function EventsPage() {
         </>
       )}
 
-      {/* ===== Report Event Modal ===== */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowReportModal(false)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between rounded-t-2xl">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Report Event</h3>
-              <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
-                <X size={20} className="text-gray-500" />
-              </button>
-            </div>
+      {/* ===== Report Event Modal (shared Modal shell, Session 45) ===== */}
+      <Modal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        title="Report Event"
+        size="md"
+        layer="high"
+      >
             <div className="p-5 space-y-3">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Why are you reporting this event? Your report is confidential.</p>
               {REPORT_CATEGORIES.map((cat) => (
@@ -2800,7 +2811,7 @@ export default function EventsPage() {
                 />
               )}
             </div>
-            <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-5 py-4 flex gap-3 rounded-b-2xl">
+            <div className="sticky bottom-0 bg-aurora-surface border-t border-aurora-border px-5 py-4 flex gap-3">
               <button
                 onClick={() => setShowReportModal(false)}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
@@ -2815,15 +2826,19 @@ export default function EventsPage() {
                 {reportSubmitting ? <><Loader2 size={16} className="animate-spin" /> Submitting...</> : <><Flag size={16} /> Submit Report</>}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {/* ===== Block User Confirmation Modal ===== */}
-      {showBlockConfirm && blockTargetUser && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowBlockConfirm(false)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+      {/* ===== Block User Confirmation Modal (shared Modal shell, Session 45) ===== */}
+      <Modal
+        open={showBlockConfirm && !!blockTargetUser}
+        onClose={() => setShowBlockConfirm(false)}
+        title={`Block ${blockTargetUser?.name ?? 'user'}?`}
+        size="sm"
+        layer="high"
+        hideHeader
+      >
+        {blockTargetUser && (
+          <div className="p-6 text-center">
             <div className="w-14 h-14 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
               <Ban className="w-7 h-7 text-red-600 dark:text-red-400" />
             </div>
@@ -2848,8 +2863,8 @@ export default function EventsPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* ===== Toast Notification ===== */}
       {toastMessage && (
