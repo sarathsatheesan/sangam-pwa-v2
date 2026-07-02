@@ -33,8 +33,9 @@ import {
   arrayRemove,
   onSnapshot,
   serverTimestamp,
+  startAfter,
 } from 'firebase/firestore';
-import type { DocumentData, Unsubscribe, FirestoreError } from 'firebase/firestore';
+import type { DocumentData, Unsubscribe, FirestoreError, QueryDocumentSnapshot } from 'firebase/firestore';
 import { z } from 'zod';
 import { db } from './firebase';
 
@@ -283,35 +284,91 @@ export async function leaveEventWaitlist(eventId: string, userId: string): Promi
 
 /* ─── comments (events/{eventId}/comments subcollection) ─── */
 
+/** Window size for the live comment subscription / older-page fetches. */
+export const EVENT_COMMENTS_PAGE_SIZE = 50;
+
+/** Pagination metadata delivered alongside each comment snapshot. */
+export interface EventCommentsSnapshotMeta {
+  /** Raw last doc of the snapshot (oldest in the desc window) — cursor for fetchOlderEventComments. */
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+  /** Window came back full ⇒ there may be older comments behind the cursor. */
+  windowFull: boolean;
+}
+
+/** Shared doc → record mapping (the page's exact default-filling). */
+function mapEventCommentDoc(d: QueryDocumentSnapshot<DocumentData>): EventCommentRecord {
+  const data = d.data();
+  return {
+    id: d.id,
+    text: data.text || '',
+    userId: data.userId || '',
+    userName: data.userName || 'Anonymous',
+    userAvatar: data.userAvatar,
+    createdAt: data.createdAt,
+  };
+}
+
 /**
- * Live subscription to ALL comments on an event. UNBOUNDED (no orderBy/limit
- * — parity). Maps each doc with the page's exact default-filling; the page
- * keeps its createdAt sort. Returns the unsubscribe function.
+ * Live subscription to the NEWEST comments on an event
+ * (orderBy createdAt desc, limit EVENT_COMMENTS_PAGE_SIZE). Maps each doc
+ * with the page's exact default-filling; the page keeps its ascending
+ * createdAt sort for display. Returns the unsubscribe function.
+ *
+ * NOTE: orderBy('createdAt') EXCLUDES docs missing the field. All in-app
+ * writes (addEventComment) set createdAt: Timestamp.now(), so only
+ * legacy/externally-written docs would be affected.
  */
 export function subscribeToEventComments(
   eventId: string,
-  onData: (comments: EventCommentRecord[]) => void,
+  onData: (comments: EventCommentRecord[], meta: EventCommentsSnapshotMeta) => void,
   onError?: (error: FirestoreError) => void,
 ): Unsubscribe {
-  return onSnapshot(
+  const q = query(
     collection(db, 'events', eventId, 'comments'),
+    orderBy('createdAt', 'desc'),
+    limit(EVENT_COMMENTS_PAGE_SIZE),
+  );
+  return onSnapshot(
+    q,
     (snapshot) => {
       const commentsList: EventCommentRecord[] = [];
       snapshot.forEach((d) => {
-        const data = d.data();
-        commentsList.push({
-          id: d.id,
-          text: data.text || '',
-          userId: data.userId || '',
-          userName: data.userName || 'Anonymous',
-          userAvatar: data.userAvatar,
-          createdAt: data.createdAt,
-        });
+        commentsList.push(mapEventCommentDoc(d));
       });
-      onData(commentsList);
+      onData(commentsList, {
+        lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+        windowFull: snapshot.docs.length === EVENT_COMMENTS_PAGE_SIZE,
+      });
     },
     onError,
   );
+}
+
+/**
+ * One-time fetch of the next (older) page of comments behind the cursor
+ * (orderBy createdAt desc, startAfter cursor, limit pageSize).
+ */
+export async function fetchOlderEventComments(
+  eventId: string,
+  cursor: QueryDocumentSnapshot<DocumentData>,
+  pageSize: number = EVENT_COMMENTS_PAGE_SIZE,
+): Promise<{
+  comments: EventCommentRecord[];
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+  hasMore: boolean;
+}> {
+  const q = query(
+    collection(db, 'events', eventId, 'comments'),
+    orderBy('createdAt', 'desc'),
+    startAfter(cursor),
+    limit(pageSize),
+  );
+  const snapshot = await getDocs(q);
+  return {
+    comments: snapshot.docs.map(mapEventCommentDoc),
+    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
 }
 
 export interface AddEventCommentInput {

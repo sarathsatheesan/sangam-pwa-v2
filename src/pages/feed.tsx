@@ -275,6 +275,10 @@ export default function FeedPage() {
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
+  // Comment pagination (newest 50 first; older pages behind "Load older comments")
+  const [commentsCursor, setCommentsCursor] = useState<any>(null);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
+  const [loadingOlderComments, setLoadingOlderComments] = useState(false);
 
   // 3-dot menu
   const [menuPostId, setMenuPostId] = useState<string | null>(null);
@@ -765,13 +769,36 @@ export default function FeedPage() {
     setSelectedPost(post);
     setLoadingComments(true);
     try {
-      const commentsData = await fetchComments(post.id);
-      setComments(commentsData);
+      const { comments: commentsData, lastDoc, hasMore } = await fetchComments(post.id);
+      // Query returns newest-first; reverse for ascending display (oldest at top)
+      setComments([...commentsData].reverse());
+      setCommentsCursor(lastDoc);
+      setHasMoreComments(hasMore);
     } catch (error) {
       console.error('Error fetching comments:', error);
       setComments([]);
+      setCommentsCursor(null);
+      setHasMoreComments(false);
     } finally {
       setLoadingComments(false);
+    }
+  };
+
+  const loadOlderComments = async () => {
+    if (!selectedPost || !commentsCursor || loadingOlderComments) return;
+    setLoadingOlderComments(true);
+    try {
+      const { comments: olderData, lastDoc, hasMore } = await fetchComments(selectedPost.id, {
+        cursor: commentsCursor,
+      });
+      // Older page is newest-first; reverse and prepend above the current list
+      setComments((prev) => [...[...olderData].reverse(), ...prev]);
+      if (lastDoc) setCommentsCursor(lastDoc);
+      setHasMoreComments(hasMore);
+    } catch (error) {
+      console.error('Error fetching older comments:', error);
+    } finally {
+      setLoadingOlderComments(false);
     }
   };
 
@@ -792,8 +819,11 @@ export default function FeedPage() {
       setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, comments: p.comments + 1 } : p));
       setNewComment('');
       setCommentImage(null);
-      const commentsData = await fetchComments(selectedPost.id);
-      setComments(commentsData);
+      // Refetch only the FIRST page (newest 50 — includes the new comment)
+      const { comments: commentsData, lastDoc, hasMore } = await fetchComments(selectedPost.id);
+      setComments([...commentsData].reverse());
+      setCommentsCursor(lastDoc);
+      setHasMoreComments(hasMore);
     } catch (error) {
       console.error('Error adding comment:', error);
       setToastMessage('Failed to add comment.');
@@ -2011,7 +2041,7 @@ export default function FeedPage() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-aurora-border flex-shrink-0">
               <h2 id="post-detail-title" className="text-lg font-bold text-aurora-text">{selectedPost.userName}'s Post</h2>
               <button
-                onClick={() => { setSelectedPost(null); setComments([]); }}
+                onClick={() => { setSelectedPost(null); setComments([]); setCommentsCursor(null); setHasMoreComments(false); }}
                 className="p-2 rounded-full hover:bg-aurora-surface-variant transition-colors"
                 aria-label="Close post detail modal"
               >
@@ -2221,6 +2251,17 @@ export default function FeedPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {hasMoreComments && (
+                      <div className="text-center">
+                        <button
+                          onClick={loadOlderComments}
+                          disabled={loadingOlderComments}
+                          className="text-aurora-indigo text-[14px] font-semibold hover:underline transition-all duration-300 disabled:opacity-50"
+                        >
+                          {loadingOlderComments ? 'Loading…' : 'Load older comments'}
+                        </button>
+                      </div>
+                    )}
                     {comments.filter((comment) => !blockedUsers.has(comment.userId)).map((comment) => (
                       <div key={comment.id} className="flex gap-3">
                         {renderAvatar(comment.userAvatar, comment.userName, 'sm')}

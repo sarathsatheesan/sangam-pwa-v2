@@ -15,8 +15,7 @@ import {
   softDeleteReply,
   acceptReply,
   unacceptReply,
-  syncThreadVoteState,
-  syncReplyVoteState,
+  fetchMyForumVotes,
   persistThreadVote,
   persistReplyVote,
   addToModerationQueue,
@@ -449,55 +448,53 @@ export default function ForumScreen() {
     return result;
   };
 
-  // Load user's votes for threads — cleans up old docs AND resets corrupted scores
+  // Session 49 — vote-state redesign. ONE collection-group query fetches all
+  // of the current user's votes (threads + replies) instead of scanning every
+  // item's forumLikes subcollection and rewriting scores on every visit.
+  // Displayed scores now come straight from the thread/reply docs (kept
+  // accurate atomically by persistThreadVote/persistReplyVote). The result is
+  // cached per uid so the thread-list and reply effects share a single read.
+  const myVotesCacheRef = useRef<{ uid: string; promise: ReturnType<typeof fetchMyForumVotes> } | null>(null);
+  const getMyVotes = useCallback((uid: string) => {
+    if (myVotesCacheRef.current?.uid !== uid) {
+      myVotesCacheRef.current = { uid, promise: fetchMyForumVotes(uid) };
+    }
+    return myVotesCacheRef.current.promise;
+  }, []);
+
   const loadThreadVotes = useCallback(async (threadIds: string[]) => {
     if (!user?.uid || threadIds.length === 0) return;
     try {
+      const { threadVotes } = await getMyVotes(user.uid);
       const upvoted = new Set<string>();
       const downvoted = new Set<string>();
-      await Promise.all(threadIds.map(async (threadId) => {
-        // Firestore work (read all vote docs, dedupe, migrate, fix score)
-        // lives in services/forum.ts — page keeps the state updates.
-        const { voteType: foundVoteType, correctScore } = await syncThreadVoteState(threadId, user.uid);
-
-        if (foundVoteType === 'up') upvoted.add(threadId);
-        else if (foundVoteType === 'down') downvoted.add(threadId);
-
-        // Update local thread state with corrected score
-        setThreads((prev) => prev.map((t) => t.id === threadId ? { ...t, voteScore: correctScore, likes: correctScore } : t));
-        if (selectedThread?.id === threadId) {
-          setSelectedThread((prev) => prev ? { ...prev, voteScore: correctScore, likes: correctScore } : null);
-        }
-      }));
+      threadVotes.forEach((voteType, threadId) => {
+        if (voteType === 'up') upvoted.add(threadId);
+        else downvoted.add(threadId);
+      });
       setUpvotedThreadIds(upvoted);
       setDownvotedThreadIds(downvoted);
     } catch (error) {
       console.error('Error loading thread votes:', error);
     }
-  }, [user?.uid]);
+  }, [user?.uid, getMyVotes]);
 
-  // Load user's votes for replies — cleans up old docs AND resets corrupted scores
   const loadReplyVotes = useCallback(async (replyIds: string[]) => {
     if (!user?.uid || replyIds.length === 0) return;
     try {
+      const { replyVotes } = await getMyVotes(user.uid);
       const upvoted = new Set<string>();
       const downvoted = new Set<string>();
-      await Promise.all(replyIds.map(async (replyId) => {
-        // Firestore work moved to services/forum.ts — page keeps state updates.
-        const { voteType: foundVoteType, correctScore } = await syncReplyVoteState(replyId, user.uid);
-
-        if (foundVoteType === 'up') upvoted.add(replyId);
-        else if (foundVoteType === 'down') downvoted.add(replyId);
-
-        // Update local reply state with corrected score
-        setReplies((prev) => prev.map((r) => r.id === replyId ? { ...r, voteScore: correctScore, likes: correctScore } : r));
-      }));
+      replyVotes.forEach((voteType, replyId) => {
+        if (voteType === 'up') upvoted.add(replyId);
+        else downvoted.add(replyId);
+      });
       setUpvotedReplyIds(upvoted);
       setDownvotedReplyIds(downvoted);
     } catch (error) {
       console.error('Error loading reply votes:', error);
     }
-  }, [user?.uid]);
+  }, [user?.uid, getMyVotes]);
 
   const loadThreads = useCallback(async () => {
     if (!selectedTopic) return;

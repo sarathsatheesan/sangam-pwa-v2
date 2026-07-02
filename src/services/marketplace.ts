@@ -1,10 +1,13 @@
 // ═══════════════════════════════════════════════════════════════════════
 // MARKETPLACE DATA ACCESS — every Firestore read/write used by
-// pages/marketplace.tsx, moved here mechanically (Session 48). Query shapes,
-// payloads, field names and timestamp choices are byte-identical to what the
-// page did inline (note: this page uses Timestamp.now(), NOT serverTimestamp(),
-// for listing/comment createdAt — preserved as-is). The page keeps all state,
-// filtering, sorting, toasts and UI logic. The shared report flow lives in
+// pages/marketplace.tsx, moved here mechanically (Session 48). Payloads,
+// field names and timestamp choices are byte-identical to what the page did
+// inline (note: this page uses Timestamp.now(), NOT serverTimestamp(), for
+// listing/comment createdAt — preserved as-is). APPROVED behavior change:
+// the formerly-unbounded reads are now paginated — fetchListingsPage
+// (24/page newest-first + cursor), fetchListingsForFilter (200-doc batch for
+// active filter/search views) and fetchListingComments (newest 50 + cursor).
+// The page keeps all state, filtering, sorting, toasts and UI logic. The shared report flow lives in
 // services/moderation.ts (submitContentReport); the marketplace-specific
 // 3-strike tail (hideListing + sendListingHiddenNotification) lives here and
 // is driven by the PAGE.
@@ -24,8 +27,11 @@ import {
   serverTimestamp,
   arrayUnion,
   Timestamp,
+  orderBy,
+  limit,
+  startAfter,
 } from 'firebase/firestore';
-import type { DocumentData } from 'firebase/firestore';
+import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { z } from 'zod';
 import { db } from './firebase';
 
@@ -148,22 +154,66 @@ export function createdAtToMillis(value: any): number {
 
 /* ─── listings: fetch / create / update / delete / status ─── */
 
-/**
- * ⚠️ UNBOUNDED QUERY (parity — no limit added): downloads the ENTIRE
- * marketplaceListings collection on every page load. isHidden docs are
- * skipped client-side, exactly as before. The page keeps all category /
- * heritage / search filtering and sorting.
- */
-export async function fetchListings(): Promise<MarketplaceItem[]> {
-  const querySnapshot = await getDocs(collection(db, 'marketplaceListings'));
+/** Cursor type shared by paginated listing/comment fetchers. */
+export type MarketplaceCursor = QueryDocumentSnapshot<DocumentData>;
+
+/** Shared per-doc mapping: isHidden skip + zod observe-mode (never drops). */
+function mapListingDocs(docs: QueryDocumentSnapshot<DocumentData>[]): MarketplaceItem[] {
   const items: MarketplaceItem[] = [];
-  querySnapshot.docs.forEach((d) => {
+  docs.forEach((d) => {
     const data = d.data();
     if (data.isHidden) return;
     observeListing({ id: d.id, ...data });
     items.push({ ...(data as Omit<MarketplaceItem, 'id'>), id: d.id });
   });
   return items;
+}
+
+/**
+ * Paginated browse fetch (replaces the old unbounded fetchListings):
+ * newest-first, 24/page by default, cursor-based Load More.
+ *
+ * ⚠️ orderBy('createdAt') EXCLUDES docs that are missing the createdAt field.
+ * The only in-app write path (createListing below) always sets
+ * `createdAt: Timestamp.now()`, so app-created docs are safe — but any legacy
+ * or externally-seeded doc without createdAt will silently disappear from
+ * browse results.
+ *
+ * `hasMore` is computed from the RAW snapshot length (before the isHidden
+ * skip), so a page full of hidden docs still advances the cursor correctly.
+ */
+export async function fetchListingsPage(
+  options: { pageSize?: number; cursor?: MarketplaceCursor | null } = {},
+): Promise<{ items: MarketplaceItem[]; lastDoc: MarketplaceCursor | null; hasMore: boolean }> {
+  const { pageSize = 24, cursor } = options;
+  const q = query(
+    collection(db, 'marketplaceListings'),
+    orderBy('createdAt', 'desc'),
+    ...(cursor ? [startAfter(cursor)] : []),
+    limit(pageSize),
+  );
+  const snapshot = await getDocs(q);
+  return {
+    items: mapListingDocs(snapshot.docs),
+    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
+}
+
+/**
+ * One-shot batch fetch for ACTIVE search/category/heritage filter views:
+ * newest-first, capped at `maxDocs` (default 200). The page fetches this once
+ * (cached) when any filter first activates — NOT per keystroke — and keeps
+ * filtering client-side as before.
+ */
+export async function fetchListingsForFilter(maxDocs = 200): Promise<MarketplaceItem[]> {
+  const q = query(
+    collection(db, 'marketplaceListings'),
+    orderBy('createdAt', 'desc'),
+    limit(maxDocs),
+  );
+  const snapshot = await getDocs(q);
+  return mapListingDocs(snapshot.docs);
 }
 
 /** Payload the page builds for a new listing (optional detail fields already
@@ -266,17 +316,37 @@ export async function backfillListingSellerInfo(
 /* ─── comments (marketplaceComments collection) ─── */
 
 /**
- * ⚠️ UNBOUNDED QUERY (parity — no limit added): all comments for a listing
- * (where listingId ==, no orderBy — the page never sorted them).
+ * Paginated comment fetch (replaces the old unbounded per-listing fetch):
+ * newest-first, capped at 50/page, cursor-based "Load older". The batch is
+ * returned NEWEST-FIRST — the page reverses it for ascending display.
+ *
+ * ⚠️ Notes: (1) `where(listingId ==) + orderBy(createdAt desc)` needs a
+ * composite Firestore index (marketplaceComments: listingId ASC,
+ * createdAt DESC). (2) orderBy excludes comments missing createdAt —
+ * addListingComment below always sets Timestamp.now(), so only legacy /
+ * externally-seeded comments are at risk.
  */
-export async function fetchListingComments(listingId: string): Promise<MarketplaceComment[]> {
-  const querySnapshot = await getDocs(
-    query(collection(db, 'marketplaceComments'), where('listingId', '==', listingId)),
+export async function fetchListingComments(
+  listingId: string,
+  options: { pageSize?: number; cursor?: MarketplaceCursor | null } = {},
+): Promise<{ comments: MarketplaceComment[]; lastDoc: MarketplaceCursor | null; hasMore: boolean }> {
+  const { pageSize = 50, cursor } = options;
+  const q = query(
+    collection(db, 'marketplaceComments'),
+    where('listingId', '==', listingId),
+    orderBy('createdAt', 'desc'),
+    ...(cursor ? [startAfter(cursor)] : []),
+    limit(pageSize),
   );
-  return querySnapshot.docs.map((d) => ({
-    ...(d.data() as Omit<MarketplaceComment, 'id'>),
-    id: d.id,
-  }));
+  const snapshot = await getDocs(q);
+  return {
+    comments: snapshot.docs.map((d) => ({
+      ...(d.data() as Omit<MarketplaceComment, 'id'>),
+      id: d.id,
+    })),
+    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
 }
 
 export interface AddListingCommentInput {

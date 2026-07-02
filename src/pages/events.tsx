@@ -11,7 +11,7 @@ import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import {
   fetchEventDocs, createEvent, updateEvent, deleteEvent, updateEventStatus,
   addEventRsvp, removeEventRsvp, joinEventWaitlist, leaveEventWaitlist,
-  subscribeToEventComments, addEventComment, fetchAttendeeProfiles,
+  subscribeToEventComments, fetchOlderEventComments, addEventComment, fetchAttendeeProfiles,
   fetchUserSafetyData, muteEventForUser, blockUser as blockUserService,
   hideEvent, sendEventHiddenNotification,
 } from '@/services/events';
@@ -467,6 +467,14 @@ export default function EventsPage() {
   const [comments, setComments] = useState<EventComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
+  // Comment pagination: the subscription only covers the newest 50; older
+  // pages are fetched once and merged by id so snapshots don't clobber them.
+  const [hasMoreComments, setHasMoreComments] = useState(false);
+  const [loadingOlderComments, setLoadingOlderComments] = useState(false);
+  const knownCommentsRef = useRef<Map<string, EventComment>>(new Map());
+  const commentCursorRef = useRef<any>(null);
+  const olderPagesLoadedRef = useRef(false);
+  const commentsEventIdRef = useRef<string | null>(null);
   const [attendees, setAttendees] = useState<any[]>([]);
   const [attendeeLoading, setAttendeeLoading] = useState(false);
   const [statusDropdown, setStatusDropdown] = useState<string | null>(null);
@@ -763,6 +771,16 @@ export default function EventsPage() {
     }
   }, [searchParams, showCreateModal, loading]);
 
+  const sortCommentsAscending = (list: EventComment[]): EventComment[] => {
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis?.() || new Date(a.createdAt).getTime();
+      const timeB = b.createdAt?.toMillis?.() || new Date(b.createdAt).getTime();
+      return timeA - timeB;
+    });
+    return sorted;
+  };
+
   const loadComments = (eventId: string) => {
     try {
       // Clean up previous subscription
@@ -770,16 +788,27 @@ export default function EventsPage() {
         commentUnsubscribeRef.current();
       }
 
+      // Reset per-event comment pagination state
+      knownCommentsRef.current = new Map();
+      commentCursorRef.current = null;
+      olderPagesLoadedRef.current = false;
+      commentsEventIdRef.current = eventId;
+      setHasMoreComments(false);
+      setLoadingOlderComments(false);
+
       const unsubscribe = subscribeToEventComments(
         eventId,
-        (commentsList) => {
-          const sorted = [...commentsList];
-          sorted.sort((a, b) => {
-            const timeA = a.createdAt?.toMillis?.() || new Date(a.createdAt).getTime();
-            const timeB = b.createdAt?.toMillis?.() || new Date(b.createdAt).getTime();
-            return timeA - timeB;
-          });
-          setComments(sorted);
+        (commentsList, meta) => {
+          // Merge the snapshot window into everything we've seen (by id) so
+          // previously-loaded older comments aren't clobbered by new snapshots.
+          for (const c of commentsList) knownCommentsRef.current.set(c.id, c);
+          if (!olderPagesLoadedRef.current) {
+            // Until an older page is fetched, the cursor is the oldest doc in
+            // the live window; afterwards the older-fetch owns the cursor.
+            commentCursorRef.current = meta.lastDoc;
+            setHasMoreComments(meta.windowFull);
+          }
+          setComments(sortCommentsAscending([...knownCommentsRef.current.values()]));
         },
         (error) => {
           console.error('[EventsPage] Comments listener error:', error);
@@ -788,6 +817,30 @@ export default function EventsPage() {
       commentUnsubscribeRef.current = unsubscribe;
     } catch (error) {
       console.error('Error loading comments:', error);
+    }
+  };
+
+  const handleLoadOlderComments = async () => {
+    const eventId = commentsEventIdRef.current;
+    if (!eventId || !commentCursorRef.current || loadingOlderComments) return;
+    setLoadingOlderComments(true);
+    try {
+      const { comments: older, lastDoc, hasMore } = await fetchOlderEventComments(
+        eventId,
+        commentCursorRef.current
+      );
+      if (commentsEventIdRef.current !== eventId) return; // switched events mid-fetch
+      olderPagesLoadedRef.current = true;
+      for (const c of older) {
+        if (!knownCommentsRef.current.has(c.id)) knownCommentsRef.current.set(c.id, c);
+      }
+      if (lastDoc) commentCursorRef.current = lastDoc;
+      setHasMoreComments(hasMore);
+      setComments(sortCommentsAscending([...knownCommentsRef.current.values()]));
+    } catch (error) {
+      console.error('Error loading older comments:', error);
+    } finally {
+      setLoadingOlderComments(false);
     }
   };
 
@@ -1897,6 +1950,17 @@ export default function EventsPage() {
                 </h4>
                 <div className="bg-aurora-surface-variant rounded-xl overflow-hidden">
                   <div className="max-h-64 overflow-y-auto space-y-2 p-3">
+                    {hasMoreComments && (
+                      <div className="text-center">
+                        <button
+                          onClick={handleLoadOlderComments}
+                          disabled={loadingOlderComments}
+                          className="text-xs font-semibold text-aurora-indigo hover:underline transition-colors disabled:opacity-50 py-1"
+                        >
+                          {loadingOlderComments ? 'Loading…' : 'Load older comments'}
+                        </button>
+                      </div>
+                    )}
                     {comments.length === 0 ? (
                       <p className="text-xs text-aurora-text-muted text-center py-4">No comments yet. Be the first!</p>
                     ) : (

@@ -260,13 +260,45 @@ export async function updatePostReaction(
 
 // ── Comments ──
 
-/** All comments for a post, orderBy createdAt asc. UNBOUNDED (no limit — parity). */
-export async function fetchComments(postId: string): Promise<FeedCommentRecord[]> {
-  const q = query(collection(db, POSTS_COL, postId, COMMENTS_SUB), orderBy('createdAt', 'asc'));
+/** Result shape for the paginated comment fetch (newest-first pages). */
+export interface CommentsPageResult {
+  /** One page of comments, in query order (createdAt DESC — newest first). */
+  comments: FeedCommentRecord[];
+  /** Raw last doc of the page — cursor for the next (older) page's startAfter. */
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+  /** Full page returned ⇒ there may be older comments behind the cursor. */
+  hasMore: boolean;
+}
+
+/**
+ * One page of comments for a post, newest first
+ * (orderBy createdAt desc, startAfter cursor?, limit pageSize).
+ * Callers wanting ascending display should reverse the returned batch.
+ */
+export async function fetchComments(
+  postId: string,
+  { pageSize = 50, cursor }: { pageSize?: number; cursor?: QueryDocumentSnapshot<DocumentData> | null } = {},
+): Promise<CommentsPageResult> {
+  const q = cursor
+    ? query(
+        collection(db, POSTS_COL, postId, COMMENTS_SUB),
+        orderBy('createdAt', 'desc'),
+        startAfter(cursor),
+        limit(pageSize),
+      )
+    : query(
+        collection(db, POSTS_COL, postId, COMMENTS_SUB),
+        orderBy('createdAt', 'desc'),
+        limit(pageSize),
+      );
   const snapshot = await getDocs(q);
   const commentsData: FeedCommentRecord[] = [];
   snapshot.forEach((d) => commentsData.push({ id: d.id, ...d.data() } as FeedCommentRecord));
-  return commentsData;
+  return {
+    comments: commentsData,
+    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
 }
 
 export interface AddCommentInput {

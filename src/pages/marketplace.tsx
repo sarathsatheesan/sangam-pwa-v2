@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { timeAgo } from '@/utils/dateFormatting';
 import {
-  fetchListings as fetchListingsFromDb,
+  fetchListingsPage,
+  fetchListingsForFilter,
   fetchUserSafetyData,
   backfillListingSellerInfo,
   fetchListingComments,
@@ -19,7 +20,7 @@ import {
   blockUser as blockUserInDb,
   createdAtToMillis,
 } from '@/services/marketplace';
-import type { MarketplaceItem, MarketplaceComment as Comment } from '@/services/marketplace';
+import type { MarketplaceItem, MarketplaceComment as Comment, MarketplaceCursor } from '@/services/marketplace';
 import { submitContentReport } from '@/services/moderation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
@@ -506,6 +507,10 @@ export default function MarketplacePage() {
   // State
   const [listings, setListings] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // Pagination state (default browse: 24/page newest-first + Load More)
+  const [lastDoc, setLastDoc] = useState<MarketplaceCursor | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
@@ -517,6 +522,10 @@ export default function MarketplacePage() {
   const [selectedHeritage, setSelectedHeritage] = useState<string[]>([]);
 
   const [comments, setComments] = useState<{ [key: string]: Comment[] }>({});
+  // Comment pagination (newest 50 shown ascending + "Load older comments")
+  const [commentCursors, setCommentCursors] = useState<{ [key: string]: MarketplaceCursor | null }>({});
+  const [commentsHasMore, setCommentsHasMore] = useState<{ [key: string]: boolean }>({});
+  const [loadingOlderComments, setLoadingOlderComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [editingItem, setEditingItem] = useState<MarketplaceItem | null>(null);
 
@@ -618,13 +627,20 @@ export default function MarketplacePage() {
     }
   }, [formData.locZip]);
 
-  // Fetch listings
+  // Any filter/search active? → switch from paginated browse to the cached
+  // 200-doc filter batch (fetched once, NOT per keystroke).
+  const filtersActive =
+    searchQuery.trim() !== '' || selectedCategory !== 'all' || selectedHeritage.length > 0;
+
+  // Fetch listings — first page (24 newest)
   useEffect(() => {
-    const fetchListings = async () => {
+    const fetchFirstPage = async () => {
       try {
         setLoading(true);
-        const items = await fetchListingsFromDb();
+        const { items, lastDoc: cursor, hasMore: more } = await fetchListingsPage({ pageSize: 24 });
         setListings(items);
+        setLastDoc(cursor);
+        setHasMore(more);
       } catch (error) {
         console.error('Error fetching listings:', error);
       } finally {
@@ -632,8 +648,53 @@ export default function MarketplacePage() {
       }
     };
 
-    fetchListings();
+    fetchFirstPage();
   }, []);
+
+  // Load More — appends the next page (dedupes against already-loaded ids)
+  const handleLoadMore = useCallback(async () => {
+    if (!lastDoc || !hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { items, lastDoc: cursor, hasMore: more } = await fetchListingsPage({
+        pageSize: 24,
+        cursor: lastDoc,
+      });
+      setListings((prev) => {
+        const seen = new Set(prev.map((i) => i.id));
+        return [...prev, ...items.filter((i) => !seen.has(i.id))];
+      });
+      if (cursor) setLastDoc(cursor);
+      setHasMore(more);
+    } catch (error) {
+      console.error('Error loading more listings:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [lastDoc, hasMore, loadingMore]);
+
+  // When any search/category/heritage filter first activates, fetch ONE cached
+  // 200-doc batch and merge it into the loaded set (ref-guarded so typing in
+  // the search box never refetches). Existing client-side filtering/sorting
+  // then applies over the merged set.
+  const filterBatchLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!filtersActive || filterBatchLoadedRef.current) return;
+    filterBatchLoadedRef.current = true;
+    const fetchFilterBatch = async () => {
+      try {
+        const batch = await fetchListingsForFilter(200);
+        setListings((prev) => {
+          const seen = new Set(prev.map((i) => i.id));
+          return [...prev, ...batch.filter((i) => !seen.has(i.id))];
+        });
+      } catch (error) {
+        console.error('Error fetching listings for filters:', error);
+        filterBatchLoadedRef.current = false; // allow retry on next activation
+      }
+    };
+    fetchFilterBatch();
+  }, [filtersActive]);
 
   // Load user safety data (muted listings, blocked users)
   useEffect(() => {
@@ -719,14 +780,20 @@ export default function MarketplacePage() {
     }
   }, [searchParams, showCreateModal, loading]);
 
-  // Fetch comments for selected item
+  // Fetch comments for selected item — newest 50, displayed ascending
   useEffect(() => {
     const fetchComments = async () => {
       if (!selectedItem || !isFeatureEnabled('marketplace_comments')) return;
 
       try {
-        const itemComments = await fetchListingComments(selectedItem.id);
-        setComments((prev) => ({ ...prev, [selectedItem.id]: itemComments }));
+        const { comments: batch, lastDoc: cursor, hasMore: more } = await fetchListingComments(
+          selectedItem.id,
+          { pageSize: 50 },
+        );
+        // Service returns newest-first; reverse for ascending display.
+        setComments((prev) => ({ ...prev, [selectedItem.id]: [...batch].reverse() }));
+        setCommentCursors((prev) => ({ ...prev, [selectedItem.id]: cursor }));
+        setCommentsHasMore((prev) => ({ ...prev, [selectedItem.id]: more }));
       } catch (error) {
         console.error('Error fetching comments:', error);
       }
@@ -734,6 +801,30 @@ export default function MarketplacePage() {
 
     fetchComments();
   }, [selectedItem, isFeatureEnabled]);
+
+  // "Load older comments" — prepends the previous 50 (still ascending overall)
+  const handleLoadOlderComments = useCallback(async () => {
+    if (!selectedItem || loadingOlderComments) return;
+    const cursor = commentCursors[selectedItem.id];
+    if (!cursor || !commentsHasMore[selectedItem.id]) return;
+    setLoadingOlderComments(true);
+    try {
+      const { comments: batch, lastDoc: nextCursor, hasMore: more } = await fetchListingComments(
+        selectedItem.id,
+        { pageSize: 50, cursor },
+      );
+      setComments((prev) => ({
+        ...prev,
+        [selectedItem.id]: [...[...batch].reverse(), ...(prev[selectedItem.id] || [])],
+      }));
+      if (nextCursor) setCommentCursors((prev) => ({ ...prev, [selectedItem.id]: nextCursor }));
+      setCommentsHasMore((prev) => ({ ...prev, [selectedItem.id]: more }));
+    } catch (error) {
+      console.error('Error loading older comments:', error);
+    } finally {
+      setLoadingOlderComments(false);
+    }
+  }, [selectedItem, loadingOlderComments, commentCursors, commentsHasMore]);
 
   // Filtered and sorted listings
   const filteredListings = useMemo(() => {
@@ -1506,6 +1597,26 @@ export default function MarketplacePage() {
             ))}
           </div>
         )}
+
+        {/* Load More — default browse only (hidden during filtered/search views) */}
+        {!loading && !myListings && !filtersActive && hasMore && (
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="px-8 py-3 aurora-gradient text-white rounded-full font-medium shadow-aurora-glow-lg hover:shadow-aurora-4 transition-all btn-press disabled:opacity-60 flex items-center gap-2"
+            >
+              {loadingMore ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                'Load More'
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ─── Floating Action Button ─── */}
@@ -2044,6 +2155,19 @@ export default function MarketplacePage() {
                         <Send className="w-4 h-4" />
                       </button>
                     </div>
+                  )}
+
+                  {commentsHasMore[selectedItem.id] && (
+                    <button
+                      onClick={handleLoadOlderComments}
+                      disabled={loadingOlderComments}
+                      className="mb-4 text-sm font-medium text-aurora-indigo hover:underline disabled:opacity-60 flex items-center gap-2"
+                    >
+                      {loadingOlderComments && (
+                        <div className="w-3.5 h-3.5 border-2 border-aurora-indigo/30 border-t-aurora-indigo rounded-full animate-spin" />
+                      )}
+                      {loadingOlderComments ? 'Loading older comments...' : 'Load older comments'}
+                    </button>
                   )}
 
                   <div className="space-y-4">

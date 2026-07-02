@@ -6,8 +6,10 @@ import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import type { AddressResult } from '@/components/shared/AddressAutocomplete';
 import { useAuth } from '@/contexts/AuthContext';
 import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
+import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import {
-  listAllListings,
+  listListingsPage,
+  listListingsForFilter,
   createListing,
   updateListing,
   deleteListing,
@@ -407,6 +409,11 @@ export default function HousingPage() {
   /* state */
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  /* pagination (approved change: 24/page newest-first, useBusinessData pattern) */
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const filterBatchFetchedRef = useRef(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
@@ -438,6 +445,10 @@ export default function HousingPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState('');
   const [commentLoading, setCommentLoading] = useState(false);
+  /* comment pagination (approved change: newest 50, "Load older" prepends) */
+  const [commentsCursor, setCommentsCursor] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [commentsHasMore, setCommentsHasMore] = useState(false);
+  const [loadingOlderComments, setLoadingOlderComments] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteListingId, setDeleteListingId] = useState<string | null>(null);
   const [showDeleteCommentConfirm, setShowDeleteCommentConfirm] = useState(false);
@@ -544,11 +555,29 @@ export default function HousingPage() {
     toggleSavedItem(user.uid, 'housing', id).then(({ ids }) => setSavedListings(ids));
   }, [user?.uid, savedListings]);
 
-  /* fetch */
+  /* Any client-side search/filter/sort/tab that needs docs beyond the current
+     page → triggers the one-shot 200-doc filter batch and hides Load More.
+     (sortBy/saved-tab included: both are computed client-side over ALL loaded
+     docs, so the paged window alone would give wrong results.) */
+  const filtersActive = useMemo(() => (
+    searchQuery.trim() !== '' ||
+    selectedTypes.length > 0 ||
+    bedsFilter !== 'any' ||
+    statusFilter !== 'all' ||
+    priceRange[0] !== '' ||
+    priceRange[1] !== '' ||
+    sortBy !== 'newest' ||
+    activeListTab === 'saved'
+  ), [searchQuery, selectedTypes, bedsFilter, statusFilter, priceRange, sortBy, activeListTab]);
+
+  /* fetch — first page (24 newest); also used as a reset after create */
   const fetchListings = async () => {
     try {
-      const data = await listAllListings();
+      const { listings: data, lastDoc: cursor, hasMore: more } = await listListingsPage({ pageSize: 24 });
       setListings(data);
+      setLastDoc(cursor);
+      setHasMore(more);
+      filterBatchFetchedRef.current = false;
     } catch (error) {
       console.error('Error fetching listings:', error);
     } finally {
@@ -557,6 +586,46 @@ export default function HousingPage() {
   };
 
   useEffect(() => { fetchListings(); }, []);
+
+  /* Load More — cursor pagination (mirrors useBusinessData.fetchMoreBusinesses).
+     Appends are deduped by id: the filter batch may already contain page docs. */
+  const handleLoadMore = async () => {
+    if (!lastDoc || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const { listings: more, lastDoc: cursor, hasMore: hasNext } = await listListingsPage({ pageSize: 24, cursor: lastDoc });
+      setListings((prev) => {
+        const seen = new Set(prev.map((l) => l.id));
+        return [...prev, ...more.filter((l) => !seen.has(l.id))];
+      });
+      if (cursor) setLastDoc(cursor);
+      setHasMore(hasNext);
+    } catch (error) {
+      console.error('Error loading more listings:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  /* One-shot 200-doc batch when search/filters first activate — fetched once
+     (ref guard), NOT per keystroke; merged & deduped into `listings` so all
+     existing save/edit/delete state updates keep working unchanged. */
+  useEffect(() => {
+    if (!filtersActive || filterBatchFetchedRef.current || loading) return;
+    filterBatchFetchedRef.current = true;
+    (async () => {
+      try {
+        const batch = await listListingsForFilter(200);
+        setListings((prev) => {
+          const seen = new Set(prev.map((l) => l.id));
+          return [...prev, ...batch.filter((l) => !seen.has(l.id))];
+        });
+      } catch (error) {
+        filterBatchFetchedRef.current = false;
+        console.error('Error fetching listings for filters:', error);
+      }
+    })();
+  }, [filtersActive, loading]);
 
   // Load user safety data (muted listings, blocked users)
   useEffect(() => {
@@ -673,12 +742,35 @@ export default function HousingPage() {
   }, [listings]);
 
   /* Comment functions */
+  /* Newest 50 (createdAt desc), reversed for ascending display (oldest at top).
+     Also serves as the reset/refetch after add/delete, as before. */
   const loadComments = async (listingId: string) => {
     try {
-      const data = await listListingComments(listingId);
-      setComments(data);
+      const { comments: page, lastDoc: cursor, hasMore: more } = await listListingComments(listingId, { pageSize: 50 });
+      setComments([...page].reverse());
+      setCommentsCursor(cursor);
+      setCommentsHasMore(more);
     } catch (error) {
       console.error('Error loading comments:', error);
+    }
+  };
+
+  /* "Load older comments" — next desc page, reversed and PREPENDED above. */
+  const loadOlderComments = async () => {
+    if (!selectedListing || !commentsCursor || loadingOlderComments) return;
+    setLoadingOlderComments(true);
+    try {
+      const { comments: page, lastDoc: cursor, hasMore: more } = await listListingComments(selectedListing.id, { pageSize: 50, cursor: commentsCursor });
+      setComments((prev) => {
+        const seen = new Set(prev.map((c) => c.id));
+        return [...[...page].reverse().filter((c) => !seen.has(c.id)), ...prev];
+      });
+      if (cursor) setCommentsCursor(cursor);
+      setCommentsHasMore(more);
+    } catch (error) {
+      console.error('Error loading older comments:', error);
+    } finally {
+      setLoadingOlderComments(false);
     }
   };
 
@@ -1638,6 +1730,7 @@ export default function HousingPage() {
             </button>
           </div>
           ) : (
+            <>
             <div className={"grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}>
               {displayListings.map((listing) => {
               const config = TYPE_CONFIG[listing.type] || TYPE_CONFIG.rent;
@@ -1763,6 +1856,20 @@ export default function HousingPage() {
               );
             })}
           </div>
+          {/* Load More — only in default browse (hidden while the 200-doc filter batch is in play) */}
+          {!filtersActive && hasMore && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-2 px-6 py-2.5 bg-aurora-indigo text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {loadingMore ? <Loader2 size={16} className="animate-spin" /> : <ChevronDown size={16} />}
+                {loadingMore ? 'Loading…' : 'Load More'}
+              </button>
+            </div>
+          )}
+          </>
           );
         })()}
       </div>
@@ -2214,6 +2321,18 @@ export default function HousingPage() {
                       {commentLoading ? <Loader2 size={16} className="animate-spin" /> : 'Post Comment'}
                     </button>
                   </div>
+                )}
+
+                {/* Load older comments (prepends the previous 50 above) */}
+                {commentsHasMore && (
+                  <button
+                    onClick={loadOlderComments}
+                    disabled={loadingOlderComments}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs text-aurora-indigo font-semibold hover:underline disabled:opacity-50 py-1"
+                  >
+                    {loadingOlderComments && <Loader2 size={12} className="animate-spin" />}
+                    {loadingOlderComments ? 'Loading…' : 'Load older comments'}
+                  </button>
                 )}
 
                 {/* Comments list */}

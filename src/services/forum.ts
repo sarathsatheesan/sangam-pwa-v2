@@ -7,6 +7,7 @@
 
 import {
   collection,
+  collectionGroup,
   query,
   where,
   limit,
@@ -349,137 +350,59 @@ export async function unacceptReply(threadId: string, replyId: string): Promise<
 
 /* ─── votes (forumLikes subcollections) ─── */
 
-export interface VoteSyncResult {
-  /** Current user's surviving vote ('up' | 'down') or null. */
-  voteType: string | null;
-  /** Recomputed absolute score after dedupe (written back to the doc). */
-  correctScore: number;
-}
-
 /**
- * Reads ALL vote docs in a thread's forumLikes subcollection, dedupes per
- * user (keeps the deterministic doc id === userId, deletes the rest, migrates
- * the current user's vote if needed), writes the corrected absolute score
- * back to the thread, and returns the current user's vote + corrected score.
- * Moved verbatim from the page's loadThreadVotes inner loop.
+ * Session 49 — vote-state redesign (replaces syncThreadVoteState /
+ * syncReplyVoteState, removed).
+ *
+ * OLD: every forum visit read the ENTIRE forumLikes subcollection of every
+ * visible thread (x50) and reply (x100), then unconditionally WROTE a
+ * recomputed voteScore back to each doc — O(votes) reads + 150 writes per
+ * user per visit.
+ *
+ * NEW: one collection-group query fetches only the current user's vote docs
+ * across ALL threads and replies. Displayed scores come from the denormalized
+ * voteScore already stored on each thread/reply doc, which persistThreadVote/
+ * persistReplyVote maintain atomically via increment() — and which is
+ * currently accurate precisely because the old repair loop ran constantly.
+ * Legacy duplicate/random-ID vote docs are still cleaned lazily per user the
+ * next time they vote (see persistThreadVote's cleanup query).
+ *
+ * Requires the forumLikes.userId COLLECTION_GROUP index (fieldOverrides in
+ * firestore.indexes.json — deploy with `firebase deploy --only
+ * firestore:indexes` BEFORE/with hosting). If the index is still building,
+ * the query throws; we degrade gracefully to "no votes highlighted" rather
+ * than breaking the forum.
  */
-export async function syncThreadVoteState(
-  threadId: string,
-  currentUserId: string,
-): Promise<VoteSyncResult> {
-  const threadDocRef = doc(db, 'forumThreads', threadId);
-  const likesCollRef = collection(threadDocRef, 'forumLikes');
-
-  // Read ALL vote docs in this thread's subcollection
-  const allVotes = await getDocs(likesCollRef);
-  let foundVoteType: string | null = null;
-  const toDelete: Promise<void>[] = [];
-  let correctScore = 0;
-
-  // Group by userId to find duplicates
-  const userVoteMap = new Map<string, { docId: string; voteType: string; ref: any }[]>();
-  allVotes.docs.forEach((d) => {
-    const data = d.data();
-    const uid = data.userId;
-    if (!uid) { toDelete.push(deleteDoc(d.ref)); return; } // orphan doc
-    const arr = userVoteMap.get(uid) || [];
-    arr.push({ docId: d.id, voteType: data.voteType, ref: d.ref });
-    userVoteMap.set(uid, arr);
-  });
-
-  // For each user, keep only the deterministic doc (id === userId), delete the rest
-  userVoteMap.forEach((docs, uid) => {
-    let kept: { voteType: string } | null = null;
-    // Prefer the deterministic doc
-    const detDoc = docs.find((d) => d.docId === uid);
-    if (detDoc) {
-      kept = detDoc;
-      // Delete all non-deterministic docs for this user
-      docs.forEach((d) => { if (d.docId !== uid) toDelete.push(deleteDoc(d.ref)); });
-    } else {
-      // No deterministic doc — keep the first, delete the rest, migrate
-      kept = docs[0];
-      docs.slice(1).forEach((d) => toDelete.push(deleteDoc(d.ref)));
-    }
-
-    if (kept) {
-      if (kept.voteType === 'up') correctScore++;
-      else if (kept.voteType === 'down') correctScore--;
-    }
-
-    // Track current user's vote
-    if (uid === currentUserId && kept) {
-      foundVoteType = kept.voteType;
-    }
-  });
-
-  // Execute all deletions
-  if (toDelete.length > 0) await Promise.all(toDelete);
-
-  // Migrate current user's vote to deterministic doc if needed
-  if (foundVoteType && !allVotes.docs.some((d) => d.id === currentUserId)) {
-    await setDoc(doc(likesCollRef, currentUserId), { userId: currentUserId, voteType: foundVoteType, createdAt: serverTimestamp() });
-  }
-
-  // Fix the thread's score to the correct absolute value
-  await updateDoc(threadDocRef, { voteScore: correctScore, likes: correctScore });
-
-  return { voteType: foundVoteType, correctScore };
+export interface MyForumVotes {
+  threadVotes: Map<string, 'up' | 'down'>;
+  replyVotes: Map<string, 'up' | 'down'>;
 }
 
-/** Reply counterpart of syncThreadVoteState — moved verbatim from loadReplyVotes. */
-export async function syncReplyVoteState(
-  replyId: string,
-  currentUserId: string,
-): Promise<VoteSyncResult> {
-  const replyDocRef = doc(db, 'forumReplies', replyId);
-  const likesCollRef = collection(replyDocRef, 'forumLikes');
-
-  const allVotes = await getDocs(likesCollRef);
-  let foundVoteType: string | null = null;
-  const toDelete: Promise<void>[] = [];
-  let correctScore = 0;
-
-  const userVoteMap = new Map<string, { docId: string; voteType: string; ref: any }[]>();
-  allVotes.docs.forEach((d) => {
-    const data = d.data();
-    const uid = data.userId;
-    if (!uid) { toDelete.push(deleteDoc(d.ref)); return; }
-    const arr = userVoteMap.get(uid) || [];
-    arr.push({ docId: d.id, voteType: data.voteType, ref: d.ref });
-    userVoteMap.set(uid, arr);
-  });
-
-  userVoteMap.forEach((docs, uid) => {
-    let kept: { voteType: string } | null = null;
-    const detDoc = docs.find((d) => d.docId === uid);
-    if (detDoc) {
-      kept = detDoc;
-      docs.forEach((d) => { if (d.docId !== uid) toDelete.push(deleteDoc(d.ref)); });
-    } else {
-      kept = docs[0];
-      docs.slice(1).forEach((d) => toDelete.push(deleteDoc(d.ref)));
-    }
-
-    if (kept) {
-      if (kept.voteType === 'up') correctScore++;
-      else if (kept.voteType === 'down') correctScore--;
-    }
-
-    if (uid === currentUserId && kept) {
-      foundVoteType = kept.voteType;
-    }
-  });
-
-  if (toDelete.length > 0) await Promise.all(toDelete);
-
-  if (foundVoteType && !allVotes.docs.some((d) => d.id === currentUserId)) {
-    await setDoc(doc(likesCollRef, currentUserId), { userId: currentUserId, voteType: foundVoteType, createdAt: serverTimestamp() });
+export async function fetchMyForumVotes(userId: string): Promise<MyForumVotes> {
+  const threadVotes = new Map<string, 'up' | 'down'>();
+  const replyVotes = new Map<string, 'up' | 'down'>();
+  try {
+    const snap = await getDocs(
+      query(collectionGroup(db, 'forumLikes'), where('userId', '==', userId)),
+    );
+    snap.docs.forEach((d) => {
+      const voteType = d.data().voteType;
+      if (voteType !== 'up' && voteType !== 'down') return;
+      const parent = d.ref.parent.parent; // forumThreads/{id} or forumReplies/{id}
+      if (!parent) return;
+      const isDeterministic = d.id === userId;
+      const target = parent.parent.id === 'forumThreads' ? threadVotes
+        : parent.parent.id === 'forumReplies' ? replyVotes
+        : null;
+      if (!target) return;
+      // Legacy random-ID docs may coexist with the deterministic doc for the
+      // same item; the deterministic one wins (matches old dedupe semantics).
+      if (isDeterministic || !target.has(parent.id)) target.set(parent.id, voteType);
+    });
+  } catch (err) {
+    console.error('[forum] fetchMyForumVotes failed (index building?):', err);
   }
-
-  await updateDoc(replyDocRef, { voteScore: correctScore, likes: correctScore });
-
-  return { voteType: foundVoteType, correctScore };
+  return { threadVotes, replyVotes };
 }
 
 /**

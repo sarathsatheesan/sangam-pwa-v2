@@ -29,8 +29,12 @@ import {
   increment,
   serverTimestamp,
   arrayUnion,
+  query,
+  orderBy,
+  limit,
+  startAfter,
 } from 'firebase/firestore';
-import type { DocumentData } from 'firebase/firestore';
+import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { z } from 'zod';
 import { db } from './firebase';
 
@@ -165,68 +169,110 @@ function observeListing(raw: { id: string } & DocumentData): void {
 /* ─── listings: list / create / update / delete ─── */
 
 /**
- * All listings, mapped with the page's exact default-filling and isHidden
- * skip.
- *
- * UNBOUNDED QUERY (flagged Session 48): downloads the ENTIRE `listings`
- * collection — no limit(), no orderBy(), no where(). Exactly what the page
- * did (all filtering/sorting is client-side). Left as-is per the parity rule;
- * needs a dedicated pagination session.
+ * Per-doc mapping shared by the paginated list paths — the page's exact
+ * default-filling and isHidden skip (returns null for hidden docs), plus
+ * zod observe-mode validation. Byte-identical field mapping to the old
+ * listAllListings (Session 48).
  */
-export async function listAllListings(): Promise<HousingListing[]> {
-  const snapshot = await getDocs(collection(db, LISTINGS_COL));
-  const data: HousingListing[] = snapshot.docs
-    .map((d) => {
-      const data = d.data();
-      if (data.isHidden) return null;
-      observeListing({ id: d.id, ...data });
-      return {
-        id: d.id,
-        title: data.title || '',
-        type: data.type || 'rent',
-        price: data.price || '',
-        beds: data.beds || 0,
-        baths: data.baths || 0,
-        sqft: data.sqft || 0,
-        address: data.address || '',
-        locCity: data.locCity || data.city || '',
-        locState: data.locState || data.state || '',
-        locZip: data.locZip || data.zip || '',
-        desc: data.desc || '',
-        tags: data.tags || [],
-        featured: data.featured || false,
-        emoji: data.emoji || '🏠',
-        bgColor: data.bgColor || '#F5F5F5',
-        posterName: data.posterName || 'Anonymous',
-        posterAvatar: data.posterAvatar || '',
-        posterId: data.posterId || '',
-        createdAt: data.createdAt,
-        heritage: data.heritage,
-        contactPhone: data.contactPhone || '',
-        contactEmail: data.contactEmail || '',
-        availableDate: data.availableDate || '',
-        petPolicy: data.petPolicy || '',
-        parking: data.parking || '',
-        photos: data.photos || [],
-        coverPhotoIndex: data.coverPhotoIndex || 0,
-        videoUrl: data.videoUrl || '',
-        yearBuilt: data.yearBuilt || '',
-        lotSize: data.lotSize || '',
-        propertyType: data.propertyType || '',
-        heating: data.heating || '',
-        cooling: data.cooling || '',
-        laundry: data.laundry || '',
-        hoa: data.hoa || '',
-        status: data.status || 'active',
-        walkScore: data.walkScore,
-        transitScore: data.transitScore,
-        neighborhoodHighlights: data.neighborhoodHighlights || [],
-        viewCount: data.viewCount || 0,
-        saveCount: data.saveCount || 0,
-      };
-    })
-    .filter(Boolean) as HousingListing[];
-  return data;
+function mapListingDoc(d: QueryDocumentSnapshot<DocumentData>): HousingListing | null {
+  const data = d.data();
+  if (data.isHidden) return null;
+  observeListing({ id: d.id, ...data });
+  return {
+    id: d.id,
+    title: data.title || '',
+    type: data.type || 'rent',
+    price: data.price || '',
+    beds: data.beds || 0,
+    baths: data.baths || 0,
+    sqft: data.sqft || 0,
+    address: data.address || '',
+    locCity: data.locCity || data.city || '',
+    locState: data.locState || data.state || '',
+    locZip: data.locZip || data.zip || '',
+    desc: data.desc || '',
+    tags: data.tags || [],
+    featured: data.featured || false,
+    emoji: data.emoji || '🏠',
+    bgColor: data.bgColor || '#F5F5F5',
+    posterName: data.posterName || 'Anonymous',
+    posterAvatar: data.posterAvatar || '',
+    posterId: data.posterId || '',
+    createdAt: data.createdAt,
+    heritage: data.heritage,
+    contactPhone: data.contactPhone || '',
+    contactEmail: data.contactEmail || '',
+    availableDate: data.availableDate || '',
+    petPolicy: data.petPolicy || '',
+    parking: data.parking || '',
+    photos: data.photos || [],
+    coverPhotoIndex: data.coverPhotoIndex || 0,
+    videoUrl: data.videoUrl || '',
+    yearBuilt: data.yearBuilt || '',
+    lotSize: data.lotSize || '',
+    propertyType: data.propertyType || '',
+    heating: data.heating || '',
+    cooling: data.cooling || '',
+    laundry: data.laundry || '',
+    hoa: data.hoa || '',
+    status: data.status || 'active',
+    walkScore: data.walkScore,
+    transitScore: data.transitScore,
+    neighborhoodHighlights: data.neighborhoodHighlights || [],
+    viewCount: data.viewCount || 0,
+    saveCount: data.saveCount || 0,
+  };
+}
+
+export interface ListingsPage {
+  listings: HousingListing[];
+  /** Raw cursor for startAfter() on the next page (null when the page was empty). */
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+  hasMore: boolean;
+}
+
+/**
+ * Paginated listing browse: newest-first, 24/page (replaces the old unbounded
+ * listAllListings — approved behavior change, pagination session).
+ *
+ * CAVEAT: orderBy('createdAt') EXCLUDES docs that lack a `createdAt` field.
+ * createListing always writes `createdAt: Timestamp.now()`, so app-created
+ * docs are safe; only hand-created console docs without the field would drop
+ * out of the list.
+ *
+ * `hasMore` is based on the RAW doc count (before the isHidden skip), so a
+ * page can return fewer than pageSize listings while hasMore stays true.
+ */
+export async function listListingsPage(options: {
+  pageSize?: number;
+  cursor?: QueryDocumentSnapshot<DocumentData> | null;
+} = {}): Promise<ListingsPage> {
+  const { pageSize = 24, cursor } = options;
+  const snapshot = await getDocs(query(
+    collection(db, LISTINGS_COL),
+    orderBy('createdAt', 'desc'),
+    ...(cursor ? [startAfter(cursor)] : []),
+    limit(pageSize),
+  ));
+  return {
+    listings: snapshot.docs.map(mapListingDoc).filter(Boolean) as HousingListing[],
+    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
+}
+
+/**
+ * One-shot batch for client-side search/filtering: newest `maxDocs` listings
+ * (default 200), same mapping + isHidden skip as listListingsPage. Fetched
+ * ONCE when the page's search/filters first activate — not per keystroke.
+ */
+export async function listListingsForFilter(maxDocs = 200): Promise<HousingListing[]> {
+  const snapshot = await getDocs(query(
+    collection(db, LISTINGS_COL),
+    orderBy('createdAt', 'desc'),
+    limit(maxDocs),
+  ));
+  return snapshot.docs.map(mapListingDoc).filter(Boolean) as HousingListing[];
 }
 
 export interface CreateListingInput {
@@ -365,16 +411,35 @@ export async function adjustListingSaveCount(listingId: string, delta: number): 
 
 /* ─── comments (listings/{id}/comments subcollection) ─── */
 
+export interface ListingCommentsPage {
+  comments: HousingComment[];
+  /** Raw cursor for startAfter() on the next (older) page. */
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null;
+  hasMore: boolean;
+}
+
 /**
- * All comments on a listing, with the page's exact defaults.
- *
- * UNBOUNDED QUERY (flagged Session 48): full subcollection read, no limit()
- * and no orderBy() (display order relies on Firestore's default doc-id
- * ordering, as before). Left as-is per the parity rule.
+ * Paginated comments on a listing, newest-first (createdAt desc), 50/page —
+ * approved behavior change replacing the old unbounded, doc-id-ordered read.
+ * The page reverses each desc batch to render ascending (oldest at top).
+ * addListingComment always writes createdAt, so no comment doc lacks the
+ * orderBy field. Per-comment mapping/defaults unchanged.
  */
-export async function listListingComments(listingId: string): Promise<HousingComment[]> {
-  const snapshot = await getDocs(collection(db, LISTINGS_COL, listingId, COMMENTS_SUB));
-  return snapshot.docs.map((d) => {
+export async function listListingComments(
+  listingId: string,
+  options: {
+    pageSize?: number;
+    cursor?: QueryDocumentSnapshot<DocumentData> | null;
+  } = {},
+): Promise<ListingCommentsPage> {
+  const { pageSize = 50, cursor } = options;
+  const snapshot = await getDocs(query(
+    collection(db, LISTINGS_COL, listingId, COMMENTS_SUB),
+    orderBy('createdAt', 'desc'),
+    ...(cursor ? [startAfter(cursor)] : []),
+    limit(pageSize),
+  ));
+  const comments: HousingComment[] = snapshot.docs.map((d) => {
     const d_data = d.data();
     return {
       id: d.id,
@@ -388,6 +453,11 @@ export async function listListingComments(listingId: string): Promise<HousingCom
       createdAt: d_data.createdAt,
     };
   });
+  return {
+    comments,
+    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+    hasMore: snapshot.docs.length === pageSize,
+  };
 }
 
 export interface AddListingCommentInput {

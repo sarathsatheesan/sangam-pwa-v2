@@ -3787,3 +3787,46 @@ Then: push, `npm run cap:sync`, `firebase deploy --only hosting`, Android Studio
 **Next:** pagination/denormalization decision for the flagged unbounded queries (forum vote-sync = denormalized vote counts on thread/reply docs; housing/marketplace lists = paginate like business module); reconcile types/firestore.ts with reality (FeedPost mismatch documented S47); unify the duplicated sendXHiddenNotification helpers; then Phase D. Carry-forwards unchanged.
 
 *Updated July 2, 2026 (Session 48) — Phase C COMPLETE: all 5 content modules (feed/forum/events/housing/marketplace) now have zero direct Firestore access, going through typed services (~2,285 lines) with zod observe-mode + shared moderation. TWO production bugs found & fixed while extracting: top-level forum replies and answer un-accept both broken since Mar 7 (a5485e7) by undefined-field Firestore writes — empirically proven, fixed with conditional spreads + deleteField(). Unbounded-query list consolidated for a deliberate pagination session. tsc clean; NOT committed. Firebase mithr-1e5f4; builds Mac-only.*
+
+**Session 48 addendum — LIVE VERIFICATION on enovoapp.com (Chrome, production):** Both bug fixes confirmed end-to-end. (1) Top-level reply: on the tab's STALE service-worker bundle the bug reproduced exactly (`Unsupported field value: undefined (found in field parentReplyId)` from old chunk forum-Cc6lGwbc.js); after hard reload onto the deployed bundle the same action succeeded. (2) Accept/un-accept: created a throwaway Question thread, replied (top-level ✓), Mark as Best ✓ (green Best Answer badge), **Unmark as Best ✓ — badge cleared, zero console errors** (previously threw + left partial state). Also exercised live: createThread, softDeleteReply + replyCount decrement, softDeleteThread, Session 45 shared-Modal create-thread form + Delete Reply/Delete Thread confirms, Session 44 aggregate topic counts. All test content deleted; production left as found. REMINDER: existing users get the new bundle on next visit/refresh (normal SW update lag) — reply-bug reports may trickle in for a day.
+
+---
+
+### Session 49 (July 2, 2026) — Unbounded-Query Remediation: Forum Vote Redesign + Housing/Marketplace Pagination + Comment Caps
+
+**⚠️ DELIBERATE BEHAVIOR CHANGES (user-approved via design review, all three recommended options chosen):**
+
+1. **Forum vote-state redesign (the big one):** `syncThreadVoteState`/`syncReplyVoteState` DELETED. Old cost: every forum visit scanned the full forumLikes subcollection of ~50 threads + ~100 replies AND unconditionally wrote recomputed voteScore back to each — O(all votes) reads + 150 writes per user per visit. New: ONE `collectionGroup('forumLikes') where userId==` query (cached per uid in the page via `getMyVotes` ref) fetches the user's own votes across threads+replies; displayed scores come from the denormalized voteScore on thread/reply docs (maintained atomically by persistThreadVote/persistReplyVote increments; accurate today because the old repair loop ran constantly). Legacy duplicate vote docs still cleaned lazily per-user on next vote. Graceful degradation: if the collection-group index is still building, votes just don't highlight (console error, no crash).
+2. **Housing + marketplace pagination:** full-collection fetch → `listListingsPage`/`fetchListingsPage` (24/page, `orderBy createdAt desc`, cursor, id-deduped append) + "Load More" button; when search/filters active → one cached 200-doc `...ForFilter` batch merged into the same listings array (so all existing mutations keep working). Housing's `filtersActive` includes non-newest sort + saved tab (client-side computations need the batch).
+3. **Comment caps (feed/events/housing/marketplace):** newest-50 + "Load older comments" above the list. Events keeps its live subscription (now orderBy+limit 50) with a `knownCommentsRef` id-merge so older pages aren't clobbered by snapshot updates; feed's post-add refetch now fetches first page only.
+
+**NEW FIRESTORE INDEXES (firestore.indexes.json) — MUST DEPLOY BEFORE/WITH HOSTING:**
+- fieldOverride: `forumLikes.userId` COLLECTION_GROUP scope (for the votes query)
+- composite: `marketplaceComments (listingId ASC, createdAt DESC)` (comments are a top-level collection with where+orderBy)
+```bash
+firebase deploy --only firestore:indexes
+# then check Firebase Console → Firestore → Indexes until both show Enabled, THEN:
+firebase deploy --only hosting
+```
+Marketplace detail-modal comments will error until the composite index is Enabled (typically minutes on small data). Forum votes degrade gracefully meanwhile.
+
+**KNOWN TRADE-OFFS (documented in code, acceptable per design decision):**
+- Docs missing `createdAt` are EXCLUDED by orderBy pagination (all app write paths set it; only console-seeded docs at risk).
+- housing/marketplace `?open=` deep-links resolve against loaded items only — an item older than the window won't auto-open (pre-existing pattern, now narrower). Follow-up candidate: fetch-by-id fallback.
+- Housing result/type counts + saved tab reflect loaded window (up to ~200 in filter mode), not whole collection.
+- Housing comments now ordered by createdAt (was doc-id order — approved fix of a pre-existing quirk).
+
+**Verified:** tsc exit 0; old unbounded fns removed (doc-comment mentions only); new fns wired (forum 3 / housing 5 / marketplace 5 / events 2 call sites); 15 indexes + 1 fieldOverride valid JSON.
+
+**NOT committed — commit from Mac:**
+```bash
+git add src/ firestore.indexes.json hand_off_note_04_16.md
+git commit -m "perf: forum vote collectionGroup redesign, housing/marketplace pagination, comment caps (Session 49)"
+```
+Deploy order: indexes → wait Enabled → hosting → cap:sync + Android.
+
+**Test checklist:** (1) forum: topic list loads, your existing up/down votes highlight correctly, vote/unvote still works, scores unchanged; (2) housing: 24 cards + Load More appends; apply a filter → results from 200-doc batch; saved tab works; (3) marketplace: same + comments in detail modal load (AFTER index Enabled) + Load older; (4) feed: post detail shows ≤50 comments + Load older; adding comment still appears; (5) events: comments live-update still works, Load older appears when 50+; (6) console: no failed-precondition errors after indexes Enabled.
+
+**Next:** types/firestore.ts reconciliation (FeedPost mismatch), unify sendXHiddenNotification duplicates, deep-link fetch-by-id fallback (housing/marketplace), THEN Phase D (messages.tsx decomposition — 76 useState; media→Storage pending DB decision; E2EE + reprice-math tests). Carry-forwards: APK, production TURN, Play submission, S42 device tests.
+
+*Updated July 2, 2026 (Session 49) — Unbounded-query remediation shipped: forum votes now 1 collection-group read + 0 writes per visit (was ~150 subcollection scans + 50 unconditional score writes), housing/marketplace paginated 24/page + Load More with a 200-doc batch under active filters, comments capped at newest-50 with Load-older across feed/events/housing/marketplace. Two new Firestore indexes REQUIRED (forumLikes.userId collection-group override + marketplaceComments composite) — deploy indexes first, wait Enabled, then hosting. tsc clean; NOT committed. Firebase mithr-1e5f4; builds Mac-only.*
