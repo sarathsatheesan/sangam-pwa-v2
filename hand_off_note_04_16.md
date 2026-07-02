@@ -3748,3 +3748,42 @@ Build+deploy hosting, then cap:sync + Run ▶ for Android as usual.
 **Next:** Phase C remainder — apply same extraction to events/housing/marketplace; reconcile types/firestore.ts FeedPost with reality; decide pagination for flagged unbounded queries (esp. forum vote sync); investigate unacceptReply undefined-write. Then Phase D (messages decomposition, media→Storage pending DB decision, E2EE+reprice tests). Carry-forwards unchanged.
 
 *Updated July 2, 2026 (Session 47) — Phase C core done: services/feed.ts (20 fns) + services/forum.ts (15 fns) + shared services/moderation.ts extracted with strict parity (identical queries/payloads, zod observe-mode that never drops docs, unbounded queries flagged not changed); feed.tsx and forum.tsx now have zero direct Firestore access; profile.tsx `as any` 28→0 with emitted-JS byte-identical proof. Sessions 44–46 deployed to all domains + Android tablet earlier this session. tsc clean; NOT committed. Firebase mithr-1e5f4; builds Mac-only.*
+
+---
+
+### Session 48 (July 2, 2026) — Phase C Remainder: Events/Housing/Marketplace Service Extraction + TWO 4-Month-Old Forum Bugs FIXED
+
+**⚠️ TWO PRODUCTION BUG FIXES (the only deliberate behavior changes; everything else strict parity):**
+Both introduced by commit `a5485e7` (Mar 7, 2026); both empirically confirmed this session by running the Firestore SDK's validation in isolation (addDoc/updateDoc THROW on `undefined` field values):
+1. **Top-level forum replies have failed since March** — `createReply` passed `parentReplyId: replyingToId || undefined` into addDoc → throw. Nested replies were fine. FIXED in services/forum.ts with conditional spreads (undefined fields omitted).
+2. **Un-accepting an accepted answer has failed since March** — `{ acceptedReplyId: undefined }` → throw, leaving PARTIAL state (reply unmarked, thread still pointing at it). FIXED with `deleteField()`. Existing threads in partial state will self-correct next time an answer is accepted/unaccepted.
+**MUST TEST after deploy:** post a TOP-LEVEL forum reply (no reply-to), then accept + un-accept an answer on a question thread.
+
+**Phase C remainder (strict parity, same protocol as Session 47):**
+- **NEW `services/events.ts` (~419 lines, 16 fns)** — list w/ triple-fallback, CRUD, RSVP/waitlist, comments subscription, attendees, safety/mute/block, 3-strike helpers. events.tsx: zero firestore imports. NOTE: events uses `Timestamp.now()` not serverTimestamp (pre-existing, preserved); notification field for event id stays `postId` (parity with existing data).
+- **NEW `services/housing.ts` (~512 lines, 16 fns)** — full-scan list, CRUD, comments (incl. last-write-wins likes pattern — preserved), view/save counters, safety, 3-strike helpers. housing.tsx: zero firestore imports. Fire-and-forget call sites preserved without await (as before).
+- **NEW `services/marketplace.ts` (~374 lines, 17 fns)** — full-scan list, CRUD, status transitions, comments, backfill, counters, safety, 3-strike helpers, `createdAtToMillis` comparator helper. marketplace.tsx: zero firestore imports. Edit-payload quirk preserved (writes `sku`+raw `location`; create doesn't).
+- All THREE pages' report flows now route through `submitContentReport` — **all 5 content modules (feed/forum/events/housing/marketplace) share services/moderation.ts**; per-module 3-strike tails stay in pages; returned-count parity verified per page.
+- Zod observe-mode schemas in all three services (warn-and-keep, never drop).
+- Events/housing/marketplace audited for more undefined-write bugs: NONE found (all use || ''/guarded spreads).
+
+**UNBOUNDED QUERIES flagged (cumulative list for the pagination decision session):**
+- housing `listAllListings` + marketplace `fetchListings` — ENTIRE collection per page load (worst two after forum vote-sync).
+- forum vote sync (Session 47) — full likes subcollection ×50 threads / ×100 replies.
+- feed `fetchComments`, events comments subscription, housing/marketplace comments — full subcollections.
+- events `fetchEventDocs` fallback #3 — whole events collection when indexed queries fail.
+
+**Verified (combined, by orchestrator):** tsc exit 0; zero firebase/firestore imports in all 5 extracted pages; 5 services total ~2,285 lines; all handlers present; deleteField fix in place.
+
+**NOT committed — commit from Mac:**
+```bash
+git add src/ hand_off_note_04_16.md
+git commit -m "arch: events/housing/marketplace services + FIX 4-month-old forum reply/unaccept bugs (Session 48 / Phase C complete)"
+```
+Then: push, `npm run cap:sync`, `firebase deploy --only hosting`, Android Studio Run ▶.
+
+**Test checklist (forum bugs first):** (1) post TOP-LEVEL reply → must appear (was broken!); (2) accept then UN-accept answer → checkmark clears (was broken!); (3) nested reply still works; (4) events: create/edit/RSVP/waitlist/comment/report; (5) housing: create/edit/delete listing, comment + like comment, report 3× → auto-hide; (6) marketplace: create/edit/status transitions (pending→available→sold→relist), comment, save toggle, report; (7) console: watch [EventSchema]/[HousingListingSchema]/[MarketplaceSchema] validation warns.
+
+**Next:** pagination/denormalization decision for the flagged unbounded queries (forum vote-sync = denormalized vote counts on thread/reply docs; housing/marketplace lists = paginate like business module); reconcile types/firestore.ts with reality (FeedPost mismatch documented S47); unify the duplicated sendXHiddenNotification helpers; then Phase D. Carry-forwards unchanged.
+
+*Updated July 2, 2026 (Session 48) — Phase C COMPLETE: all 5 content modules (feed/forum/events/housing/marketplace) now have zero direct Firestore access, going through typed services (~2,285 lines) with zod observe-mode + shared moderation. TWO production bugs found & fixed while extracting: top-level forum replies and answer un-accept both broken since Mar 7 (a5485e7) by undefined-field Firestore writes — empirically proven, fixed with conditional spreads + deleteField(). Unbounded-query list consolidated for a deliberate pagination session. tsc clean; NOT committed. Firebase mithr-1e5f4; builds Mac-only.*

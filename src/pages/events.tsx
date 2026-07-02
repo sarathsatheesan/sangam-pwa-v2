@@ -6,13 +6,16 @@ import { Modal } from '@/components/ui/Modal';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import type { AddressResult } from '@/components/shared/AddressAutocomplete';
-import {
-  collection, query, where, orderBy, getDocs, getDoc, addDoc, deleteDoc,
-  doc, updateDoc, Timestamp, limit, arrayUnion, arrayRemove, onSnapshot, serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
+import {
+  fetchEventDocs, createEvent, updateEvent, deleteEvent, updateEventStatus,
+  addEventRsvp, removeEventRsvp, joinEventWaitlist, leaveEventWaitlist,
+  subscribeToEventComments, addEventComment, fetchAttendeeProfiles,
+  fetchUserSafetyData, muteEventForUser, blockUser as blockUserService,
+  hideEvent, sendEventHiddenNotification,
+} from '@/services/events';
+import { submitContentReport } from '@/services/moderation';
 import {
   Search, MapPin, Clock, Calendar, CalendarDays, Users, UserCheck,
   X, Plus, Heart, Sparkles, Ticket, ChevronRight, ArrowLeft,
@@ -542,45 +545,22 @@ export default function EventsPage() {
       const reportedEvent = events.find((ev) => ev.id === reportEventId);
       const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
 
-      // Write to reports collection (stealth: no owner notification)
-      await addDoc(collection(db, 'reports'), {
-        eventId: reportEventId,
-        reportedBy: user.uid,
-        reporterName: userProfile?.name || user.displayName || 'Anonymous',
-        reporterAvatar: userProfile?.avatar || '',
-        category: reportReason,
-        categoryLabel: categoryObj?.label || reportReason,
-        details: reportDetails.trim() || '',
-        createdAt: serverTimestamp(),
-        status: 'pending',
-      });
-
-      // Check if moderationQueue entry already exists for this event
-      const modQueueQuery = query(
-        collection(db, 'moderationQueue'),
-        where('contentId', '==', reportEventId)
-      );
-      const existingMods = await getDocs(modQueueQuery);
-
-      let totalReportCount = 1;
-
-      if (existingMods.docs.length > 0) {
-        const existingDoc = existingMods.docs[0];
-        const existingData = existingDoc.data();
-        totalReportCount = (existingData.reportCount || 1) + 1;
-        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
-          reportCount: totalReportCount,
-          reporters: arrayUnion({
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        await addDoc(collection(db, 'moderationQueue'), {
+      // Shared report flow (Session 48): appends the reports entry (service
+      // adds createdAt + status) and find-or-increments the moderationQueue
+      // entry (service adds reportCount, reporters, createdAt). Payloads are
+      // byte-identical to what this handler wrote inline before.
+      const totalReportCount = await submitContentReport({
+        contentId: reportEventId,
+        reportDoc: {
+          eventId: reportEventId,
+          reportedBy: user.uid,
+          reporterName: userProfile?.name || user.displayName || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          details: reportDetails.trim() || '',
+        },
+        modQueueDoc: {
           type: 'event',
           content: reportedEvent?.title || '',
           contentId: reportEventId,
@@ -595,45 +575,34 @@ export default function EventsPage() {
           reportedBy: user.uid,
           reporterName: userProfile?.name || user.displayName || 'Anonymous',
           reporterAvatar: userProfile?.avatar || '',
-          reportCount: 1,
-          reporters: [{
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }],
-          createdAt: serverTimestamp(),
-        });
-      }
+        },
+        reporter: {
+          uid: user.uid,
+          name: userProfile?.name || user.displayName || 'Anonymous',
+          avatar: userProfile?.avatar || '',
+          category: reportReason,
+          details: reportDetails.trim() || '',
+          createdAt: new Date().toISOString(),
+        },
+      });
 
-      // 3-strike auto-hide
+      // 3-strike auto-hide (stays in the page, driven by the returned count)
       if (totalReportCount >= 3) {
-        await updateDoc(doc(db, 'events', reportEventId), {
-          isHidden: true,
-          hiddenAt: new Date().toISOString(),
-          hiddenReason: 'Auto-hidden: reached 3 community reports',
-        });
+        await hideEvent(reportEventId, 'Auto-hidden: reached 3 community reports');
         if (reportedEvent?.posterId) {
-          await addDoc(collection(db, 'notifications'), {
-            type: 'content_hidden',
+          await sendEventHiddenNotification({
             recipientId: reportedEvent.posterId,
             recipientName: reportedEvent.posterName || '',
             postId: reportEventId,
             reason: 'Your event received multiple community reports and has been temporarily hidden for review.',
             message: 'Your event has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
             actionUrl: '/events',
-            read: false,
-            createdAt: serverTimestamp(),
           });
         }
       }
 
       // Mute-on-report: hide this event from the reporter's view
-      await updateDoc(doc(db, 'users', user.uid), {
-        mutedEvents: arrayUnion(reportEventId),
-      });
+      await muteEventForUser(user.uid, reportEventId);
       setMutedEvents((prev) => new Set(prev).add(reportEventId));
 
       setShowReportModal(false);
@@ -651,9 +620,7 @@ export default function EventsPage() {
   const handleBlockUser = async () => {
     if (!user || !blockTargetUser) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        blockedUsers: arrayUnion(blockTargetUser.uid),
-      });
+      await blockUserService(user.uid, blockTargetUser.uid);
       setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
       setShowBlockConfirm(false);
       setBlockTargetUser(null);
@@ -695,26 +662,14 @@ export default function EventsPage() {
 
   const fetchEvents = async () => {
     try {
-      let snapshot;
-      try {
-        const q = query(collection(db, 'events'), where('disabled', '==', false), orderBy('createdAt', 'desc'), limit(100));
-        snapshot = await getDocs(q);
-      } catch {
-        try {
-          const q = query(collection(db, 'events'), where('disabled', '==', false));
-          snapshot = await getDocs(q);
-        } catch {
-          snapshot = await getDocs(collection(db, 'events'));
-        }
-      }
+      const rawDocs = await fetchEventDocs();
 
       const eventsList: Event[] = [];
-      snapshot.forEach((d) => {
-        const data = d.data();
+      rawDocs.forEach(({ id, data }) => {
         if (data.disabled) return;
         if (data.isHidden) return;
         eventsList.push({
-          id: d.id, title: data.title || '', emoji: data.emoji || EVENT_TYPES[data.type] || '📌',
+          id, title: data.title || '', emoji: data.emoji || EVENT_TYPES[data.type] || '📌',
           type: data.type || 'Other', fullDate: data.fullDate || '', time: data.time || '',
           endTime: data.endTime, location: data.location || '', locCity: data.locCity || data.city || '',
           locState: data.locState || data.state || '', locZip: data.locZip || data.zip || '',
@@ -767,9 +722,8 @@ export default function EventsPage() {
     if (!user) return;
     const loadUserSafetyData = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
+        const data = await fetchUserSafetyData(user.uid);
+        if (data) {
           if (data.mutedEvents) setMutedEvents(new Set(data.mutedEvents));
           if (data.blockedUsers) setBlockedUsers(new Set(data.blockedUsers));
         }
@@ -816,27 +770,16 @@ export default function EventsPage() {
         commentUnsubscribeRef.current();
       }
 
-      const unsubscribe = onSnapshot(
-        collection(db, 'events', eventId, 'comments'),
-        (snapshot) => {
-          const commentsList: EventComment[] = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            commentsList.push({
-              id: doc.id,
-              text: data.text || '',
-              userId: data.userId || '',
-              userName: data.userName || 'Anonymous',
-              userAvatar: data.userAvatar,
-              createdAt: data.createdAt,
-            });
-          });
-          commentsList.sort((a, b) => {
+      const unsubscribe = subscribeToEventComments(
+        eventId,
+        (commentsList) => {
+          const sorted = [...commentsList];
+          sorted.sort((a, b) => {
             const timeA = a.createdAt?.toMillis?.() || new Date(a.createdAt).getTime();
             const timeB = b.createdAt?.toMillis?.() || new Date(b.createdAt).getTime();
             return timeA - timeB;
           });
-          setComments(commentsList);
+          setComments(sorted);
         },
         (error) => {
           console.error('[EventsPage] Comments listener error:', error);
@@ -855,18 +798,8 @@ export default function EventsPage() {
     }
     setAttendeeLoading(true);
     try {
-      const usersRef = collection(db, 'users');
       const userIds = rsvpUserIds.slice(0, 6);
-      const snapshot = await getDocs(query(usersRef, where('__name__', 'in', userIds)));
-      const attendeesList: any[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        attendeesList.push({
-          uid: doc.id,
-          name: data.displayName || 'User',
-          avatar: data.photoURL || '',
-        });
-      });
+      const attendeesList = await fetchAttendeeProfiles(userIds);
       setAttendees(attendeesList);
     } catch (error) {
       console.error('Error loading attendees:', error);
@@ -987,7 +920,8 @@ export default function EventsPage() {
         desc: formData.description, ticket: (formData.ticketType === 'simple' && !formData.price) ? 'free' : 'ticketed',
         organizer: user?.displayName || 'Anonymous', promoted: false, count: 0,
         posterId: user?.uid || '', posterName: user?.displayName || 'Anonymous',
-        createdAt: Timestamp.now(), updatedAt: Timestamp.now(), disabled: false, rsvpUsers: [],
+        // createdAt/updatedAt (Timestamp.now()) are added by createEvent (Session 48)
+        disabled: false, rsvpUsers: [],
         status: 'active',
         contactEmail: formData.contactEmail,
         contactPhone: formData.contactPhone,
@@ -1014,7 +948,7 @@ export default function EventsPage() {
         eventData.ticketTiers = formData.ticketTiers;
       }
 
-      await addDoc(collection(db, 'events'), eventData);
+      await createEvent(eventData);
 
       setFormData({
         title: '', type: 'Community', date: '', endDate: '', time: '', endTime: '',
@@ -1047,30 +981,29 @@ export default function EventsPage() {
     setRsvpAnimating(eventId);
 
     try {
-      const eventRef = doc(db, 'events', eventId);
       const isRSVPed = userRSVPs.has(eventId);
       const isWaitlisted = userWaitlists.has(eventId);
 
       if (isRSVPed) {
         // Remove from RSVP
-        await updateDoc(eventRef, { rsvpUsers: arrayRemove(user.uid), count: Math.max(0, event.count - 1) });
+        await removeEventRsvp(eventId, user.uid, Math.max(0, event.count - 1));
         setUserRSVPs((prev) => { const n = new Set(prev); n.delete(eventId); return n; });
         setEvents((prev) => prev.map((e) => e.id === eventId ? { ...e, count: Math.max(0, e.count - 1), rsvpUsers: (e.rsvpUsers || []).filter((u) => u !== user.uid) } : e));
       } else if (isWaitlisted) {
         // Remove from waitlist
-        await updateDoc(eventRef, { waitlistUsers: arrayRemove(user.uid) });
+        await leaveEventWaitlist(eventId, user.uid);
         setUserWaitlists((prev) => { const n = new Set(prev); n.delete(eventId); return n; });
         setEvents((prev) => prev.map((e) => e.id === eventId ? { ...e, waitlistUsers: (e.waitlistUsers || []).filter((u) => u !== user.uid) } : e));
       } else if (isSoldOutStatus || (event.capacity && (event.rsvpUsers?.length || 0) >= event.capacity)) {
         // Add to waitlist
         if (event.waitlistEnabled) {
-          await updateDoc(eventRef, { waitlistUsers: arrayUnion(user.uid) });
+          await joinEventWaitlist(eventId, user.uid);
           setUserWaitlists((prev) => new Set([...prev, eventId]));
           setEvents((prev) => prev.map((e) => e.id === eventId ? { ...e, waitlistUsers: [...(e.waitlistUsers || []), user.uid] } : e));
         }
       } else {
         // Add to RSVP
-        await updateDoc(eventRef, { rsvpUsers: arrayUnion(user.uid), count: event.count + 1 });
+        await addEventRsvp(eventId, user.uid, event.count + 1);
         setUserRSVPs((prev) => new Set([...prev, eventId]));
         setEvents((prev) => prev.map((e) => e.id === eventId ? { ...e, count: e.count + 1, rsvpUsers: [...(e.rsvpUsers || []), user.uid] } : e));
       }
@@ -1095,12 +1028,12 @@ export default function EventsPage() {
 
     setCommentLoading(true);
     try {
-      await addDoc(collection(db, 'events', eventId, 'comments'), {
+      // createdAt (Timestamp.now()) is added by addEventComment (Session 48)
+      await addEventComment(eventId, {
         text: newComment,
         userId: user.uid,
         userName: user.displayName || 'Anonymous',
         userAvatar: userProfile?.avatar || '',
-        createdAt: Timestamp.now(),
       });
       setNewComment('');
     } catch (error) {
@@ -1118,7 +1051,7 @@ export default function EventsPage() {
   const confirmDeleteEvent = async () => {
     if (!deleteEventId) return;
     try {
-      await deleteDoc(doc(db, 'events', deleteEventId));
+      await deleteEvent(deleteEventId);
       setEvents(events.filter((e) => e.id !== deleteEventId));
       setSelectedEvent(null);
     } catch (error) {
@@ -1202,7 +1135,7 @@ export default function EventsPage() {
         contactEmail: editData.contactEmail,
         contactPhone: editData.contactPhone,
         waitlistEnabled: editData.waitlistEnabled,
-        updatedAt: Timestamp.now(),
+        // updatedAt (Timestamp.now()) is added by updateEvent (Session 48)
       };
 
       if (editData.endTime) {
@@ -1228,7 +1161,7 @@ export default function EventsPage() {
         updateData.coverPhotoIndex = 0;
       }
 
-      await updateDoc(doc(db, 'events', selectedEvent.id), updateData);
+      await updateEvent(selectedEvent.id, updateData);
 
       const updated = {
         ...selectedEvent,
@@ -1248,7 +1181,7 @@ export default function EventsPage() {
 
   const handleChangeStatus = async (eventId: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, 'events', eventId), { status: newStatus });
+      await updateEventStatus(eventId, newStatus);
       setEvents((prev) => prev.map((e) => e.id === eventId ? { ...e, status: newStatus as any } : e));
       if (selectedEvent?.id === eventId) {
         setSelectedEvent((prev) => prev ? { ...prev, status: newStatus as any } : prev);

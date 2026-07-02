@@ -21,6 +21,7 @@ import {
   serverTimestamp,
   arrayUnion,
   getCountFromServer,
+  deleteField,
 } from 'firebase/firestore';
 import type { DocumentData } from 'firebase/firestore';
 import { z } from 'zod';
@@ -276,6 +277,11 @@ export interface CreateReplyInput {
  * same two sequential writes, same order, as the page did. Returns the reply id.
  */
 export async function createReply(input: CreateReplyInput): Promise<string> {
+  // BUG FIX (Session 48): the page used to pass `parentReplyId: replyingToId
+  // || undefined` straight into addDoc. Firestore's SDK throws on `undefined`
+  // (verified empirically), so TOP-LEVEL replies have failed since commit
+  // a5485e7 (Mar 7, 2026). Undefined optional fields are now omitted, which
+  // is what that code always intended. Nested replies were unaffected.
   const replyRef = await addDoc(collection(db, 'forumReplies'), {
     threadId: input.threadId,
     content: input.content,
@@ -290,9 +296,9 @@ export async function createReply(input: CreateReplyInput): Promise<string> {
     isFlagged: input.isFlagged,
     isRemoved: false,
     createdAt: serverTimestamp(),
-    parentReplyId: input.parentReplyId,
-    parentAuthorName: input.parentAuthorName,
-    depth: input.depth,
+    ...(input.parentReplyId !== undefined ? { parentReplyId: input.parentReplyId } : {}),
+    ...(input.parentAuthorName !== undefined ? { parentAuthorName: input.parentAuthorName } : {}),
+    ...(input.depth !== undefined ? { depth: input.depth } : {}),
   });
   const threadRef = doc(db, 'forumThreads', input.threadId);
   await updateDoc(threadRef, { replyCount: increment(1), lastReplyAt: serverTimestamp() });
@@ -333,7 +339,12 @@ export async function unacceptReply(threadId: string, replyId: string): Promise<
   const replyRef = doc(db, 'forumReplies', replyId);
 
   await updateDoc(replyRef, { isAccepted: false });
-  await updateDoc(threadRef, { acceptedReplyId: undefined });
+  // BUG FIX (Session 48): was `{ acceptedReplyId: undefined }`, which the
+  // Firestore SDK rejects (verified empirically) — un-accepting an answer has
+  // thrown since commit a5485e7 (Mar 7, 2026), leaving partial state (reply
+  // unmarked, thread still pointing at it). deleteField() removes the field,
+  // which is what the code always intended.
+  await updateDoc(threadRef, { acceptedReplyId: deleteField() });
 }
 
 /* ─── votes (forumLikes subcollections) ─── */

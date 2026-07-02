@@ -2,21 +2,25 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { timeAgo } from '@/utils/dateFormatting';
 import {
-  collection,
-  getDocs,
-  getDoc,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-  doc,
-  Timestamp,
-  increment,
-  query,
-  where,
-  serverTimestamp,
-  arrayUnion,
-} from 'firebase/firestore';
-import { db } from '@/services/firebase';
+  fetchListings as fetchListingsFromDb,
+  fetchUserSafetyData,
+  backfillListingSellerInfo,
+  fetchListingComments,
+  createListing,
+  updateListing,
+  deleteListing,
+  updateListingStatus,
+  adjustListingSaveCount,
+  incrementListingViewCount,
+  addListingComment,
+  hideListing,
+  sendListingHiddenNotification,
+  muteListingForUser,
+  blockUser as blockUserInDb,
+  createdAtToMillis,
+} from '@/services/marketplace';
+import type { MarketplaceItem, MarketplaceComment as Comment } from '@/services/marketplace';
+import { submitContentReport } from '@/services/moderation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
@@ -78,57 +82,10 @@ import {
   Image,
 } from 'lucide-react';
 
-// TYPE DEFINITIONS
-interface MarketplaceItem {
-  id: string;
-  title: string;
-  price: string;
-  category: string;
-  condition: 'new' | 'like_new' | 'good' | 'fair' | 'poor';
-  description: string;
-  photos: string[];
-  location: string;
-  locCity: string;
-  locState: string;
-  locZip: string;
-  sellerId: string;
-  sellerName: string;
-  sellerAvatar: string;
-  createdAt: any;
-  status: 'available' | 'pending' | 'sold';
-  featured: boolean;
-  viewCount: number;
-  saveCount: number;
-  brand?: string;
-  model?: string;
-  color?: string;
-  size?: string;
-  material?: string;
-  dimensions?: string;
-  weight?: string;
-  sku?: string;
-  deliveryMethod: 'pickup' | 'shipping' | 'both';
-  shippingPrice?: string;
-  negotiable: boolean;
-  tags: string[];
-  videoUrl?: string;
-  heritage?: string[];
-  isHidden?: boolean;
-  hiddenAt?: string;
-  hiddenReason?: string;
-}
+// TYPE DEFINITIONS: MarketplaceItem and Comment (MarketplaceComment) moved
+// verbatim to '@/services/marketplace' (Session 48) and imported type-only above.
 
 // REPORT_CATEGORIES now imported from '@/constants/config' (Session 46 dedup)
-
-interface Comment {
-  id: string;
-  listingId: string;
-  userId: string;
-  userName: string;
-  userAvatar: string;
-  text: string;
-  createdAt: any;
-}
 
 const CATEGORIES = [
   'Vehicles',
@@ -666,13 +623,7 @@ export default function MarketplacePage() {
     const fetchListings = async () => {
       try {
         setLoading(true);
-        const querySnapshot = await getDocs(collection(db, 'marketplaceListings'));
-        const items: MarketplaceItem[] = [];
-        querySnapshot.docs.forEach((d) => {
-          const data = d.data();
-          if (data.isHidden) return;
-          items.push({ ...(data as Omit<MarketplaceItem, 'id'>), id: d.id });
-        });
+        const items = await fetchListingsFromDb();
         setListings(items);
       } catch (error) {
         console.error('Error fetching listings:', error);
@@ -689,9 +640,8 @@ export default function MarketplacePage() {
     if (!user) return;
     const loadUserSafetyData = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
+        const data = await fetchUserSafetyData(user.uid);
+        if (data) {
           if (data.mutedListings) setMutedListings(new Set(data.mutedListings));
           if (data.blockedUsers) setBlockedUsers(new Set(data.blockedUsers));
         }
@@ -720,12 +670,11 @@ export default function MarketplacePage() {
     // Update Firestore and local state
     myListingsToBackfill.forEach(async (item) => {
       try {
-        const updates: any = {};
+        const updates: { heritage?: string[]; sellerAvatar?: string } = {};
         if (!item.heritage || item.heritage.length === 0) updates.heritage = profileHeritage;
         if (!item.sellerAvatar || item.sellerAvatar === '?' || item.sellerAvatar === '') updates.sellerAvatar = profileAvatar;
         if (Object.keys(updates).length > 0) {
-          const listingRef = doc(db, 'marketplaceListings', item.id);
-          await updateDoc(listingRef, updates);
+          await backfillListingSellerInfo(item.id, updates);
         }
       } catch (err) {
         console.error('Error backfilling listing', item.id, err);
@@ -776,13 +725,7 @@ export default function MarketplacePage() {
       if (!selectedItem || !isFeatureEnabled('marketplace_comments')) return;
 
       try {
-        const querySnapshot = await getDocs(
-          query(collection(db, 'marketplaceComments'), where('listingId', '==', selectedItem.id))
-        );
-        const itemComments = querySnapshot.docs.map((doc) => ({
-          ...(doc.data() as Omit<Comment, 'id'>),
-          id: doc.id,
-        }));
+        const itemComments = await fetchListingComments(selectedItem.id);
         setComments((prev) => ({ ...prev, [selectedItem.id]: itemComments }));
       } catch (error) {
         console.error('Error fetching comments:', error);
@@ -842,8 +785,8 @@ export default function MarketplacePage() {
           return (b.saveCount || 0) - (a.saveCount || 0);
         case 'newest':
         default:
-          const dateA = a.createdAt instanceof Timestamp ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime();
-          const dateB = b.createdAt instanceof Timestamp ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime();
+          const dateA = createdAtToMillis(a.createdAt);
+          const dateB = createdAtToMillis(b.createdAt);
           return dateB - dateA;
       }
     });
@@ -885,7 +828,7 @@ export default function MarketplacePage() {
     }
 
     try {
-      const newListing: Omit<MarketplaceItem, 'id'> = {
+      const newListing: Omit<MarketplaceItem, 'id' | 'createdAt'> = {
         title: formData.title.trim(),
         price: formData.price.trim(),
         category: formData.category,
@@ -899,7 +842,6 @@ export default function MarketplacePage() {
         sellerId: user.uid,
         sellerName: userProfile?.name || user.displayName || user.email?.split('@')[0] || 'Anonymous',
         sellerAvatar: userProfile?.avatar || '🧑',
-        createdAt: Timestamp.now(),
         status: 'available',
         featured: false,
         viewCount: 0,
@@ -919,8 +861,8 @@ export default function MarketplacePage() {
         ...(formData.videoUrl.trim() && { videoUrl: formData.videoUrl.trim() }),
       };
 
-      const docRef = await addDoc(collection(db, 'marketplaceListings'), newListing);
-      setListings((prev) => [...prev, { ...newListing, id: docRef.id }]);
+      const { id, createdAt } = await createListing(newListing);
+      setListings((prev) => [...prev, { ...newListing, createdAt, id }]);
       resetForm();
       setShowCreateModal(false);
     } catch (error: any) {
@@ -945,10 +887,7 @@ export default function MarketplacePage() {
 
     // Update Firestore
     try {
-      const listingRef = doc(db, 'marketplaceListings', itemId);
-      await updateDoc(listingRef, {
-        saveCount: increment(isSaved ? -1 : 1),
-      });
+      await adjustListingSaveCount(itemId, isSaved ? -1 : 1);
       setListings((prev) =>
         prev.map((item) =>
           item.id === itemId
@@ -968,10 +907,7 @@ export default function MarketplacePage() {
 
     // Increment view count
     try {
-      const listingRef = doc(db, 'marketplaceListings', item.id);
-      await updateDoc(listingRef, {
-        viewCount: increment(1),
-      });
+      await incrementListingViewCount(item.id);
       setListings((prev) =>
         prev.map((i) => (i.id === item.id ? { ...i, viewCount: (i.viewCount || 0) + 1 } : i))
       );
@@ -985,19 +921,18 @@ export default function MarketplacePage() {
     if (!user || !selectedItem || !newComment.trim() || !isFeatureEnabled('marketplace_comments')) return;
 
     try {
-      const comment: Omit<Comment, 'id'> = {
+      const comment: Omit<Comment, 'id' | 'createdAt'> = {
         listingId: selectedItem.id,
         userId: user.uid,
         userName: userProfile?.name || 'Anonymous',
         userAvatar: userProfile?.avatar || '',
         text: newComment,
-        createdAt: Timestamp.now(),
       };
 
-      const docRef = await addDoc(collection(db, 'marketplaceComments'), comment);
+      const { id, createdAt } = await addListingComment(comment);
       setComments((prev) => ({
         ...prev,
-        [selectedItem.id]: [...(prev[selectedItem.id] || []), { ...comment, id: docRef.id }],
+        [selectedItem.id]: [...(prev[selectedItem.id] || []), { ...comment, createdAt, id }],
       }));
       setNewComment('');
     } catch (error) {
@@ -1015,7 +950,7 @@ export default function MarketplacePage() {
   const confirmDeleteListing = async () => {
     if (!deleteItemId) return;
     try {
-      await deleteDoc(doc(db, 'marketplaceListings', deleteItemId));
+      await deleteListing(deleteItemId);
       setListings((prev) => prev.filter((item) => item.id !== deleteItemId));
       setShowDetailModal(false);
     } catch (error) {
@@ -1071,8 +1006,7 @@ export default function MarketplacePage() {
         heritage: formHeritage,
       };
 
-      const listingRef = doc(db, 'marketplaceListings', editingItem.id);
-      await updateDoc(listingRef, updatedData);
+      await updateListing(editingItem.id, updatedData);
 
       setListings((prev) =>
         prev.map((item) =>
@@ -1112,8 +1046,7 @@ export default function MarketplacePage() {
   // Handle mark as sold/available/pending
   const handleChangeStatus = async (itemId: string, newStatus: 'available' | 'pending' | 'sold') => {
     try {
-      const listingRef = doc(db, 'marketplaceListings', itemId);
-      await updateDoc(listingRef, { status: newStatus });
+      await updateListingStatus(itemId, newStatus);
       setListings((prev) =>
         prev.map((item) => (item.id === itemId ? { ...item, status: newStatus } : item))
       );
@@ -1168,45 +1101,21 @@ export default function MarketplacePage() {
       const reportedListing = listings.find((l) => l.id === reportListingId);
       const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
 
-      // Write to reports collection (stealth: no owner notification)
-      await addDoc(collection(db, 'reports'), {
-        listingId: reportListingId,
-        reportedBy: user.uid,
-        reporterName: userProfile?.name || user.displayName || 'Anonymous',
-        reporterAvatar: userProfile?.avatar || '',
-        category: reportReason,
-        categoryLabel: categoryObj?.label || reportReason,
-        details: reportDetails.trim() || '',
-        createdAt: serverTimestamp(),
-        status: 'pending',
-      });
-
-      // Check if moderationQueue entry already exists for this listing
-      const modQueueQuery = query(
-        collection(db, 'moderationQueue'),
-        where('contentId', '==', reportListingId)
-      );
-      const existingMods = await getDocs(modQueueQuery);
-
-      let totalReportCount = 1;
-
-      if (existingMods.docs.length > 0) {
-        const existingDoc = existingMods.docs[0];
-        const existingData = existingDoc.data();
-        totalReportCount = (existingData.reportCount || 1) + 1;
-        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
-          reportCount: totalReportCount,
-          reporters: arrayUnion({
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        await addDoc(collection(db, 'moderationQueue'), {
+      // Shared report flow (Session 47/48): appends to `reports` (service adds
+      // createdAt + status:'pending') and finds-or-increments the crowdsourced
+      // moderationQueue entry (service adds reportCount/reporters/createdAt).
+      const totalReportCount = await submitContentReport({
+        contentId: reportListingId,
+        reportDoc: {
+          listingId: reportListingId,
+          reportedBy: user.uid,
+          reporterName: userProfile?.name || user.displayName || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          details: reportDetails.trim() || '',
+        },
+        modQueueDoc: {
           type: 'listing',
           content: reportedListing?.title || '',
           contentId: reportListingId,
@@ -1221,45 +1130,34 @@ export default function MarketplacePage() {
           reportedBy: user.uid,
           reporterName: userProfile?.name || user.displayName || 'Anonymous',
           reporterAvatar: userProfile?.avatar || '',
-          reportCount: 1,
-          reporters: [{
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }],
-          createdAt: serverTimestamp(),
-        });
-      }
+        },
+        reporter: {
+          uid: user.uid,
+          name: userProfile?.name || user.displayName || 'Anonymous',
+          avatar: userProfile?.avatar || '',
+          category: reportReason,
+          details: reportDetails.trim() || '',
+          createdAt: new Date().toISOString(),
+        },
+      });
 
-      // 3-strike auto-hide
+      // 3-strike auto-hide (marketplace-specific tail — stays in the page)
       if (totalReportCount >= 3) {
-        await updateDoc(doc(db, 'marketplaceListings', reportListingId), {
-          isHidden: true,
-          hiddenAt: new Date().toISOString(),
-          hiddenReason: 'Auto-hidden: reached 3 community reports',
-        });
+        await hideListing(reportListingId, 'Auto-hidden: reached 3 community reports');
         if (reportedListing?.sellerId) {
-          await addDoc(collection(db, 'notifications'), {
-            type: 'content_hidden',
+          await sendListingHiddenNotification({
             recipientId: reportedListing.sellerId,
             recipientName: reportedListing.sellerName || '',
             postId: reportListingId,
             reason: 'Your marketplace listing received multiple community reports and has been temporarily hidden for review.',
             message: 'Your marketplace listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
             actionUrl: '/marketplace',
-            read: false,
-            createdAt: serverTimestamp(),
           });
         }
       }
 
       // Mute-on-report: hide this listing from the reporter's view
-      await updateDoc(doc(db, 'users', user.uid), {
-        mutedListings: arrayUnion(reportListingId),
-      });
+      await muteListingForUser(user.uid, reportListingId);
       setMutedListings((prev) => new Set(prev).add(reportListingId));
 
       setReportedListings((prev) => new Set(prev).add(reportListingId));
@@ -1280,9 +1178,7 @@ export default function MarketplacePage() {
   const handleBlockUser = async () => {
     if (!user || !blockTargetUser) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        blockedUsers: arrayUnion(blockTargetUser.uid),
-      });
+      await blockUserInDb(user.uid, blockTargetUser.uid);
       setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
       setShowBlockConfirm(false);
       setBlockTargetUser(null);

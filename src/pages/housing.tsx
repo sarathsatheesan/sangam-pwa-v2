@@ -4,24 +4,27 @@ import { copyToClipboard } from '@/utils/clipboard';
 import { timeAgo } from '@/utils/dateFormatting';
 import AddressAutocomplete from '@/components/shared/AddressAutocomplete';
 import type { AddressResult } from '@/components/shared/AddressAutocomplete';
-import {
-  collection,
-  getDocs,
-  getDoc,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-  doc,
-  Timestamp,
-  increment,
-  query,
-  where,
-  serverTimestamp,
-  arrayUnion,
-} from 'firebase/firestore';
-import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
+import {
+  listAllListings,
+  createListing,
+  updateListing,
+  deleteListing,
+  incrementListingViewCount,
+  adjustListingSaveCount,
+  listListingComments,
+  addListingComment,
+  setListingCommentLikes,
+  deleteListingComment,
+  getUserHousingSafetyData,
+  muteListingForUser,
+  blockUser,
+  hideListing,
+  sendListingHiddenNotification,
+} from '@/services/housing';
+import type { HousingListing, HousingComment } from '@/services/housing';
+import { submitContentReport } from '@/services/moderation';
 import { REPORT_CATEGORIES } from '@/constants/config';
 import {
   Search, X, Heart, MapPin, BedDouble, Bath, Ruler, Home,
@@ -41,68 +44,13 @@ import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import { Modal } from '@/components/ui/Modal';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
-/* ─── types ─── */
-interface Listing {
-  id: string;
-  title: string;
-  type: 'rent' | 'sale' | 'roommate' | 'sublet';
-  price: string;
-  beds: number;
-  baths: number;
-  sqft: number;
-  address: string;
-  locCity: string;
-  locState: string;
-  locZip: string;
-  desc: string;
-  tags: string[];
-  featured: boolean;
-  emoji: string;
-  bgColor: string;
-  posterName: string;
-  posterAvatar: string;
-  posterId: string;
-  createdAt: any;
-  heritage?: string | string[];
-  contactPhone?: string;
-  contactEmail?: string;
-  availableDate?: string;
-  petPolicy?: string;
-  parking?: string;
-  photos?: string[];
-  coverPhotoIndex?: number;
-  videoUrl?: string;
-  yearBuilt?: string;
-  lotSize?: string;
-  propertyType?: string;
-  heating?: string;
-  cooling?: string;
-  laundry?: string;
-  hoa?: string;
-  status?: 'active' | 'pending' | 'under_contract' | 'sold' | 'rented';
-  walkScore?: number;
-  transitScore?: number;
-  neighborhoodHighlights?: string[];
-  viewCount?: number;
-  saveCount?: number;
-  isHidden?: boolean;
-  hiddenAt?: string;
-  hiddenReason?: string;
-}
+/* ─── types ───
+ * Listing/Comment moved verbatim to services/housing.ts (Session 48) —
+ * aliased here so the rest of the page is untouched. */
+type Listing = HousingListing;
+type Comment = HousingComment;
 
 // REPORT_CATEGORIES now imported from '@/constants/config' (Session 46 dedup)
-
-interface Comment {
-  id: string;
-  listingId: string;
-  userId: string;
-  userName: string;
-  userAvatar: string;
-  text: string;
-  likes: number;
-  likedBy: string[];
-  createdAt: any;
-}
 
 type FilterType = 'all' | 'rent' | 'sale' | 'roommate' | 'sublet';
 type SortOption = 'newest' | 'price-low' | 'price-high' | 'largest' | 'popular';
@@ -587,10 +535,10 @@ export default function HousingPage() {
     const isSaving = !savedListings.has(id);
     // Optimistic UI update for saveCount
     if (isSaving) {
-      try { updateDoc(doc(db, 'listings', id), { saveCount: increment(1) }); } catch {}
+      try { adjustListingSaveCount(id, 1); } catch {}
       setListings((prev) => prev.map((l) => l.id === id ? { ...l, saveCount: (l.saveCount || 0) + 1 } : l));
     } else {
-      try { updateDoc(doc(db, 'listings', id), { saveCount: increment(-1) }); } catch {}
+      try { adjustListingSaveCount(id, -1); } catch {}
       setListings((prev) => prev.map((l) => l.id === id ? { ...l, saveCount: Math.max(0, (l.saveCount || 0) - 1) } : l));
     }
     toggleSavedItem(user.uid, 'housing', id).then(({ ids }) => setSavedListings(ids));
@@ -599,57 +547,7 @@ export default function HousingPage() {
   /* fetch */
   const fetchListings = async () => {
     try {
-      const snapshot = await getDocs(collection(db, 'listings'));
-      const data: Listing[] = snapshot.docs
-        .map((d) => {
-          const data = d.data();
-          if (data.isHidden) return null;
-          return {
-            id: d.id,
-            title: data.title || '',
-            type: data.type || 'rent',
-            price: data.price || '',
-            beds: data.beds || 0,
-            baths: data.baths || 0,
-            sqft: data.sqft || 0,
-            address: data.address || '',
-            locCity: data.locCity || data.city || '',
-            locState: data.locState || data.state || '',
-            locZip: data.locZip || data.zip || '',
-            desc: data.desc || '',
-            tags: data.tags || [],
-            featured: data.featured || false,
-            emoji: data.emoji || '🏠',
-            bgColor: data.bgColor || '#F5F5F5',
-            posterName: data.posterName || 'Anonymous',
-            posterAvatar: data.posterAvatar || '',
-            posterId: data.posterId || '',
-            createdAt: data.createdAt,
-            heritage: data.heritage,
-            contactPhone: data.contactPhone || '',
-            contactEmail: data.contactEmail || '',
-            availableDate: data.availableDate || '',
-            petPolicy: data.petPolicy || '',
-            parking: data.parking || '',
-            photos: data.photos || [],
-            coverPhotoIndex: data.coverPhotoIndex || 0,
-            videoUrl: data.videoUrl || '',
-            yearBuilt: data.yearBuilt || '',
-            lotSize: data.lotSize || '',
-            propertyType: data.propertyType || '',
-            heating: data.heating || '',
-            cooling: data.cooling || '',
-            laundry: data.laundry || '',
-            hoa: data.hoa || '',
-            status: data.status || 'active',
-            walkScore: data.walkScore,
-            transitScore: data.transitScore,
-            neighborhoodHighlights: data.neighborhoodHighlights || [],
-            viewCount: data.viewCount || 0,
-            saveCount: data.saveCount || 0,
-          };
-        })
-        .filter(Boolean) as Listing[];
+      const data = await listAllListings();
       setListings(data);
     } catch (error) {
       console.error('Error fetching listings:', error);
@@ -665,9 +563,8 @@ export default function HousingPage() {
     if (!user) return;
     const loadUserSafetyData = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
+        const data = await getUserHousingSafetyData(user.uid);
+        if (data) {
           if (data.mutedHousingListings) setMutedListings(new Set(data.mutedHousingListings));
           if (data.blockedUsers) setBlockedUsers(new Set(data.blockedUsers));
         }
@@ -689,11 +586,9 @@ export default function HousingPage() {
           const updated = [selectedListing.id, ...prev.filter((id) => id !== selectedListing.id)].slice(0, 20);
           return updated;
         });
-        // Increment viewCount in Firestore
+        // Increment viewCount in Firestore (fire-and-forget, as before)
         try {
-          updateDoc(doc(db, 'listings', selectedListing.id), {
-            viewCount: increment(1),
-          });
+          incrementListingViewCount(selectedListing.id);
         } catch (error) {
           console.error('Error updating view count:', error);
         }
@@ -780,21 +675,7 @@ export default function HousingPage() {
   /* Comment functions */
   const loadComments = async (listingId: string) => {
     try {
-      const snapshot = await getDocs(collection(db, 'listings', listingId, 'comments'));
-      const data: Comment[] = snapshot.docs.map((d) => {
-        const d_data = d.data();
-        return {
-          id: d.id,
-          listingId: d_data.listingId,
-          userId: d_data.userId,
-          userName: d_data.userName,
-          userAvatar: d_data.userAvatar,
-          text: d_data.text,
-          likes: d_data.likes || 0,
-          likedBy: d_data.likedBy || [],
-          createdAt: d_data.createdAt,
-        };
-      });
+      const data = await listListingComments(listingId);
       setComments(data);
     } catch (error) {
       console.error('Error loading comments:', error);
@@ -805,15 +686,11 @@ export default function HousingPage() {
     if (!user || !commentText.trim()) return;
     setCommentLoading(true);
     try {
-      await addDoc(collection(db, 'listings', listingId, 'comments'), {
-        listingId,
+      await addListingComment(listingId, {
         userId: user.uid,
         userName: user.displayName || 'Anonymous',
         userAvatar: user.photoURL || '',
         text: commentText,
-        likes: 0,
-        likedBy: [],
-        createdAt: Timestamp.now(),
       });
       setCommentText('');
       await loadComments(listingId);
@@ -842,10 +719,7 @@ export default function HousingPage() {
       const newLikedBy = alreadyLiked
         ? comment.likedBy.filter((id) => id !== user.uid)
         : [...comment.likedBy, user.uid];
-      await updateDoc(doc(db, 'listings', listingId, 'comments', commentId), {
-        likes: newLikedBy.length,
-        likedBy: newLikedBy,
-      });
+      await setListingCommentLikes(listingId, commentId, newLikedBy.length, newLikedBy);
     } catch (error) {
       console.error('Error toggling comment like:', error);
     }
@@ -859,7 +733,7 @@ export default function HousingPage() {
   const confirmDeleteComment = async () => {
     if (!deleteCommentInfo) return;
     try {
-      await deleteDoc(doc(db, 'listings', deleteCommentInfo.listingId, 'comments', deleteCommentInfo.commentId));
+      await deleteListingComment(deleteCommentInfo.listingId, deleteCommentInfo.commentId);
       await loadComments(deleteCommentInfo.listingId);
     } catch (error) {
       console.error('Error deleting comment:', error);
@@ -877,7 +751,7 @@ export default function HousingPage() {
     }
     setSaving(true);
     try {
-      await addDoc(collection(db, 'listings'), {
+      await createListing({
         title: formData.title,
         type: formData.type,
         price: formData.price,
@@ -890,13 +764,9 @@ export default function HousingPage() {
         locZip: formData.zip,
         desc: formData.desc,
         tags: formData.tags,
-        featured: false,
-        emoji: '🏠',
-        bgColor: '#F5F5F5',
         posterName: user?.displayName || 'Anonymous',
         posterAvatar: user?.photoURL || '',
         posterId: user?.uid || '',
-        createdAt: Timestamp.now(),
         heritage: Array.isArray(userProfile?.heritage)
           ? userProfile.heritage
           : userProfile?.heritage ? [userProfile.heritage] : [],
@@ -916,8 +786,6 @@ export default function HousingPage() {
         laundry: formData.laundry,
         hoa: formData.hoa,
         status: formData.status || 'active',
-        viewCount: 0,
-        saveCount: 0,
       });
       setFormData({ title: '', type: 'rent', price: '', beds: '1', baths: '1', sqft: '', address: '', city: '', state: '', zip: '', desc: '', tags: [], contactPhone: '', contactEmail: '', availableDate: '', petPolicy: '', parking: '', photos: [], coverPhotoIndex: 0, videoUrl: '', propertyType: '', yearBuilt: '', lotSize: '', heating: '', cooling: '', laundry: '', hoa: '', status: 'active' as const, walkScore: '', transitScore: '', neighborhoodHighlights: [] });
       setShowCreateModal(false);
@@ -938,7 +806,7 @@ export default function HousingPage() {
   const confirmDeleteListing = async () => {
     if (!deleteListingId) return;
     try {
-      await deleteDoc(doc(db, 'listings', deleteListingId));
+      await deleteListing(deleteListingId);
       setListings(listings.filter((l) => l.id !== deleteListingId));
       setSelectedListing(null);
     } catch (error) {
@@ -988,7 +856,7 @@ export default function HousingPage() {
     if (!selectedListing) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'listings', selectedListing.id), {
+      await updateListing(selectedListing.id, {
         title: editData.title,
         type: editData.type,
         price: editData.price,
@@ -1097,45 +965,22 @@ export default function HousingPage() {
       const reportedListing = listings.find((l) => l.id === reportListingId);
       const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
 
-      // Write to reports collection (stealth: no owner notification)
-      await addDoc(collection(db, 'reports'), {
-        listingId: reportListingId,
-        reportedBy: user.uid,
-        reporterName: userProfile?.name || user.displayName || 'Anonymous',
-        reporterAvatar: userProfile?.avatar || '',
-        category: reportReason,
-        categoryLabel: categoryObj?.label || reportReason,
-        details: reportDetails.trim() || '',
-        createdAt: serverTimestamp(),
-        status: 'pending',
-      });
-
-      // Check if moderationQueue entry already exists for this listing
-      const modQueueQuery = query(
-        collection(db, 'moderationQueue'),
-        where('contentId', '==', reportListingId)
-      );
-      const existingMods = await getDocs(modQueueQuery);
-
-      let totalReportCount = 1;
-
-      if (existingMods.docs.length > 0) {
-        const existingDoc = existingMods.docs[0];
-        const existingData = existingDoc.data();
-        totalReportCount = (existingData.reportCount || 1) + 1;
-        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
-          reportCount: totalReportCount,
-          reporters: arrayUnion({
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        await addDoc(collection(db, 'moderationQueue'), {
+      // Shared report mechanics (services/moderation, Session 48): writes the
+      // `reports` record then find-or-increments the moderationQueue entry.
+      // The service adds createdAt/status to reportDoc and
+      // reportCount/reporters/createdAt to modQueueDoc — not included here.
+      const totalReportCount = await submitContentReport({
+        contentId: reportListingId,
+        reportDoc: {
+          listingId: reportListingId,
+          reportedBy: user.uid,
+          reporterName: userProfile?.name || user.displayName || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          details: reportDetails.trim() || '',
+        },
+        modQueueDoc: {
           type: 'housing',
           content: reportedListing?.title || '',
           contentId: reportListingId,
@@ -1150,45 +995,34 @@ export default function HousingPage() {
           reportedBy: user.uid,
           reporterName: userProfile?.name || user.displayName || 'Anonymous',
           reporterAvatar: userProfile?.avatar || '',
-          reportCount: 1,
-          reporters: [{
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }],
-          createdAt: serverTimestamp(),
-        });
-      }
+        },
+        reporter: {
+          uid: user.uid,
+          name: userProfile?.name || user.displayName || 'Anonymous',
+          avatar: userProfile?.avatar || '',
+          category: reportReason,
+          details: reportDetails.trim() || '',
+          createdAt: new Date().toISOString(),
+        },
+      });
 
-      // 3-strike auto-hide
+      // 3-strike auto-hide (housing-specific tail — stays in the page)
       if (totalReportCount >= 3) {
-        await updateDoc(doc(db, 'listings', reportListingId), {
-          isHidden: true,
-          hiddenAt: new Date().toISOString(),
-          hiddenReason: 'Auto-hidden: reached 3 community reports',
-        });
+        await hideListing(reportListingId, 'Auto-hidden: reached 3 community reports');
         if (reportedListing?.posterId) {
-          await addDoc(collection(db, 'notifications'), {
-            type: 'content_hidden',
+          await sendListingHiddenNotification({
             recipientId: reportedListing.posterId,
             recipientName: reportedListing.posterName || '',
             postId: reportListingId,
             reason: 'Your housing listing received multiple community reports and has been temporarily hidden for review.',
             message: 'Your housing listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
             actionUrl: '/housing',
-            read: false,
-            createdAt: serverTimestamp(),
           });
         }
       }
 
       // Mute-on-report: hide this listing from the reporter's view
-      await updateDoc(doc(db, 'users', user.uid), {
-        mutedHousingListings: arrayUnion(reportListingId),
-      });
+      await muteListingForUser(user.uid, reportListingId);
       setMutedListings((prev) => new Set(prev).add(reportListingId));
 
       setReportedListings((prev) => new Set(prev).add(reportListingId));
@@ -1208,9 +1042,7 @@ export default function HousingPage() {
   const handleBlockUser = async () => {
     if (!user || !blockTargetUser) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        blockedUsers: arrayUnion(blockTargetUser.uid),
-      });
+      await blockUser(user.uid, blockTargetUser.uid);
       setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
       setShowBlockConfirm(false);
       setBlockTargetUser(null);
@@ -1919,7 +1751,7 @@ export default function HousingPage() {
                     
                     {/* View/Save counts */}
                     <div className="flex items-center justify-between gap-2 text-xs text-[var(--aurora-text-muted)] mt-2.5 pt-2.5 border-t border-[var(--aurora-border)]">
-                      <button onClick={() => { setSelectedListing(listing); setListings((prev) => prev.map((l) => l.id === listing.id ? { ...l, viewCount: (l.viewCount || 0) + 1 } : l)); try { updateDoc(doc(db, 'listings', listing.id), { viewCount: increment(1) }); } catch {} }} className="flex items-center gap-1 hover:text-aurora-indigo transition-colors">
+                      <button onClick={() => { setSelectedListing(listing); setListings((prev) => prev.map((l) => l.id === listing.id ? { ...l, viewCount: (l.viewCount || 0) + 1 } : l)); try { incrementListingViewCount(listing.id); } catch {} }} className="flex items-center gap-1 hover:text-aurora-indigo transition-colors">
                         <Eye size={12} /> {listing.viewCount || 0}
                       </button>
                       <button onClick={(e) => toggleSave(listing.id, e)} className="flex items-center gap-1 hover:text-red-500 transition-colors">
