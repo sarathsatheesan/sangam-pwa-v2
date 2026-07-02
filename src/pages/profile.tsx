@@ -6,6 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserSettings } from '@/contexts/UserSettingsContext';
 import { db, auth } from '@/services/firebase';
 import { doc, updateDoc, getDoc, arrayRemove, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
+import type { DocumentData, Timestamp } from 'firebase/firestore';
+import type { UserData } from '@/contexts/AuthContext';
 import { signOut } from 'firebase/auth';
 import { downloadMyData, deleteMyData } from '@/services/dataPrivacy';
 import { pullSavedItems } from '@/services/savedItems';
@@ -44,13 +46,67 @@ const GRADIENT_SETS = [
 ];
 
 /* ─── types ─── */
+
+/**
+ * Minimal structural shape of a Firestore Timestamp as it appears on fetched
+ * docs. All members optional because legacy documents may store plain objects.
+ */
+interface TimestampLike {
+  toMillis?: () => number;
+  toDate?: () => Date;
+  seconds?: number;
+}
+
+/**
+ * UserData plus the legacy flat `tinValidationMessage` field which
+ * handleSaveProfile writes to the user doc but AuthContext's UserData omits.
+ */
+type UserDataWithTinMessage = UserData & { tinValidationMessage?: string };
+
+/** A Firestore document's data plus its id, as returned by the saved-items batch fetcher. */
+type FetchedDoc = { id: string } & DocumentData;
+
+/** Keys of editForm rendered by the generic text-field loop in the edit modal. */
+type EditFormTextKey = 'name' | 'preferredName' | 'profession' | 'city' | 'phone';
+
+/** Optional media/title fields read generically off any listing-detail payload for the modal header. */
+interface ListingHeaderFields {
+  photos?: string[];
+  images?: string[];
+  coverPhotoIndex?: number;
+  title?: string;
+}
+
+/** Firestore user-doc update payload built by handleSaveProfile (business fields assigned conditionally). */
+type ProfileUpdateData = {
+  name: string;
+  preferredName: string;
+  avatar: string;
+  heritage: string[];
+  city: string;
+  profession: string;
+  bio: string;
+  interests: string[];
+  messagingPrivacy: string;
+  phone: string;
+  accountType: 'individual' | 'business';
+  businessName?: string;
+  businessType?: string;
+  isRegistered?: boolean | null;
+  tinNumber?: string;
+  tinValidationStatus?: 'pending' | 'valid' | 'invalid' | 'not_checked';
+  tinValidationMessage?: string;
+  adminReviewRequired?: boolean;
+  adminApproved?: boolean;
+};
+
 interface UserPost {
   id: string;
   content: string;
   type: string;
   likes: number;
   comments: number;
-  createdAt: any;
+  createdAt: TimestampLike | undefined;
   userName?: string;
   userAvatar?: string;
   heritage?: string | string[];
@@ -66,7 +122,7 @@ interface UserThread {
   content: string;
   replies: number;
   score: number;
-  createdAt: any;
+  createdAt: TimestampLike | undefined;
   authorName?: string;
   authorAvatar?: string;
   heritage?: string | string[];
@@ -84,7 +140,7 @@ interface UserActivity {
   preview: string;
   likes: number;
   comments: number;
-  createdAt: any;
+  createdAt: TimestampLike | undefined;
   gradient: string;
   icon: string;
 }
@@ -121,7 +177,7 @@ interface BusinessDetail {
   location?: string; phone?: string; website?: string; email?: string;
   hours?: string; rating?: number; reviews?: number; heritage?: string | string[];
   specialtyTags?: string[]; paymentMethods?: string[]; priceRange?: string;
-  yearEstablished?: number; photos?: string[]; coverPhotoIndex?: number; createdAt: any;
+  yearEstablished?: number; photos?: string[]; coverPhotoIndex?: number; createdAt: TimestampLike | undefined;
 }
 
 interface HousingDetail {
@@ -131,7 +187,7 @@ interface HousingDetail {
   posterName?: string; heritage?: string | string[]; contactPhone?: string;
   contactEmail?: string; availableDate?: string; petPolicy?: string;
   parking?: string; photos?: string[]; coverPhotoIndex?: number;
-  propertyType?: string; createdAt: any;
+  propertyType?: string; createdAt: TimestampLike | undefined;
 }
 
 interface MarketplaceDetail {
@@ -140,7 +196,7 @@ interface MarketplaceDetail {
   location?: string; locCity?: string; locState?: string;
   sellerName?: string; brand?: string; model?: string;
   deliveryMethod?: string; shippingPrice?: number; negotiable?: boolean;
-  tags?: string[]; heritage?: string | string[]; createdAt: any;
+  tags?: string[]; heritage?: string | string[]; createdAt: TimestampLike | undefined;
 }
 
 interface EventDetail {
@@ -149,7 +205,7 @@ interface EventDetail {
   locCity?: string; locState?: string; ticket?: string; price?: number;
   organizer?: string; count?: number; capacity?: number;
   contactEmail?: string; contactPhone?: string; heritage?: string | string[];
-  photos?: string[]; coverPhotoIndex?: number; status?: string; createdAt: any;
+  photos?: string[]; coverPhotoIndex?: number; status?: string; createdAt: TimestampLike | undefined;
 }
 
 type ListingDetailItem =
@@ -279,7 +335,7 @@ export default function ProfilePage() {
   const [messagingPrivacy, setMessagingPrivacy] = useState('Everyone');
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'grid' | 'saved' | 'listings'>(initialTab as any);
+  const [activeTab, setActiveTab] = useState<'grid' | 'saved' | 'listings'>(initialTab);
 
   // Blocked users
   const [blockedUsers, setBlockedUsers] = useState<Array<{ uid: string; name: string; avatar: string }>>([]);
@@ -339,7 +395,7 @@ export default function ProfilePage() {
       setMessagingPrivacy(userProfile.messagingPrivacy || 'Everyone');
       setEditForm({
         name: userProfile.name || '',
-        preferredName: (userProfile as any)?.preferredName || '',
+        preferredName: userProfile?.preferredName || '',
         avatar: userProfile.avatar || '🧑',
         heritage: Array.isArray(userProfile.heritage)
           ? userProfile.heritage
@@ -351,12 +407,12 @@ export default function ProfilePage() {
         messagingPrivacy: userProfile.messagingPrivacy || 'Everyone',
         phone: userProfile.phone || '',
         accountType: (userProfile.accountType as 'individual' | 'business') || 'individual',
-        businessName: (userProfile as any)?.businessName || '',
-        businessType: (userProfile as any)?.businessType || '',
-        isRegistered: (userProfile as any)?.isRegistered ?? null,
-        tinNumber: (userProfile as any)?.tinNumber || '',
-        tinValidationStatus: ((userProfile as any)?.tinValidationStatus as 'pending' | 'valid' | 'invalid' | 'not_checked') || 'not_checked',
-        tinValidationMessage: (userProfile as any)?.tinValidationMessage || '',
+        businessName: userProfile?.businessName || '',
+        businessType: userProfile?.businessType || '',
+        isRegistered: userProfile?.isRegistered ?? null,
+        tinNumber: userProfile?.tinNumber || '',
+        tinValidationStatus: userProfile?.tinValidationStatus || 'not_checked',
+        tinValidationMessage: (userProfile as UserDataWithTinMessage | null)?.tinValidationMessage || '',
       });
     }
   }, [userProfile]);
@@ -542,12 +598,12 @@ export default function ProfilePage() {
 
       // Helper to batch-fetch docs by IDs (Firestore 'in' supports max 30)
       const fetchByIds = async (collectionName: string, ids: string[]) => {
-        if (ids.length === 0) return [] as any[];
+        if (ids.length === 0) return [] as FetchedDoc[];
         const batches = [];
         for (let i = 0; i < ids.length; i += 30) {
           batches.push(ids.slice(i, i + 30));
         }
-        const results: any[] = [];
+        const results: FetchedDoc[] = [];
         for (const batch of batches) {
           try {
             const q = query(collection(db, collectionName), where(documentId(), 'in', batch));
@@ -677,8 +733,8 @@ export default function ProfilePage() {
 
     // Tab 1 (Grid) only shows posts + forums
     return [...postItems, ...threadItems].sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
-      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+      const aTime = a.createdAt?.toMillis?.() || (a.createdAt?.seconds as number) * 1000 || 0;
+      const bTime = b.createdAt?.toMillis?.() || (b.createdAt?.seconds as number) * 1000 || 0;
       return bTime - aTime;
     });
   }, [userPosts, userThreads, userBusinesses, userHousing, userMarketplace, userEvents]);
@@ -839,7 +895,7 @@ export default function ProfilePage() {
   const handleEditPress = () => {
     setEditForm({
       name: userProfile?.name || '',
-      preferredName: (userProfile as any)?.preferredName || '',
+      preferredName: userProfile?.preferredName || '',
       avatar: userProfile?.avatar || '🧑',
       heritage: Array.isArray(userProfile?.heritage)
         ? userProfile.heritage
@@ -851,12 +907,12 @@ export default function ProfilePage() {
       messagingPrivacy: userProfile?.messagingPrivacy || 'Everyone',
       phone: userProfile?.phone || '',
       accountType: (userProfile?.accountType as 'individual' | 'business') || 'individual',
-      businessName: (userProfile as any)?.businessName || '',
-      businessType: (userProfile as any)?.businessType || '',
-      isRegistered: (userProfile as any)?.isRegistered ?? null,
-      tinNumber: (userProfile as any)?.tinNumber || '',
-      tinValidationStatus: ((userProfile as any)?.tinValidationStatus as 'pending' | 'valid' | 'invalid' | 'not_checked') || 'not_checked',
-      tinValidationMessage: (userProfile as any)?.tinValidationMessage || '',
+      businessName: userProfile?.businessName || '',
+      businessType: userProfile?.businessType || '',
+      isRegistered: userProfile?.isRegistered ?? null,
+      tinNumber: userProfile?.tinNumber || '',
+      tinValidationStatus: userProfile?.tinValidationStatus || 'not_checked',
+      tinValidationMessage: (userProfile as UserDataWithTinMessage | null)?.tinValidationMessage || '',
     });
     setEditModalOpen(true);
   };
@@ -915,7 +971,7 @@ export default function ProfilePage() {
     try {
       setIsSaving(true);
       const userDocRef = doc(db, 'users', user.uid);
-      const updateData: any = {
+      const updateData: ProfileUpdateData = {
         name: editForm.name, preferredName: editForm.preferredName, avatar: editForm.avatar, heritage: editForm.heritage,
         city: editForm.city, profession: editForm.profession, bio: editForm.bio,
         interests: editForm.interests, messagingPrivacy: editForm.messagingPrivacy,
@@ -934,13 +990,15 @@ export default function ProfilePage() {
         }
       }
       await updateDoc(userDocRef, updateData);
+      // Cast via unknown: UserData declares heritage as `string` but the app stores string[],
+      // and messagingPrivacy holds display labels ('Everyone') rather than the declared lowercase union.
       setUserProfile({
         ...userProfile, ...updateData,
         ...(editForm.accountType === 'business' && {
           adminReviewRequired: isUnregisteredBusiness || editForm.tinValidationStatus === 'invalid',
           adminApproved: isUnregisteredBusiness ? false : undefined,
         }),
-      } as any);
+      } as unknown as UserData);
       setEditModalOpen(false);
       if (isUnregisteredBusiness) {
         setToastMessage('Profile updated! Your unregistered business account is pending admin approval.');
@@ -961,7 +1019,8 @@ export default function ProfilePage() {
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, { messagingPrivacy: value });
       setMessagingPrivacy(value);
-      if (userProfile) setUserProfile({ ...userProfile, messagingPrivacy: value } as any);
+      // messagingPrivacy holds display labels ('Everyone') rather than UserData's declared lowercase union.
+      if (userProfile) setUserProfile({ ...userProfile, messagingPrivacy: value } as UserData);
     } catch (error) {
       console.error('Error updating privacy:', error);
       setToastMessage('Failed to update privacy setting');
@@ -1021,10 +1080,10 @@ export default function ProfilePage() {
     }
   };
 
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: Timestamp | Date | number | string | null | undefined) => {
     if (!timestamp) return 'New Member';
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      const date = (timestamp as Timestamp).toDate ? (timestamp as Timestamp).toDate() : new Date(timestamp as Date | number | string);
       if (isNaN(date.getTime())) return 'New Member';
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return `${months[date.getMonth()]} ${date.getFullYear()}`;
@@ -1097,12 +1156,12 @@ export default function ProfilePage() {
             <div className="flex items-start justify-between gap-2 mb-0.5">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-base font-bold text-[var(--aurora-text)] truncate">{(userProfile as any)?.preferredName || userProfile?.name || 'User'}</h2>
+                  <h2 className="text-base font-bold text-[var(--aurora-text)] truncate">{userProfile?.preferredName || userProfile?.name || 'User'}</h2>
                   {userProfile?.accountType === 'business' && (
                     <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-500/15 text-aurora-indigo text-[10px] font-bold rounded-md uppercase flex-shrink-0">Business</span>
                   )}
                 </div>
-                {(userProfile as any)?.preferredName && userProfile?.name && (userProfile as any).preferredName !== userProfile.name && (
+                {userProfile?.preferredName && userProfile?.name && userProfile.preferredName !== userProfile.name && (
                   <p className="text-[13px] text-[var(--aurora-text-muted)]">{userProfile.name}</p>
                 )}
               </div>
@@ -1464,7 +1523,7 @@ export default function ProfilePage() {
                         minHeight: '44px',
                         WebkitTapHighlightColor: 'transparent',
                         WebkitAppearance: 'none',
-                        MozAppearance: 'none' as any,
+                        MozAppearance: 'none',
                         appearance: 'none',
                       }}
                     >
@@ -1498,7 +1557,7 @@ export default function ProfilePage() {
                               minHeight: '44px',
                               WebkitTapHighlightColor: 'transparent',
                               WebkitAppearance: 'none',
-                              MozAppearance: 'none' as any,
+                              MozAppearance: 'none',
                               appearance: 'none',
                             }}
                           >
@@ -1912,7 +1971,7 @@ export default function ProfilePage() {
                 <label className="block text-xs font-bold text-[var(--aurora-text-muted)] mb-1.5 uppercase tracking-wider">{field.label}</label>
                 <input
                   type={field.type}
-                  value={(editForm as any)[field.key]}
+                  value={editForm[field.key as EditFormTextKey]}
                   onChange={(e) => setEditForm({ ...editForm, [field.key]: e.target.value })}
                   placeholder={field.placeholder}
                   className="w-full px-4 py-2.5 border border-[var(--aurora-border)] rounded-xl text-[var(--aurora-text)] bg-[var(--aurora-surface)] text-sm focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 focus:border-aurora-indigo transition"
@@ -2127,10 +2186,10 @@ export default function ProfilePage() {
               const gradientMap: Record<string, string> = { post: 'from-indigo-500 to-purple-600', forum: 'from-cyan-500 to-blue-600', business: 'from-indigo-500 to-purple-600', housing: 'from-emerald-500 to-teal-600', marketplace: 'from-amber-500 to-orange-600', event: 'from-rose-500 to-pink-600' };
               const iconMap: Record<string, React.ReactNode> = { post: <Edit3 size={18} className="text-white" />, forum: <MessageSquare size={18} className="text-white" />, business: <Store size={22} className="text-white" />, housing: <Home size={22} className="text-white" />, marketplace: <ShoppingBag size={22} className="text-white" />, event: <CalendarDays size={22} className="text-white" /> };
               const labelMap: Record<string, string> = { post: 'Post', forum: 'Forum Thread', business: 'Business', housing: 'Housing', marketplace: 'Marketplace', event: 'Event' };
-              const photos = (listingDetail.data as any).photos as string[] | undefined;
-              const images = (listingDetail.data as any).images as string[] | undefined;
+              const photos = (listingDetail.data as ListingHeaderFields).photos;
+              const images = (listingDetail.data as ListingHeaderFields).images;
               const allPhotos = photos || images;
-              const coverIdx = (listingDetail.data as any).coverPhotoIndex ?? 0;
+              const coverIdx = (listingDetail.data as ListingHeaderFields).coverPhotoIndex ?? 0;
               const coverPhoto = allPhotos && allPhotos.length > 0 ? allPhotos[coverIdx] || allPhotos[0] : null;
 
               // Determine title
@@ -2138,7 +2197,7 @@ export default function ProfilePage() {
               if (listingDetail.kind === 'business') headerTitle = (listingDetail.data as BusinessDetail).name;
               else if (listingDetail.kind === 'post') headerTitle = (listingDetail.data as UserPost).content.slice(0, 80) + ((listingDetail.data as UserPost).content.length > 80 ? '...' : '');
               else if (listingDetail.kind === 'forum') headerTitle = (listingDetail.data as UserThread).title;
-              else headerTitle = (listingDetail.data as any).title || '';
+              else headerTitle = (listingDetail.data as ListingHeaderFields).title || '';
 
               return (
                 <div className={`relative ${coverPhoto ? 'h-48 sm:h-56' : 'h-28'} shrink-0`}>

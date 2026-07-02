@@ -5,25 +5,26 @@ import { useSearchParams } from 'react-router-dom';
 import { copyToClipboard } from '@/utils/clipboard';
 import { timeAgo } from '@/utils/dateFormatting';
 import {
-  collection,
-  query,
-  orderBy,
-  getDocs,
-  addDoc,
-  deleteDoc,
-  doc,
-  updateDoc,
-  increment,
-  serverTimestamp,
-  where,
-  limit,
-  onSnapshot,
-  setDoc,
-  getDoc,
-  arrayUnion,
-  getCountFromServer,
-} from 'firebase/firestore';
-import { db } from '@/services/firebase';
+  getTopicThreadCounts,
+  listThreadsByTopic,
+  listRepliesByThread,
+  getThreadById,
+  createThread,
+  softDeleteThread,
+  createReply,
+  softDeleteReply,
+  acceptReply,
+  unacceptReply,
+  syncThreadVoteState,
+  syncReplyVoteState,
+  persistThreadVote,
+  persistReplyVote,
+  addToModerationQueue,
+  getBlockedUserIds,
+  blockUser,
+} from '@/services/forum';
+import type { ForumThread, ForumReply } from '@/services/forum';
+import { submitContentReport } from '@/services/moderation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import { FORUM_TOPICS, HERITAGE_OPTIONS, REPORT_REASONS } from '@/constants/config';
@@ -63,49 +64,7 @@ const FORUM_REPORT_CATEGORIES = [
 ];
 
 /* ─── types ─── */
-interface ForumThread {
-  id: string;
-  topicId: string;
-  title: string;
-  content: string;
-  authorId: string;
-  authorName: string;
-  authorAvatar?: string;
-  heritage: string[];
-  replyCount: number;
-  lastReplyAt: any;
-  likes: number;
-  upvotes?: number;
-  downvotes?: number;
-  voteScore?: number;
-  isPinned: boolean;
-  isFlagged: boolean;
-  isRemoved: boolean;
-  createdAt: any;
-  flair?: string;
-  acceptedReplyId?: string;
-}
-
-interface ForumReply {
-  id: string;
-  threadId: string;
-  content: string;
-  authorId: string;
-  authorName: string;
-  authorAvatar?: string;
-  heritage: string[];
-  likes: number;
-  upvotes?: number;
-  downvotes?: number;
-  voteScore?: number;
-  isFlagged: boolean;
-  isRemoved: boolean;
-  createdAt: any;
-  parentReplyId?: string;
-  parentAuthorName?: string;
-  depth?: number;
-  isAccepted?: boolean;
-}
+/* ForumThread / ForumReply moved to services/forum.ts (imported above). */
 
 interface TopicWithCount {
   id: string;
@@ -441,21 +400,9 @@ export default function ForumScreen() {
       setLoading(true);
       const initialTopics = FORUM_TOPICS.map((topic: ForumTopic) => ({ ...topic, threadCount: 0 }));
       setTopics(initialTopics);
-      // Server-side aggregate counts per topic — replaces downloading the
-      // entire forumThreads collection just to count. `total - removed`
-      // preserves the old `!data.isRemoved` semantics for legacy docs that
-      // lack the isRemoved field (a `== false` filter would skip them).
-      // Equality-only queries need no composite index (index merging).
-      const counts = await Promise.all(
-        FORUM_TOPICS.map(async (topic: ForumTopic) => {
-          const base = query(collection(db, 'forumThreads'), where('topicId', '==', topic.id));
-          const [totalSnap, removedSnap] = await Promise.all([
-            getCountFromServer(base),
-            getCountFromServer(query(base, where('isRemoved', '==', true))),
-          ]);
-          return totalSnap.data().count - removedSnap.data().count;
-        }),
-      );
+      // Server-side aggregate counts per topic (services/forum.ts) — same
+      // Session 44 semantics: per-topic total minus isRemoved==true.
+      const counts = await getTopicThreadCounts();
       setTopics(FORUM_TOPICS.map((topic: ForumTopic, i: number) => ({
         ...topic,
         threadCount: counts[i],
@@ -509,62 +456,9 @@ export default function ForumScreen() {
       const upvoted = new Set<string>();
       const downvoted = new Set<string>();
       await Promise.all(threadIds.map(async (threadId) => {
-        const threadDocRef = doc(db, 'forumThreads', threadId);
-        const likesCollRef = collection(threadDocRef, 'forumLikes');
-
-        // Read ALL vote docs in this thread's subcollection
-        const allVotes = await getDocs(likesCollRef);
-        let foundVoteType: string | null = null;
-        const toDelete: Promise<void>[] = [];
-        let correctScore = 0;
-
-        // Group by userId to find duplicates
-        const userVoteMap = new Map<string, { docId: string; voteType: string; ref: any }[]>();
-        allVotes.docs.forEach((d) => {
-          const data = d.data();
-          const uid = data.userId;
-          if (!uid) { toDelete.push(deleteDoc(d.ref)); return; } // orphan doc
-          const arr = userVoteMap.get(uid) || [];
-          arr.push({ docId: d.id, voteType: data.voteType, ref: d.ref });
-          userVoteMap.set(uid, arr);
-        });
-
-        // For each user, keep only the deterministic doc (id === userId), delete the rest
-        userVoteMap.forEach((docs, uid) => {
-          let kept: { voteType: string } | null = null;
-          // Prefer the deterministic doc
-          const detDoc = docs.find((d) => d.docId === uid);
-          if (detDoc) {
-            kept = detDoc;
-            // Delete all non-deterministic docs for this user
-            docs.forEach((d) => { if (d.docId !== uid) toDelete.push(deleteDoc(d.ref)); });
-          } else {
-            // No deterministic doc — keep the first, delete the rest, migrate
-            kept = docs[0];
-            docs.slice(1).forEach((d) => toDelete.push(deleteDoc(d.ref)));
-          }
-
-          if (kept) {
-            if (kept.voteType === 'up') correctScore++;
-            else if (kept.voteType === 'down') correctScore--;
-          }
-
-          // Track current user's vote
-          if (uid === user.uid && kept) {
-            foundVoteType = kept.voteType;
-          }
-        });
-
-        // Execute all deletions
-        if (toDelete.length > 0) await Promise.all(toDelete);
-
-        // Migrate current user's vote to deterministic doc if needed
-        if (foundVoteType && !allVotes.docs.some((d) => d.id === user.uid)) {
-          await setDoc(doc(likesCollRef, user.uid), { userId: user.uid, voteType: foundVoteType, createdAt: serverTimestamp() });
-        }
-
-        // Fix the thread's score to the correct absolute value
-        await updateDoc(threadDocRef, { voteScore: correctScore, likes: correctScore });
+        // Firestore work (read all vote docs, dedupe, migrate, fix score)
+        // lives in services/forum.ts — page keeps the state updates.
+        const { voteType: foundVoteType, correctScore } = await syncThreadVoteState(threadId, user.uid);
 
         if (foundVoteType === 'up') upvoted.add(threadId);
         else if (foundVoteType === 'down') downvoted.add(threadId);
@@ -589,52 +483,8 @@ export default function ForumScreen() {
       const upvoted = new Set<string>();
       const downvoted = new Set<string>();
       await Promise.all(replyIds.map(async (replyId) => {
-        const replyDocRef = doc(db, 'forumReplies', replyId);
-        const likesCollRef = collection(replyDocRef, 'forumLikes');
-
-        const allVotes = await getDocs(likesCollRef);
-        let foundVoteType: string | null = null;
-        const toDelete: Promise<void>[] = [];
-        let correctScore = 0;
-
-        const userVoteMap = new Map<string, { docId: string; voteType: string; ref: any }[]>();
-        allVotes.docs.forEach((d) => {
-          const data = d.data();
-          const uid = data.userId;
-          if (!uid) { toDelete.push(deleteDoc(d.ref)); return; }
-          const arr = userVoteMap.get(uid) || [];
-          arr.push({ docId: d.id, voteType: data.voteType, ref: d.ref });
-          userVoteMap.set(uid, arr);
-        });
-
-        userVoteMap.forEach((docs, uid) => {
-          let kept: { voteType: string } | null = null;
-          const detDoc = docs.find((d) => d.docId === uid);
-          if (detDoc) {
-            kept = detDoc;
-            docs.forEach((d) => { if (d.docId !== uid) toDelete.push(deleteDoc(d.ref)); });
-          } else {
-            kept = docs[0];
-            docs.slice(1).forEach((d) => toDelete.push(deleteDoc(d.ref)));
-          }
-
-          if (kept) {
-            if (kept.voteType === 'up') correctScore++;
-            else if (kept.voteType === 'down') correctScore--;
-          }
-
-          if (uid === user.uid && kept) {
-            foundVoteType = kept.voteType;
-          }
-        });
-
-        if (toDelete.length > 0) await Promise.all(toDelete);
-
-        if (foundVoteType && !allVotes.docs.some((d) => d.id === user.uid)) {
-          await setDoc(doc(likesCollRef, user.uid), { userId: user.uid, voteType: foundVoteType, createdAt: serverTimestamp() });
-        }
-
-        await updateDoc(replyDocRef, { voteScore: correctScore, likes: correctScore });
+        // Firestore work moved to services/forum.ts — page keeps state updates.
+        const { voteType: foundVoteType, correctScore } = await syncReplyVoteState(replyId, user.uid);
 
         if (foundVoteType === 'up') upvoted.add(replyId);
         else if (foundVoteType === 'down') downvoted.add(replyId);
@@ -653,14 +503,8 @@ export default function ForumScreen() {
     if (!selectedTopic) return;
     try {
       setLoading(true);
-      const threadsQuery = query(
-        collection(db, 'forumThreads'),
-        where('topicId', '==', selectedTopic.id),
-        limit(50)
-      );
-      const snapshot = await getDocs(threadsQuery);
-      let threadsList: ForumThread[] = snapshot.docs
-        .map((d) => ({ id: d.id, ...d.data() } as ForumThread))
+      const fetched = await listThreadsByTopic(selectedTopic.id);
+      let threadsList: ForumThread[] = fetched
         .filter((t) => !t.isRemoved)
         .filter((t) => !blockedUsers.has(t.authorId));
 
@@ -719,14 +563,8 @@ export default function ForumScreen() {
   const loadReplies = useCallback(async () => {
     if (!selectedThread) return;
     try {
-      const repliesQuery = query(
-        collection(db, 'forumReplies'),
-        where('threadId', '==', selectedThread.id),
-        limit(100)
-      );
-      const snapshot = await getDocs(repliesQuery);
-      const repliesList: ForumReply[] = snapshot.docs
-        .map((d) => ({ id: d.id, ...d.data() } as ForumReply))
+      const fetched = await listRepliesByThread(selectedThread.id);
+      const repliesList: ForumReply[] = fetched
         .filter((r) => !r.isRemoved)
         .filter((r) => !blockedUsers.has(r.authorId));
 
@@ -752,11 +590,8 @@ export default function ForumScreen() {
     if (!user?.uid) return;
     const loadBlockedUsers = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          if (data.blockedUsers) setBlockedUsers(new Set(data.blockedUsers));
-        }
+        const blocked = await getBlockedUserIds(user.uid);
+        if (blocked) setBlockedUsers(new Set(blocked));
       } catch (error) {
         console.error('Error loading blocked users:', error);
       }
@@ -772,11 +607,11 @@ export default function ForumScreen() {
     // Fetch thread directly from Firestore since threads may not be loaded yet
     (async () => {
       try {
-        const threadDoc = await getDoc(doc(db, 'forumThreads', openId));
-        if (threadDoc.exists()) {
-          const data = threadDoc.data();
+        const result = await getThreadById(openId);
+        if (result) {
+          const data = result.data;
           const thread: ForumThread = {
-            id: threadDoc.id,
+            id: result.id,
             topicId: data.topicId || '',
             title: data.title || '',
             content: data.content || '',
@@ -832,7 +667,7 @@ export default function ForumScreen() {
           }
         }
         const heritage = Array.isArray(userProfile.heritage) ? userProfile.heritage : userProfile.heritage ? [userProfile.heritage] : [];
-        const threadRef = await addDoc(collection(db, 'forumThreads'), {
+        const threadId = await createThread({
           topicId: selectedTopic.id,
           title: sanitizeText(threadTitle),
           content: sanitizeText(threadContent),
@@ -840,25 +675,16 @@ export default function ForumScreen() {
           authorName: userProfile.name || 'Anonymous',
           authorAvatar: userProfile.avatar || '',
           heritage,
-          replyCount: 0,
-          lastReplyAt: serverTimestamp(),
-          likes: 0,
-          upvotes: 0,
-          downvotes: 0,
-          voteScore: 0,
-          isPinned: false,
           isFlagged: moderation ? moderation.severity === 'medium' || moderation.severity === 'low' : false,
-          isRemoved: false,
-          createdAt: serverTimestamp(),
           flair: threadFlair,
         });
         if (moderation && (moderation.severity === 'medium' || moderation.severity === 'low')) {
-          await addDoc(collection(db, 'moderationQueue'), {
-            contentId: threadRef.id, contentType: 'thread', authorId: user.uid,
+          await addToModerationQueue({
+            contentId: threadId, contentType: 'thread', authorId: user.uid,
             authorName: userProfile.name || 'Anonymous', content: threadTitle + ' ' + threadContent,
             topicId: selectedTopic.id, flaggedCategories: moderation.flaggedCategories,
             severity: moderation.severity, flaggedWords: moderation.flaggedWords,
-            status: 'pending', createdAt: serverTimestamp(),
+            status: 'pending',
           });
         }
         setThreadTitle(''); setThreadContent(''); setThreadFlair('discussion'); setShowCreateThread(false);
@@ -909,26 +735,24 @@ export default function ForumScreen() {
           depth = Math.min(3, (parentReply?.depth || 0) + 1);
         }
 
-        const replyRef = await addDoc(collection(db, 'forumReplies'), {
+        // createReply also bumps the thread (replyCount +1, lastReplyAt) —
+        // same two writes, same order, moved to services/forum.ts.
+        const replyId = await createReply({
           threadId: selectedThread.id, content: sanitizeText(replyContent),
           authorId: user.uid, authorName: userProfile.name || 'Anonymous',
-          authorAvatar: userProfile.avatar || '', heritage, likes: 0,
-          upvotes: 0, downvotes: 0, voteScore: 0,
+          authorAvatar: userProfile.avatar || '', heritage,
           isFlagged: moderation ? moderation.severity === 'medium' || moderation.severity === 'low' : false,
-          isRemoved: false, createdAt: serverTimestamp(),
           parentReplyId: replyingToId || undefined,
           parentAuthorName: replyingToName || undefined,
           depth: depth,
         });
-        const threadRef = doc(db, 'forumThreads', selectedThread.id);
-        await updateDoc(threadRef, { replyCount: increment(1), lastReplyAt: serverTimestamp() });
         if (moderation && (moderation.severity === 'medium' || moderation.severity === 'low')) {
-          await addDoc(collection(db, 'moderationQueue'), {
-            contentId: replyRef.id, contentType: 'reply', authorId: user.uid,
+          await addToModerationQueue({
+            contentId: replyId, contentType: 'reply', authorId: user.uid,
             authorName: userProfile.name || 'Anonymous', content: replyContent,
             topicId: selectedThread.topicId, flaggedCategories: moderation.flaggedCategories,
             severity: moderation.severity, flaggedWords: moderation.flaggedWords,
-            status: 'pending', createdAt: serverTimestamp(),
+            status: 'pending',
           });
         }
         // Auto-collapse the parent reply thread after submitting
@@ -983,44 +807,28 @@ export default function ForumScreen() {
       const authorAvatar = reportedThread?.authorAvatar || reportedReply?.authorAvatar || '';
       const categoryObj = FORUM_REPORT_CATEGORIES.find((c) => c.id === reportReason);
 
-      // Write to reports collection
-      await addDoc(collection(db, 'reports'), {
+      // Shared report flow (services/moderation.ts): appends to `reports`
+      // (adds createdAt + status:'pending') and find-or-increments the
+      // `moderationQueue` entry (adds reportCount/reporters/createdAt).
+      // Payloads below are exactly what this page wrote before, minus the
+      // fields the service adds. Forum has no 3-strike tail — nothing else
+      // followed the modQueue write here.
+      await submitContentReport({
         contentId: reportingContent.contentId,
-        contentType: reportingContent.contentType,
-        type: reportingContent.contentType === 'thread' ? 'forum_thread' : 'forum_reply',
-        reportedBy: user.uid,
-        reporterName: user.displayName || userProfile?.name || 'Anonymous',
-        reporterAvatar: userProfile?.avatar || '',
-        reportedUserId: authorId,
-        reportedUserName: authorName,
-        category: reportReason,
-        categoryLabel: categoryObj?.label || reportReason,
-        details: reportDetails.trim() || '',
-        status: 'pending',
-        createdAt: serverTimestamp(),
-      });
-
-      // Write to moderationQueue (check for existing entry)
-      const modQueueQuery = query(
-        collection(db, 'moderationQueue'),
-        where('contentId', '==', reportingContent.contentId)
-      );
-      const existingMods = await getDocs(modQueueQuery);
-
-      if (existingMods.docs.length > 0) {
-        const existingDoc = existingMods.docs[0];
-        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
-          reportCount: (existingDoc.data().reportCount || 1) + 1,
-          reporters: arrayUnion({
-            uid: user.uid,
-            name: user.displayName || userProfile?.name || 'Anonymous',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        await addDoc(collection(db, 'moderationQueue'), {
+        reportDoc: {
+          contentId: reportingContent.contentId,
+          contentType: reportingContent.contentType,
+          type: reportingContent.contentType === 'thread' ? 'forum_thread' : 'forum_reply',
+          reportedBy: user.uid,
+          reporterName: user.displayName || userProfile?.name || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          reportedUserId: authorId,
+          reportedUserName: authorName,
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          details: reportDetails.trim() || '',
+        },
+        modQueueDoc: {
           type: reportingContent.contentType === 'thread' ? 'forum_thread' : 'forum_reply',
           content: flaggedContent.substring(0, 500),
           contentId: reportingContent.contentId,
@@ -1033,17 +841,15 @@ export default function ForumScreen() {
           reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
           reportedBy: user.uid,
           reporterName: user.displayName || userProfile?.name || 'Anonymous',
-          reportCount: 1,
-          reporters: [{
-            uid: user.uid,
-            name: user.displayName || userProfile?.name || 'Anonymous',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }],
-          createdAt: serverTimestamp(),
-        });
-      }
+        },
+        reporter: {
+          uid: user.uid,
+          name: user.displayName || userProfile?.name || 'Anonymous',
+          category: reportReason,
+          details: reportDetails.trim() || '',
+          createdAt: new Date().toISOString(),
+        },
+      });
 
       setReportReason(''); setReportDetails(''); setReportingContent(null); setShowReportModal(false);
       setToastMessage('Report submitted. Thank you for helping keep our community safe.');
@@ -1064,9 +870,7 @@ export default function ForumScreen() {
   const handleBlockUser = useCallback(async () => {
     if (!user || !blockTargetUser) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        blockedUsers: arrayUnion(blockTargetUser.uid),
-      });
+      await blockUser(user.uid, blockTargetUser.uid);
       setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
       setShowBlockConfirm(false);
       setBlockTargetUser(null);
@@ -1112,27 +916,9 @@ export default function ForumScreen() {
     setUpvotedThreadIds((prev) => { const n = new Set(prev); n.delete(threadId); if (newVote === 'up') n.add(threadId); return n; });
     setDownvotedThreadIds((prev) => { const n = new Set(prev); n.delete(threadId); if (newVote === 'down') n.add(threadId); return n; });
 
-    // 4) Persist to Firestore in background
+    // 4) Persist to Firestore in background (services/forum.ts)
     try {
-      const threadRef = doc(db, 'forumThreads', threadId);
-      const likesCollRef = collection(threadRef, 'forumLikes');
-      const voteDocRef = doc(likesCollRef, user.uid);
-
-      // Clean up old random-ID vote docs
-      const oldVotes = await getDocs(query(likesCollRef, where('userId', '==', user.uid)));
-      const toDelete: Promise<void>[] = [];
-      oldVotes.docs.forEach((d) => { if (d.id !== user.uid) toDelete.push(deleteDoc(d.ref)); });
-      if (toDelete.length > 0) await Promise.all(toDelete);
-
-      // Write or delete the vote doc
-      if (isToggleOff) {
-        await deleteDoc(voteDocRef);
-      } else {
-        await setDoc(voteDocRef, { userId: user.uid, voteType, createdAt: serverTimestamp() });
-      }
-
-      // Update thread score using increment (atomic, no read needed)
-      await updateDoc(threadRef, { voteScore: increment(scoreDelta), likes: increment(scoreDelta) });
+      await persistThreadVote(threadId, user.uid, voteType, isToggleOff, scoreDelta);
     } catch (error) {
       console.error('Error voting on thread:', error);
       // Revert local state on error
@@ -1182,27 +968,9 @@ export default function ForumScreen() {
     setUpvotedReplyIds((prev) => { const n = new Set(prev); n.delete(replyId); if (newVote === 'up') n.add(replyId); return n; });
     setDownvotedReplyIds((prev) => { const n = new Set(prev); n.delete(replyId); if (newVote === 'down') n.add(replyId); return n; });
 
-    // 4) Persist to Firestore in background
+    // 4) Persist to Firestore in background (services/forum.ts)
     try {
-      const replyRef = doc(db, 'forumReplies', replyId);
-      const likesCollRef = collection(replyRef, 'forumLikes');
-      const voteDocRef = doc(likesCollRef, user.uid);
-
-      // Clean up old random-ID vote docs
-      const oldVotes = await getDocs(query(likesCollRef, where('userId', '==', user.uid)));
-      const toDelete: Promise<void>[] = [];
-      oldVotes.docs.forEach((d) => { if (d.id !== user.uid) toDelete.push(deleteDoc(d.ref)); });
-      if (toDelete.length > 0) await Promise.all(toDelete);
-
-      // Write or delete the vote doc
-      if (isToggleOff) {
-        await deleteDoc(voteDocRef);
-      } else {
-        await setDoc(voteDocRef, { userId: user.uid, voteType, createdAt: serverTimestamp() });
-      }
-
-      // Update reply score using increment (atomic)
-      await updateDoc(replyRef, { voteScore: increment(scoreDelta), likes: increment(scoreDelta) });
+      await persistReplyVote(replyId, user.uid, voteType, isToggleOff, scoreDelta);
     } catch (error) {
       console.error('Error voting on reply:', error);
       // Revert local state on error
@@ -1219,18 +987,8 @@ export default function ForumScreen() {
   const handleAcceptReply = useCallback(async (replyId: string) => {
     if (!user || !selectedThread || selectedThread.authorId !== user.uid) return;
     try {
-      const threadRef = doc(db, 'forumThreads', selectedThread.id);
-      const replyRef = doc(db, 'forumReplies', replyId);
-
-      // Unmark previous accepted reply if exists
-      if (selectedThread.acceptedReplyId) {
-        const prevReplyRef = doc(db, 'forumReplies', selectedThread.acceptedReplyId);
-        await updateDoc(prevReplyRef, { isAccepted: false });
-      }
-
-      // Mark new accepted reply
-      await updateDoc(replyRef, { isAccepted: true });
-      await updateDoc(threadRef, { acceptedReplyId: replyId });
+      // Unmarks previous accepted reply (if any), marks the new one, updates the thread
+      await acceptReply(selectedThread.id, replyId, selectedThread.acceptedReplyId);
 
       setSelectedThread((prev) => prev ? { ...prev, acceptedReplyId: replyId } : null);
       await loadReplies();
@@ -1242,11 +1000,7 @@ export default function ForumScreen() {
   const handleUnacceptReply = useCallback(async (replyId: string) => {
     if (!user || !selectedThread || selectedThread.authorId !== user.uid) return;
     try {
-      const threadRef = doc(db, 'forumThreads', selectedThread.id);
-      const replyRef = doc(db, 'forumReplies', replyId);
-
-      await updateDoc(replyRef, { isAccepted: false });
-      await updateDoc(threadRef, { acceptedReplyId: undefined });
+      await unacceptReply(selectedThread.id, replyId);
 
       setSelectedThread((prev) => prev ? { ...prev, acceptedReplyId: undefined } : null);
       await loadReplies();
@@ -1264,7 +1018,7 @@ export default function ForumScreen() {
   const confirmDeleteThread = useCallback(async () => {
     if (!deleteThreadId) return;
     try {
-      await updateDoc(doc(db, 'forumThreads', deleteThreadId), { isRemoved: true });
+      await softDeleteThread(deleteThreadId);
       if (viewMode === 'detail') { setViewMode(selectedTopic ? 'threads' : 'topics'); setSelectedThread(null); }
       await loadThreads();
     } catch (error) {
@@ -1285,8 +1039,8 @@ export default function ForumScreen() {
   const confirmDeleteReply = useCallback(async () => {
     if (!deleteReplyInfo) return;
     try {
-      await updateDoc(doc(db, 'forumReplies', deleteReplyInfo.replyId), { isRemoved: true });
-      if (deleteReplyInfo.threadId) await updateDoc(doc(db, 'forumThreads', deleteReplyInfo.threadId), { replyCount: increment(-1) });
+      // Soft-deletes the reply and (when threadId is set) decrements the thread's replyCount
+      await softDeleteReply(deleteReplyInfo.replyId, deleteReplyInfo.threadId);
       await loadReplies();
       setSelectedThread((prev) => prev ? { ...prev, replyCount: Math.max(0, prev.replyCount - 1) } : null);
     } catch (error) {

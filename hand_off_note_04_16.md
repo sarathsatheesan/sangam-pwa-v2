@@ -3713,3 +3713,38 @@ Build+deploy: `./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build && f
 **Next:** Phase C — `services/feed.ts`/`services/forum.ts` (zod + limit()), shared `useModeration`, profile.tsx `as any` burn-down (27); optional cleanup: delete dead `pages/main/auth/` + `pages/main/signup.tsx`. Phase D unchanged. Carry-forwards unchanged.
 
 *Updated July 2, 2026 (Session 46) — Phase B complete: all 30 live native alert()/window.confirm() calls replaced with toasts + a new promise-based useConfirm dialog (built on the Session 45 shared Modal); REPORT_CATEGORIES deduplicated to constants/config.ts (5 copies → 1 canonical + business re-export); dead pages/main auth duplicates identified and skipped (not deleted). tsc clean. NOT committed — commit+build+deploy from Mac along with Sessions 44-45, then run the 8-point checklist. Firebase mithr-1e5f4; builds Mac-only.*
+
+---
+
+### Session 47 (July 2, 2026) — Review Phase C: Service Layer for Feed + Forum, Shared Moderation, profile.tsx Type Burn-Down
+
+**Also this session (pre-Phase-C):** Sessions 44–46 committed (`245a18d`, `0b57744`) + pushed + deployed to hosting (verified live on enovoapp.com via content-hash match of entry chunk `index-t7KuG1Xu.js`); Android tablet updated via Android Studio Run ▶ (no uninstall needed — self-heal worked); tablet login issue diagnosed as WiFi/network (auth/network-request-failed), NOT app; cleared a stale `.git/index.lock` (caused by concurrent sandbox git reads — avoid running Mac git while a Cowork session is verifying).
+
+**Phase C changes (STRICT parity — mechanical I/O moves, zero behavior change):**
+1. **NEW `src/services/moderation.ts`** — `submitContentReport({contentId, reportDoc, modQueueDoc, reporter})`: shared report mechanics (reports write + find-or-increment moderationQueue + reporters arrayUnion), returns post-report count. Service adds `createdAt`/`status` to reportDoc and `reportCount`/`reporters`/`createdAt` to modQueueDoc — callers must NOT include those. Module-specific 3-strike/auto-hide/notification logic deliberately stays in pages (payloads diverge).
+2. **NEW `src/services/feed.ts` (~416 lines)** — 20 typed functions covering ALL of feed.tsx's Firestore I/O (subscribeToPosts/fetchMorePosts/createPost/updatePostReaction/comments CRUD/safety data/mute/block/notifications/hidePost/...). feed.tsx now has ZERO firebase/firestore imports. `FeedPostSchema` (zod, permissive+passthrough) runs in OBSERVE MODE: safeParse failures console.warn and the doc is KEPT unchanged — validation cannot hide content. NOTE: `types/firestore.ts#FeedPost` does NOT match real posts data (authorId vs userId etc.) — service exports its own `FeedPostRecord` matching reality; reconcile types/firestore.ts someday.
+3. **NEW `src/services/forum.ts` (~565 lines)** — 15 typed functions (getTopicThreadCounts [Session 44 aggregates moved verbatim], threads/replies CRUD, accept/unaccept, vote sync + persist with the dedupe/migrate/repair loops moved verbatim, blocked users). forum.tsx has ZERO firebase/firestore imports. ForumThread/ForumReply types live in the service now (page imports type-only). Zod observe-mode same as feed.
+4. **Both pages' handleSubmitReport** now route through `submitContentReport` — returned-count semantics verified equal to old totalReportCount in both branches; feed keeps its 3-strike auto-hide + author notification; forum never had a 3-strike tail (returned count ignored, as before).
+5. **profile.tsx type burn-down: 28 `as any` + 10 `: any` → ZERO.** Key insight: `userProfile` is AuthContext's `UserData`, NOT types/firestore.ts UserProfile — most casts deleted outright. Local types added (TimestampLike, UserDataWithTinMessage, FetchedDoc, ProfileUpdateData, ListingHeaderFields). Runtime-identical PROVEN by transpiling before/after and byte-comparing emitted JS (EMITTED_JS_IDENTICAL). Known type-model debts documented inline: UserData.heritage declared `string` but app stores `string[]`; tinValidationMessage missing from UserData.
+
+**UNBOUNDED QUERIES flagged for a deliberate pagination decision (NOT changed — parity rule):**
+- feed: `fetchComments(postId)` — full comments subcollection per post-detail open.
+- forum: `syncThreadVoteState`/`syncReplyVoteState` — full forumLikes subcollection per thread (×50) / per reply (×100) on every list/thread load. WORST offender in the app now.
+- moderation: contentId lookup (0–1 docs realistically).
+
+**Pre-existing suspect bug flagged (NOT touched):** forum `unacceptReply` writes `{acceptedReplyId: undefined}` and `createReply` passes undefined parent fields — Firestore rejects undefined unless `ignoreUndefinedProperties` is set (it isn't in services/firebase.ts as far as known). May be silently failing in prod today. Investigate next session: test unaccept-answer flow live.
+
+**Verified (combined state, by orchestrator):** tsc exit 0; zero firestore value/type imports in feed.tsx+forum.tsx; profile.tsx 0 `as any`; both pages use submitContentReport; all key handlers present (feed 9, forum 11 grep hits).
+
+**NOT committed — commit from Mac:**
+```bash
+git add src/ hand_off_note_04_16.md
+git commit -m "arch: service layer for feed+forum, shared moderation, profile type burn-down (Session 47 / review Phase C)"
+```
+Build+deploy hosting, then cap:sync + Run ▶ for Android as usual.
+
+**Test checklist:** (1) feed: create/edit/delete post, react, comment (add/edit/delete/like), report a post 3× from different accounts → auto-hide + author notification; (2) forum: create thread/reply, vote up/down + toggle, accept/unaccept answer (WATCH for the undefined-write suspect bug), delete thread/reply, report; (3) profile: edit+save profile (heritage multi-select especially), TIN status display, listings tab; (4) console: watch for '[feed]/[ForumSchema] doc failed validation' warns — they identify malformed docs, harmless but informative.
+
+**Next:** Phase C remainder — apply same extraction to events/housing/marketplace; reconcile types/firestore.ts FeedPost with reality; decide pagination for flagged unbounded queries (esp. forum vote sync); investigate unacceptReply undefined-write. Then Phase D (messages decomposition, media→Storage pending DB decision, E2EE+reprice tests). Carry-forwards unchanged.
+
+*Updated July 2, 2026 (Session 47) — Phase C core done: services/feed.ts (20 fns) + services/forum.ts (15 fns) + shared services/moderation.ts extracted with strict parity (identical queries/payloads, zod observe-mode that never drops docs, unbounded queries flagged not changed); feed.tsx and forum.tsx now have zero direct Firestore access; profile.tsx `as any` 28→0 with emitted-JS byte-identical proof. Sessions 44–46 deployed to all domains + Android tablet earlier this session. tsc clean; NOT committed. Firebase mithr-1e5f4; builds Mac-only.*

@@ -3,26 +3,28 @@ import { useSearchParams } from 'react-router-dom';
 import { copyToClipboard } from '@/utils/clipboard';
 import { timeAgo } from '@/utils/dateFormatting';
 import {
-  collection,
-  query,
-  orderBy,
-  getDocs,
-  addDoc,
-  deleteDoc,
-  doc,
-  updateDoc,
-  increment,
-  serverTimestamp,
-  onSnapshot,
-  Timestamp,
-  arrayUnion,
-  arrayRemove,
-  limit,
-  startAfter,
-  where,
-  getDoc,
-} from 'firebase/firestore';
-import { db } from '@/services/firebase';
+  subscribeToPosts,
+  fetchMorePosts,
+  createPost,
+  updatePost,
+  deletePost,
+  updatePostReaction,
+  fetchComments,
+  addComment,
+  incrementPostComments,
+  toggleCommentLike,
+  removeCommentImage,
+  deleteComment,
+  updateCommentText,
+  fetchUserSafetyData,
+  mutePostForUser,
+  blockUser,
+  fetchModerationNotifications,
+  markNotificationRead,
+  hidePost,
+  sendContentHiddenNotification,
+} from '@/services/feed';
+import { submitContentReport } from '@/services/moderation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toggleSavedItem, getLocalSavedIds } from '@/services/savedItems';
 import { useCulturalTheme } from '@/contexts/CulturalThemeContext';
@@ -297,9 +299,8 @@ export default function FeedPage() {
     if (!user) return;
     const loadUserSafetyData = async () => {
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
+        const data = await fetchUserSafetyData(user.uid);
+        if (data) {
           if (data.mutedPosts) {
             setMutedPosts(new Set(data.mutedPosts));
           }
@@ -323,15 +324,8 @@ export default function FeedPage() {
     if (!user) return;
     const loadNotifs = async () => {
       try {
-        const q = query(
-          collection(db, 'notifications'),
-          where('recipientId', '==', user.uid),
-          where('type', '==', 'content_hidden'),
-          orderBy('createdAt', 'desc'),
-          limit(10)
-        );
-        const snap = await getDocs(q);
-        setModerationNotifs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as any)));
+        const notifs = await fetchModerationNotifications(user.uid);
+        setModerationNotifs(notifs);
       } catch (e) {
         console.error('Error loading notifications:', e);
       }
@@ -341,7 +335,7 @@ export default function FeedPage() {
 
   const dismissNotification = async (notifId: string) => {
     try {
-      await updateDoc(doc(db, 'notifications', notifId), { read: true });
+      await markNotificationRead(notifId);
       setModerationNotifs((prev) => prev.filter((n) => n.id !== notifId));
     } catch (e) {
       console.error('Error dismissing notification:', e);
@@ -419,15 +413,9 @@ export default function FeedPage() {
 
   // Listen for posts with pagination
   useEffect(() => {
-    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const postsData: Post[] = [];
+    const unsubscribe = subscribeToPosts(PAGE_SIZE, ({ posts: postsData, lastVisible, fetchedCount }) => {
       const reactionsMap = new Map<string, string>();
-      snapshot.forEach((docSnapshot) => {
-        const data = docSnapshot.data();
-        if (data.isHidden) return; // Skip hidden posts
-        const post = { id: docSnapshot.id, ...data } as Post;
-        postsData.push(post);
+      postsData.forEach((post) => {
         // Scan reactions to find current user's reaction
         if (user && post.reactions) {
           for (const [emoji, users] of Object.entries(post.reactions)) {
@@ -447,9 +435,9 @@ export default function FeedPage() {
         });
       }
       setLoading(false);
-      if (snapshot.docs.length > 0) {
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMore(snapshot.docs.length === PAGE_SIZE);
+      if (fetchedCount > 0) {
+        setLastDoc(lastVisible);
+        setHasMore(fetchedCount === PAGE_SIZE);
       }
     }, (error) => {
       console.error('[FeedPage] Firestore listener error:', error);
@@ -535,16 +523,10 @@ export default function FeedPage() {
     if (!user || !lastDoc || loadingMore) return;
     setLoadingMore(true);
     try {
-      const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'), startAfter(lastDoc), limit(PAGE_SIZE));
-      const snapshot = await getDocs(q);
-      if (snapshot.docs.length > 0) {
-        const newPosts: Post[] = [];
+      const { posts: newPosts, lastVisible, fetchedCount } = await fetchMorePosts(lastDoc, PAGE_SIZE);
+      if (fetchedCount > 0) {
         const reactionsMap = new Map<string, string>();
-        snapshot.forEach((docSnapshot) => {
-          const data = docSnapshot.data();
-          if (data.isHidden) return; // Skip hidden posts
-          const post = { id: docSnapshot.id, ...data } as Post;
-          newPosts.push(post);
+        newPosts.forEach((post) => {
           if (user && post.reactions) {
             for (const [emoji, users] of Object.entries(post.reactions)) {
               if (Array.isArray(users) && users.includes(user.uid)) {
@@ -562,8 +544,8 @@ export default function FeedPage() {
             return merged;
           });
         }
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMore(snapshot.docs.length === PAGE_SIZE);
+        setLastDoc(lastVisible);
+        setHasMore(fetchedCount === PAGE_SIZE);
       } else {
         setHasMore(false);
       }
@@ -610,7 +592,7 @@ export default function FeedPage() {
     }
     try {
       setSubmitting(true);
-      await addDoc(collection(db, 'posts'), {
+      await createPost({
         content: postContent.trim(),
         type: selectedType,
         userId: user.uid,
@@ -621,7 +603,6 @@ export default function FeedPage() {
           : userProfile?.heritage ? [userProfile.heritage] : [],
         likes: 0,
         comments: 0,
-        createdAt: serverTimestamp(),
         feeling: selectedFeeling,
         reactions: {},
         reactionCount: 0,
@@ -689,17 +670,7 @@ export default function FeedPage() {
 
     // Write to Firestore in background
     try {
-      const postRef = doc(db, 'posts', postId);
-      if (currentReaction === emoji) {
-        await updateDoc(postRef, { [`reactions.${emoji}`]: arrayRemove(user.uid) });
-      } else if (currentReaction) {
-        await updateDoc(postRef, {
-          [`reactions.${currentReaction}`]: arrayRemove(user.uid),
-          [`reactions.${emoji}`]: arrayUnion(user.uid),
-        });
-      } else {
-        await updateDoc(postRef, { [`reactions.${emoji}`]: arrayUnion(user.uid) });
-      }
+      await updatePostReaction(postId, user.uid, emoji, currentReaction);
     } catch (error) {
       console.error('Error handling reaction:', error);
     }
@@ -714,7 +685,7 @@ export default function FeedPage() {
   const confirmDeletePost = async () => {
     if (!deletePostId) return;
     try {
-      await deleteDoc(doc(db, 'posts', deletePostId));
+      await deletePost(deletePostId);
       if (selectedPost?.id === deletePostId) setSelectedPost(null);
     } catch (error) {
       console.error('Error deleting post:', error);
@@ -739,7 +710,7 @@ export default function FeedPage() {
     if ((!postContent.trim() && postImages.length === 0) || !user || !editingPost) return;
     try {
       setSubmitting(true);
-      await updateDoc(doc(db, 'posts', editingPost.id), {
+      await updatePost(editingPost.id, {
         content: postContent.trim(),
         type: selectedType,
         feeling: selectedFeeling,
@@ -794,13 +765,7 @@ export default function FeedPage() {
     setSelectedPost(post);
     setLoadingComments(true);
     try {
-      const q = query(
-        collection(db, 'posts', post.id, 'comments'),
-        orderBy('createdAt', 'asc')
-      );
-      const snapshot = await getDocs(q);
-      const commentsData: Comment[] = [];
-      snapshot.forEach((d) => commentsData.push({ id: d.id, ...d.data() } as Comment));
+      const commentsData = await fetchComments(post.id);
       setComments(commentsData);
     } catch (error) {
       console.error('Error fetching comments:', error);
@@ -814,27 +779,20 @@ export default function FeedPage() {
     if ((!newComment.trim() && !commentImage) || !user || !selectedPost) return;
     try {
       setSubmittingComment(true);
-      await addDoc(collection(db, 'posts', selectedPost.id, 'comments'), {
+      await addComment(selectedPost.id, {
         text: newComment.trim(),
         userId: user.uid,
         userName: userProfile?.name || user.displayName || 'Anonymous',
         userAvatar: userProfile?.avatar || user.photoURL || '👤',
-        createdAt: serverTimestamp(),
         ...(commentImage ? { image: commentImage } : {}),
       });
-      await updateDoc(doc(db, 'posts', selectedPost.id), { comments: increment(1) });
+      await incrementPostComments(selectedPost.id, 1);
       // Update local comment count so detail header reflects new count immediately
       setSelectedPost((prev) => prev ? { ...prev, comments: prev.comments + 1 } : prev);
       setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, comments: p.comments + 1 } : p));
       setNewComment('');
       setCommentImage(null);
-      const q = query(
-        collection(db, 'posts', selectedPost.id, 'comments'),
-        orderBy('createdAt', 'asc')
-      );
-      const snapshot = await getDocs(q);
-      const commentsData: Comment[] = [];
-      snapshot.forEach((d) => commentsData.push({ id: d.id, ...d.data() } as Comment));
+      const commentsData = await fetchComments(selectedPost.id);
       setComments(commentsData);
     } catch (error) {
       console.error('Error adding comment:', error);
@@ -848,7 +806,6 @@ export default function FeedPage() {
 
   const handleCommentLike = async (commentId: string) => {
     if (!user || !selectedPost) return;
-    const commentRef = doc(db, 'posts', selectedPost.id, 'comments', commentId);
     const comment = comments.find((c) => c.id === commentId);
     if (!comment) return;
 
@@ -869,11 +826,7 @@ export default function FeedPage() {
 
     // Persist to Firestore
     try {
-      if (alreadyLiked) {
-        await updateDoc(commentRef, { likes: increment(-1), likedBy: arrayRemove(user.uid) });
-      } else {
-        await updateDoc(commentRef, { likes: increment(1), likedBy: arrayUnion(user.uid) });
-      }
+      await toggleCommentLike(selectedPost.id, commentId, user.uid, !!alreadyLiked);
     } catch (error) {
       console.error('Error liking comment:', error);
     }
@@ -884,8 +837,7 @@ export default function FeedPage() {
   const handleRemoveCommentImage = async (commentId: string) => {
     if (!user || !selectedPost) return;
     try {
-      const commentRef = doc(db, 'posts', selectedPost.id, 'comments', commentId);
-      await updateDoc(commentRef, { image: '' });
+      await removeCommentImage(selectedPost.id, commentId);
       // Optimistic UI update
       setComments((prev) =>
         prev.map((c) => c.id === commentId ? { ...c, image: undefined } : c)
@@ -900,8 +852,8 @@ export default function FeedPage() {
   const handleDeleteComment = async (commentId: string) => {
     if (!user || !selectedPost) return;
     try {
-      await deleteDoc(doc(db, 'posts', selectedPost.id, 'comments', commentId));
-      await updateDoc(doc(db, 'posts', selectedPost.id), { comments: increment(-1) });
+      await deleteComment(selectedPost.id, commentId);
+      await incrementPostComments(selectedPost.id, -1);
       setSelectedPost((prev) => prev ? { ...prev, comments: Math.max(prev.comments - 1, 0) } : prev);
       setPosts((prev) => prev.map((p) => p.id === selectedPost.id ? { ...p, comments: Math.max(p.comments - 1, 0) } : p));
       setComments((prev) => prev.filter((c) => c.id !== commentId));
@@ -925,8 +877,7 @@ export default function FeedPage() {
   const handleUpdateComment = async () => {
     if (!user || !selectedPost || !editingCommentId || !editCommentText.trim()) return;
     try {
-      const commentRef = doc(db, 'posts', selectedPost.id, 'comments', editingCommentId);
-      await updateDoc(commentRef, { text: editCommentText.trim() });
+      await updateCommentText(selectedPost.id, editingCommentId, editCommentText.trim());
       setComments((prev) =>
         prev.map((c) => c.id === editingCommentId ? { ...c, text: editCommentText.trim() } : c)
       );
@@ -954,47 +905,21 @@ export default function FeedPage() {
       const reportedPost = posts.find((p) => p.id === reportPostId);
       const categoryObj = REPORT_CATEGORIES.find((c) => c.id === reportReason);
 
-      // Write to reports collection for record-keeping (stealth: no author notification)
-      await addDoc(collection(db, 'reports'), {
-        postId: reportPostId,
-        reportedBy: user.uid,
-        reporterName: userProfile?.name || user.displayName || 'Anonymous',
-        reporterAvatar: userProfile?.avatar || '',
-        category: reportReason,
-        categoryLabel: categoryObj?.label || reportReason,
-        details: reportDetails.trim() || '',
-        createdAt: serverTimestamp(),
-        status: 'pending',
-      });
-
-      // Check if moderationQueue entry already exists for this post (crowdsourced aggregation)
-      const modQueueQuery = query(
-        collection(db, 'moderationQueue'),
-        where('contentId', '==', reportPostId)
-      );
-      const existingMods = await getDocs(modQueueQuery);
-
-      let totalReportCount = 1;
-
-      if (existingMods.docs.length > 0) {
-        // Aggregate into existing moderation queue item
-        const existingDoc = existingMods.docs[0];
-        const existingData = existingDoc.data();
-        totalReportCount = (existingData.reportCount || 1) + 1;
-        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
-          reportCount: totalReportCount,
-          reporters: arrayUnion({
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        // Create new moderationQueue entry
-        await addDoc(collection(db, 'moderationQueue'), {
+      // Shared report mechanics: reports entry (stealth: no author notification)
+      // + moderationQueue find-or-increment. The service adds createdAt/status
+      // to the report doc and reportCount/reporters/createdAt to the queue doc.
+      const totalReportCount = await submitContentReport({
+        contentId: reportPostId,
+        reportDoc: {
+          postId: reportPostId,
+          reportedBy: user.uid,
+          reporterName: userProfile?.name || user.displayName || 'Anonymous',
+          reporterAvatar: userProfile?.avatar || '',
+          category: reportReason,
+          categoryLabel: categoryObj?.label || reportReason,
+          details: reportDetails.trim() || '',
+        },
+        modQueueDoc: {
           type: 'post',
           content: reportedPost?.content || '',
           contentId: reportPostId,
@@ -1009,46 +934,35 @@ export default function FeedPage() {
           reportedBy: user.uid,
           reporterName: userProfile?.name || user.displayName || 'Anonymous',
           reporterAvatar: userProfile?.avatar || '',
-          reportCount: 1,
-          reporters: [{
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }],
-          createdAt: serverTimestamp(),
-        });
-      }
+        },
+        reporter: {
+          uid: user.uid,
+          name: userProfile?.name || user.displayName || 'Anonymous',
+          avatar: userProfile?.avatar || '',
+          category: reportReason,
+          details: reportDetails.trim() || '',
+          createdAt: new Date().toISOString(),
+        },
+      });
 
       // 3-strike auto-hide: if 3+ reports, auto-hide the post globally
       if (totalReportCount >= 3) {
-        await updateDoc(doc(db, 'posts', reportPostId), {
-          isHidden: true,
-          hiddenAt: new Date().toISOString(),
-          hiddenReason: 'Auto-hidden: reached 3 community reports',
-        });
+        await hidePost(reportPostId, 'Auto-hidden: reached 3 community reports');
         // Notify post author about auto-hide with appeal instructions
         if (reportedPost?.userId) {
-          await addDoc(collection(db, 'notifications'), {
-            type: 'content_hidden',
+          await sendContentHiddenNotification({
             recipientId: reportedPost.userId,
             recipientName: reportedPost.userName || '',
             postId: reportPostId,
             reason: 'Your post received multiple community reports and has been temporarily hidden for review.',
             message: 'Your post has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
             actionUrl: '/feed',
-            read: false,
-            createdAt: serverTimestamp(),
           });
         }
       }
 
       // Mute-on-report: hide this post from the reporter's feed permanently
-      await updateDoc(doc(db, 'users', user.uid), {
-        mutedPosts: arrayUnion(reportPostId),
-      });
+      await mutePostForUser(user.uid, reportPostId);
       setMutedPosts((prev) => new Set(prev).add(reportPostId));
 
       setReportedPosts((prev) => new Set(prev).add(reportPostId));
@@ -1069,9 +983,7 @@ export default function FeedPage() {
   const handleBlockUser = async () => {
     if (!user || !blockTargetUser) return;
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        blockedUsers: arrayUnion(blockTargetUser.uid),
-      });
+      await blockUser(user.uid, blockTargetUser.uid);
       setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
       setShowBlockConfirm(false);
       setBlockTargetUser(null);
