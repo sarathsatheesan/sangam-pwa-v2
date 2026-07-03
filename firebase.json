@@ -22,6 +22,10 @@
   "hosting": {
     "site": "mithr-1e5f4",
     "public": "dist",
+    "predeploy": [
+      "npm test",
+      "npm run build"
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",

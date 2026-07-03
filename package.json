@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "cap:sync": "npm run build && npx cap sync android",
+    "cap:sync": "npm test && npm run build && npx cap sync android",
     "cap:open": "npx cap open android",
     "android:assets": "capacitor-assets generate --android"
   },

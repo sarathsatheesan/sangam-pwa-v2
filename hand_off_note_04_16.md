@@ -3918,3 +3918,8 @@ NEW `hooks/useMessageActions.ts` (domain 3): `contextMenuMsg`/`setContextMenuMsg
 Commit: `git add src/ docs/ hand_off_note_04_16.md && git commit -m "refactor: message context-menu + delete-confirm domain (Session 52 / D1 tranche 3)"` → npm test (270) → build+deploy+cap:sync when convenient (can batch with Session 51 deploy).
 
 *Updated July 3, 2026 (Session 52) — D1 tranche 3 done: useMessageActions extracts the context-menu + delete-confirm domain with zero churn on the 10 context-menu call sites; messages.tsx down to 60 useState (from 76). Domains 4-11 remain per docs/messages-state-decomposition-plan.md. tsc clean; NOT committed.*
+
+**Session 52 addendum — tests now GATE every deployment (automation, not memory):**
+1. `firebase.json` hosting gained `"predeploy": ["npm test", "npm run build"]` — every `firebase deploy --only hosting` now auto-runs the 270-test suite + a fresh build first and ABORTS the deploy on any failure. This also permanently retires the long-standing "must build before deploy or stale bundle ships" gotcha.
+2. `package.json` `cap:sync` now runs `npm test` before building/syncing Android — same gate for app builds.
+WORKFLOW CHANGE: no need to run npm test or the build manually before deploying anymore — `firebase deploy --only hosting` does test→build→deploy in one command (rules/indexes-only deploys are NOT gated, correctly). If a deploy suddenly fails, read the vitest output — that's the gate working. Escape hatch for a true emergency: deploy from a commit where tests pass, or fix the test; do NOT strip the predeploy hook.
