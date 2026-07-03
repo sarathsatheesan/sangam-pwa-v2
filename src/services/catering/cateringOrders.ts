@@ -1170,6 +1170,41 @@ export function validateDeliveryETA(
   return { valid: true };
 }
 
+/**
+ * Session 51: UI-facing wrapper for validateDeliveryETA, used by OrderCard's
+ * 'time'-mode ETA inputs. Per product decision, a clock-time ETA ("14:30")
+ * means that time ON THE ORDER'S EVENT DATE (vendor-local == event-local for
+ * local catering). Normalizes eventDate (Firestore Timestamp | Date |
+ * 'YYYY-MM-DD' string) to a local Y-M-D, composes it with the entered HH:MM,
+ * and validates future + not-after-event-EOD. Duration-mode ETAs are relative
+ * to now and skip this entirely. Returns an error message or null.
+ *
+ * NOTE: because checkout enforces future event dates, the failure branch can
+ * only fire on the event day itself — it is regression-tested in vitest
+ * (timezone-edge-cases.test.ts) rather than manually.
+ */
+export function validateTimeEta(timeHHMM: string, eventDate: unknown): string | null {
+  // Normalize eventDate → local Y-M-D
+  let y: number, m: number, d: number;
+  const tsLike = eventDate as { toDate?: () => Date } | null;
+  if (typeof eventDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(eventDate)) {
+    [y, m, d] = eventDate.slice(0, 10).split('-').map(Number);
+  } else if (tsLike && typeof tsLike.toDate === 'function') {
+    const dt = tsLike.toDate();
+    y = dt.getFullYear(); m = dt.getMonth() + 1; d = dt.getDate();
+  } else if (eventDate instanceof Date) {
+    y = eventDate.getFullYear(); m = eventDate.getMonth() + 1; d = eventDate.getDate();
+  } else {
+    return null; // no usable event date — nothing to validate against
+  }
+  const [hh, mm] = timeHHMM.split(':').map(Number);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 'Invalid time';
+  const composed = new Date(y, m - 1, d, hh, mm, 0);
+  const ymd = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const result = validateDeliveryETA(composed, ymd);
+  return result.valid ? null : (result.error || 'Invalid ETA');
+}
+
 // ── FIX-M5: Vendor decline notification to customer ──
 
 /**

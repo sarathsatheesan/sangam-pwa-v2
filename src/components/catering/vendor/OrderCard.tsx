@@ -6,10 +6,16 @@ import {
 import { getTaxRate } from '@/services/cateringService';
 import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import { formatPrice, vendorModifyOrder } from '@/services/cateringService';
+import { validateTimeEta } from '@/services/catering/cateringOrders';
 import { useToast } from '@/contexts/ToastContext';
 import OrderTimeline from '../OrderTimeline';
 import OrderMessages from '../OrderMessages';
 import { SafeText } from '../SafeText';
+
+// Session 51: validateTimeEta moved to services/catering/cateringOrders.ts
+// (next to validateDeliveryETA) so it's unit-testable — the UI can't trigger
+// the failure branch until an order's event day arrives (checkout enforces
+// future event dates), so the guard is regression-tested in vitest instead.
 
 // SB-31: Format ETA value based on mode (time or duration)
 function formatEtaValue(value: string, mode: string): string {
@@ -493,6 +499,12 @@ function OrderCardInner({
                     onClick={() => {
                       const eta = etaInputs[`prep_${order.id}`]?.trim();
                       if (eta) {
+                        // Session 51: FIX-M3 validation re-wired
+                        const etaError = validateTimeEta(eta, order.eventDate);
+                        if (etaError) {
+                          addToast(etaError, 'error');
+                          return;
+                        }
                         const formattedEta = formatEtaValue(eta, 'time');
                         onStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: formattedEta }).catch(() => {});
                         addToast('Prep time estimate shared with customer', 'success');
@@ -561,6 +573,15 @@ function OrderCardInner({
                 onClick={() => {
                   const eta = etaInputs[order.id]?.trim();
                   const mode = etaInputs[`mode_${order.id}`] || 'time';
+                  // Session 51: FIX-M3 validation re-wired ('time' mode only —
+                  // durations are relative to now and always valid)
+                  if (eta && mode === 'time') {
+                    const etaError = validateTimeEta(eta, order.eventDate);
+                    if (etaError) {
+                      addToast(etaError, 'error');
+                      return;
+                    }
+                  }
                   const formattedEta = eta ? formatEtaValue(eta, mode) : undefined;
                   onStatusChange(order.id, 'out_for_delivery', formattedEta ? { estimatedDeliveryTime: formattedEta } : undefined);
                 }}

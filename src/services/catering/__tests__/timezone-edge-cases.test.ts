@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
-import { validateDeliveryETA } from '../cateringOrders';
+import { validateDeliveryETA, validateTimeEta } from '../cateringOrders';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -279,5 +279,58 @@ describe('Timezone Edge Cases: validateDeliveryETA', () => {
       const result = validateDeliveryETA('2026-06-16T10:00:00.000Z');
       expect(result.valid).toBe(true);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// validateTimeEta — OrderCard's 'time'-mode ETA wrapper (Session 51).
+// The UI cannot reach the failure branch until an order's event day arrives
+// (checkout enforces future event dates), so the guard is verified here.
+// ═══════════════════════════════════════════════════════════════════════
+describe('validateTimeEta (OrderCard time-mode ETA wrapper)', () => {
+  class FakeTimestamp {
+    constructor(private readonly date: Date) {}
+    toDate(): Date { return this.date; }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // "Now" = June 15, 2026, 12:00 local
+    vi.setSystemTime(new Date(2026, 5, 15, 12, 0, 0));
+  });
+
+  it('accepts a time on a FUTURE event date (any clock time)', () => {
+    expect(validateTimeEta('09:00', '2026-06-20')).toBeNull();
+    expect(validateTimeEta('23:59', '2026-06-20')).toBeNull();
+  });
+
+  it('event-day order: accepts a time later than now', () => {
+    expect(validateTimeEta('14:30', '2026-06-15')).toBeNull();
+  });
+
+  it('event-day order: REJECTS a time earlier than now (the untestable-in-UI branch)', () => {
+    const err = validateTimeEta('09:00', '2026-06-15');
+    expect(err).toBe('ETA must be in the future');
+  });
+
+  it('normalizes Firestore Timestamp-like eventDate', () => {
+    const eventDay = new FakeTimestamp(new Date(2026, 5, 15, 0, 0, 0));
+    expect(validateTimeEta('14:30', eventDay)).toBeNull();
+    expect(validateTimeEta('09:00', eventDay)).toBe('ETA must be in the future');
+  });
+
+  it('normalizes plain Date eventDate', () => {
+    expect(validateTimeEta('14:30', new Date(2026, 5, 15))).toBeNull();
+    expect(validateTimeEta('09:00', new Date(2026, 5, 15))).toBe('ETA must be in the future');
+  });
+
+  it('returns null (no validation) when eventDate is missing/unusable', () => {
+    expect(validateTimeEta('09:00', undefined)).toBeNull();
+    expect(validateTimeEta('09:00', null)).toBeNull();
+    expect(validateTimeEta('09:00', 'not-a-date')).toBeNull();
+  });
+
+  it('rejects malformed time strings', () => {
+    expect(validateTimeEta('bogus', '2026-06-20')).toBe('Invalid time');
   });
 });

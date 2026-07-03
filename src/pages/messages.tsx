@@ -76,6 +76,7 @@ import {
 } from '@/utils/messageHelpers';
 import { reportError } from '@/utils/reportError';
 import { useChatNotification } from '@/hooks/useChatNotification';
+import { useChatModeration } from '@/hooks/useChatModeration';
 import {
   LinkPreviewCard,
   ChatAvatar,
@@ -216,17 +217,17 @@ export default function MessagesPage() {
   // Bumped whenever a shared/group key is derived so message listener re-decrypts
   const [e2eKeyVersion, setE2eKeyVersion] = useState(0);
 
-  // Report / Block state
-  const [blockedUsers, setBlockedUsers] = useState<Set<string>>(new Set());
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reportMessageId, setReportMessageId] = useState<string | null>(null);
-  const [reportMessageText, setReportMessageText] = useState('');
-  const [reportSenderId, setReportSenderId] = useState<string | null>(null);
-  const [reportReason, setReportReason] = useState('');
-  const [reportDetails, setReportDetails] = useState('');
-  const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
-  const [blockTargetUser, setBlockTargetUser] = useState<{ uid: string; name: string } | null>(null);
+  // Report / Block moderation domain → hooks/useChatModeration (Session 50, D1 tranche 2)
+  // State only — Firestore I/O stays in handleSubmitReport / handleBlockUser /
+  // the blocked-users load effect below until services/messages.ts exists.
+  const {
+    showReportModal, reportMessageId, reportMessageText, reportSenderId,
+    reportReason, reportDetails, reportSubmitting,
+    showBlockConfirm, blockTargetUser,
+    openReportModal, closeReportModal, setReportReason, setReportDetails,
+    setReportSubmitting, openBlockConfirm, closeBlockConfirm,
+    blockedUsers, setBlockedUsers,
+  } = useChatModeration();
 
   // Call state — subscribe to CallManager for header button states
   const [callState, setCallState] = useState<CallState>(getCallManager().getState());
@@ -912,15 +913,7 @@ export default function MessagesPage() {
   }, [user]);
 
   // ===== REPORT & BLOCK HANDLERS =====
-
-  const openReportModal = (msgId: string, msgText: string, senderId: string) => {
-    setReportMessageId(msgId);
-    setReportMessageText(msgText);
-    setReportSenderId(senderId);
-    setReportReason('');
-    setReportDetails('');
-    setShowReportModal(true);
-  };
+  // openReportModal / openBlockConfirm now come from useChatModeration (same signatures)
 
   const handleSubmitReport = async () => {
     if (!reportReason || !reportMessageId || !user || !reportSenderId) return;
@@ -992,9 +985,7 @@ export default function MessagesPage() {
         });
       }
 
-      setShowReportModal(false);
-      setReportReason('');
-      setReportDetails('');
+      closeReportModal();
       showNotif('Report submitted. Thank you for helping keep the community safe.', 'success');
     } catch (error) {
       console.error('Error submitting report:', error);
@@ -1004,11 +995,6 @@ export default function MessagesPage() {
     }
   };
 
-  const openBlockConfirm = (uid: string, name: string) => {
-    setBlockTargetUser({ uid, name });
-    setShowBlockConfirm(true);
-  };
-
   const handleBlockUser = async () => {
     if (!user || !blockTargetUser) return;
     try {
@@ -1016,8 +1002,7 @@ export default function MessagesPage() {
         blockedUsers: arrayUnion(blockTargetUser.uid),
       });
       setBlockedUsers((prev) => new Set(prev).add(blockTargetUser.uid));
-      setShowBlockConfirm(false);
-      setBlockTargetUser(null);
+      closeBlockConfirm();
       showNotif(`${blockTargetUser.name} has been blocked. Their messages will be hidden.`, 'success');
     } catch (error) {
       console.error('Error blocking user:', error);
@@ -4035,11 +4020,11 @@ export default function MessagesPage() {
       {/* ===== Report Message Modal ===== */}
       {showReportModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => setShowReportModal(false)} onTouchStart={() => setShowReportModal(false)} />
+          <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => closeReportModal()} onTouchStart={() => closeReportModal()} />
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-y-auto">
             <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center justify-between rounded-t-2xl">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Report Message</h3>
-              <button onClick={() => setShowReportModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700 rounded-lg">
+              <button onClick={() => closeReportModal()} className="p-1 hover:bg-gray-100 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700 rounded-lg">
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
@@ -4074,7 +4059,7 @@ export default function MessagesPage() {
             </div>
             <div className="sticky bottom-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-5 py-4 flex gap-3 rounded-b-2xl">
               <button
-                onClick={() => setShowReportModal(false)}
+                onClick={() => closeReportModal()}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700"
               >
                 Cancel
@@ -4094,7 +4079,7 @@ export default function MessagesPage() {
       {/* ===== Block User Confirmation Modal ===== */}
       {showBlockConfirm && blockTargetUser && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => setShowBlockConfirm(false)} onTouchStart={() => setShowBlockConfirm(false)} />
+          <div className="absolute inset-0 bg-black/50" style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} onClick={() => closeBlockConfirm()} onTouchStart={() => closeBlockConfirm()} />
           <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
             <div className="w-14 h-14 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
               <Ban className="w-7 h-7 text-red-600 dark:text-red-400" />
@@ -4107,7 +4092,7 @@ export default function MessagesPage() {
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => setShowBlockConfirm(false)}
+                onClick={() => closeBlockConfirm()}
                 className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700"
               >
                 Cancel
