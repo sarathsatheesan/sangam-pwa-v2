@@ -3907,3 +3907,15 @@ Deploy: hosting + cap:sync (bundle-only). Manual check: request a reprice with a
 tsc clean. Commit: `git add src/ docs/ hand_off_note_04_16.md && git commit -m "feat: re-wire ETA validation into OrderCard; refactor: chat moderation domain extraction (Session 51)"` then npm test (263/263 expected), build+deploy+cap:sync.
 
 **Session 51 addendum 2 — ETA guard made machine-verifiable:** The manual "enter a past time" test is IMPOSSIBLE from the UI — checkout enforces future event dates, and time-mode ETAs compose onto the event date, so the rejection branch can only fire ON the event day itself (working as designed, just untestable until then). Resolution: `validateTimeEta` moved from OrderCard.tsx into services/catering/cateringOrders.ts (exported, next to validateDeliveryETA) and 7 unit tests added to timezone-edge-cases.test.ts covering exactly the unreachable branch (event-day past-time rejection, Timestamp/Date/string eventDate normalization, missing-eventDate passthrough, malformed time). Manual testing reduces to the positive path only (valid time → shares/dispatches). `npm test` now expects **270 passing** (263 + 7). tsc clean.
+
+---
+
+### Session 52 (July 3, 2026) — D1 Tranche 3: Context Menu + Delete Confirm Domain
+
+NEW `hooks/useMessageActions.ts` (domain 3): `contextMenuMsg`/`setContextMenuMsg` exposed with their exact useState shape (all 10 page call sites untouched — open on right-click/long-press, null on every menu action); the `showDeleteMsgConfirm` + `deleteMsgId` pair collapsed into one nullable `deleteMsgId` (non-null == dialog open) with `requestDeleteMessage`/`cancelDeleteMessage`; the actual deleteDoc stays in the page (`confirmDeleteMessage`), per tranche rules. JSX conditional now `deleteMsgId !== null`. messages.tsx **63→60 useState**. Plan doc updated (domain 3 ✅; next = domain 4 chat search). tsc exit 0.
+
+**Manual live-test (combine with the still-pending tranche-2 checks):** right-click/long-press a message → context menu opens with correct options (mine vs theirs); Delete → styled confirm → Cancel (backdrop, touch, button) closes without deleting; Delete deletes + 'Message deleted' toast; Reply/Forward/Pin/Star/Edit/Report/Block from the menu all still work (each closes the menu).
+
+Commit: `git add src/ docs/ hand_off_note_04_16.md && git commit -m "refactor: message context-menu + delete-confirm domain (Session 52 / D1 tranche 3)"` → npm test (270) → build+deploy+cap:sync when convenient (can batch with Session 51 deploy).
+
+*Updated July 3, 2026 (Session 52) — D1 tranche 3 done: useMessageActions extracts the context-menu + delete-confirm domain with zero churn on the 10 context-menu call sites; messages.tsx down to 60 useState (from 76). Domains 4-11 remain per docs/messages-state-decomposition-plan.md. tsc clean; NOT committed.*

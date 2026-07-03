@@ -18,8 +18,8 @@ STATE monolith: 76 useState hooks (73 after tranche 1).*
 | # | Domain | States | Target | Risk |
 |---|---|---|---|---|
 | ✅1 | Notification toast | 3 (showNotification, notificationMessage, notificationType) | `hooks/useChatNotification.ts` — DONE Session 50 | Low |
-| 2 | Report/block moderation | 10 (showReportModal, reportMessageId/Text/SenderId, reportReason/Details/Submitting, showBlockConfirm, blockTargetUser, blockedUsers) | `hooks/useChatModeration.ts` (reducer) — mirror business/forum pattern; candidate to share `services/moderation.ts` | Low-Med |
-| 3 | Context menu + delete confirm | 3 (contextMenuMsg, showDeleteMsgConfirm, deleteMsgId) | fold into domain-2 hook or small `useMessageActions` | Low |
+| ✅2 | Report/block moderation | 10 (showReportModal, reportMessageId/Text/SenderId, reportReason/Details/Submitting, showBlockConfirm, blockTargetUser, blockedUsers) | `hooks/useChatModeration.ts` — DONE Session 50 (reducer for the 9 modal states + useState for blockedUsers to keep functional-setter shape); Firestore I/O still in page, move with `services/messages.ts` | Low-Med |
+| ✅3 | Context menu + delete confirm | 3 (contextMenuMsg, showDeleteMsgConfirm, deleteMsgId) | `hooks/useMessageActions.ts` — DONE Session 52 (setContextMenuMsg exposed as-is → 10 call sites untouched; delete pair collapsed to nullable deleteMsgId; deleteDoc stays in page) | Low |
 | 4 | Chat search | 3 (chatSearch, chatSearchQuery, chatSearchIndex) | `useChatSearch` | Low |
 | 5 | Wallpaper/appearance | 3 (selectedWallpaper, showWallpaperPicker, compactMode) | `useChatAppearance` (localStorage-backed — check persistence effects) | Low |
 | 6 | Forward/lightbox | 6 (lightboxImage, lightboxForwardOpen, forwardingImage, forwardingMessage, showForwardPicker, forwardingMsg) | `useForwarding` reducer | Med |
@@ -29,7 +29,7 @@ STATE monolith: 76 useState hooks (73 after tranche 1).*
 | 10 | Core data (conversations/messages/users/selection) | ~10 (viewState, conversations, selectedUser, messages, loading, messagesLoading, users, searchTerm, activeFilter, selectedConvId) | reducer + eventual `services/messages.ts` (subscriptions incl. the snapshot-race guard `msgSnapshotSeqRef` — Session 42) | High |
 | 11 | E2EE + calls | 5 (e2eReady, e2eKeyVersion, callState, groupCallState, activeGroupCallId) | LAST — interlocks with CallManager singletons and key lifecycle; only after 1–10 are stable | High |
 
-Remaining after tranche 1: 73 useState. Suggested order: 2+3 together → 4 →
+Remaining after tranche 3: 60 useState. Suggested order: 4 →
 5 → 6 → 7 → 8 → 9 → 10 → 11.
 
 ## Companion work (separate tranches)

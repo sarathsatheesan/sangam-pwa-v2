@@ -76,6 +76,7 @@ import {
 } from '@/utils/messageHelpers';
 import { reportError } from '@/utils/reportError';
 import { useChatNotification } from '@/hooks/useChatNotification';
+import { useMessageActions } from '@/hooks/useMessageActions';
 import { useChatModeration } from '@/hooks/useChatModeration';
 import {
   LinkPreviewCard,
@@ -176,13 +177,13 @@ export default function MessagesPage() {
   // Notification toast domain → hooks/useChatNotification (Session 50, D1 tranche 1)
   const { notification, showNotif, clearNotif } = useChatNotification();
 
-  // Message context menu state
-  const [contextMenuMsg, setContextMenuMsg] = useState<Message | null>(null);
+  // Context menu + delete confirm domain → hooks/useMessageActions
+  // (Session 52, D1 tranche 3). deleteMsgId non-null == confirm dialog open.
+  const {
+    contextMenuMsg, setContextMenuMsg,
+    deleteMsgId, requestDeleteMessage, cancelDeleteMessage,
+  } = useMessageActions();
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Delete confirmation modal state
-  const [showDeleteMsgConfirm, setShowDeleteMsgConfirm] = useState(false);
-  const [deleteMsgId, setDeleteMsgId] = useState<string | null>(null);
 
   // Image message state
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -1945,8 +1946,7 @@ export default function MessagesPage() {
 
   const deleteMessage = (messageId: string) => {
     if ((!selectedUser && !selectedConvId) || !user?.uid) return;
-    setDeleteMsgId(messageId);
-    setShowDeleteMsgConfirm(true);
+    requestDeleteMessage(messageId);
   };
 
   const confirmDeleteMessage = async () => {
@@ -1960,8 +1960,7 @@ export default function MessagesPage() {
       console.error('Error deleting message:', err);
       showNotif('Failed to delete message', 'error');
     } finally {
-      setShowDeleteMsgConfirm(false);
-      setDeleteMsgId(null);
+      cancelDeleteMessage();
     }
   };
 
@@ -4004,13 +4003,13 @@ export default function MessagesPage() {
           duration={notification.type === 'error' ? 5000 : 3000}
         />
       )}
-      {showDeleteMsgConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={() => { setShowDeleteMsgConfirm(false); setDeleteMsgId(null); }} onTouchStart={() => { setShowDeleteMsgConfirm(false); setDeleteMsgId(null); }} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+      {deleteMsgId !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]" onClick={cancelDeleteMessage} onTouchStart={cancelDeleteMessage} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 mx-4 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete Message</h3>
             <p className="text-gray-600 dark:text-gray-300 mb-4">Are you sure you want to delete this message? This action cannot be undone.</p>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => { setShowDeleteMsgConfirm(false); setDeleteMsgId(null); }} className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
+              <button onClick={cancelDeleteMessage} className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>
               <button onClick={confirmDeleteMessage} className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">Delete</button>
             </div>
           </div>
