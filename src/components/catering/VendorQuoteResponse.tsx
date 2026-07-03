@@ -82,6 +82,7 @@ import {
   toDate,
 } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
+import { reportError } from '@/utils/reportError';
 import { SafeText } from './SafeText';
 
 interface VendorQuoteResponseProps {
@@ -302,11 +303,11 @@ export default function VendorQuoteResponse({
       });
       addToast('Quote submitted successfully!', 'success');
       // Notify customer about the new quote (fire-and-forget)
-      notifyVendorQuoteReceived(request.customerId, request.id, businessName, total).catch(() => {});
+      notifyVendorQuoteReceived(request.customerId, request.id, businessName, total).catch((err) => reportError(err, { op: 'notify-customer-quote-received-push' }));
       // In-app bell notification for customer
-      notifyCustomerQuoteReceived(request.customerId, request.id, businessName, total).catch(() => {});
+      notifyCustomerQuoteReceived(request.customerId, request.id, businessName, total).catch((err) => reportError(err, { op: 'notify-customer-quote-received-bell' }));
       // Reload requests to update the open/responded lists
-      fetchQuoteRequestsForBusiness(businessId).then(setRequests).catch(() => {});
+      fetchQuoteRequestsForBusiness(businessId).then(setRequests).catch((err) => reportError(err, { op: 'refresh-vendor-quote-requests' }));
     } catch (err: any) {
       addToast(err.message || 'Failed to submit quote', 'error');
     } finally {
@@ -365,7 +366,7 @@ export default function VendorQuoteResponse({
       addToast('Quote updated successfully!', 'success');
       setEditingResponseId(null);
       // Reload responses to reflect updates
-      fetchQuoteRequestsForBusiness(businessId).then(setRequests).catch(() => {});
+      fetchQuoteRequestsForBusiness(businessId).then(setRequests).catch((err) => reportError(err, { op: 'refresh-vendor-quote-requests' }));
     } catch (err: any) {
       addToast(err.message || 'Failed to update quote', 'error');
     } finally {
@@ -414,12 +415,12 @@ export default function VendorQuoteResponse({
           request.customerId, response.quoteRequestId, businessName,
           action === 'accept' ? 'accepted' : action === 'deny' ? 'denied' : 'countered',
           counterPrice,
-        ).catch(() => {});
+        ).catch((err) => reportError(err, { op: 'notify-customer-reprice-response' }));
         notifyCustomerRepriceResponseMultiChannel(
           request.customerId, response.quoteRequestId,
           action === 'accept' ? 'accepted' : action === 'deny' ? 'denied' : 'countered',
           counterPrice,
-        ).catch(() => {});
+        ).catch((err) => reportError(err, { op: 'notify-customer-reprice-response-multichannel' }));
       }
     } catch (err: any) {
       addToast(err.message || 'Failed to respond to reprice request', 'error');

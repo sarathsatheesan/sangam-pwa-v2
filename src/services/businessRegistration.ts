@@ -24,6 +24,7 @@ import {
   getDownloadURL,
 } from 'firebase/storage';
 import { db, storage } from './firebase';
+import { reportError } from '@/utils/reportError';
 import type { BusinessFormData } from '../reducers/businessReducer';
 
 // ── Types ──
@@ -213,8 +214,9 @@ export async function submitBusinessRegistration(
       await updateDoc(docRef, updates);
     }
 
-    // 5. Clean up any draft for this user
-    await deleteDraft(userId).catch(() => {});
+    // 5. Clean up any draft for this user — a leftover draft would repopulate
+    // the wizard on next visit, so log (but don't fail registration) if it sticks.
+    await deleteDraft(userId).catch((err) => reportError(err, { op: 'delete-registration-draft' }));
 
     return { success: true, businessId };
   } catch (error: any) {

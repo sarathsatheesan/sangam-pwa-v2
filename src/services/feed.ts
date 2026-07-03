@@ -45,6 +45,7 @@ import {
 } from 'firebase/firestore';
 import { z } from 'zod';
 import { db } from './firebase';
+import { sendContentHiddenNotificationDoc } from './moderation';
 
 const POSTS_COL = 'posts';
 const COMMENTS_SUB = 'comments';
@@ -439,10 +440,6 @@ export interface ContentHiddenNotificationInput {
 export async function sendContentHiddenNotification(
   input: ContentHiddenNotificationInput,
 ): Promise<void> {
-  await addDoc(collection(db, 'notifications'), {
-    type: 'content_hidden',
-    ...input,
-    read: false,
-    createdAt: serverTimestamp(),
-  });
+  // Delegates to the shared moderation helper (Session 53 dedup).
+  await sendContentHiddenNotificationDoc({ ...input });
 }

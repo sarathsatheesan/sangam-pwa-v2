@@ -58,7 +58,7 @@ export async function recordView(businessId: string): Promise<void> {
         createdAt: Timestamp.now(),
       });
     }
-    // Update denormalized counter
+    // Update denormalized counter — telemetry: intentionally fire-and-forget
     await updateDoc(businessRef, { viewCount: increment(1) }).catch(() => {});
   } catch (err) {
     console.warn('Analytics: failed to record view', err);
@@ -87,6 +87,7 @@ export async function recordContactClick(businessId: string): Promise<void> {
         createdAt: Timestamp.now(),
       });
     }
+    // telemetry: intentionally fire-and-forget denormalized counter
     await updateDoc(businessRef, { contactClicks: increment(1) }).catch(() => {});
   } catch (err) {
     console.warn('Analytics: failed to record contact click', err);
@@ -115,6 +116,7 @@ export async function recordShare(businessId: string): Promise<void> {
         createdAt: Timestamp.now(),
       });
     }
+    // telemetry: intentionally fire-and-forget denormalized counter
     await updateDoc(businessRef, { shareCount: increment(1) }).catch(() => {});
   } catch (err) {
     console.warn('Analytics: failed to record share', err);

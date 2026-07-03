@@ -286,6 +286,8 @@ const GlobalCallOverlay: React.FC = () => {
         setTimeout(() => {
           if (remoteAudioRef.current?.srcObject) {
             remoteAudioRef.current.muted = false;
+            // intentional-suppression: second-chance retry after the warn above —
+            // play() may still reject under autoplay policy (NotAllowedError/AbortError).
             remoteAudioRef.current.play().catch(() => {});
           }
         }, 500);
@@ -366,9 +368,12 @@ const GlobalCallOverlay: React.FC = () => {
     }
     if (remoteVideoRef.current?.srcObject) {
       remoteVideoRef.current.muted = true;
+      // intentional-suppression: play() rejects on autoplay-policy blocks or when
+      // interrupted by a new load (AbortError) — muted video retry is best-effort.
       remoteVideoRef.current.play().catch(() => {});
     }
     if (localVideoRef.current?.srcObject) {
+      // intentional-suppression: same expected play() interruption/autoplay rejection.
       localVideoRef.current.play().catch(() => {});
     }
   }, []);

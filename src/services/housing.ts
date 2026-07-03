@@ -37,6 +37,7 @@ import {
 import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { z } from 'zod';
 import { db } from './firebase';
+import { sendContentHiddenNotificationDoc } from './moderation';
 
 const LISTINGS_COL = 'listings';
 const COMMENTS_SUB = 'comments';
@@ -568,15 +569,15 @@ export interface ListingHiddenNotificationInput {
 export async function sendListingHiddenNotification(
   input: ListingHiddenNotificationInput,
 ): Promise<void> {
-  await addDoc(collection(db, 'notifications'), {
-    type: 'content_hidden',
+  // Delegates to the shared moderation helper (Session 53 dedup). The old
+  // explicit field list == spread: the input interface defines exactly
+  // these six fields.
+  await sendContentHiddenNotificationDoc({
     recipientId: input.recipientId,
     recipientName: input.recipientName,
     postId: input.postId,
     reason: input.reason,
     message: input.message,
     actionUrl: input.actionUrl,
-    read: false,
-    createdAt: serverTimestamp(),
   });
 }

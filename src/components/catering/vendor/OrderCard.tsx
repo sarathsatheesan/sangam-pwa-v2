@@ -8,6 +8,7 @@ import type { CateringOrder, OrderItem } from '@/services/cateringService';
 import { formatPrice, vendorModifyOrder } from '@/services/cateringService';
 import { validateTimeEta } from '@/services/catering/cateringOrders';
 import { useToast } from '@/contexts/ToastContext';
+import { reportError } from '@/utils/reportError';
 import OrderTimeline from '../OrderTimeline';
 import OrderMessages from '../OrderMessages';
 import { SafeText } from '../SafeText';
@@ -506,7 +507,11 @@ function OrderCardInner({
                           return;
                         }
                         const formattedEta = formatEtaValue(eta, 'time');
-                        onStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: formattedEta }).catch(() => {});
+                        onStatusChange(order.id, 'preparing' as any, { estimatedDeliveryTime: formattedEta }).catch((err) => reportError(err, {
+                          op: 'share-prep-eta',
+                          toast: addToast,
+                          toastMessage: 'Could not share the prep time estimate. Please try again.',
+                        }));
                         addToast('Prep time estimate shared with customer', 'success');
                       }
                     }}

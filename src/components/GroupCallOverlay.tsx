@@ -8,6 +8,7 @@ import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { copyToClipboard } from '@/utils/clipboard';
+import { reportError } from '@/utils/reportError';
 import {
   getGroupCallManager,
   type GroupCallState, type GroupCallEndedEvent, type GroupCallType,
@@ -482,12 +483,14 @@ export default function GroupCallOverlay() {
             const baseUrl = window.location.origin;
             const link = `${baseUrl}/messages?joinCall=${callState.roomId}&conv=${callState.conversationId}`;
             if (navigator.share) {
+              // intentional-suppression: share() rejects with AbortError when the
+              // user dismisses the native share sheet — that is a normal cancel.
               navigator.share({ title: 'Join Group Call', text: 'Join the group call on eNoVo', url: link }).catch(() => {});
             } else {
               copyToClipboard(link).then(() => {
                 setLinkCopied(true);
                 setTimeout(() => setLinkCopied(false), 2000);
-              }).catch(() => {});
+              }).catch((err) => reportError(err, { op: 'copy-group-call-link' }));
             }
           }}
           className="rounded-full flex items-center justify-center"

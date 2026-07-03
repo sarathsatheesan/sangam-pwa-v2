@@ -38,6 +38,7 @@ import {
 import type { DocumentData, Unsubscribe, FirestoreError, QueryDocumentSnapshot } from 'firebase/firestore';
 import { z } from 'zod';
 import { db } from './firebase';
+import { sendContentHiddenNotificationDoc } from './moderation';
 
 /* ─── types ─── */
 
@@ -467,10 +468,6 @@ export interface EventHiddenNotificationInput {
 export async function sendEventHiddenNotification(
   input: EventHiddenNotificationInput,
 ): Promise<void> {
-  await addDoc(collection(db, 'notifications'), {
-    type: 'content_hidden',
-    ...input,
-    read: false,
-    createdAt: serverTimestamp(),
-  });
+  // Delegates to the shared moderation helper (Session 53 dedup).
+  await sendContentHiddenNotificationDoc({ ...input });
 }

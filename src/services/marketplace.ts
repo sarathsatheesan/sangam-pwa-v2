@@ -34,6 +34,7 @@ import {
 import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { z } from 'zod';
 import { db } from './firebase';
+import { sendContentHiddenNotificationDoc } from './moderation';
 
 /* ─── types (moved verbatim from pages/marketplace.tsx) ─── */
 
@@ -406,12 +407,8 @@ export interface ListingHiddenNotificationInput {
 export async function sendListingHiddenNotification(
   input: ListingHiddenNotificationInput,
 ): Promise<void> {
-  await addDoc(collection(db, 'notifications'), {
-    type: 'content_hidden',
-    ...input,
-    read: false,
-    createdAt: serverTimestamp(),
-  });
+  // Delegates to the shared moderation helper (Session 53 dedup).
+  await sendContentHiddenNotificationDoc({ ...input });
 }
 
 /* ─── user safety data (mutedListings / blockedUsers on users/{uid}) ─── */

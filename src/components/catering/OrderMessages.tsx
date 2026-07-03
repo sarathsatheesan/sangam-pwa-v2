@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Send, MessageSquare, ChevronDown, ChevronUp, Check, CheckCheck, Lock } from 'lucide-react';
 import type { OrderNote } from '@/services/cateringService';
 import { addOrderNote, subscribeToOrderNotes, markOrderNotesRead, toEpochMs } from '@/services/cateringService';
+import { reportError } from '@/utils/reportError';
 
 const MESSAGING_WINDOW_MS = 48 * 60 * 60 * 1000; // 48 hours
 
@@ -88,7 +89,7 @@ export default function OrderMessages({
       (n) => n.senderId !== currentUserId && !(n.readBy || []).includes(currentUserId),
     );
     if (hasUnread) {
-      markOrderNotesRead(orderId, currentUserId).catch(() => {});
+      markOrderNotesRead(orderId, currentUserId).catch((err) => reportError(err, { op: 'mark-order-notes-read' }));
     }
   }, [expanded, notes, orderId, currentUserId]);
 

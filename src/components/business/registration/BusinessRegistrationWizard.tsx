@@ -10,6 +10,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useFeatureSettings } from '../../../contexts/FeatureSettingsContext';
 import { validateSignupStep } from '../businessValidation';
 import { submitBusinessRegistration, saveDraft, loadDraft } from '../../../services/businessRegistration';
+import { reportError } from '@/utils/reportError';
 import type { BusinessFormData, BusinessSignupDraft } from '../../../reducers/businessReducer';
 import StepIdentity from './StepIdentity';
 import StepLocation from './StepLocation';
@@ -180,7 +181,7 @@ const BusinessRegistrationWizard: React.FC = () => {
         setCurrentStep(draft.currentStep);
         setCompletedSteps(new Set(draft.completedSteps));
       }
-    }).catch(() => {});
+    }).catch((err) => reportError(err, { op: 'load-registration-draft' }));
   }, [user?.uid]);
 
   // ── Step renderer ──

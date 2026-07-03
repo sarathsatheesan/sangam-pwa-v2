@@ -1014,12 +1014,16 @@ export class CallManager {
       const ctx = new AudioCtx();
       // Safari: resume() must be called to unlock suspended AudioContext
       if (ctx.state === 'suspended') {
+        // intentional-suppression: resume() rejects with NotAllowedError when
+        // called outside a user gesture (autoplay policy) — ringtone is best-effort.
         ctx.resume().catch(() => {});
       }
       const playBeep = () => {
         if (!this.ringAudio) return;
         // Safari: re-check context state and resume if needed
         if (ctx.state === 'suspended') {
+          // intentional-suppression: resume() rejects with NotAllowedError outside
+          // a user gesture (autoplay policy) — ringtone beep is best-effort.
           ctx.resume().catch(() => {});
         }
         const osc = ctx.createOscillator();

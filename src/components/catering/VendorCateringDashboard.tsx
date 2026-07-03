@@ -33,6 +33,7 @@ import {
 import type { CateringNotification } from '@/services/cateringService';
 import { useToast } from '@/contexts/ToastContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { reportError } from '@/utils/reportError';
 import OrderTimeline from './OrderTimeline';
 import OrderMessages from './OrderMessages';
 import ReviewModerationPanel from './ReviewModerationPanel';
@@ -213,6 +214,8 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
   useEffect(() => {
     return () => {
       if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
+        // intentional-suppression: close() rejects with InvalidStateError if the
+        // context raced to 'closed' between the guard and the call — harmless on unmount.
         audioCtxRef.current.close().catch(() => {});
         audioCtxRef.current = null;
       }
@@ -435,7 +438,7 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
       setPaymentMethod(info.paymentMethod || '');
       setPaymentNote(info.paymentNote || '');
       setPaymentSkippedUntil(info.paymentSetupSkippedUntil ?? null);
-    }).catch(() => {});
+    }).catch((err) => reportError(err, { op: 'load-vendor-payment-info' }));
   }, [businessId]);
 
   // Derived: does the vendor have any payment info configured at all?

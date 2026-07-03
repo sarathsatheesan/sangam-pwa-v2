@@ -24,6 +24,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { reportError } from '@/utils/reportError';
 
 interface QuoteComparisonProps {
   quoteRequest: CateringQuoteRequest;
@@ -126,7 +127,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
           setOrdersCreated(true);
         }
       })
-    ).catch(() => {});
+    ).catch((err) => reportError(err, { op: 'catering-check-existing-orders' }));
   }, [quoteRequest.id, ordersCreated]);
 
   // ── Compute assigned items from the quote request's itemAssignments ──
@@ -300,7 +301,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
           notifyVendorQuoteDeclined(ownerId, quoteRequest.id, response.businessName);
           notifyVendorQuoteDeclinedMultiChannel(ownerId, quoteRequest.id, response.businessName);
         }
-      }).catch(() => {});
+      }).catch((err) => reportError(err, { op: 'notify-vendor-quote-declined' }));
     } catch (err: any) {
       addToast(err.message || 'Failed to decline quote', 'error');
     } finally {
@@ -343,10 +344,10 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
         const bizData = bizSnap.data();
         const ownerId = bizData?.ownerId;
         if (ownerId) {
-          notifyVendorRepriceRequested(ownerId, quoteRequest.id, response.businessName, priceCents).catch(() => {});
-          notifyVendorRepriceRequestedMultiChannel(ownerId, quoteRequest.id, priceCents).catch(() => {});
+          notifyVendorRepriceRequested(ownerId, quoteRequest.id, response.businessName, priceCents).catch((err) => reportError(err, { op: 'notify-vendor-reprice-requested' }));
+          notifyVendorRepriceRequestedMultiChannel(ownerId, quoteRequest.id, priceCents).catch((err) => reportError(err, { op: 'notify-vendor-reprice-requested-multichannel' }));
         }
-      }).catch(() => {});
+      }).catch((err) => reportError(err, { op: 'notify-vendor-reprice-requested' }));
     } catch (err: any) {
       addToast(err.message || 'Failed to send reprice request', 'error');
     } finally {
@@ -374,10 +375,10 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
         const bizData = bizSnap.data();
         const ownerId = bizData?.ownerId;
         if (ownerId) {
-          notifyVendorCounterResolved(ownerId, quoteRequest.id, response.businessName, accept).catch(() => {});
-          notifyVendorCounterResolvedMultiChannel(ownerId, quoteRequest.id, accept).catch(() => {});
+          notifyVendorCounterResolved(ownerId, quoteRequest.id, response.businessName, accept).catch((err) => reportError(err, { op: 'notify-vendor-counter-resolved' }));
+          notifyVendorCounterResolvedMultiChannel(ownerId, quoteRequest.id, accept).catch((err) => reportError(err, { op: 'notify-vendor-counter-resolved-multichannel' }));
         }
-      }).catch(() => {});
+      }).catch((err) => reportError(err, { op: 'notify-vendor-counter-resolved' }));
     } catch (err: any) {
       addToast(err.message || 'Failed to resolve counter-offer', 'error');
     } finally {
@@ -1844,7 +1845,7 @@ export default function QuoteComparison({ quoteRequest, onBack, onViewOrders }: 
                             userProfile?.name || '', itemNames.length,
                           );
                         }
-                      }).catch(() => {});
+                      }).catch((err) => reportError(err, { op: 'notify-vendor-quote-accepted' }));
                     }
 
                     setPendingAcceptance(null);

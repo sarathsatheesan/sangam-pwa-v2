@@ -91,3 +91,21 @@ export async function submitContentReport(params: SubmitReportParams): Promise<n
   });
   return 1;
 }
+
+/**
+ * Notifies a content author that their content was auto-hidden by the
+ * 3-strike flow (Session 53 dedup — was implemented identically in
+ * services/feed.ts, events.ts, housing.ts and marketplace.ts; those modules'
+ * typed wrappers now delegate here). Adds `type: 'content_hidden'`,
+ * `read: false` and `createdAt: serverTimestamp()` to the module payload.
+ */
+export async function sendContentHiddenNotificationDoc(
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await addDoc(collection(db, 'notifications'), {
+    type: 'content_hidden',
+    ...payload,
+    read: false,
+    createdAt: serverTimestamp(),
+  });
+}
