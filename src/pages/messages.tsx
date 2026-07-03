@@ -75,6 +75,7 @@ import {
   compressImage,
 } from '@/utils/messageHelpers';
 import { reportError } from '@/utils/reportError';
+import { useChatNotification } from '@/hooks/useChatNotification';
 import {
   LinkPreviewCard,
   ChatAvatar,
@@ -171,9 +172,8 @@ export default function MessagesPage() {
   const [compactMode, setCompactMode] = useState(false);
 
   // Notification State
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
-  const [notificationType, setNotificationType] = useState<NotificationType>('info');
+  // Notification toast domain → hooks/useChatNotification (Session 50, D1 tranche 1)
+  const { notification, showNotif, clearNotif } = useChatNotification();
 
   // Message context menu state
   const [contextMenuMsg, setContextMenuMsg] = useState<Message | null>(null);
@@ -1027,11 +1027,7 @@ export default function MessagesPage() {
 
   // ===== UTILITY FUNCTIONS =====
 
-  const showNotif = useCallback((msg: string, type: NotificationType = 'info') => {
-    setNotificationMessage(msg);
-    setNotificationType(type);
-    setShowNotification(true);
-  }, []);
+  // showNotif now comes from useChatNotification (same signature, same 70 call sites)
 
   // ===== PUSH NOTIFICATIONS (FCM) =====
   // Cross-browser: Chrome, Firefox, Safari desktop, Android Chrome, iOS Safari 16.4+ (PWA).
@@ -4015,12 +4011,12 @@ export default function MessagesPage() {
       )}
       {/* COMMENTED OUT — undo feature disabled (duplicate of delete) */}
       {/* {showUndoToast && <UndoToast onUndo={undoSend} onDismiss={() => setShowUndoToast(false)} />} */}
-      {showNotification && (
+      {notification && (
         <NotificationToast
-          message={notificationMessage}
-          type={notificationType}
-          onDismiss={() => setShowNotification(false)}
-          duration={notificationType === 'error' ? 5000 : 3000}
+          message={notification.message}
+          type={notification.type}
+          onDismiss={clearNotif}
+          duration={notification.type === 'error' ? 5000 : 3000}
         />
       )}
       {showDeleteMsgConfirm && (

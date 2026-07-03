@@ -3832,3 +3832,40 @@ Deploy order: indexes → wait Enabled → hosting → cap:sync + Android.
 *Updated July 2, 2026 (Session 49) — Unbounded-query remediation shipped: forum votes now 1 collection-group read + 0 writes per visit (was ~150 subcollection scans + 50 unconditional score writes), housing/marketplace paginated 24/page + Load More with a 200-doc batch under active filters, comments capped at newest-50 with Load-older across feed/events/housing/marketplace. Two new Firestore indexes REQUIRED (forumLikes.userId collection-group override + marketplaceComments composite) — deploy indexes first, wait Enabled, then hosting. tsc clean; NOT committed. Firebase mithr-1e5f4; builds Mac-only.*
 
 **Session 49 addendum — ROOT CAUSE: indexes were NEVER deployed, ever.** `firebase.json`'s firestore block only declared `"rules"` — no `"indexes"` key — so every `firebase deploy --only firestore:indexes` in project history (including Session 37's) silently deployed NOTHING ("Deploy complete!" with zero effect). Production had only 2 composite indexes, both created ad-hoc from console error links (conversations, notifications). This retroactively explains Session 37's "missing composite index" bug and why the catering services needed index-fallback query patterns. FIXED: `"indexes": "firestore.indexes.json"` added to firebase.json; the 2 existing console indexes added to firestore.indexes.json (17 composites + 1 fieldOverride total) so the deploy won't propose deletions. After the next `firebase deploy --only firestore:indexes`, ALL app composite indexes exist for the first time — catering/notification queries will start using indexed paths (fallbacks become dormant, no behavior change). Commit firebase.json + firestore.indexes.json with the Session 49 files.
+
+**Session 49 addendum — LIVE VERIFICATION on enovoapp.com + infra fixes found during rollout:**
+1. **firebase.json was missing `"indexes"`** → fixed (see earlier addendum); ALL composite indexes now deployed for the first time in project history. One legacy definition (notificationAnalytics/date, single-field) was rejected by the API and removed — auto single-field indexing covers it. Final: 16 composites + 1 fieldOverride, all Enabled.
+2. **Collection-group rules gap** → `fetchMyForumVotes` initially failed with permission-denied (graceful degradation worked: no crash, correct scores, just no highlights). Root cause: nested `match /forumThreads/{id}/forumLikes` rules do NOT authorize collectionGroup() queries. Fixed with read-only `match /{path=**}/forumLikes/{likeId}` rule; deployed.
+3. **Verified live (Chrome, production):** forum vote highlights restored via the single collection-group query (matched pre-redesign state exactly); vote toggle-off/on round-trip works (1→0→1, highlight follows); housing lists all 9 items with correctly NO Load More (<24); marketplace detail comments load via the new composite index, comment post + indexed readback works ("Comments (1)"); catering orders index was still building mid-test — Session 37 fallback engaged as designed (warning will disappear once Enabled). One test comment remains on Sarath's own "TV" marketplace listing (no comment-delete UI exists — pre-existing limitation, harmless).
+4. Android: BUILD SUCCESSFUL (Gradle deprecation + flatDir warnings are pre-existing/benign); Session 49 synced to tablet.
+NOTE: Load More on housing/marketplace can't be visibly exercised until collections exceed 24 docs — logic verified by code + hasMore=false behavior; re-test when data grows.
+
+---
+
+### Session 50 (July 3, 2026) — Phase D Start: E2EE + Reprice Test Suites (64 tests) + messages.tsx Decomposition Tranche 1
+
+**Decisions (user):** D2 (media→Firebase Storage) DEFERRED — user is leaning toward a database migration (see `../eNoVo_Database_Options_Analysis.md`); media strategy folds into that design. Session order: tests before touching messages.
+
+**D3 — Tests (NEW, 64 total):**
+- `src/utils/__tests__/encryption.test.ts` (38): generateConversationKey determinism/order-insensitivity, legacy encrypt/decrypt round-trips (unicode/emoji/long), wrong-key never leaks plaintext, v2/non-JSON passthroughs, isEncryptedPayload; Web Crypto suites (deterministic V2 key, e2eEncrypt/Decrypt, group key lifecycle, ECDH) gated by `describe.runIf(crypto.subtle)`. getOrCreateKeyPair (IndexedDB) deliberately untested.
+- `src/services/catering/__tests__/reprice-math.test.ts` (26): accept total = repriceRequestedPrice+deliveryFee, deny leaves total, counter validation + 24h window, expiry/status/missing-doc guards, resolveCounterOffer accept/decline math — via the existing global firestore mock in `src/__tests__/setup.ts` (seedDoc + captured updateDoc payloads, vi.setSystemTime).
+- **Vitest CANNOT run in Cowork sandbox** (rollup native binary, Mac-only). Tests are tsc-clean; RUN ON MAC: `npx vitest run src/utils/__tests__/encryption.test.ts src/services/catering/__tests__/reprice-math.test.ts` (or full `npm test`).
+- **5 LATENT BUGS flagged while pinning behavior (tests assert CURRENT behavior; fix deliberately later):** (1) empty-string message round-trip returns '[Unable to decrypt message]' (`plaintext || fallback`); (2) requestReprice accepts 0/negative prices (counterPrice validates, requestedPrice doesn't); (3) accept with missing reprice price collapses total to deliveryFee alone; (4) missing expiry timestamps treated as ALREADY expired (`|| 0`); (5) wrong-key legacy decrypt returns fallback/raw/garbage depending on padding luck.
+
+**D1 tranche 1 — messages.tsx:**
+- NEW `docs/messages-state-decomposition-plan.md` — all 76 useState mapped into 11 domains with targets, risk ratings, and extraction order (moderation → search → appearance → forwarding → pinned → groups → composer → core data → E2EE/calls LAST). RULES: one domain per tranche, full manual chat test before the next, no two domains in one deploy.
+- NEW `hooks/useChatNotification.ts` — domain 1 (notification toast) extracted: 3 useState → 1 nullable object; `showNotif` keeps exact signature (70 call sites untouched). messages.tsx 76→73 useState.
+
+**Verified:** tsc exit 0 (app config + standalone strict check of test files, which are excluded from tsconfig.app.json per repo convention).
+
+**NOT committed — commit from Mac, THEN RUN THE TESTS:**
+```bash
+git add src/ docs/ hand_off_note_04_16.md
+git commit -m "test: E2EE + reprice suites (64); refactor: messages decomposition plan + tranche 1 (Session 50 / Phase D)"
+npm test   # ← first run of the new suites; expect 64 passing (Web Crypto suites need Node>=18)
+```
+Deploy hosting only if shipping tranche 1 now (safe, but bundle-only change): build + deploy + cap:sync as usual. **Manual test after deploy per plan rules:** open Messages → trigger any toast (e.g., failed action or report submit) → toast appears/dismisses; send/receive still fine.
+
+**Next:** run 64 tests on Mac (report failures back — they may catch real drift); D1 tranche 2 (moderation domain, 10 states) in a fresh session with live testing; decide fixes for the 5 latent bugs (esp. #2/#3 — money math); DB-migration decision owns D2. Carry-forwards unchanged (APK, TURN, Play, S42 device tests, deep-link fetch-by-id, types/firestore.ts reconciliation).
+
+*Updated July 3, 2026 (Session 50) — Phase D started: 64 regression tests written for E2EE crypto + reprice money-math (5 latent bugs discovered and documented, tests pin current behavior; vitest runs on Mac only), messages.tsx decomposition planned (11 domains, docs/messages-state-decomposition-plan.md) and tranche 1 extracted (useChatNotification, 76→73 useState, 70 call sites untouched). D2 media→Storage deferred pending DB-migration decision. tsc clean; NOT committed. Firebase mithr-1e5f4; builds Mac-only.*
