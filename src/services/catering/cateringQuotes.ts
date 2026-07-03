@@ -936,6 +936,13 @@ export async function requestReprice(
   reason?: string,
   repriceItemNames?: string[],
 ): Promise<void> {
+  // BUG FIX (Session 51): requestedPrice was written unvalidated — 0 and
+  // negative prices were accepted (counterPrice always validated; this
+  // didn't). Latent-bug #2 from the Session 50 test suite.
+  if (requestedPrice == null || !Number.isFinite(requestedPrice) || requestedPrice <= 0) {
+    throw new Error('Requested price must be greater than zero');
+  }
+
   const responseRef = doc(db, QUOTE_RESPONSES_COL, responseId);
   const snap = await getDoc(responseRef);
   if (!snap.exists()) throw new Error('Quote response not found');
@@ -998,8 +1005,14 @@ export async function respondToReprice(
 
   if (action === 'accept') {
     // Vendor accepts the customer's proposed item price — total = item subtotal + delivery fee
+    // BUG FIX (Session 51): a missing/invalid repriceRequestedPrice used to
+    // collapse the total to the delivery fee alone ((undefined||0)+fee).
+    // Latent-bug #3 from the Session 50 test suite.
+    if (data.repriceRequestedPrice == null || !Number.isFinite(data.repriceRequestedPrice) || data.repriceRequestedPrice <= 0) {
+      throw new Error('Reprice request is missing a valid requested price');
+    }
     update.repriceStatus = 'vendor_accepted';
-    update.total = (data.repriceRequestedPrice || 0) + (data.deliveryFee || 0);
+    update.total = data.repriceRequestedPrice + (data.deliveryFee || 0);
   } else if (action === 'deny') {
     // Vendor refuses — original price stands, negotiation over
     update.repriceStatus = 'vendor_denied';
@@ -1047,9 +1060,14 @@ export async function resolveCounterOffer(
   };
 
   if (action === 'accept') {
+    // BUG FIX (Session 51): same missing-price total-collapse guard as
+    // respondToReprice 'accept' (latent-bug #3, Session 50 test suite).
+    if (data.repriceCounterPrice == null || !Number.isFinite(data.repriceCounterPrice) || data.repriceCounterPrice <= 0) {
+      throw new Error('Counter-offer is missing a valid counter price');
+    }
     update.repriceStatus = 'counter_accepted';
     // Counter price is items-only — total = counter item subtotal + delivery fee
-    update.total = (data.repriceCounterPrice || 0) + (data.deliveryFee || 0);
+    update.total = data.repriceCounterPrice + (data.deliveryFee || 0);
   } else {
     update.repriceStatus = 'counter_declined';
     // Total stays at original value

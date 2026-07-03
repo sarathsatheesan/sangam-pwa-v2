@@ -1095,8 +1095,46 @@ export async function deleteOrderNote(
 // ── FIX-M3: ETA validation ──
 
 /**
+ * Real epoch ms of a wall-clock time in a given IANA timezone (Session 51).
+ * Standard two-pass refinement: guess the epoch as if the wall-clock were
+ * UTC, format that instant back into the target zone, and correct by the
+ * observed difference (second pass handles DST-transition edge cases).
+ */
+function zonedTimeToEpochMs(
+  y: number, m: number, d: number,
+  hh: number, mm: number, ss: number,
+  timeZone: string,
+): number {
+  const wallUtc = Date.UTC(y, m - 1, d, hh, mm, ss);
+  let ts = wallUtc;
+  for (let i = 0; i < 2; i++) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(new Date(ts));
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+    const asUtc = Date.UTC(
+      get('year'), get('month') - 1, get('day'),
+      get('hour') % 24, get('minute'), get('second'),
+    );
+    ts += wallUtc - asUtc;
+  }
+  return ts;
+}
+
+/**
  * FIX-M3: Validate that a vendor-entered ETA is both in the future
- * and before the event date. Throws descriptive errors on failure.
+ * and before the event date.
+ *
+ * BUG FIX (Session 51): the old implementation round-tripped dates through
+ * toLocaleString(timezone) and re-parsed them as MACHINE-LOCAL, producing
+ * pseudo-epochs that only matched reality when the device timezone equalled
+ * the event timezone — users in other timezones had valid ETAs rejected (or
+ * invalid ones accepted). Now: "in the future" is a plain epoch comparison
+ * (timezones are irrelevant to absolute instants), and the event's end-of-day
+ * is converted to a REAL epoch in the event's timezone via zonedTimeToEpochMs.
+ * Regression-tested in services/catering/__tests__/timezone-edge-cases.test.ts.
  */
 export function validateDeliveryETA(
   eta: string | Date,
@@ -1108,26 +1146,19 @@ export function validateDeliveryETA(
     return { valid: false, error: 'Invalid date/time format for ETA' };
   }
 
-  // Get user timezone for accurate comparison. Default to system timezone.
   const timezone = userTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // Must be in the future
-  // Use toLocaleString with timezone context for accurate comparison
-  const nowInTz = new Date().toLocaleString('en-US', { timeZone: timezone });
-  const etaInTz = etaDate.toLocaleString('en-US', { timeZone: timezone });
-  if (new Date(etaInTz).getTime() <= new Date(nowInTz).getTime()) {
+  // Must be in the future — epochs are absolute; no timezone gymnastics needed.
+  if (etaDate.getTime() <= Date.now()) {
     return { valid: false, error: 'ETA must be in the future' };
   }
 
-  // Must be before the event date (if provided)
+  // Must be before the event date's end-of-day in the event's timezone.
   if (eventDate) {
     let eventMs: number;
     if (typeof eventDate === 'string') {
-      // Create event date end-of-day in the user's timezone
       const [y, m, d] = eventDate.split('-').map(Number);
-      const eventDateObj = new Date(y, m - 1, d, 23, 59, 59);
-      const eventInTz = eventDateObj.toLocaleString('en-US', { timeZone: timezone });
-      eventMs = new Date(eventInTz).getTime();
+      eventMs = zonedTimeToEpochMs(y, m, d, 23, 59, 59, timezone);
     } else {
       eventMs = toEpochMs(eventDate);
     }

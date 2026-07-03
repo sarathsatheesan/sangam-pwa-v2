@@ -110,16 +110,14 @@ describe('requestReprice', () => {
     expect(storedDoc().repriceStatus).toBe('requested');
   });
 
-  it('CURRENT BEHAVIOR: does not validate requestedPrice — 0 and negative are accepted', async () => {
-    // There is no price validation in requestReprice (unlike counterPrice in
-    // respondToReprice). Documenting as-is; flagged as a latent gap.
+  it('rejects requestedPrice of 0, negative, and non-finite values (Session 51 fix)', async () => {
+    // FIXED (Session 51): requestReprice now validates like counterPrice does.
     seedResponse();
-    await requestReprice('resp-1', 0);
-    expect(storedDoc().repriceRequestedPrice).toBe(0);
-
-    seedResponse(); // reset status
-    await requestReprice('resp-1', -100);
-    expect(storedDoc().repriceRequestedPrice).toBe(-100);
+    await expect(requestReprice('resp-1', 0)).rejects.toThrow('Requested price must be greater than zero');
+    await expect(requestReprice('resp-1', -100)).rejects.toThrow('Requested price must be greater than zero');
+    await expect(requestReprice('resp-1', NaN)).rejects.toThrow('Requested price must be greater than zero');
+    // Nothing was written
+    expect(storedDoc().repriceStatus ?? 'none').not.toBe('requested');
   });
 });
 
@@ -155,10 +153,11 @@ describe('respondToReprice', () => {
       expect(lastUpdate().total).toBe(400); // 400 + 0
     });
 
-    it('CURRENT BEHAVIOR: missing repriceRequestedPrice falls back to 0 — total becomes deliveryFee only', async () => {
+    it('throws on missing/invalid repriceRequestedPrice instead of collapsing total to the fee (Session 51 fix)', async () => {
       seedRequested({ repriceRequestedPrice: undefined });
-      await respondToReprice('resp-1', 'accept');
-      expect(lastUpdate().total).toBe(50); // (0) + 50 — flagged as a latent hazard
+      await expect(respondToReprice('resp-1', 'accept'))
+        .rejects.toThrow('Reprice request is missing a valid requested price');
+      expect(storedDoc().total).toBe(600); // original total untouched
     });
 
     it('defaults vendorNote to ""', async () => {
@@ -266,10 +265,11 @@ describe('resolveCounterOffer', () => {
       expect(lastUpdate().total).toBe(475);
     });
 
-    it('CURRENT BEHAVIOR: missing repriceCounterPrice falls back to 0 — total becomes deliveryFee only', async () => {
+    it('throws on missing/invalid repriceCounterPrice instead of collapsing total to the fee (Session 51 fix)', async () => {
       seedCountered({ repriceCounterPrice: undefined });
-      await resolveCounterOffer('resp-1', 'accept');
-      expect(lastUpdate().total).toBe(50); // (0) + 50 — flagged as a latent hazard
+      await expect(resolveCounterOffer('resp-1', 'accept'))
+        .rejects.toThrow('Counter-offer is missing a valid counter price');
+      expect(storedDoc().total).toBe(600); // original total untouched
     });
   });
 

@@ -3871,3 +3871,31 @@ Deploy hosting only if shipping tranche 1 now (safe, but bundle-only change): bu
 *Updated July 3, 2026 (Session 50) — Phase D started: 64 regression tests written for E2EE crypto + reprice money-math (5 latent bugs discovered and documented, tests pin current behavior; vitest runs on Mac only), messages.tsx decomposition planned (11 domains, docs/messages-state-decomposition-plan.md) and tranche 1 extracted (useChatNotification, 76→73 useState, 70 call sites untouched). D2 media→Storage deferred pending DB-migration decision. tsc clean; NOT committed. Firebase mithr-1e5f4; builds Mac-only.*
 
 **Session 50 addendum — legacy test suite repaired (263 expected green) + ONE REAL BUG FOUND:** First-ever full `npm test` run on Mac: new Session 50 suites 64/64 PASS; 5 failures all in legacy suites (last touched Apr 13; code evolved after — they'd been silently broken ~2.5 months). Triage verdicts: (C1 marker check) STALE TEST — dedupe contract intentionally changed in 685bb6e+6dc3649 to transactional marker returning [], production duplicate-prevention INTACT; test now asserts the real invariant (no duplicate orders written). (C4) STALE MOCK — setup.ts cateringNotifications mock now enumerates all 24/24 exports with KEEP-IN-SYNC comment. (M1) STALE MOCK — code correctly uses server-side limit (d8a5072); setup.ts in-memory query engine now implements orderBy+limit for getDocs AND onSnapshot. (M7) STALE TEST — d8a5072 added a 5-min session throttle; tests now advance mocked clock +6min each. (TZ:187) ENV-SENSITIVE TEST pinned to TZ=America/Los_Angeles **and a GENUINE PRODUCTION BUG flagged (NOT fixed): `validateDeliveryETA` (cateringOrders.ts ~1101-1140) mixes a machine-local pseudo-epoch with a real epoch — whenever device TZ ≠ event timezone, valid ETAs can be wrongly rejected or invalid ones accepted. Needs proper Intl-based TZ math — schedule a fix.** Only test files + setup.ts touched; tsc clean. Commit test fixes and re-run `npm test` — expect 263/263.
+
+---
+
+### Session 51 (July 3, 2026) — Bug-Fix Batch: TZ Math + Reprice Money Guards (test-verified fixes)
+
+**Code fixes (services/catering/):**
+1. **`validateDeliveryETA` rewritten (cateringOrders.ts)** — the pseudo-epoch timezone bug is gone: new `zonedTimeToEpochMs()` (Intl formatToParts, two-pass DST-safe) converts the event's end-of-day to a REAL epoch in the event's timezone; the "in the future" check is now a plain epoch comparison (the old toLocaleString round-trip was cargo cult). Results are machine-TZ-independent.
+   **⚠ HOWEVER — discovered the function has ZERO production callers.** FIX-M3's wiring was lost in the Session 37 OrderCard rewrite: vendor ETAs are currently UNVALIDATED in production (past/post-event ETAs accepted). Wiring it back is NOT mechanical — OrderCard's ETA inputs are time-of-day/duration strings (SB-31 toggle), not datetimes; needs a small design decision (compose time + order.eventDate → Date for 'time' mode; 'duration' mode likely exempt). QUEUED, not done.
+2. **`requestReprice` (cateringQuotes.ts)** — now rejects 0/negative/non-finite requestedPrice (latent-bug #2; counterPrice already validated).
+3. **`respondToReprice` 'accept' + `resolveCounterOffer` 'accept'** — throw on missing/invalid reprice/counter price instead of silently collapsing total to the delivery fee alone (latent-bug #3). UI callers (QuoteComparison/VendorQuoteResponse) already catch → error toast.
+
+**Deliberately NOT fixed (documented):** missing-expiry-treated-as-expired (#4 — conservative for malformed docs; requestReprice always writes expiry); empty-string legacy encrypt round-trip (#1) and wrong-key output variance (#5) — indistinguishable in legacy CBC design, v2 GCM already solves both; composer blocks empty sends.
+
+**Tests updated to assert FIXED behavior (3 flipped from CURRENT-BEHAVIOR pins):** reprice-math.test.ts — requestReprice rejects 0/-100/NaN; both accepts throw on missing price with total untouched. timezone-edge-cases.test.ts — TZ pin flipped LA→**Asia/Kolkata** (the TZ that exposed the bug) to PROVE machine-TZ independence; if that block fails again, independence has regressed.
+
+**Verified:** tsc exit 0. RUN ON MAC: `npm test` → expect 263/263 (same count — 3 tests flipped, none added).
+
+**NOT committed:**
+```bash
+git add src/services/catering/ hand_off_note_04_16.md
+git commit -m "fix: TZ-safe validateDeliveryETA + reprice price guards, tests flipped to fixed behavior (Session 51)"
+npm test
+```
+Deploy: hosting + cap:sync (bundle-only). Manual check: request a reprice with a valid price (still works); vendor accept still totals items+fee.
+
+**Next queue:** wire validateDeliveryETA into OrderCard ETA flow (design decision above); D1 tranche 2 (moderation domain, 10 states) with live chat testing; DB-migration decision session (gates D2 + messages service design). Carry-forwards unchanged.
+
+*Updated July 3, 2026 (Session 51) — TZ bug fixed properly (Intl-based zoned-time math, machine-independent, proven by re-pinning tests to Asia/Kolkata) but validateDeliveryETA turns out to be UNCALLED in production since the Session 37 OrderCard rewrite — vendor ETA validation is a queued wiring task with a small design decision. Reprice money-math hardened: no more 0/negative request prices, no more totals collapsing to delivery-fee-only on malformed docs. 3 tests flipped from pinning bugs to asserting fixes. tsc clean; NOT committed; expect 263/263 on Mac.*
