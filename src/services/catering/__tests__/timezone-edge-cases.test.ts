@@ -3,7 +3,7 @@
 // DST transitions, month/year boundaries, and delivery ETA validation
 // ═══════════════════════════════════════════════════════════════════════
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
 import { validateDeliveryETA } from '../cateringOrders';
 
 beforeEach(() => {
@@ -176,6 +176,30 @@ describe('Timezone Edge Cases: validateDeliveryETA', () => {
   });
 
   describe('Event date with timezone context', () => {
+    // ⚠ ENVIRONMENT-SENSITIVE — suspected bug in validateDeliveryETA:
+    // For string event dates the implementation builds end-of-day with
+    // `new Date(y, m - 1, d, 23, 59, 59)` (MACHINE-local), round-trips it
+    // through toLocaleString(userTimezone), then re-parses that string as
+    // machine-local again. The resulting `eventMs` is a pseudo-epoch, yet it
+    // is compared against `etaDate.getTime()` — a REAL epoch. The two agree
+    // only when the machine timezone equals the userTimezone argument. On a
+    // machine east of UTC (e.g. Asia/Kolkata) a perfectly valid event-day ETA
+    // for an America/Los_Angeles event is wrongly rejected (its computed EOD
+    // lands hours early).
+    // Until the implementation does true TZ-aware math, we pin the process
+    // timezone to the userTimezone under test so these assertions are
+    // deterministic on any machine. Node picks up runtime changes to
+    // process.env.TZ for local Date construction (POSIX platforms).
+    // Do NOT loosen the assertions — they describe the intended contract.
+    const ORIGINAL_TZ = process.env.TZ;
+    beforeAll(() => {
+      process.env.TZ = 'America/Los_Angeles';
+    });
+    afterAll(() => {
+      if (ORIGINAL_TZ === undefined) delete process.env.TZ;
+      else process.env.TZ = ORIGINAL_TZ;
+    });
+
     it('should enforce event date end-of-day in user timezone', () => {
       vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
 

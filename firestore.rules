@@ -316,6 +316,15 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // ─── Forum likes: collection-group READ (Session 49) ───────────
+    // fetchMyForumVotes() uses collectionGroup('forumLikes'), which the
+    // nested per-path matches above do NOT authorize — collection-group
+    // queries need a /{path=**}/ match. Read-only: writes remain governed
+    // by the specific per-path rules.
+    match /{path=**}/forumLikes/{likeId} {
+      allow read: if request.auth != null;
+    }
+
     // ─── Calls (WebRTC signaling) ─────────────────────
     match /calls/{callId} {
       allow read: if request.auth != null

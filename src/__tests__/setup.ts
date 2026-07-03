@@ -61,6 +61,53 @@ function mockSnap(collectionPath: string, docId: string) {
   };
 }
 
+// Normalize a value for orderBy comparison (Timestamp-likes → epoch millis)
+function orderableValue(v: any) {
+  if (v && typeof v.toMillis === 'function') return v.toMillis();
+  if (v && typeof v.seconds === 'number') return v.seconds * 1000;
+  return v;
+}
+
+// Materialize a mock query: apply where filters, orderBy sorts, then limit —
+// mirroring real Firestore query semantics. Service code relies on
+// server-side pagination (e.g. FIX-M1: orderBy('createdAt','desc') + limit()
+// in subscribeToOrderNotes since commit d8a5072), so the mock must honor
+// these constraints or pagination tests silently receive the whole collection.
+function runQuery(q: any) {
+  const col = q._col || q.collectionPath || q.path || '';
+  const docs = firestoreStore[col] || {};
+  let entries = Object.entries(docs).map(([id, data]) => ({
+    id,
+    data: () => ({ ...data }),
+    ref: mockDocRef(col, id),
+    exists: () => true,
+  }));
+  // Apply where filters
+  for (const f of q._filters || []) {
+    entries = entries.filter((e) => {
+      const val = e.data()[f.field];
+      switch (f.op) {
+        case '==': return val === f.value;
+        case 'array-contains': return Array.isArray(val) && val.includes(f.value);
+        default: return true;
+      }
+    });
+  }
+  // Apply orderBy clauses (reversed stable sorts ⇒ multi-key ordering)
+  for (const o of [...(q._orderBys || [])].reverse()) {
+    entries.sort((a, b) => {
+      const av = orderableValue(a.data()[o.field]);
+      const bv = orderableValue(b.data()[o.field]);
+      if (av === bv) return 0;
+      const cmp = av < bv ? -1 : 1;
+      return o.direction === 'desc' ? -cmp : cmp;
+    });
+  }
+  // Apply limit
+  if (typeof q._limit === 'number') entries = entries.slice(0, q._limit);
+  return entries;
+}
+
 // ── Firebase/Firestore mock ──
 
 vi.mock('firebase/firestore', () => {
@@ -92,26 +139,7 @@ vi.mock('firebase/firestore', () => {
     }),
     getDoc: vi.fn(async (ref: any) => mockSnap(ref._col, ref._id)),
     getDocs: vi.fn(async (q: any) => {
-      const col = q._col || q.collectionPath || '';
-      const docs = firestoreStore[col] || {};
-      const filters = q._filters || [];
-      let entries = Object.entries(docs).map(([id, data]) => ({
-        id,
-        data: () => ({ ...data }),
-        ref: mockDocRef(col, id),
-        exists: () => true,
-      }));
-      // Apply where filters
-      for (const f of filters) {
-        entries = entries.filter((e) => {
-          const val = e.data()[f.field];
-          switch (f.op) {
-            case '==': return val === f.value;
-            case 'array-contains': return Array.isArray(val) && val.includes(f.value);
-            default: return true;
-          }
-        });
-      }
+      const entries = runQuery(q);
       return { docs: entries, size: entries.length, empty: entries.length === 0 };
     }),
     addDoc: vi.fn(async (colRef: any, data: any) => {
@@ -131,26 +159,24 @@ vi.mock('firebase/firestore', () => {
     }),
     query: vi.fn((colRef: any, ...constraints: any[]) => {
       const filters: Array<{ field: string; op: string; value: any }> = [];
+      const orderBys: Array<{ field: string; direction: 'asc' | 'desc' }> = [];
+      let limitN: number | undefined;
       for (const c of constraints) {
         if (c?._type === 'where') filters.push(c);
+        else if (c?._type === 'orderBy') orderBys.push(c);
+        else if (c?._type === 'limit') limitN = c.n;
       }
-      return { _col: colRef._col || colRef.path, _filters: filters, collectionPath: colRef._col || colRef.path };
+      const col = colRef._col || colRef.path;
+      return { _col: col, _filters: filters, _orderBys: orderBys, _limit: limitN, collectionPath: col };
     }),
     where: vi.fn((field: string, op: string, value: any) => ({ _type: 'where', field, op, value })),
-    orderBy: vi.fn(() => ({ _type: 'orderBy' })),
-    limit: vi.fn(() => ({ _type: 'limit' })),
+    orderBy: vi.fn((field: string, direction: 'asc' | 'desc' = 'asc') => ({ _type: 'orderBy', field, direction })),
+    limit: vi.fn((n: number) => ({ _type: 'limit', n })),
     startAfter: vi.fn(() => ({ _type: 'startAfter' })),
     serverTimestamp: vi.fn(() => MockTimestamp.now()),
     onSnapshot: vi.fn((_q: any, onNext: any, _onError?: any) => {
-      // Immediate fire with current data
-      const col = _q._col || _q.collectionPath || '';
-      const docs = firestoreStore[col] || {};
-      const entries = Object.entries(docs).map(([id, data]) => ({
-        id,
-        data: () => ({ ...data }),
-        ref: mockDocRef(col, id),
-        exists: () => true,
-      }));
+      // Immediate fire with current data (honors where/orderBy/limit like getDocs)
+      const entries = runQuery(_q);
       if (typeof onNext === 'function') {
         onNext({ docs: entries, size: entries.length, empty: entries.length === 0 });
       }
@@ -211,12 +237,39 @@ vi.mock('@/services/firebase', () => ({
 }));
 
 // ── Mock notification service (non-critical side effects) ──
+// ⚠ KEEP IN SYNC with the real exports of
+//   src/services/catering/cateringNotifications.ts
+// vi.mock() replaces the ENTIRE module, so any function exported there but
+// missing here resolves to `undefined` — and the service that calls it blows
+// up with a cryptic "notifyX is not a function" TypeError mid-test. This
+// happened when notifyCustomerRfpCancelled was added (commit 5bec82d, "patch
+// 12 notification gaps") without updating this mock, breaking the
+// closeQuoteRequest tests. When you add a new export to
+// cateringNotifications.ts, add a matching vi.fn() entry below.
+// (The `CateringNotification` interface is type-only and needs no mock.)
 vi.mock('@/services/catering/cateringNotifications', () => ({
+  sendCateringNotification: vi.fn(async () => {}),
+  notifyVendorNewOrder: vi.fn(async () => {}),
   notifyCustomerStatusChange: vi.fn(async () => {}),
   notifyCustomerOrderModified: vi.fn(async () => {}),
+  notifyVendorModificationRejected: vi.fn(async () => {}),
+  fetchCateringNotifications: vi.fn(async () => []),
+  subscribeToCateringNotifications: vi.fn(() => vi.fn()),
+  markNotificationRead: vi.fn(async () => {}),
+  markAllNotificationsRead: vi.fn(async () => {}),
+  getUnreadNotificationCount: vi.fn(async () => 0),
   notifyVendorItemReassigned: vi.fn(async () => {}),
   notifyVendorsRfpEdited: vi.fn(async () => {}),
   notifyCustomerRfpExpired: vi.fn(async () => {}),
   notifyCustomerFinalizationExpired: vi.fn(async () => {}),
-  sendCateringNotification: vi.fn(async () => {}),
+  notifyVendorsNewQuoteRequest: vi.fn(async () => {}),
+  notifyCustomerQuoteReceived: vi.fn(async () => {}),
+  notifyVendorQuoteDeclined: vi.fn(async () => {}),
+  notifyOrderCancelled: vi.fn(async () => {}),
+  notifyVendorRfpCancelled: vi.fn(async () => {}),
+  notifyCustomerRfpCancelled: vi.fn(async () => {}),
+  notifyVendorQuoteAccepted: vi.fn(async () => {}),
+  notifyVendorRepriceRequested: vi.fn(async () => {}),
+  notifyCustomerRepriceResponse: vi.fn(async () => {}),
+  notifyVendorCounterResolved: vi.fn(async () => {}),
 }));

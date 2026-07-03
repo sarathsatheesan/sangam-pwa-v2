@@ -3,7 +3,7 @@
 // Pagination, retry, ETA validation, dedup, quote races
 // ═══════════════════════════════════════════════════════════════════════
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { resetFirestoreStore, seedDoc, MockTimestamp, firestoreStore } from './setup';
 import {
   addOrderNote,
@@ -250,6 +250,23 @@ describe('FIX-M6: Review deduplication guard', () => {
 // M-7: Modification timeout enforcement
 // ═══════════════════════════════════════════════════════════════════════
 describe('FIX-M7: Expired modification auto-reject', () => {
+  // checkAndRejectExpiredModifications gained a module-level 5-minute session
+  // guard in commit d8a5072 ("Phase 3 — performance"): `_lastExpiredModCheck`
+  // makes repeat calls within 5 minutes early-return 0 to avoid redundant
+  // queries on dashboard re-renders. That module state persists across the
+  // tests in this file, so only the FIRST call would do real work. Advance the
+  // mocked clock past the guard window before each test so every test
+  // exercises the real query/reject path. (Seeds below use Date.now() too, so
+  // relative expiry times stay consistent with the skewed clock.)
+  let clockSkewMs = 0;
+  beforeEach(() => {
+    clockSkewMs += 6 * 60 * 1000; // > the 5-minute EXPIRED_MOD_CHECK_INTERVAL_MS
+    vi.setSystemTime(Date.now() + clockSkewMs);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('should auto-reject expired modifications and revert items', async () => {
     const expiredAt = MockTimestamp.fromMillis(Date.now() - 60 * 60 * 1000); // expired 1hr ago
     const originalItems = [

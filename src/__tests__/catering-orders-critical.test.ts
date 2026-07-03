@@ -73,7 +73,7 @@ describe('FIX-C1: Duplicate order creation prevention', () => {
     expect(ids.length).toBeGreaterThan(0);
   });
 
-  it('should return existing order IDs if orders already created (marker check)', async () => {
+  it('should return empty array and create no duplicates if orders already created (marker check)', async () => {
     // Seed with ordersCreated = true (another call already succeeded)
     seedDoc('cateringQuoteRequests', 'qr-1', { ...baseQuoteRequest, ordersCreated: true });
     seedDoc('cateringOrders', 'existing-1', { quoteRequestId: 'qr-1', status: 'confirmed' });
@@ -84,7 +84,16 @@ describe('FIX-C1: Duplicate order creation prevention', () => {
       { street: '123 Main', city: 'Austin', state: 'TX', zip: '78701' },
     );
 
-    expect(ids).toContain('existing-1');
+    // Contract intentionally changed since this test was written:
+    //  - 685bb6e (Sprint 2) removed the pre-transaction getDocs duplicate check
+    //    ("Fix quote finalization race condition").
+    //  - 6dc3649 (Phase 1.1) made the in-transaction marker check abort with []
+    //    instead of re-querying existing orders, because that getDocs ran outside
+    //    the transaction's consistency boundary and could return stale results.
+    // Callers (QuoteComparison) now treat [] as "race detected" and show a toast.
+    // Duplicate-prevention is what matters here: no new orders may be written.
+    expect(ids).toEqual([]);
+    expect(Object.keys(firestoreStore['cateringOrders'])).toEqual(['existing-1']);
   });
 
   it('should return existing orders via idempotency key match', async () => {
