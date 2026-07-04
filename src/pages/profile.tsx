@@ -21,7 +21,7 @@ import {
   Download, Trash2, LogOut, Lock, Eye, EyeOff, Phone,
   Mail, X, Check, Loader2, MoreHorizontal, Share2,
   Star, TrendingUp, Award, Globe, Hash, Building2,
-  Camera, Link2, ChevronDown, UserPlus, Send, Sparkles, Plus,
+  Camera, ImagePlus, Link2, ChevronDown, UserPlus, Send, Sparkles, Plus,
   Tag, Home, Store, ShoppingBag, CalendarDays, Package, Ban, UserX
 } from 'lucide-react';
 
@@ -376,6 +376,11 @@ export default function ProfilePage() {
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  // Session 54: separate camera input — the old single input had
+  // capture="environment", which on Android/iOS forces the camera and makes
+  // choosing from the gallery/files IMPOSSIBLE. Gallery input (fileInputRef)
+  // now has NO capture attr; this one is camera-only (user-facing lens).
+  const cameraInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (toastMessage) {
@@ -1847,18 +1852,18 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              {/* Hidden file input for photo upload */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
+              {/* Session 54: two hidden inputs — gallery/files (no capture)
+                  and camera (capture="user"). The old single input's
+                  capture="environment" forced the rear camera on mobile,
+                  making gallery selection impossible. Shared handler. */}
+              {(() => {
+                const handleProfilePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                  const input = e.target;
+                  const file = input.files?.[0];
                   if (!file) return;
                   if (file.size > 10 * 1024 * 1024) {
                     setToastMessage('Image too large. Please select an image under 10MB.');
+                    input.value = '';
                     return;
                   }
                   setUploadingImage(true);
@@ -1870,31 +1875,59 @@ export default function ProfilePage() {
                     setToastMessage('Failed to process image. Please try a different photo.');
                   } finally {
                     setUploadingImage(false);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    input.value = '';
                   }
-                }}
-              />
+                };
+                return (
+                  <>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleProfilePhotoSelected}
+                    />
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="user"
+                      className="hidden"
+                      onChange={handleProfilePhotoSelected}
+                    />
+                  </>
+                );
+              })()}
 
-              {/* Toggle: Photo or Avatar */}
+              {/* Toggle: Photo (choose or take) or Avatar — Session 54 */}
               {(() => {
                 const isImageAvatar = !!(editForm.avatar && (editForm.avatar.startsWith('http') || editForm.avatar.startsWith('data:')));
+                const photoBtnClass = `flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
+                  isImageAvatar
+                    ? 'bg-aurora-indigo text-white shadow-sm'
+                    : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
+                }`;
                 return (
-                  <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingImage}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                        isImageAvatar
-                          ? 'bg-aurora-indigo text-white shadow-sm'
-                          : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'
-                      }`}
+                      className={photoBtnClass}
                     >
                       {uploadingImage ? (
                         <><Loader2 className="w-4 h-4 animate-spin" /> Uploading...</>
                       ) : (
-                        <><Camera className="w-4 h-4" /> Use Photo</>
+                        <><ImagePlus className="w-4 h-4" /> Choose Photo</>
                       )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      className={photoBtnClass}
+                    >
+                      <Camera className="w-4 h-4" /> Take Photo
                     </button>
                     <span className="text-xs text-[var(--aurora-text-muted)]">or</span>
                     <button
@@ -1902,7 +1935,7 @@ export default function ProfilePage() {
                       onClick={() => {
                         if (isImageAvatar) setEditForm((prev) => ({ ...prev, avatar: '🧑' }));
                       }}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${
                         !isImageAvatar
                           ? 'bg-aurora-indigo text-white shadow-sm'
                           : 'bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10'

@@ -335,12 +335,14 @@ const SmartPasteInput: React.FC<SmartPasteInputProps> = ({
                 We'll extract item names, prices, descriptions, and dietary info automatically.
               </p>
 
-              {/* Photo Capture */}
+              {/* Photo capture/upload — Session 54: capture="environment"
+                  removed; it forced the rear camera on mobile, so vendors
+                  couldn't upload an existing menu photo or screenshot. The
+                  native chooser now offers camera AND gallery/files. */}
               <input
                 ref={photoInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={handlePhotoCapture}
                 className="hidden"
               />
@@ -365,7 +367,7 @@ const SmartPasteInput: React.FC<SmartPasteInputProps> = ({
                   className="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center gap-3 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
                 >
                   <Camera size={20} />
-                  <span className="text-sm font-medium">Snap a Photo of Your Menu</span>
+                  <span className="text-sm font-medium">Snap or Upload a Photo of Your Menu</span>
                 </button>
               )}
 

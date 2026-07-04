@@ -3942,3 +3942,18 @@ Closes the actionable gaps from `../eNoVo_Review_Coverage_Audit_07_03_2026.md` �
 **Light test:** any vendor quote flow (notifications still fire), a call connects/ends cleanly, report-3x auto-hide on any module still notifies the author.
 
 *Updated July 3, 2026 (Session 53) — review coverage gaps closed: silent-catch policy enforced repo-wide (19 reporting, 12 justified-bare), groupWebrtc leak concern disproven and documented, 1,804 lines of dead auth duplicates deleted, content-hidden notifications unified to one writer. Gap 3 (admin list pagination) deferred with a named trigger. The February 2026 code review is now fully dispositioned: every finding either done, in-progress-by-plan (messages domains 4-11), user-deferred (media/DB), or deferred-with-trigger (admin lists, cosmetic polish batch). tsc clean; NOT committed.*
+
+---
+
+### Session 54 (July 3, 2026) — BUG FIX: Profile Photo Picker Forced Camera-Only on Mobile (+ same bug in vendor Smart Paste)
+
+**User-reported bug:** profile image update only offered taking a new photo — no gallery/device-storage option. Root cause: the single hidden file input had `capture="environment"`, which on Android/iOS forces the (rear!) camera and bypasses the gallery entirely; desktop ignores `capture`, which is why it looked fine there.
+
+**Fix (pages/profile.tsx):** split into TWO hidden inputs sharing one handler — gallery/files input (NO capture; `fileInputRef`) and camera input (`capture="user"` — front lens, more apt for a profile shot than the old rear; new `cameraInputRef`). Buttons now: **Choose Photo** (ImagePlus icon → gallery) · **Take Photo** (Camera icon) · **or 🧑 Use Avatar** (emoji grid unchanged — it already worked). "Change photo" link opens the gallery input (the common intent). 10MB limit, compressProfileImage pipeline, error toasts, and input-value reset all preserved; handler also clears input.value on the too-large path (previously left stale, blocking re-selection of the same file).
+
+**Same bug found & fixed by sweep (components/catering/SmartPasteInput.tsx):** menu photo input also had `capture="environment"` — vendors couldn't upload an existing menu photo/screenshot. `capture` removed (native chooser now offers camera AND gallery); button relabeled "Snap or Upload a Photo of Your Menu". Repo-wide grep confirms ZERO `capture=` attributes remain.
+
+**Verified:** tsc exit 0. **Ship (web + Android — this is exactly a mobile-behavior fix, so the ANDROID test is the one that matters):** commit `src/`, `firebase deploy --only hosting` (test-gated), `npm run cap:sync` + Run ▶.
+**Test on the TABLET:** Profile → Edit → "Choose Photo" MUST open the gallery/file picker (the bug); "Take Photo" opens the front camera; picked image compresses + previews + saves; emoji avatar path unchanged; vendor dashboard → Smart Paste → menu photo button offers gallery too. Desktop Chrome: both buttons open the file dialog (capture is ignored there — expected).
+
+*Updated July 3, 2026 (Session 54) — user-reported profile photo bug fixed: capture="environment" was forcing camera-only on mobile; now Choose Photo (gallery) + Take Photo (front camera) + avatar grid, with the same latent bug also fixed in the vendor Smart Paste menu-photo input. Zero capture= attributes remain app-wide. tsc clean; NOT committed; Android re-test is the critical one.*
