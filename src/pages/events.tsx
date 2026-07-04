@@ -411,6 +411,7 @@ export default function EventsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const myEvents = false; // My Events moved to Profile page
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -705,6 +706,7 @@ export default function EventsPage() {
       });
 
       setEvents(eventsList);
+      setLoadError(false);
 
       if (user?.uid) {
         const rsvpIds = new Set<string>();
@@ -718,6 +720,7 @@ export default function EventsPage() {
       }
     } catch (error) {
       console.error('Error fetching events:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -1516,6 +1519,22 @@ export default function EventsPage() {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : loadError && events.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-full bg-aurora-surface-variant flex items-center justify-center mb-4">
+              <AlertCircle className="w-7 h-7 text-aurora-text-muted" />
+            </div>
+            <h3 className="text-lg font-semibold text-aurora-text mb-1">Couldn't load events</h3>
+            <p className="text-sm text-aurora-text-secondary max-w-xs">
+              Check your connection and try again.
+            </p>
+            <button
+              onClick={() => { setLoadError(false); setLoading(true); fetchEvents(); }}
+              className="mt-4 px-6 py-2.5 bg-aurora-indigo text-white rounded-xl text-sm font-semibold hover:bg-aurora-indigo/90 shadow-sm transition-colors"
+            >
+              Retry
+            </button>
           </div>
         ) : filteredEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">

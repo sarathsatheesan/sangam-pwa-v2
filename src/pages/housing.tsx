@@ -39,7 +39,7 @@ import {
   Wind, Snowflake,
   UtensilsCrossed, Dumbbell, Waves, Package, TreePine,
   DoorOpen, Flame, Zap, Droplets, Sun, MessageCircle, Star,
-  Flag, Ban, MoreHorizontal,
+  Flag, Ban, MoreHorizontal, WifiOff,
 } from 'lucide-react';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
@@ -409,6 +409,7 @@ export default function HousingPage() {
   /* state */
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   /* pagination (approved change: 24/page newest-first, useBusinessData pattern) */
   const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -578,8 +579,10 @@ export default function HousingPage() {
       setLastDoc(cursor);
       setHasMore(more);
       filterBatchFetchedRef.current = false;
+      setLoadError(false);
     } catch (error) {
       console.error('Error fetching listings:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -1704,6 +1707,22 @@ export default function HousingPage() {
         {loading ? (
           <div className={"grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}>
             {[1, 2, 3, 4, 5, 6].map((i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : loadError && listings.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="w-20 h-20 rounded-full bg-[var(--aurora-surface-variant)] flex items-center justify-center mx-auto mb-4">
+              <WifiOff size={32} className="text-[var(--aurora-text-muted)]" />
+            </div>
+            <h3 className="text-lg font-semibold text-[var(--aurora-text)]">Couldn't load listings</h3>
+            <p className="text-[var(--aurora-text-muted)] mt-2 max-w-sm mx-auto text-sm">
+              Check your connection and try again.
+            </p>
+            <button
+              onClick={() => { setLoadError(false); setLoading(true); fetchListings(); }}
+              className="mt-4 px-6 py-2.5 bg-aurora-indigo text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Retry
+            </button>
           </div>
         ) : (() => {
           const displayListings = activeListTab === 'saved'

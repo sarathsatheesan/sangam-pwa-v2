@@ -50,7 +50,7 @@ export function CateringPanel({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4">
           <div className="flex items-center gap-2 mb-1">
-            <Package size={16} className="text-[#6366F1]" />
+            <Package size={16} className="text-aurora-indigo" />
             <span className="text-xs font-medium text-[var(--aurora-text-secondary)]">Total Orders</span>
           </div>
           <p className="text-2xl font-bold text-[var(--aurora-text)]">{cateringOrders.length}</p>
@@ -71,7 +71,7 @@ export function CateringPanel({
         </div>
         <div className="bg-[var(--aurora-surface)] rounded-xl border border-[var(--aurora-border)] p-4">
           <div className="flex items-center gap-2 mb-1">
-            <Store size={16} className="text-[#6366F1]" />
+            <Store size={16} className="text-aurora-indigo" />
             <span className="text-xs font-medium text-[var(--aurora-text-secondary)]">Active Caterers</span>
           </div>
           <p className="text-2xl font-bold text-[var(--aurora-text)]">{cateringBusinesses.length}</p>
@@ -117,7 +117,7 @@ export function CateringPanel({
             onClick={() => onCateringFilterChange(f)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
               cateringFilter === f
-                ? 'bg-[#FF3008] text-white'
+                ? 'bg-admin-accent text-white'
                 : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)]'
             }`}
           >
@@ -202,7 +202,7 @@ export function CateringPanel({
                         <button
                           onClick={() => onStatusChange(order.id, 'preparing')}
                           disabled={isActionLoading}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-[#6366F1] hover:bg-[#5558E6] transition disabled:opacity-50"
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-aurora-indigo hover:bg-[#5558E6] transition disabled:opacity-50"
                         >
                           Mark Preparing
                         </button>

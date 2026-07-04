@@ -54,6 +54,7 @@ import {
   AlertTriangle,
   Ban,
   Download,
+  WifiOff,
 } from 'lucide-react';
 
 interface Post {
@@ -249,6 +250,8 @@ export default function FeedPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedType, setSelectedType] = useState<'community' | 'professional' | 'event'>('community');
   const [postContent, setPostContent] = useState('');
@@ -438,6 +441,7 @@ export default function FeedPage() {
           return merged;
         });
       }
+      setLoadError(false);
       setLoading(false);
       if (fetchedCount > 0) {
         setLastDoc(lastVisible);
@@ -445,10 +449,11 @@ export default function FeedPage() {
       }
     }, (error) => {
       console.error('[FeedPage] Firestore listener error:', error);
+      setLoadError(true);
       setLoading(false);
     });
     return unsubscribe;
-  }, []);
+  }, [reloadKey]);
 
   // Deep-link: open specific post from profile activity
   useEffect(() => {
@@ -1426,6 +1431,25 @@ export default function FeedPage() {
                 <div className="h-12 shimmer rounded-xl" />
               </div>
             ))}
+          </div>
+        ) : loadError && posts.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 mx-auto mb-4 bg-aurora-surface-variant rounded-full flex items-center justify-center">
+              <WifiOff size={28} className="text-aurora-text-muted" />
+            </div>
+            <h3 className="text-lg font-semibold text-aurora-text mb-1">Couldn't load posts</h3>
+            <p className="text-sm text-aurora-text-secondary max-w-xs mx-auto">
+              Check your connection and try again.
+            </p>
+            <button
+              onClick={() => { setLoadError(false); setLoading(true); setReloadKey((k) => k + 1); }}
+              className={`mt-4 px-6 py-2.5 text-white rounded-full text-sm font-semibold shadow-aurora-glow hover:shadow-aurora-glow-lg transition-all btn-press ${isNeutral ? 'aurora-gradient' : ''}`}
+              style={!isNeutral ? {
+                background: `linear-gradient(to right, ${theme.colors.primary}, ${theme.colors.secondary})`,
+              } : undefined}
+            >
+              Retry
+            </button>
           </div>
         ) : filteredPosts.length === 0 ? (
           <div className="text-center py-16">

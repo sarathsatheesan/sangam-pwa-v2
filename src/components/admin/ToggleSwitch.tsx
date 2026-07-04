@@ -14,7 +14,7 @@ export function ToggleSwitch({
     <button
       onClick={onChange}
       className={`${dims} rounded-full transition-colors duration-200 relative flex items-center ${
-        enabled ? 'bg-[#FF3008]' : 'bg-gray-300 dark:bg-gray-600'
+        enabled ? 'bg-admin-accent' : 'bg-gray-300 dark:bg-gray-600'
       }`}
     >
       <span

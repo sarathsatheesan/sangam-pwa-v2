@@ -78,7 +78,7 @@ export function UserManagementPanel({
             placeholder="Search by name or email..."
             value={userSearch}
             onChange={(e) => onUserSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008]"
+            className="w-full pl-10 pr-4 py-2.5 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent"
           />
         </div>
         <div className="flex gap-2">
@@ -88,7 +88,7 @@ export function UserManagementPanel({
               onClick={() => onUserFilterChange(f)}
               className={`px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition ${
                 userFilter === f
-                  ? 'bg-[#FF3008] text-white shadow-md'
+                  ? 'bg-admin-accent text-white shadow-md'
                   : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)] hover:bg-[var(--aurora-surface-variant)]'
               }`}
             >
@@ -123,13 +123,13 @@ export function UserManagementPanel({
                     <button
                       onClick={() => onExpandedUserChange(isExpanded ? null : u.id)}
                       className={`w-full flex items-center gap-4 p-4 hover:bg-[var(--aurora-surface-variant)]/50 transition text-left ${
-                        userIsAdmin ? 'bg-[#FF3008]/[0.03]' : ''
+                        userIsAdmin ? 'bg-admin-accent/[0.03]' : ''
                       }`}
                     >
                       {/* Avatar */}
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0 overflow-hidden ${
                         userIsAdmin
-                          ? 'bg-gradient-to-br from-[#FF3008] to-[#FF6034] text-white'
+                          ? 'bg-gradient-to-br from-admin-accent to-admin-accent-light text-white'
                           : 'bg-[var(--aurora-surface-variant)]'
                       }`}>
                         <AvatarImg value={u.avatar} fallback="🧑" />
@@ -139,7 +139,7 @@ export function UserManagementPanel({
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-[var(--aurora-text)] truncate">{u.name}</p>
                           {userIsAdmin && (
-                            <span className="text-[9px] bg-[#FF3008] text-white px-1.5 py-0.5 rounded font-bold tracking-wider flex-shrink-0">
+                            <span className="text-[9px] bg-admin-accent text-white px-1.5 py-0.5 rounded font-bold tracking-wider flex-shrink-0">
                               ADMIN
                             </span>
                           )}
@@ -172,7 +172,7 @@ export function UserManagementPanel({
                       {/* Status */}
                       <div className="flex-shrink-0">
                         {userIsAdmin ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#FF3008]/10 text-[#FF3008]">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-admin-accent/10 text-admin-accent">
                             <Shield size={10} /> Protected
                           </span>
                         ) : isBanned ? (

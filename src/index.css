@@ -6,6 +6,14 @@
   /* ── Modern Aurora Color System ── */
   /* These are the DEFAULT (light) values. Dark mode overrides via CSS variables below. */
 
+  /* Admin accent — the admin section's distinct brand red (Session 55).
+     Was hardcoded as arbitrary values (bg-[#FF3008] etc.) at 37 sites across
+     admin.tsx + admin panels; now tokenized. Static (not dark-mode-varied),
+     matching the previous hardcoded rendering exactly. */
+  --color-admin-accent: #FF3008;
+  --color-admin-accent-light: #FF6034;
+  --color-admin-accent-dark: #E02A06;
+
   /* Backgrounds — Soft Cool Gray */
   --color-aurora-bg: var(--aurora-bg, #F5F6FA);
   --color-aurora-surface: var(--aurora-surface, #FFFFFF);
@@ -654,3 +662,18 @@ select.appearance-none option {
   color: #1f2937;
   background-color: #ffffff;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Z-INDEX SCALE (Session 55 — canonical policy, review finding 4.6)
+   New/touched code MUST use these levels; do not invent new z-values.
+     z-40        page-level sticky chrome (headers, filter bars)
+     z-[55]      transparent click-away overlays for menus
+     z-[56]      dropdown/context menus themselves
+     z-50        page-level modals & sheets (shared <Modal> layer="base")
+     z-[70]      modals stacked on modals (shared <Modal> layer="high")
+     z-[80]      toasts / notification pills (always on top of modals)
+     z-[200]     messages module full-screen dialogs (legacy ceiling —
+                 fold down to the scale during decomposition tranches)
+   Existing off-scale values migrate opportunistically when files are
+   touched, not in bulk.
+   ═══════════════════════════════════════════════════════════════════ */

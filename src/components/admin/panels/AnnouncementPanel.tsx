@@ -33,7 +33,7 @@ export function AnnouncementPanel({
 
       <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-6">
         <h3 className="font-bold text-[var(--aurora-text)] mb-4 flex items-center gap-2">
-          <Plus size={18} className="text-[#FF3008]" /> New Announcement
+          <Plus size={18} className="text-admin-accent" /> New Announcement
         </h3>
         <div className="space-y-3">
           <input
@@ -41,18 +41,18 @@ export function AnnouncementPanel({
             placeholder="Announcement title..."
             value={announcementTitle}
             onChange={(e) => onTitleChange(e.target.value)}
-            className="w-full px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30"
+            className="w-full px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-admin-accent/30"
           />
           <textarea
             placeholder="Message content..."
             value={announcementMessage}
             onChange={(e) => onMessageChange(e.target.value)}
             rows={4}
-            className="w-full px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 resize-none"
+            className="w-full px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-admin-accent/30 resize-none"
           />
           <button
             onClick={onAddAnnouncement}
-            className="w-full px-6 py-2.5 bg-[#FF3008] text-white rounded-xl text-sm font-semibold hover:bg-[#E02A06] transition shadow-md"
+            className="w-full px-6 py-2.5 bg-admin-accent text-white rounded-xl text-sm font-semibold hover:bg-admin-accent-dark transition shadow-md"
           >
             Create Announcement
           </button>

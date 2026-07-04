@@ -45,7 +45,7 @@ export function ListingPanel({
             placeholder="Search listings..."
             value={listingSearch}
             onChange={(e) => onListingSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30 focus:border-[#FF3008]"
+            className="w-full pl-10 pr-4 py-2.5 bg-[var(--aurora-surface)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-admin-accent/30 focus:border-admin-accent"
           />
         </div>
         <div className="flex gap-2">
@@ -55,7 +55,7 @@ export function ListingPanel({
               onClick={() => onListingFilterChange(f)}
               className={`px-4 py-2.5 rounded-xl text-sm font-medium capitalize transition ${
                 listingFilter === f
-                  ? 'bg-[#FF3008] text-white shadow-md'
+                  ? 'bg-admin-accent text-white shadow-md'
                   : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)] hover:bg-[var(--aurora-surface-variant)]'
               }`}
             >

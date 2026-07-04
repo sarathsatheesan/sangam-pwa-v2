@@ -1231,7 +1231,7 @@ export default function AdminPage() {
         <div className="max-w-[1400px] mx-auto px-4 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#FF3008] to-[#FF6034] flex items-center justify-center shadow-md">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-admin-accent to-admin-accent-light flex items-center justify-center shadow-md">
                 <BarChart3 size={18} className="text-white" />
               </div>
               <div>
@@ -1246,13 +1246,13 @@ export default function AdminPage() {
                   className="relative p-2 rounded-xl hover:bg-[var(--aurora-surface-variant)] transition"
                 >
                   <Flag size={18} className="text-[var(--aurora-text-secondary)]" />
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#FF3008] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-admin-accent text-white text-[9px] font-bold rounded-full flex items-center justify-center">
                     {dashStats.modQueueCount}
                   </span>
                 </button>
               )}
               <div className="flex items-center gap-2 pl-3 border-l border-[var(--aurora-border)]">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FF3008] to-[#FF6034] flex items-center justify-center text-white text-sm font-bold">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-admin-accent to-admin-accent-light flex items-center justify-center text-white text-sm font-bold">
                   {(userProfile?.name || user?.email || 'A').charAt(0).toUpperCase()}
                 </div>
                 <div className="hidden sm:block">
@@ -1281,14 +1281,14 @@ export default function AdminPage() {
                     onClick={() => setSelectedSection(item.id)}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-[#FF3008]/10 text-[#FF3008]'
+                        ? 'bg-admin-accent/10 text-admin-accent'
                         : 'text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface-variant)] hover:text-[var(--aurora-text)]'
                     }`}
                   >
                     <Icon size={18} />
                     {item.label}
                     {item.id === 'moderation' && dashStats.modQueueCount > 0 && (
-                      <span className="ml-auto w-5 h-5 bg-[#FF3008] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      <span className="ml-auto w-5 h-5 bg-admin-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                         {dashStats.modQueueCount}
                       </span>
                     )}
@@ -1311,7 +1311,7 @@ export default function AdminPage() {
                     onClick={() => setSelectedSection(item.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition ${
                       isActive
-                        ? 'bg-[#FF3008] text-white shadow-md'
+                        ? 'bg-admin-accent text-white shadow-md'
                         : 'bg-[var(--aurora-surface)] text-[var(--aurora-text-secondary)] border border-[var(--aurora-border)]'
                     }`}
                   >

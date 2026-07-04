@@ -25,7 +25,7 @@ export function AdminEmailPanel({
 
       <div className="bg-[var(--aurora-surface)] rounded-2xl border border-[var(--aurora-border)] p-6">
         <h3 className="font-bold text-[var(--aurora-text)] mb-4 flex items-center gap-2">
-          <Plus size={18} className="text-[#FF3008]" /> Add Admin
+          <Plus size={18} className="text-admin-accent" /> Add Admin
         </h3>
         <div className="flex gap-3">
           <input
@@ -33,11 +33,11 @@ export function AdminEmailPanel({
             placeholder="Email address"
             value={newAdminEmail}
             onChange={(e) => onNewAdminEmailChange(e.target.value)}
-            className="flex-1 px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[#FF3008]/30"
+            className="flex-1 px-4 py-2.5 bg-[var(--aurora-bg)] border border-[var(--aurora-border)] rounded-xl text-sm text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-secondary)] focus:outline-none focus:ring-2 focus:ring-admin-accent/30"
           />
           <button
             onClick={onAddAdmin}
-            className="px-6 py-2.5 bg-[#FF3008] text-white rounded-xl text-sm font-semibold hover:bg-[#E02A06] transition shadow-md"
+            className="px-6 py-2.5 bg-admin-accent text-white rounded-xl text-sm font-semibold hover:bg-admin-accent-dark transition shadow-md"
           >
             Add
           </button>
@@ -66,7 +66,7 @@ export function AdminEmailPanel({
             {adminEmails.map((email) => (
               <div key={email} className="flex items-center justify-between px-5 py-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF3008] to-[#FF6034] flex items-center justify-center text-white text-sm font-bold">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-admin-accent to-admin-accent-light flex items-center justify-center text-white text-sm font-bold">
                     {email.charAt(0).toUpperCase()}
                   </div>
                   <div>
