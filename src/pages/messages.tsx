@@ -82,6 +82,7 @@ import { useForwarding } from '@/hooks/useForwarding';
 import { usePinnedAndDisappearing } from '@/hooks/usePinnedAndDisappearing';
 import { useComposer } from '@/hooks/useComposer';
 import { useChatData } from '@/hooks/useChatData';
+import { useCallAndE2EEState } from '@/hooks/useCallAndE2EEState';
 import { useChatModeration } from '@/hooks/useChatModeration';
 import { useGroupManagement } from '@/hooks/useGroupManagement';
 import {
@@ -242,9 +243,18 @@ export default function MessagesPage() {
   const e2ePublicKeyRef = useRef<ExportedPublicKey | null>(null);
   const e2eSharedKeysRef = useRef<Map<string, CryptoKey>>(new Map());
   const e2eGroupKeysRef = useRef<Map<string, CryptoKey>>(new Map());
-  const [e2eReady, setE2eReady] = useState(false);
-  // Bumped whenever a shared/group key is derived so message listener re-decrypts
-  const [e2eKeyVersion, setE2eKeyVersion] = useState(0);
+  // E2EE + calls state domain → hooks/useCallAndE2EEState (Session 64, tranche 11
+  // FINALE). STATE only, raw setters/identical names. The singleton refs
+  // (callManagerRef/groupCallManagerRef below), the subscribe() effects, the
+  // key-init/derivation effects and every call handler STAY in the page.
+  // e2eKeyVersion bumps whenever a shared/group key is derived → re-decrypt.
+  const {
+    e2eReady, setE2eReady,
+    e2eKeyVersion, setE2eKeyVersion,
+    callState, setCallState,
+    groupCallState, setGroupCallState,
+    activeGroupCallId, setActiveGroupCallId,
+  } = useCallAndE2EEState();
 
   // Report / Block moderation domain → hooks/useChatModeration (Session 50, D1 tranche 2)
   // State only — Firestore I/O stays in handleSubmitReport / handleBlockUser /
@@ -258,14 +268,10 @@ export default function MessagesPage() {
     blockedUsers, setBlockedUsers,
   } = useChatModeration();
 
-  // Call state — subscribe to CallManager for header button states
-  const [callState, setCallState] = useState<CallState>(getCallManager().getState());
+  // Call/group-call state → useCallAndE2EEState (declared above). Singleton
+  // refs stay here — the subscribe() effects below wire them to the setters.
   const callManagerRef = useRef(getCallManager());
-
-  // Group call state
-  const [groupCallState, setGroupCallState] = useState<GroupCallState>(getGroupCallManager().getState());
   const groupCallManagerRef = useRef(getGroupCallManager());
-  const [activeGroupCallId, setActiveGroupCallId] = useState<string | null>(null);
 
   // Refs
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
