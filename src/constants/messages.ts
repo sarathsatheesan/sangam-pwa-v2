@@ -53,7 +53,55 @@ export const WALLPAPER_PRESETS = {
       backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0 L60 30 L30 60 L0 30Z' fill='none' stroke='%2363668808' stroke-width='0.5'/%3E%3C/svg%3E")`,
     } as React.CSSProperties,
   },
+  // ── Session 57: additional presets ──
+  mesh_aurora: {
+    label: 'Mesh',
+    description: 'Soft aurora mesh',
+    style: {
+      backgroundImage:
+        'radial-gradient(at 20% 20%, rgba(99,102,241,0.10) 0px, transparent 50%),' +
+        'radial-gradient(at 80% 30%, rgba(34,211,238,0.08) 0px, transparent 50%),' +
+        'radial-gradient(at 50% 80%, rgba(16,185,129,0.08) 0px, transparent 50%)',
+    } as React.CSSProperties,
+  },
+  gradient_forest: {
+    label: 'Forest',
+    description: 'Fresh green gradient',
+    style: {
+      backgroundImage: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(5,150,105,0.09) 50%, rgba(6,95,70,0.05) 100%)',
+    } as React.CSSProperties,
+  },
+  gradient_rose: {
+    label: 'Rose',
+    description: 'Soft rose gradient',
+    style: {
+      backgroundImage: 'linear-gradient(135deg, rgba(244,114,182,0.06) 0%, rgba(236,72,153,0.09) 50%, rgba(219,39,119,0.05) 100%)',
+    } as React.CSSProperties,
+  },
+  grid_lines: {
+    label: 'Grid',
+    description: 'Subtle graph grid',
+    style: {
+      backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0 H40 M0 0 V40' fill='none' stroke='%2363668810' stroke-width='0.5'/%3E%3C/svg%3E")`,
+    } as React.CSSProperties,
+  },
 };
+
+/**
+ * Curated solid-color wallpapers (Session 57). Values are used directly as
+ * backgroundColor; the swatch row + a native color input in WallpaperPicker
+ * let users pick any color beyond these.
+ */
+export const WALLPAPER_COLORS: { label: string; value: string }[] = [
+  { label: 'Cloud', value: '#F5F6FA' },
+  { label: 'Mint', value: '#E7F5EF' },
+  { label: 'Sky', value: '#E7F0FB' },
+  { label: 'Lavender', value: '#EFEBFB' },
+  { label: 'Sand', value: '#F5EFE6' },
+  { label: 'Blush', value: '#FBEBF1' },
+  { label: 'Slate', value: '#232438' },
+  { label: 'Ink', value: '#1A1B2E' },
+];
 
 // ===== EMOJI CATEGORIES =====
 

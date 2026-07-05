@@ -101,6 +101,9 @@
   --aurora-shadow-4: 0 16px 40px rgba(0, 0, 0, 0.12), 0 6px 12px rgba(0, 0, 0, 0.04);
 
   /* Message-specific vars */
+  /* Scrim layered over custom-photo wallpapers so bubbles stay readable
+     (Session 57). Light mode = subtle white wash. */
+  --msg-scrim: rgba(255, 255, 255, 0.12);
   --msg-own-bubble: #E0E7FF;
   --msg-own-bubble-hover: #EEF2FF;
   --msg-text: #111B21;
@@ -149,6 +152,7 @@
   color-scheme: dark;
 
   /* Message-specific dark overrides */
+  --msg-scrim: rgba(0, 0, 0, 0.30);
   --msg-own-bubble: #2D2F5E;
   --msg-own-bubble-hover: #353768;
   --msg-text: #F0F1F5;

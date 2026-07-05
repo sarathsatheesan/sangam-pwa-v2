@@ -4006,3 +4006,14 @@ NEW `hooks/useChatAppearance.ts` (domain 5): owns wallpaper (localStorage load-o
 **Device test:** chat 3-dots menu → Wallpaper → pick a preset → applies + persists across app restart; 3-dots → Compact/Comfortable toggles message text size (resets to Comfortable on restart — known/intended).
 
 *Updated July 5, 2026 (Session 57) — tranche 5 done: useChatAppearance (wallpaper persistence + picker + compact density). messages.tsx at 54/76 useState, domains 1–5 complete. compactMode persistence flagged as optional enhancement. tsc clean; NOT committed.*
+
+**Session 57 addendum — WALLPAPER FEATURE EXPANDED (user request):** the basic 7-preset picker got real functionality per user spec (custom photo + solid colors + more presets + live preview; kept global scope):
+- **Storage model reworked** (`hooks/useChatAppearance.ts`): wallpaper is now `{type:'preset'|'color'|'image', value}` JSON under `chatWallpaper`, with backward-compat fallback to the legacy `selectedWallpaper` string key (existing users keep their preset). Exported `wallpaperToStyle()` + `wallpaperStyle` (computed, memoized) — page applies that instead of the inline WALLPAPER_PRESETS lookup. Setters: selectPreset/selectColor/selectImage (image returns false on localStorage quota → picker toasts).
+- **4 new presets** (constants/messages.ts): Mesh (aurora radial), Forest, Rose gradients, Grid lines → 11 total. **8 curated solid colors** (WALLPAPER_COLORS) + native custom-color input.
+- **Custom photo**: compressImage(file, 1280, 0.72) → base64 in localStorage; 12MB pre-compress cap; quota-safe. **`--msg-scrim`** CSS var (light rgba white 0.12 / dark black 0.30) layered over photo wallpapers so bubbles stay readable — no manual dim slider (user didn't request one).
+- **WallpaperPicker rebuilt** on the shared `<Modal>` (ESC/focus-trap/scroll-lock free): Presets|Colors|Photo tabs, **live preview pane** with sample incoming/outgoing bubbles over the draft choice, Reset + Cancel + Apply (draft-then-apply, not apply-on-click).
+- messages.tsx: unused WALLPAPER_PRESETS import removed; still 54 useState.
+
+**Verified:** tsc exit 0. Ship web + Android (`npm run cap:sync` — mind the copy step). **Device test:** 3-dots → Wallpaper → preview updates as you pick a preset/color; Photo tab → Choose a photo → gallery opens → compresses → preview shows it with readable bubbles → Apply persists across restart; huge image → graceful "not enough space" message; existing users' old preset still applied on first open (backward compat).
+
+*Updated July 5, 2026 (Session 57) — wallpaper feature expanded: custom photo upload + solid colors + 4 new presets (11 total) + live-preview picker on shared Modal; storage migrated to typed {type,value} with legacy fallback; readability scrim on photos. tsc clean; NOT committed; ship web + Android.*

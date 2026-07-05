@@ -45,7 +45,6 @@ import {
 // ===== IMPORTS FROM EXTRACTED FILES =====
 import type { User, Message, Conversation, ViewState, NotificationType, PresenceStatus, LinkPreviewData } from '@/types/messages';
 import {
-  WALLPAPER_PRESETS,
   EMOJI_CATEGORIES,
   QUICK_REPLIES,
   MESSAGE_CONFIG,
@@ -172,7 +171,7 @@ export default function MessagesPage() {
   // Chat appearance domain → hooks/useChatAppearance (Session 57, D1 tranche 5).
   // wallpaper (localStorage-persisted) + picker open state + compact density.
   const {
-    selectedWallpaper, selectWallpaper,
+    wallpaper, wallpaperStyle, selectPreset, selectColor, selectImage,
     wallpaperPickerOpen, openWallpaperPicker, closeWallpaperPicker,
     compactMode, toggleCompactMode,
   } = useChatAppearance();
@@ -3357,7 +3356,7 @@ export default function MessagesPage() {
         className="flex-1 overflow-y-auto py-2"
         ref={messagesContainerRef}
         style={{
-          ...(WALLPAPER_PRESETS[selectedWallpaper as keyof typeof WALLPAPER_PRESETS]?.style || {}),
+          ...wallpaperStyle,
           // Fluid side padding — scales continuously with the container width
           // instead of jumping at a breakpoint. Floor of 16px so incoming bubbles
           // never sit flush on small screens; ~5% mid-range (matches the previous
@@ -3987,8 +3986,12 @@ export default function MessagesPage() {
       {isRecording && <VoiceRecorder onSend={(dur, blob) => { setIsRecording(false); sendVoiceMessage(dur, blob); }} onCancel={() => setIsRecording(false)} />}
       {wallpaperPickerOpen && (
         <WallpaperPicker
-          current={selectedWallpaper}
-          onSelect={selectWallpaper}
+          current={wallpaper}
+          onApply={(wp) => {
+            if (wp.type === 'color') return selectColor(wp.value);
+            if (wp.type === 'image') return selectImage(wp.value);
+            return selectPreset(wp.value);
+          }}
           onClose={closeWallpaperPicker}
         />
       )}
