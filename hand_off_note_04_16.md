@@ -4236,3 +4236,28 @@ NEW `services/messages.ts` (522 lines, feed.ts conventions header: mechanical mo
 **Revert if the backbone misbehaves:** `git checkout src/pages/messages.tsx src/services/messages.ts` (isolated pair).
 
 *Updated July 5, 2026 (Session 67b) — companion 10b done: services/messages.ts extracts all messages Firestore I/O (thread subscription + decrypt pipeline + seq guard, conversations, presence reader+writer, group-call banner, E2EE key fetches, mark-read). messages.tsx has zero inline Firestore left; 12-tranche decomposition program fully closed. tsc clean; NOT committed; ship + full messages regression pending.*
+
+---
+
+## ⏳ PENDING ITEMS (authoritative as of Session 67b, July 5 2026)
+
+Single source of truth for open work. Update this section when items close — do not let stale copies accumulate in session entries.
+
+**Code review / implementation plan (`../eNoVo_Implementation_Plan_07_02_2026.md`) — ONE active item left:**
+1. **Type-safety burn-down (C3 tail / coverage-audit gap 9)** — repo-wide `: any` at 338 (was 365), `as any` at 121 (was 158; profile.tsx already 0), plus `types/firestore.ts` reconciliation (FeedPost mismatch documented S47). Background debt; mechanical, behavior-free, tsc-gated pass. Everything else in Phases A–D is done — D1 closed Session 64 (state) + 67b (I/O).
+
+**Deferred WITH named triggers (deliberate, not forgotten):**
+2. **Admin section-list pagination** (audit gap 3) — deferred because naive pagination breaks admin's client-side search. Trigger: >1,000 users OR admin page feels slow (S53).
+3. **Off-scale z-index values** — migrate to the documented scale on touch, no dedicated pass (S55 policy).
+4. **One arbitrary hex one-off** — `CateringPanel.tsx:205` `hover:bg-[#5558E6]`, documented (S55).
+5. **Report-dedupe re-verify** — S52's second-report check (reportCount increments on ONE queue item) was never exercised (needs a second account); re-verify opportunistically next time moderation is touched (S55 addendum).
+
+**Blocked on a USER decision:**
+6. **D2 media → Firebase Storage** — parked on the DB decision TABLED July 3 (`../eNoVo_Database_Options_Analysis.md` §7, no revisit trigger set). Revisit when a driver crystallizes: catering search requirements, cost signal, or a lock-in strategy call.
+
+**Business / infra carry-forwards (outside the review plan):**
+7. **Shareable APK + Play Store submission** (PLAY_SUBMISSION.md from S40).
+8. **TURN hardening** — ephemeral per-call credentials via Cloud Function (`iceConfig.ts getIceServers()` already stubbed); defer until usage grows, set a Metered budget alert meanwhile (S65/66).
+9. **PAT expiry** — the `sangam-push` GitHub token expires **Aug 4, 2026**; renew via GitHub → Settings → Developer settings → Fine-grained tokens, then update the remote URL (S67).
+
+**Immediate next action (from Session 67b):** commit + `npm run ship` + Run ▶ + full messages regression on device (list live-updates, 1:1 + group send/receive with quiet console, presence, unread clears, pinned/group-call banners).
