@@ -4056,3 +4056,15 @@ NEW `hooks/useGroupManagement.ts` (domain 8, delegated to agent w/ exact transit
 **Device test (group flows):** pen icon → menu → New Message opens user picker; pen → Create Group → name + search + select members → create → group appears + creator closes/resets; open a group → header/avatar → Group Settings; edit group name (pencil → save/cancel); Add Member (toggle picker + search); mobile back button exits room cleanly.
 
 *Updated July 5, 2026 (Session 60) — tranche 8 done: useGroupManagement (11 states, biggest domain). messages.tsx at 30/76 useState, domains 1–8 complete. tsc clean; NOT committed; ship via npm run ship.*
+
+---
+
+### Session 61 (July 5, 2026) — D1 Tranche 9: Composer Domain (Med-High, ref-entangled)
+
+NEW `hooks/useComposer.ts` (domain 9): 11 composer states — messageText, showFormatting, editingMessage, replyingTo, recentEmojis, showEmojiPicker, showGifPicker, isRecording, pendingImage, imageCompressing, pendingFile. LOWEST-RISK approach for the riskiest tranche so far: exposed RAW setters with IDENTICAL names, so all ~34 call sites stay byte-for-byte unchanged — only the (scattered) declarations moved into the hook + one destructure block. `textareaRef` + its auto-resize effect (~line 898) + the markdown `handleFormat` (selection/focus manipulation ~1254-1269) DELIBERATELY stay in the page: they're entangled with the DOM node and the send pipeline; co-locating them waits for domain 10. Also deleted 2 dead commented-out undo-feature useState lines.
+**METRIC CORRECTION:** prior handoff "N useState" used a loose `grep -c useState` (counted import + comments). Accurate metric is `grep -c 'const \[.*\] = useState'` → **16 active declarations remain** after tranche 9 (domains 1–9 done). Composer states confirmed no longer raw useState.
+**Verified:** tsc exit 0; 0 composer states left as page-level useState.
+**Ship web + Android:** `npm run ship` then Run ▶.
+**Device test (composer — exercise everything):** type + send text; **B**/*i* formatting toolbar; reply-to a message (preview bar + send); edit your own message (populates composer, save); emoji picker (recent emojis update); GIF picker; voice record; attach an image (compressing → preview → send); attach a file; multiline auto-resize of the textarea; all clear correctly after send.
+
+*Updated July 5, 2026 (Session 61) — tranche 9 done: useComposer (11 states, raw setters/zero call-site churn; textareaRef stays in page). 16 active useState declarations remain (metric corrected), domains 1–9 complete. Only domains 10 (core data + services/messages.ts) and 11 (E2EE/calls) left. tsc clean; NOT committed; ship via npm run ship.*

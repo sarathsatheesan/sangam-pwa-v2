@@ -80,6 +80,7 @@ import { useChatSearch } from '@/hooks/useChatSearch';
 import { useChatAppearance } from '@/hooks/useChatAppearance';
 import { useForwarding } from '@/hooks/useForwarding';
 import { usePinnedAndDisappearing } from '@/hooks/usePinnedAndDisappearing';
+import { useComposer } from '@/hooks/useComposer';
 import { useChatModeration } from '@/hooks/useChatModeration';
 import { useGroupManagement } from '@/hooks/useGroupManagement';
 import {
@@ -110,7 +111,22 @@ export default function MessagesPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [messageText, setMessageText] = useState('');
+  // Composer domain → hooks/useComposer (Session 61, tranche 9). Raw setters,
+  // identical names → call sites unchanged. textareaRef + resize effect +
+  // handleFormat stay in the page (ref-entangled with the send pipeline).
+  const {
+    messageText, setMessageText,
+    showFormatting, setShowFormatting,
+    editingMessage, setEditingMessage,
+    replyingTo, setReplyingTo,
+    recentEmojis, setRecentEmojis,
+    showEmojiPicker, setShowEmojiPicker,
+    showGifPicker, setShowGifPicker,
+    isRecording, setIsRecording,
+    pendingImage, setPendingImage,
+    imageCompressing, setImageCompressing,
+    pendingFile, setPendingFile,
+  } = useComposer();
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -160,16 +176,7 @@ export default function MessagesPage() {
   const msgSnapshotSeqRef = useRef(0);
   const unsubscribersRef = useRef<Array<() => void>>([]);
 
-  // UI State
-  const [showFormatting, setShowFormatting] = useState(false);
-  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
-  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
-  // const [undoMessageId, setUndoMessageId] = useState<string | null>(null); // COMMENTED OUT — undo feature disabled
-  // const [showUndoToast, setShowUndoToast] = useState(false); // COMMENTED OUT — undo feature disabled
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showGifPicker, setShowGifPicker] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  // UI State (composer state → useComposer, declared above)
   // Chat search domain → hooks/useChatSearch (Session 56, D1 tranche 4).
   // Also restores the amber match-highlight (dead since Session 33) and
   // deletes the never-used chatSearchIndex state.
@@ -197,11 +204,8 @@ export default function MessagesPage() {
   } = useMessageActions();
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Image message state
-  const [pendingImage, setPendingImage] = useState<string | null>(null);
-  const [imageCompressing, setImageCompressing] = useState(false);
+  // Image message state (pendingImage/imageCompressing/pendingFile → useComposer, declared above)
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const [pendingFile, setPendingFile] = useState<{ name: string; size: number; type: string; data: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Forward + image-lightbox domain → hooks/useForwarding (Session 58, tranche 6)
