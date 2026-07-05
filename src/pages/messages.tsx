@@ -79,6 +79,7 @@ import { useMessageActions } from '@/hooks/useMessageActions';
 import { useChatSearch } from '@/hooks/useChatSearch';
 import { useChatAppearance } from '@/hooks/useChatAppearance';
 import { useForwarding } from '@/hooks/useForwarding';
+import { usePinnedAndDisappearing } from '@/hooks/usePinnedAndDisappearing';
 import { useChatModeration } from '@/hooks/useChatModeration';
 import {
   LinkPreviewCard,
@@ -208,14 +209,16 @@ export default function MessagesPage() {
     forwardingMsg, setForwardingMsg,
   } = useForwarding();
 
-  // Batch 2: Pin, Star, Export state
-  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
-  const [showPinnedBanner, setShowPinnedBanner] = useState(true);
-  const [showStarredView, setShowStarredView] = useState(false);
-  const [showPinnedView, setShowPinnedView] = useState(false);
-  const [showDisappearingMenu, setShowDisappearingMenu] = useState(false);
-  const [disappearingPerMessage, setDisappearingPerMessage] = useState<number | null>(null); // per-message override (ms)
-  const [showPerMsgTimerPicker, setShowPerMsgTimerPicker] = useState(false);
+  // Pinned/starred/disappearing domain → hooks/usePinnedAndDisappearing (Session 59, tranche 7)
+  const {
+    pinnedMessages, setPinnedMessages,
+    showPinnedBanner, dismissPinnedBanner,
+    showPinnedView, openPinnedView, closePinnedView,
+    showStarredView, openStarredView, closeStarredView,
+    showDisappearingMenu, openDisappearingMenu, closeDisappearingMenu,
+    disappearingPerMessage, clearDisappearingPerMessage,
+    showPerMsgTimerPicker, togglePerMsgTimerPicker, closePerMsgTimerPicker, selectPerMsgTimer,
+  } = usePinnedAndDisappearing();
 
   // E2EE state
   const e2ePrivateKeyRef = useRef<CryptoKey | null>(null);
@@ -1362,7 +1365,7 @@ export default function MessagesPage() {
       setPendingImage(null);
       setPendingFile(null);
       setReplyingTo(null);
-      if (disappearingPerMessage) setDisappearingPerMessage(null);
+      if (disappearingPerMessage) clearDisappearingPerMessage();
       const lastMsgPreview = pendingFile ? `📎 ${pendingFile.name}` : imageToSend ? (payload ? `📷 ${messageText.slice(0, 40)}` : '📷 Photo') : messageText.slice(0, 50);
       const convUpdateData: Record<string, unknown> = {
         lastMessage: lastMsgPreview,
@@ -1511,7 +1514,7 @@ export default function MessagesPage() {
         encrypted: false,
       };
       await addDoc(collection(db, 'conversations', convId, 'messages'), { ...msgData, ...getDisappearingFields(convId) });
-      if (disappearingPerMessage) setDisappearingPerMessage(null);
+      if (disappearingPerMessage) clearDisappearingPerMessage();
       const convUpdateData: Record<string, unknown> = {
         lastMessage: 'GIF',
         lastMessageTime: serverTimestamp(),
@@ -1671,7 +1674,7 @@ export default function MessagesPage() {
       // setUndoMessageId(msgRef.id); // COMMENTED OUT — undo feature disabled
       // setShowUndoToast(true); // COMMENTED OUT — undo feature disabled
       void msgRef;
-      if (disappearingPerMessage) setDisappearingPerMessage(null);
+      if (disappearingPerMessage) clearDisappearingPerMessage();
       const convUpdateData: Record<string, unknown> = {
         lastMessage: '🎤 Voice message',
         lastMessageTime: serverTimestamp(),
@@ -2756,7 +2759,7 @@ export default function MessagesPage() {
                 {starredMessagesEnabled && (
                 <button
                   onClick={() => {
-                    setShowStarredView(true);
+                    openStarredView();
                     setShowChatMenu(false);
                   }}
                   className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
@@ -2769,7 +2772,7 @@ export default function MessagesPage() {
                 {pinnedMessagesEnabled && (
                 <button
                   onClick={() => {
-                    setShowPinnedView(true);
+                    openPinnedView();
                     setShowChatMenu(false);
                   }}
                   className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
@@ -2782,7 +2785,7 @@ export default function MessagesPage() {
                 {disappearingMessagesEnabled && selectedConvId && (
                   <button
                     onClick={() => {
-                      setShowDisappearingMenu(true);
+                      openDisappearingMenu();
                       setShowChatMenu(false);
                     }}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
@@ -2916,7 +2919,7 @@ export default function MessagesPage() {
             <span className="text-xs font-medium text-amber-700 dark:text-amber-400">{pinnedMessages.length} pinned message{pinnedMessages.length > 1 ? 's' : ''}</span>
             <p className="text-xs truncate" style={{ color: 'var(--msg-secondary)' }}>{pinnedMessages[pinnedMessages.length - 1]?.text || '📷 Photo'}</p>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); setShowPinnedBanner(false); }} onTouchStart={(e) => { e.stopPropagation(); setShowPinnedBanner(false); }} className="p-1 rounded-full hover:bg-amber-200/50">
+          <button onClick={(e) => { e.stopPropagation(); dismissPinnedBanner(); }} onTouchStart={(e) => { e.stopPropagation(); dismissPinnedBanner(); }} className="p-1 rounded-full hover:bg-amber-200/50">
             <X size={14} className="text-amber-600" />
           </button>
         </div>
@@ -2926,7 +2929,7 @@ export default function MessagesPage() {
       {showStarredView && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)', paddingTop: 'var(--safe-top, 0px)', paddingBottom: 'var(--safe-bottom, 0px)' }}>
           <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
-            <button onClick={() => setShowStarredView(false)} className="p-1 rounded-full hover:bg-white/10" onTouchStart={() => setShowStarredView(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <button onClick={() => closeStarredView()} className="p-1 rounded-full hover:bg-white/10" onTouchStart={() => closeStarredView()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               <ArrowLeft size={20} className="text-white" />
             </button>
             <h3 className="text-white font-semibold">Starred Messages</h3>
@@ -2940,7 +2943,7 @@ export default function MessagesPage() {
               </div>
             ) : messages.filter(m => m.starred && !m.deleted).map(msg => {
               const handleStarredClick = () => {
-                setShowStarredView(false);
+                closeStarredView();
                 const idx = messages.findIndex(m => m.id === msg.id);
                 if (idx >= 0 && messagesContainerRef.current) {
                   setTimeout(() => {
@@ -2973,7 +2976,7 @@ export default function MessagesPage() {
       {showPinnedView && (
         <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--aurora-surface)', paddingTop: 'var(--safe-top, 0px)', paddingBottom: 'var(--safe-bottom, 0px)' }}>
           <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
-            <button onClick={() => setShowPinnedView(false)} className="p-1 rounded-full hover:bg-white/10" onTouchStart={() => setShowPinnedView(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+            <button onClick={() => closePinnedView()} className="p-1 rounded-full hover:bg-white/10" onTouchStart={() => closePinnedView()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
               <ArrowLeft size={20} className="text-white" />
             </button>
             <h3 className="text-white font-semibold">Pinned Messages</h3>
@@ -2987,7 +2990,7 @@ export default function MessagesPage() {
               </div>
             ) : messages.filter(m => m.pinned && !m.deleted).map(msg => {
               const handlePinnedClick = () => {
-                setShowPinnedView(false);
+                closePinnedView();
                 const idx = messages.findIndex(m => m.id === msg.id);
                 if (idx >= 0 && messagesContainerRef.current) {
                   setTimeout(() => {
@@ -3031,7 +3034,7 @@ export default function MessagesPage() {
 
       {/* Disappearing messages settings overlay */}
       {showDisappearingMenu && selectedConvId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDisappearingMenu(false)} onTouchStart={() => setShowDisappearingMenu(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => closeDisappearingMenu()} onTouchStart={() => closeDisappearingMenu()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
           <div className="bg-white dark:bg-[var(--aurora-surface)] rounded-xl shadow-xl w-[90%] max-w-sm overflow-hidden" onClick={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
             <div className="px-4 py-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600 flex items-center gap-3">
               <Timer size={18} className="text-white" />
@@ -3047,7 +3050,7 @@ export default function MessagesPage() {
                   try {
                     await updateDoc(doc(db, 'conversations', selectedConvId!), { disappearingTimer: null });
                     showNotif('Disappearing messages turned off', 'info');
-                    setShowDisappearingMenu(false);
+                    closeDisappearingMenu();
                   } catch (err) {
                     console.error('Error updating disappearing timer:', err);
                     showNotif('Failed to update setting', 'error');
@@ -3072,7 +3075,7 @@ export default function MessagesPage() {
                       try {
                         await updateDoc(doc(db, 'conversations', selectedConvId!), { disappearingTimer: opt.value });
                         showNotif(`Disappearing messages set to ${opt.label}`, 'success');
-                        setShowDisappearingMenu(false);
+                        closeDisappearingMenu();
                       } catch (err) {
                         console.error('Error updating disappearing timer:', err);
                         showNotif('Failed to update setting', 'error');
@@ -3682,8 +3685,8 @@ export default function MessagesPage() {
             {disappearingMessagesEnabled && (
             <div className="relative">
               <button
-                onClick={() => setShowPerMsgTimerPicker(!showPerMsgTimerPicker)}
-                onTouchStart={() => setShowPerMsgTimerPicker(!showPerMsgTimerPicker)}
+                onClick={() => togglePerMsgTimerPicker()}
+                onTouchStart={() => togglePerMsgTimerPicker()}
                 className="p-1.5 rounded-full hover:bg-gray-200/60 transition-colors relative"
                 style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
                 aria-label="Set disappearing message timer"
@@ -3705,8 +3708,8 @@ export default function MessagesPage() {
                   <div
                     className="fixed inset-0"
                     style={{ zIndex: 9998, cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
-                    onClick={() => setShowPerMsgTimerPicker(false)}
-                    onTouchStart={() => setShowPerMsgTimerPicker(false)}
+                    onClick={() => closePerMsgTimerPicker()}
+                    onTouchStart={() => closePerMsgTimerPicker()}
                   />
                   <div
                     className="fixed rounded-xl shadow-lg border py-1.5 w-40"
@@ -3723,8 +3726,8 @@ export default function MessagesPage() {
                       Timer for next message
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); setDisappearingPerMessage(null); setShowPerMsgTimerPicker(false); }}
-                      onTouchStart={(e) => { e.stopPropagation(); setDisappearingPerMessage(null); setShowPerMsgTimerPicker(false); }}
+                      onClick={(e) => { e.stopPropagation(); selectPerMsgTimer(null); }}
+                      onTouchStart={(e) => { e.stopPropagation(); selectPerMsgTimer(null); }}
                       className="w-full px-3 py-1.5 text-left text-sm flex items-center justify-between hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                       style={{ color: !disappearingPerMessage ? '#10b981' : 'var(--msg-text)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
                     >
@@ -3734,8 +3737,8 @@ export default function MessagesPage() {
                     {DISAPPEARING_TIMER_OPTIONS.map((opt) => (
                       <button
                         key={opt.value}
-                        onClick={(e) => { e.stopPropagation(); setDisappearingPerMessage(opt.value); setShowPerMsgTimerPicker(false); }}
-                        onTouchStart={(e) => { e.stopPropagation(); setDisappearingPerMessage(opt.value); setShowPerMsgTimerPicker(false); }}
+                        onClick={(e) => { e.stopPropagation(); selectPerMsgTimer(opt.value); }}
+                        onTouchStart={(e) => { e.stopPropagation(); selectPerMsgTimer(opt.value); }}
                         className="w-full px-3 py-1.5 text-left text-sm flex items-center justify-between hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
                         style={{ color: disappearingPerMessage === opt.value ? '#10b981' : 'var(--msg-text)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
                       >

@@ -4033,3 +4033,15 @@ NEW `hooks/useForwarding.ts` (domain 6): two related sub-flows — (A) image lig
 1. **`npm run ship`** (package.json) — ONE command for both platforms: test → build → cap sync android → firebase deploy hosting → prints a reminder to open Android Studio + Run ▶. Use this instead of a bare `firebase deploy`. (Android device install still needs the manual Run ▶ — Capacitor can't push to a physical device headlessly, but assets are guaranteed synced.)
 2. **`npm run android:check`** (scripts/check-android-sync.mjs) — compares dist/ vs android/.../public entry-chunk hashes; exits 1 with the fix command if stale. Run before any device test.
 NEW WORKFLOW: `npm run ship` to deploy web + sync Android, then Run ▶ in Android Studio; if ever unsure whether the tablet is current, `npm run android:check`. tsc/JSON valid.
+
+---
+
+### Session 59 (July 5, 2026) — D1 Tranche 7: Pinned/Starred/Disappearing Domain
+
+NEW `hooks/usePinnedAndDisappearing.ts` (domain 7): three surfaces — pinned (banner dismiss + full-screen pinned view), starred (full-screen view), disappearing (conversation timer menu + per-message timer override). Grouped useState + semantic helpers (openPinnedView/closePinnedView, openStarredView/closeStarredView, openDisappearingMenu/closeDisappearingMenu, dismissPinnedBanner, togglePerMsgTimerPicker/closePerMsgTimerPicker, selectPerMsgTimer(value|null) which sets override + closes picker). TWO setters kept RAW for exact parity: `setPinnedMessages` (the page derives it via `msgs.filter(m=>m.pinned)` inside the message onSnapshot — NOT a separate subscription, contrary to the plan's note) and `clearDisappearingPerMessage` (the 3 send handlers clear the override post-send). messages.tsx **48→41 useState** (76 at start; domains 1–7 done). Plan doc corrected re: no own subscription. Next = domain 8 (group management UI, 11 states — the biggest single domain).
+
+**Verified:** tsc exit 0; zero stray old setters; selectPerMsgTimer wired into all 4 picker-option handlers.
+**Ship web + Android:** `npm run ship` then Run ▶ (or `npm run android:check` before testing).
+**Device test:** pin a message → amber banner appears → dismiss (X) hides it → 3-dots → Pinned shows full-screen list → tap jumps to message; star a message → 3-dots → Starred view → tap jumps; disappearing: 3-dots → Disappearing menu sets conversation timer; composer Timer icon → per-message picker → pick a duration (green ✓) → send → message shows timer + override clears after send.
+
+*Updated July 5, 2026 (Session 59) — tranche 7 done: usePinnedAndDisappearing (pinned/starred/disappearing surfaces). messages.tsx at 41/76 useState, domains 1–7 complete. tsc clean; NOT committed; ship web + Android via `npm run ship`.*

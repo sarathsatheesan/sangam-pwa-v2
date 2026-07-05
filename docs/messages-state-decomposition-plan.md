@@ -23,13 +23,13 @@ STATE monolith: 76 useState hooks (73 after tranche 1).*
 | ✅4 | Chat search | 3 (chatSearch, chatSearchQuery, chatSearchIndex) | `hooks/useChatSearch.ts` — DONE Session 56. BONUS: found chatSearchQuery/Index were DEAD since S33 (MessageSearchBar kept query internal) which had silently killed the bubble match-highlight; restored via new onQueryChange prop; chatSearchIndex deleted outright | Low |
 | ✅5 | Wallpaper/appearance | 3 (selectedWallpaper, showWallpaperPicker, compactMode) | `hooks/useChatAppearance.ts` — DONE Session 57 (wallpaper localStorage load/save moved in; compactMode kept NON-persisted for parity — flagged as optional future enhancement) | Low |
 | ✅6 | Forward/lightbox | 6 (lightboxImage, lightboxForwardOpen, forwardingImage, forwardingMessage, showForwardPicker, forwardingMsg) | `hooks/useForwarding.ts` — DONE Session 58 (two sub-flows: image-lightbox + message-forward; grouped useState w/ semantic transitions, in-flight flag setters exposed raw for the page's try/finally; async send handlers stay in page) | Med |
-| 7 | Pinned/starred/disappearing | 7 (pinnedMessages, showPinnedBanner, showStarredView, showPinnedView, showDisappearingMenu, disappearingPerMessage, showPerMsgTimerPicker) | `usePinnedAndDisappearing` — has Firestore subscriptions; move I/O to a `services/messages.ts` when created | Med |
+| ✅7 | Pinned/starred/disappearing | 7 (...) | `hooks/usePinnedAndDisappearing.ts` — DONE Session 59 (grouped useState + semantic helpers; pinnedMessages setter kept raw — it's derived from the message onSnapshot; disappearingPerMessage clear kept raw for send handlers; selectPerMsgTimer collapses value+close). NOTE: no OWN Firestore subscription — pinnedMessages is filtered from the messages array in the page's existing onSnapshot | Med |
 | 8 | Group management UI | 11 (showPenMenu, showNewMsgPicker, showGroupCreator, groupName, selectedGroupMembers, groupSearchTerm, showGroupSettings, editingGroupName, editGroupNameValue, showAddMemberPicker, addMemberSearchTerm) | `useGroupManagement` reducer | Med |
 | 9 | Composer | 10 (messageText, showFormatting, editingMessage, replyingTo, recentEmojis, showEmojiPicker, showGifPicker, isRecording, pendingImage+imageCompressing, pendingFile) | `useComposer` reducer — many textarea ref interactions, careful | Med-High |
 | 10 | Core data (conversations/messages/users/selection) | ~10 (viewState, conversations, selectedUser, messages, loading, messagesLoading, users, searchTerm, activeFilter, selectedConvId) | reducer + eventual `services/messages.ts` (subscriptions incl. the snapshot-race guard `msgSnapshotSeqRef` — Session 42) | High |
 | 11 | E2EE + calls | 5 (e2eReady, e2eKeyVersion, callState, groupCallState, activeGroupCallId) | LAST — interlocks with CallManager singletons and key lifecycle; only after 1–10 are stable | High |
 
-Remaining after tranche 6: 48 useState. Suggested order: 7 → 8 → 9 → 10 → 11.
+Remaining after tranche 7: 41 useState. Suggested order: 8 → 9 → 10 → 11.
 
 ## Companion work (separate tranches)
 
