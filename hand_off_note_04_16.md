@@ -4084,3 +4084,19 @@ NEW `hooks/useChatData.ts`: 10 core states (viewState, conversations, selectedUs
 **NEXT:** tranche 11 (E2EE + calls, 5-6 states, the FINALE — CallManager singleton interlock, run encryption.test.ts as guard). THEN companion 10b: services/messages.ts (move the 6 subscriptions + guard out of the page). After both, messages.tsx state decomposition is COMPLETE.
 
 *Updated July 5, 2026 (Session 62) — tranche 10a done: useChatData (10 core-data states, STATE-only split; subscriptions/services deferred to 10b). messages.tsx at 6 active useState (all domain 11). Domains 1–10a complete. tsc clean; NOT committed; ship via npm run ship.*
+
+---
+
+### Session 63 (July 5, 2026) — E2EE Decryption "Errors" Investigated → LOG NOISE, not a bug (fixed)
+
+**Trigger:** the tranche-10a Chrome regression surfaced 113 `[E2EE] Decryption failed: OperationError` console errors — user asked to investigate before tranche 11.
+
+**Diagnosis (NOT a functional bug, NOT caused by 10a):** the 1:1 decryption path (`tryDecryptAllFields` in messages.tsx ~681) deliberately tries FOUR keys in order — deterministic (new cross-device default) → cached ECDH → per-message ECDH → legacy v1. `e2eDecrypt` (utils/encryption.ts) was doing `console.error('[E2EE] Decryption failed:', err)` on EVERY failed attempt, then returning the unchanged (still-encrypted) payload as the caller's "try next strategy" signal (`isStillEncrypted()`). So every LEGACY-key message logs 1–3 error-level lines even though it ultimately decrypts fine via strategy 2/3 → ~100+ false alarms per thread. Visual test confirmed messages render correctly (zero 🔒 "cannot be decrypted" icons), so decryption WORKS; only the logging was wrong. The error level also BURIED the one case that matters (all strategies fail → user-facing lock message).
+
+**Fix (1 line, behavior-preserving):** `e2eDecrypt` catch downgraded `console.error` → `console.debug` with an explanatory comment. Return value unchanged → multi-strategy fallback, isStillEncrypted signal, and the genuine all-strategies-failed lock message are all untouched. The other console.error/warn in the E2EE paths (init/derivation/encryption/group-key failures) are genuine once-per-event errors — LEFT AS-IS.
+
+**Not a bug, no action (documented):** most existing messages predate the deterministic-key scheme so they decrypt via ECDH fallback (strategy-1 always misses first) — expected post key-migration; resolves naturally as threads get new messages. Minor pre-existing perf note (not fixed): the subscription re-decrypts the whole thread on every snapshot — future optimization, unrelated.
+
+**Verified:** tsc exit 0. RUN encryption.test.ts on Mac (`npm test`) — only a log line changed, all 38 crypto tests should still pass. **Ship web + Android** (`npm run ship`); after deploy the Messages console should be quiet except real errors.
+
+*Updated July 5, 2026 (Session 63) — the 113 E2EE "errors" from the tranche-10a test were diagnosed as expected multi-strategy-fallback log noise (not a bug, not from 10a); e2eDecrypt error→debug downgrade makes genuine decryption failures visible again. tsc clean; NOT committed. Tranche 11 (E2EE/calls state) still pending.*

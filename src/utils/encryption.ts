@@ -309,8 +309,15 @@ export async function e2eDecrypt(encryptedPayload: string, sharedKey: CryptoKey)
 
     return new TextDecoder().decode(decrypted);
   } catch (err) {
-    // Log for debugging Safari issues
-    console.error('[E2EE] Decryption failed:', err);
+    // Session 63: downgraded error→debug. A decrypt failure here is EXPECTED
+    // and non-fatal — the 1:1 path deliberately tries this with several keys
+    // in turn (deterministic → ECDH → per-message → legacy), and the returned
+    // (unchanged, still-encrypted) payload is the caller's "try the next
+    // strategy" signal via isStillEncrypted(). Logging every probe at error
+    // level produced ~100+ false alarms per thread and buried the ONE case
+    // that matters — when ALL strategies fail the caller shows the user
+    // "🔒 cannot be decrypted on this device". Kept at debug for Safari triage.
+    console.debug('[E2EE] decrypt attempt did not match this key (expected during fallback):', err);
     return encryptedPayload;
   }
 }
