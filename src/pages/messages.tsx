@@ -77,6 +77,7 @@ import {
 import { reportError } from '@/utils/reportError';
 import { useChatNotification } from '@/hooks/useChatNotification';
 import { useMessageActions } from '@/hooks/useMessageActions';
+import { useChatSearch } from '@/hooks/useChatSearch';
 import { useChatModeration } from '@/hooks/useChatModeration';
 import {
   LinkPreviewCard,
@@ -163,9 +164,10 @@ export default function MessagesPage() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [chatSearch, setChatSearch] = useState(false);
-  const [chatSearchQuery, setChatSearchQuery] = useState('');
-  const [chatSearchIndex, setChatSearchIndex] = useState(0);
+  // Chat search domain → hooks/useChatSearch (Session 56, D1 tranche 4).
+  // Also restores the amber match-highlight (dead since Session 33) and
+  // deletes the never-used chatSearchIndex state.
+  const { searchOpen, toggleSearch, closeSearch, searchQuery, setSearchQuery } = useChatSearch();
   const [selectedWallpaper, setSelectedWallpaper] = useState<string>('default');
   const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
   const [showChatMenu, setShowChatMenu] = useState(false);
@@ -2668,7 +2670,7 @@ export default function MessagesPage() {
           )}
           {searchEnabled && (
           <button
-            onClick={() => setChatSearch(!chatSearch)}
+            onClick={toggleSearch}
             className="p-2 rounded-full hover:bg-white/10 transition-colors"
             aria-label="Search messages"
           >
@@ -2830,7 +2832,7 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      {chatSearch && (
+      {searchOpen && (
         <MessageSearchBar
           messages={messages}
           onNavigate={(idx) => {
@@ -2839,7 +2841,8 @@ export default function MessagesPage() {
               elem?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
           }}
-          onClose={() => setChatSearch(false)}
+          onClose={closeSearch}
+          onQueryChange={setSearchQuery}
         />
       )}
 
@@ -3382,7 +3385,7 @@ export default function MessagesPage() {
               const prevMsg = messages[idx - 1];
               const showAvatar = !prevMsg || prevMsg.senderId !== msg.senderId;
               const showDateLabel = !prevMsg || getDateLabel(prevMsg.createdAt) !== getDateLabel(msg.createdAt);
-              const isSearchMatch = chatSearchQuery && msg.text.toLowerCase().includes(chatSearchQuery.toLowerCase());
+              const isSearchMatch = searchQuery && msg.text.toLowerCase().includes(searchQuery.toLowerCase());
               const isFirstInGroup = !prevMsg || prevMsg.senderId !== msg.senderId || showDateLabel;
 
               return (

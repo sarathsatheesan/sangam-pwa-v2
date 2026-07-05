@@ -10,10 +10,17 @@ export function MessageSearchBar({
   messages,
   onNavigate,
   onClose,
+  onQueryChange,
 }: {
   messages: Message[];
   onNavigate: (index: number) => void;
   onClose: () => void;
+  /**
+   * Session 56: reports the live query upward so the page can highlight
+   * matching bubbles (the highlight had been dead since Session 33 — the
+   * page's query state was never wired to this component's internal one).
+   */
+  onQueryChange?: (query: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [currentMatch, setCurrentMatch] = useState(0);
@@ -41,6 +48,7 @@ export function MessageSearchBar({
         onChange={(e) => {
           setQuery(e.target.value);
           setCurrentMatch(0);
+          onQueryChange?.(e.target.value);
         }}
         className="flex-1 bg-transparent text-base outline-none"
       />

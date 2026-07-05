@@ -3978,3 +3978,16 @@ DB decision remains TABLED per user (needs more time/review — see preamble abo
 **Remaining polish debt (small):** 1 hex one-off; off-scale z-values migrate on touch; global `:any` burn-down + types/firestore.ts reconciliation still queued.
 
 *Updated July 4, 2026 (Session 55) — polish batch done: admin brand-red tokenized (app now has ONE arbitrary hex, down from 31), z-index scale documented as policy, retry-able inline error states on feed/events/housing. DB decision tabled by user. tsc clean; NOT committed; ship web + Android.*
+
+**Session 55 addendum — Messages tranche 2/3 DEVICE TESTS PASSED (July 4, Android tablet):** Tranche 3 (context menu + delete confirm, useMessageActions): all steps pass — menu options correct per own/others' messages, all actions close the menu, delete confirm's three cancel paths safe, delete + toast works. Tranche 2 (report/block, useChatModeration): passes per user ("looks like also passes" — softer confidence; the second-report dedupe check [reportCount increments on ONE queue item] may not have been exercised since it needs a second account — re-verify opportunistically next time moderation is touched). D1 tranche 4 (chat search domain) is now UNBLOCKED per the one-domain-per-tested-tranche rule.
+
+---
+
+### Session 56 (July 4, 2026) — D1 Tranche 4: Chat Search Domain + RESTORED Match Highlighting
+
+NEW `hooks/useChatSearch.ts` (domain 4). Discovery while extracting: 2 of the 3 domain states were DEAD — `chatSearchQuery`/`chatSearchIndex` had no setters anywhere because Session 33's MessageSearchBar extraction gave the component its own internal query, which silently killed the amber match-highlight ring on message bubbles (it read the always-empty page query; `isSearchMatch` was permanently falsy). This tranche: (1) deleted dead `chatSearchIndex`; (2) RESTORED highlighting — MessageSearchBar gained an optional `onQueryChange` prop reporting its live query up, wired into the hook's `searchQuery`, which `isSearchMatch` now reads; (3) toggle/close semantics moved to `toggleSearch`/`closeSearch` (both clear the query so highlights vanish on close — new but obviously-intended behavior; previously the highlight never showed at all). messages.tsx **60→57 useState** (76 at start). Plan doc updated; next = domain 5 (wallpaper/appearance).
+
+**Verified:** tsc exit 0. **Ship web + Android** (bundle change): commit src/ + docs/, deploy hosting (test-gated), `npm run cap:sync` + Run ▶.
+**Device test (tranche rule):** open a chat with several messages → search icon → type a word that appears in multiple messages → **matching bubbles get an amber ring (this is NEW-working — it never worked before)** → ▲▼ navigate between matches (scrolls + counter) → X closes search AND rings disappear → toggle search re-opens clean.
+
+*Updated July 4, 2026 (Session 56) — tranche 4 done with a bonus bug fix: chat-search match highlighting had been dead since Session 33 (orphaned page state); now restored via onQueryChange wiring. messages.tsx at 57/76 useState, domains 1–4 complete. tsc clean; NOT committed.*
