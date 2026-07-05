@@ -4008,8 +4008,10 @@ export default function MessagesPage() {
         // Join existing group call
         await groupCallManagerRef.current.joinCall(activeGroupCallId, user.uid, myName);
       } else {
-        // Start new group call
-        const roomId = await groupCallManagerRef.current.startCall(selectedConvId, callType, user.uid, myName);
+        // Start new group call. Pass the full member list so absent members can
+        // be rung (in-app listener + Cloud Function push key off memberUids).
+        const memberUids = activeGroupConv.participants || [];
+        const roomId = await groupCallManagerRef.current.startCall(selectedConvId, callType, user.uid, myName, memberUids);
         setActiveGroupCallId(roomId);
         // Write a system message to the conversation
         try {

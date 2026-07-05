@@ -223,6 +223,21 @@ export default function GroupCallOverlay() {
     return unsub;
   }, []);
 
+  // Listen for incoming group calls (foreground ring). Mirrors the 1:1
+  // GlobalCallOverlay → listenForIncomingCalls wiring. A Cloud Function
+  // handles the backgrounded/closed-app push.
+  useEffect(() => {
+    if (!user?.uid) return;
+    const manager = getGroupCallManager();
+    const myName = userProfile?.name || userProfile?.preferredName || user.displayName || 'User';
+    const unsub = manager.listenForIncomingGroupCalls(
+      user.uid,
+      myName,
+      () => { setIsMinimized(false); },
+    );
+    return unsub;
+  }, [user?.uid, userProfile?.name, userProfile?.preferredName, user?.displayName]);
+
   // Write group call event message to conversation when call ends
   useEffect(() => {
     const manager = getGroupCallManager();
@@ -256,6 +271,79 @@ export default function GroupCallOverlay() {
   if (!callState) return null;
 
   const manager = getGroupCallManager();
+
+  // ─── Incoming Group Call — Ring Screen ──────────────────────────
+  if (callState.status === 'ringing') {
+    const fromName = callState.incomingFromName || 'Someone';
+    const incomingType = callState.incomingCallType || 'audio';
+    const initials = fromName.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    return (
+      <div
+        style={{
+          position: 'fixed', inset: 0, zIndex: 10001,
+          background: 'linear-gradient(160deg, #0f0f1a 0%, #1a1b2e 60%, #2d2f5e 100%)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
+          paddingTop: 'max(64px, env(safe-area-inset-top))',
+          paddingBottom: 'max(48px, env(safe-area-inset-bottom))',
+        }}
+      >
+        {/* Caller info */}
+        <div className="flex flex-col items-center gap-4 mt-8">
+          <div className="flex items-center gap-1.5">
+            <Shield size={14} className="text-green-400" />
+            <span className="text-green-400 text-xs font-medium">Encrypted</span>
+          </div>
+          <div
+            className="rounded-full flex items-center justify-center text-white font-bold animate-pulse"
+            style={{
+              width: '112px', height: '112px', fontSize: '40px',
+              background: 'linear-gradient(135deg, #7e22ce, #4f46e5)',
+              boxShadow: '0 0 0 8px rgba(124,58,206,0.15), 0 0 0 20px rgba(124,58,206,0.08)',
+            }}
+          >
+            {initials}
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-white text-2xl font-semibold">{fromName}</span>
+            <span className="text-purple-300 text-sm">
+              Incoming group {incomingType === 'video' ? 'video' : 'audio'} call
+            </span>
+          </div>
+        </div>
+
+        {/* Accept / Decline */}
+        <div className="flex items-center justify-center gap-16 w-full">
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={() => manager.declineIncoming()}
+              onTouchStart={(e) => { e.preventDefault(); manager.declineIncoming(); }}
+              className="rounded-full flex items-center justify-center"
+              style={{ width: '68px', height: '68px', background: '#EF4444', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+              aria-label="Decline call"
+            >
+              <PhoneOff size={28} className="text-white" />
+            </button>
+            <span className="text-white/60 text-xs">Decline</span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={() => { manager.acceptIncoming().catch((err) => reportError(err, { op: 'accept-group-call' })); }}
+              onTouchStart={(e) => { e.preventDefault(); manager.acceptIncoming().catch((err) => reportError(err, { op: 'accept-group-call' })); }}
+              className="rounded-full flex items-center justify-center animate-bounce"
+              style={{ width: '68px', height: '68px', background: '#22C55E', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+              aria-label="Accept call"
+            >
+              {incomingType === 'video'
+                ? <Video size={28} className="text-white" />
+                : <Phone size={28} className="text-white" />}
+            </button>
+            <span className="text-white/60 text-xs">Accept</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const { callType, participants, peers, localStream, screenStream, isScreenSharing, isMuted, isVideoOff, duration } = callState;
 
   // Build tile list: local + remote peers

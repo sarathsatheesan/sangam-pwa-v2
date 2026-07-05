@@ -35,6 +35,7 @@ export type GroupCallType = 'audio' | 'video';
 
 export type GroupCallStatus =
   | 'idle'
+  | 'ringing'     // Incoming group call — being alerted, not yet joined
   | 'joining'     // Acquiring media, setting up connections
   | 'connected'   // In the call
   | 'ended';      // Left or call ended
@@ -71,6 +72,11 @@ export interface GroupCallState {
   peers: Map<string, { remoteStream: MediaStream; name: string }>;
   duration: number;
   error: string | null;
+  // Incoming-call ring metadata (populated only while status === 'ringing')
+  incomingRoomId: string | null;
+  incomingFromName: string | null;
+  incomingCallType: GroupCallType | null;
+  incomingConversationId: string | null;
 }
 
 export type GroupCallStateListener = (state: GroupCallState) => void;
@@ -120,6 +126,15 @@ export class GroupCallManager {
   private listeners: Set<GroupCallStateListener> = new Set();
   private callEndedListeners: Set<GroupCallEndedListener> = new Set();
 
+  // ─── Incoming-call ring state ──────────────────────────────────────
+  private ringAudio: HTMLAudioElement | null = null;
+  private ringTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private incomingUnsub: (() => void) | null = null;
+  // roomIds we've already accepted/declined/handled — never re-ring for them.
+  private handledIncomingRooms: Set<string> = new Set();
+  // Context needed to join the call we're currently ringing for.
+  private pendingIncoming: { roomId: string; myUid: string; myName: string } | null = null;
+
   private state: GroupCallState = {
     status: 'idle',
     roomId: null,
@@ -134,6 +149,10 @@ export class GroupCallManager {
     peers: new Map(),
     duration: 0,
     error: null,
+    incomingRoomId: null,
+    incomingFromName: null,
+    incomingCallType: null,
+    incomingConversationId: null,
   };
 
   private myUid: string = '';
@@ -179,6 +198,7 @@ export class GroupCallManager {
     callType: GroupCallType,
     myUid: string,
     myName: string,
+    memberUids: string[] = [],
   ): Promise<string> {
     if (this.state.status !== 'idle') {
       throw new Error('Already in a call');
@@ -209,9 +229,15 @@ export class GroupCallManager {
       // Create room in Firestore
       const roomId = `gc_${conversationId}_${Date.now()}`;
       const roomRef = doc(db, 'groupCalls', roomId);
+      // memberUids = everyone in the group (so absent members can be rung via a
+      // Firestore array-contains query + a Cloud Function push). Always include
+      // the creator. De-duplicated.
+      const allMemberUids = Array.from(new Set([myUid, ...memberUids]));
       await setDoc(roomRef, {
         conversationId,
         createdBy: myUid,
+        createdByName: myName,
+        memberUids: allMemberUids,
         callType,
         status: 'active',
         participants: [myUid],
@@ -243,6 +269,7 @@ export class GroupCallManager {
       // Listen for incoming signals from new participants
       this.listenForSignals(roomId);
 
+      this.handledIncomingRooms.add(roomId);
       console.log('[GroupCall] Created room:', roomId);
       return roomId;
 
@@ -269,6 +296,7 @@ export class GroupCallManager {
     }
     this.myUid = myUid;
     this.myName = myName;
+    this.handledIncomingRooms.add(roomId);
 
     this.setState({ status: 'joining', roomId, error: null });
 
@@ -920,7 +948,179 @@ export class GroupCallManager {
       this.durationIntervalId = null;
     }
 
+    // Stop any ring in progress
+    this.stopRingtone();
+    if (this.ringTimeoutId) { clearTimeout(this.ringTimeoutId); this.ringTimeoutId = null; }
+
     this.connectedAt = 0;
+  }
+
+  // ─── Incoming group-call ring (mirrors the 1:1 CallManager) ───────
+  //
+  // A group call has no single "callee", so we ring every member. The room doc
+  // carries `memberUids`; this listener fires an in-app ring on any active call
+  // in a group the user belongs to (foreground). A Cloud Function sends a push
+  // for the backgrounded/closed case (see functions/src/index.ts).
+
+  listenForIncomingGroupCalls(
+    myUid: string,
+    myName: string,
+    onIncoming: (roomId: string, callType: GroupCallType, fromName: string, conversationId: string) => void,
+  ): () => void {
+    // Tear down any previous listener (e.g. on user change).
+    if (this.incomingUnsub) { this.incomingUnsub(); this.incomingUnsub = null; }
+
+    const q = query(
+      collection(db, 'groupCalls'),
+      where('memberUids', 'array-contains', myUid),
+      where('status', '==', 'active'),
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      snap.docChanges().forEach((change) => {
+        const roomId = change.doc.id;
+        const data = change.doc.data();
+
+        if (change.type === 'added') {
+          // Skip if: I'm busy, it's my own call, I've already handled it, or I'm
+          // already listed as a participant (joined on another session/device).
+          if (this.state.status !== 'idle') return;
+          if (data.createdBy === myUid) return;
+          if (this.handledIncomingRooms.has(roomId)) return;
+          if ((data.participants || []).includes(myUid)) return;
+
+          // Skip stale rings (older than the ring timeout).
+          const createdAt = data.createdAt as Timestamp | null;
+          if (createdAt && Date.now() - createdAt.toMillis() > RING_TIMEOUT_MS) return;
+
+          const callType = (data.callType as GroupCallType) || 'audio';
+          const fromName = (data.createdByName as string) || 'Someone';
+          const conversationId = (data.conversationId as string) || '';
+
+          this.pendingIncoming = { roomId, myUid, myName };
+          this.setState({
+            status: 'ringing',
+            incomingRoomId: roomId,
+            incomingFromName: fromName,
+            incomingCallType: callType,
+            incomingConversationId: conversationId,
+          });
+          this.playRingtone();
+
+          // Auto-dismiss the ring after the timeout if unanswered.
+          if (this.ringTimeoutId) clearTimeout(this.ringTimeoutId);
+          this.ringTimeoutId = setTimeout(() => {
+            if (this.state.status === 'ringing' && this.state.incomingRoomId === roomId) {
+              this.handledIncomingRooms.add(roomId);
+              this.dismissRing();
+            }
+          }, RING_TIMEOUT_MS);
+
+          onIncoming(roomId, callType, fromName, conversationId);
+        } else if (change.type === 'modified') {
+          // If the call we're ringing for ends, dismiss the ring.
+          if (this.state.status === 'ringing' && this.state.incomingRoomId === roomId && data.status === 'ended') {
+            this.handledIncomingRooms.add(roomId);
+            this.dismissRing();
+          }
+        } else if (change.type === 'removed') {
+          if (this.state.status === 'ringing' && this.state.incomingRoomId === roomId) {
+            this.handledIncomingRooms.add(roomId);
+            this.dismissRing();
+          }
+        }
+      });
+    }, (error) => {
+      console.error('[GroupCall] Incoming-call listener error:', error);
+    });
+
+    this.incomingUnsub = unsub;
+    return () => {
+      unsub();
+      if (this.incomingUnsub === unsub) this.incomingUnsub = null;
+    };
+  }
+
+  // Accept the currently-ringing incoming group call → join its room.
+  async acceptIncoming(): Promise<void> {
+    if (this.state.status !== 'ringing' || !this.pendingIncoming) return;
+    const { roomId, myUid, myName } = this.pendingIncoming;
+    this.handledIncomingRooms.add(roomId);
+    this.stopRingtone();
+    if (this.ringTimeoutId) { clearTimeout(this.ringTimeoutId); this.ringTimeoutId = null; }
+    this.pendingIncoming = null;
+    // Reset to idle so joinCall's guard passes, then join.
+    this.setState({
+      status: 'idle',
+      incomingRoomId: null,
+      incomingFromName: null,
+      incomingCallType: null,
+      incomingConversationId: null,
+    });
+    await this.joinCall(roomId, myUid, myName);
+  }
+
+  // Decline / dismiss the currently-ringing incoming group call (local only).
+  declineIncoming(): void {
+    if (this.state.status !== 'ringing') return;
+    if (this.state.incomingRoomId) this.handledIncomingRooms.add(this.state.incomingRoomId);
+    this.dismissRing();
+  }
+
+  // Clear ring state back to idle (shared by decline / timeout / room-ended).
+  private dismissRing(): void {
+    this.stopRingtone();
+    if (this.ringTimeoutId) { clearTimeout(this.ringTimeoutId); this.ringTimeoutId = null; }
+    this.pendingIncoming = null;
+    this.setState({
+      status: 'idle',
+      incomingRoomId: null,
+      incomingFromName: null,
+      incomingCallType: null,
+      incomingConversationId: null,
+    });
+  }
+
+  // ─── Ringtone (mirrors CallManager) ───────────────────────────────
+
+  private playRingtone(): void {
+    try {
+      this.stopRingtone();
+      const AudioCtx = (window as unknown as Record<string, unknown>).webkitAudioContext as typeof AudioContext || AudioContext;
+      const ctx = new AudioCtx();
+      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      const playBeep = () => {
+        if (!this.ringAudio) return;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 440;
+        gain.gain.value = 0.15;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + 0.2);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+      };
+      this.ringAudio = new Audio();
+      playBeep();
+      const interval = setInterval(() => {
+        if (!this.ringAudio) { clearInterval(interval); return; }
+        playBeep();
+      }, 2000);
+      (this.ringAudio as unknown as Record<string, unknown>)._interval = interval;
+    } catch {
+      // Audio not available — ringtone is best-effort.
+    }
+  }
+
+  private stopRingtone(): void {
+    if (this.ringAudio) {
+      const interval = (this.ringAudio as unknown as Record<string, unknown>)._interval as ReturnType<typeof setInterval>;
+      if (interval) clearInterval(interval);
+      this.ringAudio = null;
+    }
   }
 
   // ─── Check for active group call in a conversation ────────────────

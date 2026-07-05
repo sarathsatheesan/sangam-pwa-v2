@@ -270,6 +270,121 @@ export const sendIncomingCallNotification = onDocumentCreated(
 );
 
 /**
+ * Cloud Function: sendIncomingGroupCallNotification
+ *
+ * Triggers when a new group call room is created (groupCalls/{roomId}). Sends a
+ * HIGH-priority FCM to every group member EXCEPT the creator, so their devices
+ * ring / show a heads-up even when the eNoVo app isn't focused.
+ *
+ * Mirrors sendIncomingCallNotification (1:1). Group calls have no single callee,
+ * so we fan out to `memberUids`. Without this (and the in-app listener), other
+ * members were never alerted — the initiator would sit alone and the call
+ * appeared "broken".
+ *
+ * Firestore path: /groupCalls/{roomId}
+ */
+export const sendIncomingGroupCallNotification = onDocumentCreated(
+  "groupCalls/{roomId}",
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+
+    const room = snap.data();
+    if (!room || room.status !== "active") return;
+
+    const createdBy = (room.createdBy as string) || "";
+    const createdByName = (room.createdByName as string) || "Someone";
+    const callType = (room.callType as string) === "video" ? "video" : "audio";
+    const conversationId = (room.conversationId as string) || "";
+    const memberUids = (room.memberUids as string[] | undefined) || [];
+
+    // Everyone except the person who started the call.
+    const recipients = memberUids.filter((uid) => uid && uid !== createdBy);
+    if (recipients.length === 0) return;
+
+    const roomId = event.params.roomId;
+
+    // Gather FCM tokens for all recipients (dedup, and remember token→owner so
+    // we can prune stale ones).
+    const tokenOwners = new Map<string, string>();
+    await Promise.all(
+      recipients.map(async (uid) => {
+        const userDoc = await db.collection("users").doc(uid).get();
+        if (!userDoc.exists) return;
+        const tokens = (userDoc.data()?.fcmTokens as string[] | undefined) || [];
+        tokens.forEach((t) => { if (t) tokenOwners.set(t, uid); });
+      })
+    );
+
+    const tokens = Array.from(tokenOwners.keys());
+    if (tokens.length === 0) return;
+
+    const response = await admin.messaging().sendEachForMulticast({
+      tokens,
+      notification: {
+        title: `${createdByName} · Group call`,
+        body: `Incoming group ${callType} call`,
+      },
+      data: {
+        type: "incoming_call",
+        callId: roomId,
+        callerId: createdBy,
+        callerName: createdByName,
+        callType,
+        conversationId,
+        isGroup: "true",
+        click_action: "https://enovoapp.com/messages",
+      },
+      android: {
+        priority: "high",
+        ttl: 45_000,
+        notification: {
+          channelId: "calls",
+          priority: "max",
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          tag: `groupcall-${roomId}`,
+          visibility: "public",
+        },
+      },
+      webpush: {
+        fcmOptions: { link: "https://enovoapp.com/messages" },
+        notification: {
+          icon: "/icon-192.png",
+          badge: "/icon-192.png",
+          tag: `groupcall-${roomId}`,
+          renotify: true,
+          requireInteraction: true,
+        },
+      },
+    });
+
+    // Prune stale tokens from their owning user docs.
+    if (response.failureCount > 0) {
+      const staleByUser = new Map<string, string[]>();
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success && resp.error?.code === "messaging/registration-token-not-registered") {
+          const token = tokens[idx];
+          const owner = tokenOwners.get(token);
+          if (owner) {
+            const list = staleByUser.get(owner) || [];
+            list.push(token);
+            staleByUser.set(owner, list);
+          }
+        }
+      });
+      await Promise.all(
+        Array.from(staleByUser.entries()).map(([uid, staleTokens]) =>
+          db.collection("users").doc(uid).update({
+            fcmTokens: admin.firestore.FieldValue.arrayRemove(...staleTokens),
+          })
+        )
+      );
+    }
+  }
+);
+
+/**
  * Cloud Function: transcribeVoiceMessage
  *
  * Callable function that takes a conversationId + messageId,
