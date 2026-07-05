@@ -55,6 +55,7 @@ import {
   MESSAGE_REPORT_CATEGORIES,
   URL_REGEX,
 } from '@/constants/messages';
+import { AVATAR_OPTIONS } from '@/constants/config';
 import {
   generateConvId,
   formatTimestamp,
@@ -217,6 +218,7 @@ export default function MessagesPage() {
   // Image message state (pendingImage/imageCompressing/pendingFile → useComposer, declared above)
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const groupAvatarInputRef = useRef<HTMLInputElement>(null);
 
   // Forward + image-lightbox domain → hooks/useForwarding (Session 58, tranche 6)
   const {
@@ -1832,6 +1834,52 @@ export default function MessagesPage() {
     }
   };
 
+  const updateGroupAvatar = async (value: string) => {
+    if (!selectedConvId) return;
+    const conv = conversations.find((c) => c.id === selectedConvId);
+    if (!isGroupAdmin(conv)) {
+      showNotif('Only group admins can change the group photo', 'warning');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'conversations', selectedConvId), {
+        groupAvatar: value,
+        updatedAt: serverTimestamp(),
+      });
+      // System message
+      await addDoc(collection(db, 'conversations', selectedConvId, 'messages'), {
+        text: `${user?.displayName || 'Admin'} updated the group photo`,
+        senderId: 'system',
+        time: formatMessageTime(Timestamp.now()),
+        createdAt: serverTimestamp(),
+      });
+      showNotif('Group photo updated!', 'success');
+    } catch (err) {
+      console.error('Error updating group photo:', err);
+      showNotif('Failed to update group photo', 'error');
+    }
+  };
+
+  const handleGroupAvatarSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showNotif('Image too large. Please select an image under 10MB.', 'error');
+      input.value = '';
+      return;
+    }
+    try {
+      const dataUrl = await compressImage(file, 512, 0.75);
+      await updateGroupAvatar(dataUrl);
+    } catch (err) {
+      console.error('[Group] Failed to process image:', err);
+      showNotif('Failed to process image. Please try a different photo.', 'error');
+    } finally {
+      input.value = '';
+    }
+  };
+
   const addMemberToGroup = async (newMember: User) => {
     if (!selectedConvId || !user?.uid) return;
     const conv = conversations.find((c) => c.id === selectedConvId);
@@ -2321,8 +2369,14 @@ export default function MessagesPage() {
                   onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = ''; }}
                 >
                   <div className="flex items-center gap-3 px-4 py-2.5">
-                    <div className="w-[45px] h-[45px] rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--aurora-accent)' }}>
-                      <Users size={22} className="text-white" />
+                    <div className="w-[45px] h-[45px] rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden" style={{ backgroundColor: 'var(--aurora-accent)' }}>
+                      {conv.groupAvatar && (conv.groupAvatar.startsWith('http') || conv.groupAvatar.startsWith('data:')) ? (
+                        <img src={conv.groupAvatar} alt="" className="w-full h-full object-cover" />
+                      ) : conv.groupAvatar ? (
+                        <span className="text-xl leading-none">{conv.groupAvatar}</span>
+                      ) : (
+                        <Users size={22} className="text-white" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0 border-b py-1" style={{ borderColor: 'var(--msg-divider)' }}>
                       <div className="flex items-center justify-between mb-0.5">
@@ -2613,10 +2667,16 @@ export default function MessagesPage() {
           <>
             <button
               onClick={() => openGroupSettings(activeGroupConv.groupName || '')}
-              className="w-[34px] h-[34px] rounded-full flex items-center justify-center flex-shrink-0 hover:opacity-80 transition"
+              className="w-[34px] h-[34px] rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden hover:opacity-80 transition"
               style={{ backgroundColor: '#818CF8' }}
             >
-              <Users size={18} className="text-white" />
+              {activeGroupConv.groupAvatar && (activeGroupConv.groupAvatar.startsWith('http') || activeGroupConv.groupAvatar.startsWith('data:')) ? (
+                <img src={activeGroupConv.groupAvatar} alt="" className="w-full h-full object-cover" />
+              ) : activeGroupConv.groupAvatar ? (
+                <span className="text-lg leading-none">{activeGroupConv.groupAvatar}</span>
+              ) : (
+                <Users size={18} className="text-white" />
+              )}
             </button>
             <button
               onClick={() => openGroupSettings(activeGroupConv.groupName || '')}
@@ -3184,10 +3244,67 @@ export default function MessagesPage() {
             <div className="flex-1 overflow-y-auto">
               {/* Group Name Section */}
               <div className="px-4 py-4" style={{ borderBottom: '8px solid #F0F2F5' }}>
-                <div className="flex items-center justify-center mb-3">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: '#818CF8' }}>
-                    <Users size={32} className="text-white" />
-                  </div>
+                <div className="flex flex-col items-center justify-center mb-3">
+                  {(() => {
+                    const av = activeGroupConv.groupAvatar;
+                    const isImage = !!(av && (av.startsWith('http') || av.startsWith('data:')));
+                    return (
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center overflow-hidden" style={{ backgroundColor: '#818CF8' }}>
+                        {isImage ? (
+                          <img src={av} alt="Group avatar" className="w-full h-full object-cover" />
+                        ) : av ? (
+                          <span className="text-3xl leading-none">{av}</span>
+                        ) : (
+                          <Users size={32} className="text-white" />
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {amAdmin && (
+                    <>
+                      <input
+                        ref={groupAvatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleGroupAvatarSelected}
+                      />
+                      <div className="flex items-center justify-center gap-3 mt-3">
+                        <button
+                          type="button"
+                          onClick={() => groupAvatarInputRef.current?.click()}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium transition-all bg-[var(--aurora-surface-variant)] text-[var(--aurora-text-secondary)] hover:bg-aurora-indigo/10 focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40"
+                        >
+                          <ImagePlus className="w-4 h-4" /> Change Photo
+                        </button>
+                        {activeGroupConv.groupAvatar && (
+                          <button
+                            type="button"
+                            onClick={() => updateGroupAvatar('')}
+                            className="text-xs text-red-500 hover:underline focus:outline-none"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1.5 mt-3">
+                        {AVATAR_OPTIONS.slice(0, 16).map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => updateGroupAvatar(emoji)}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-lg transition-all focus:outline-none focus:ring-2 focus:ring-aurora-indigo/40 ${
+                              activeGroupConv.groupAvatar === emoji
+                                ? 'bg-aurora-indigo/20 ring-2 ring-aurora-indigo'
+                                : 'bg-[var(--aurora-surface-variant)] hover:bg-aurora-indigo/10'
+                            }`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
                 {editingGroupName ? (
                   <div className="flex items-center gap-2">

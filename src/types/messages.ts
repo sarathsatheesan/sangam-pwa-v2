@@ -78,6 +78,7 @@ export type Conversation = {
   notificationsMuted?: boolean;
   isGroup?: boolean;
   groupName?: string;
+  groupAvatar?: string;
   groupCreatedBy?: string;
   groupAdmins?: string[];
   lastMessageRead?: boolean;
