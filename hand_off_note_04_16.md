@@ -4045,3 +4045,14 @@ NEW `hooks/usePinnedAndDisappearing.ts` (domain 7): three surfaces — pinned (b
 **Device test:** pin a message → amber banner appears → dismiss (X) hides it → 3-dots → Pinned shows full-screen list → tap jumps to message; star a message → 3-dots → Starred view → tap jumps; disappearing: 3-dots → Disappearing menu sets conversation timer; composer Timer icon → per-message picker → pick a duration (green ✓) → send → message shows timer + override clears after send.
 
 *Updated July 5, 2026 (Session 59) — tranche 7 done: usePinnedAndDisappearing (pinned/starred/disappearing surfaces). messages.tsx at 41/76 useState, domains 1–7 complete. tsc clean; NOT committed; ship web + Android via `npm run ship`.*
+
+---
+
+### Session 60 (July 5, 2026) — D1 Tranche 8: Group Management UI Domain (biggest single domain, 11 states)
+
+NEW `hooks/useGroupManagement.ts` (domain 8, delegated to agent w/ exact transition map, orchestrator-verified): 11 states across 3 sub-flows — pen menu (togglePenMenu/closePenMenu), new-message picker (open/close), group creator (openGroupCreator/closeGroupCreator bundle the groupName/''+selectedGroupMembers/[]+groupSearchTerm/'' draft reset), group settings (openGroupSettings(name) sets editGroupNameValue; closeGroupSettings resets editingGroupName+showAddMemberPicker+addMemberSearchTerm), edit-name (startEditGroupName(name)/cancelEditGroupName), add-member (toggleAddMemberPicker). Raw setters kept for the 4 controlled text inputs (groupName/groupSearchTerm/editGroupNameValue/addMemberSearchTerm) + selectedGroupMembers (functional updater in toggleGroupMember). Async Firestore group handlers (createGroup/updateGroupName/add/remove member) stay in page. Notable: `selectedConvId` was declared INTERLEAVED among these 11 (line 144) — agent correctly left it as its own useState. Line 2585 (room-header back button) mapped to closeGroupSettings() — it navigates away AND now also clears edit/add-member sub-state (harmless-desirable). messages.tsx **41→30 useState** (76 at start; domains 1–8 done). Orchestrator re-verified: tsc 0, all 6 semantic-only setters gone, selectedConvId intact (setSelectedConvId still 6 uses), import wired. Next = domain 9 (composer, 10 states, Med-High — textarea ref interactions, careful).
+
+**Ship web + Android:** `npm run ship` then Run ▶.
+**Device test (group flows):** pen icon → menu → New Message opens user picker; pen → Create Group → name + search + select members → create → group appears + creator closes/resets; open a group → header/avatar → Group Settings; edit group name (pencil → save/cancel); Add Member (toggle picker + search); mobile back button exits room cleanly.
+
+*Updated July 5, 2026 (Session 60) — tranche 8 done: useGroupManagement (11 states, biggest domain). messages.tsx at 30/76 useState, domains 1–8 complete. tsc clean; NOT committed; ship via npm run ship.*

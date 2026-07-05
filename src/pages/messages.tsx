@@ -81,6 +81,7 @@ import { useChatAppearance } from '@/hooks/useChatAppearance';
 import { useForwarding } from '@/hooks/useForwarding';
 import { usePinnedAndDisappearing } from '@/hooks/usePinnedAndDisappearing';
 import { useChatModeration } from '@/hooks/useChatModeration';
+import { useGroupManagement } from '@/hooks/useGroupManagement';
 import {
   LinkPreviewCard,
   ChatAvatar,
@@ -135,18 +136,21 @@ export default function MessagesPage() {
   const searchEnabled = isFeatureEnabled('messages_search');
   const readReceiptsEnabled = isFeatureEnabled('messages_readReceipts');
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'connects' | 'archived'>('all');
-  const [showPenMenu, setShowPenMenu] = useState(false);
-  const [showNewMsgPicker, setShowNewMsgPicker] = useState(false);
-  const [showGroupCreator, setShowGroupCreator] = useState(false);
-  const [groupName, setGroupName] = useState('');
-  const [selectedGroupMembers, setSelectedGroupMembers] = useState<User[]>([]);
-  const [groupSearchTerm, setGroupSearchTerm] = useState('');
+  // Group management UI domain → hooks/useGroupManagement (Session 60, tranche 8)
+  const {
+    showPenMenu, togglePenMenu, closePenMenu,
+    showNewMsgPicker, openNewMsgPicker, closeNewMsgPicker,
+    showGroupCreator, openGroupCreator, closeGroupCreator,
+    groupName, setGroupName,
+    selectedGroupMembers, setSelectedGroupMembers,
+    groupSearchTerm, setGroupSearchTerm,
+    showGroupSettings, openGroupSettings, closeGroupSettings,
+    editingGroupName, startEditGroupName, cancelEditGroupName,
+    editGroupNameValue, setEditGroupNameValue,
+    showAddMemberPicker, toggleAddMemberPicker, closeAddMemberPicker,
+    addMemberSearchTerm, setAddMemberSearchTerm,
+  } = useGroupManagement();
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
-  const [showGroupSettings, setShowGroupSettings] = useState(false);
-  const [editingGroupName, setEditingGroupName] = useState(false);
-  const [editGroupNameValue, setEditGroupNameValue] = useState('');
-  const [showAddMemberPicker, setShowAddMemberPicker] = useState(false);
-  const [addMemberSearchTerm, setAddMemberSearchTerm] = useState('');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1755,10 +1759,7 @@ export default function MessagesPage() {
         createdAt: serverTimestamp(),
       });
       showNotif(`Group "${groupName.trim()}" created!`, 'success');
-      setShowGroupCreator(false);
-      setGroupName('');
-      setSelectedGroupMembers([]);
-      setGroupSearchTerm('');
+      closeGroupCreator();
       // Select the group conversation
       setSelectedConvId(groupId);
       setViewState('room');
@@ -1805,7 +1806,7 @@ export default function MessagesPage() {
         createdAt: serverTimestamp(),
       });
       showNotif('Group name updated!', 'success');
-      setEditingGroupName(false);
+      cancelEditGroupName();
     } catch (err) {
       console.error('Error updating group name:', err);
       showNotif('Failed to update group name', 'error');
@@ -2200,7 +2201,7 @@ export default function MessagesPage() {
           <h1 className="text-xl font-bold tracking-wide" style={{ color: 'var(--msg-header-text, #ffffff)' }}>Messages</h1>
           <div className="relative">
             <button
-              onClick={() => setShowPenMenu(!showPenMenu)}
+              onClick={() => togglePenMenu()}
               className="p-1.5 rounded-full transition-colors"
               style={{ color: 'var(--msg-header-text, #ffffff)' }}
               aria-label="New message or group"
@@ -2210,13 +2211,13 @@ export default function MessagesPage() {
             {/* Pen dropdown menu */}
             {showPenMenu && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowPenMenu(false)} onTouchStart={() => setShowPenMenu(false)} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} />
+                <div className="fixed inset-0 z-40" onClick={() => closePenMenu()} onTouchStart={() => closePenMenu()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }} />
                 <div
                   className="absolute right-0 top-full mt-1 w-48 rounded-lg shadow-lg overflow-hidden z-50"
                   style={{ backgroundColor: 'var(--aurora-surface)', border: '1px solid var(--aurora-border)' }}
                 >
                   <button
-                    onClick={(e) => { e.stopPropagation(); setShowPenMenu(false); setShowNewMsgPicker(true); }}
+                    onClick={(e) => { e.stopPropagation(); closePenMenu(); openNewMsgPicker(); }}
                     className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-[var(--msg-hover-bg)] transition-colors"
                   >
                     <MessageSquare size={18} style={{ color: 'var(--msg-icon)' }} />
@@ -2224,7 +2225,7 @@ export default function MessagesPage() {
                   </button>
                   {groupMessagingEnabled && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); setShowPenMenu(false); setShowGroupCreator(true); setGroupName(''); setSelectedGroupMembers([]); setGroupSearchTerm(''); }}
+                      onClick={(e) => { e.stopPropagation(); closePenMenu(); openGroupCreator(); }}
                       className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-[var(--msg-hover-bg)] transition-colors"
                       style={{ borderTop: '1px solid #F0F2F5' }}
                     >
@@ -2413,7 +2414,7 @@ export default function MessagesPage() {
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
-                <button onClick={() => setShowNewMsgPicker(false)} className="p-1">
+                <button onClick={() => closeNewMsgPicker()} className="p-1">
                   <ArrowLeft size={20} style={{ color: 'var(--msg-icon)' }} />
                 </button>
                 <h2 className="text-lg font-bold" style={{ color: 'var(--msg-text)' }}>New Message</h2>
@@ -2445,7 +2446,7 @@ export default function MessagesPage() {
                   onClick={() => {
                     setSelectedUser(u);
                     setViewState('room');
-                    setShowNewMsgPicker(false);
+                    closeNewMsgPicker();
                     setSearchTerm('');
                   }}
                   className="w-full text-left transition-colors hover:bg-[var(--msg-hover-bg)]"
@@ -2472,7 +2473,7 @@ export default function MessagesPage() {
         <div className="absolute inset-0 z-50 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--aurora-surface)' }}>
           <div className="px-4 pt-3 pb-2" style={{ borderBottom: '1px solid #F0F2F5' }}>
             <div className="flex items-center gap-3 mb-3">
-              <button onClick={() => { setShowGroupCreator(false); setGroupName(''); setSelectedGroupMembers([]); setGroupSearchTerm(''); }} className="p-1">
+              <button onClick={() => closeGroupCreator()} className="p-1">
                 <ArrowLeft size={20} style={{ color: 'var(--msg-icon)' }} />
               </button>
               <h2 className="text-lg font-bold" style={{ color: 'var(--msg-text)' }}>Create Group</h2>
@@ -2582,7 +2583,7 @@ export default function MessagesPage() {
             setViewState('list');
             setSelectedUser(null);
             setSelectedConvId(null);
-            setShowGroupSettings(false);
+            closeGroupSettings();
           }}
           className="p-1.5 rounded-full hover:bg-white/10 transition-colors md:hidden"
           aria-label="Back to conversations list"
@@ -2592,14 +2593,14 @@ export default function MessagesPage() {
         {activeGroupConv ? (
           <>
             <button
-              onClick={() => { setShowGroupSettings(true); setEditGroupNameValue(activeGroupConv.groupName || ''); }}
+              onClick={() => openGroupSettings(activeGroupConv.groupName || '')}
               className="w-[34px] h-[34px] rounded-full flex items-center justify-center flex-shrink-0 hover:opacity-80 transition"
               style={{ backgroundColor: '#818CF8' }}
             >
               <Users size={18} className="text-white" />
             </button>
             <button
-              onClick={() => { setShowGroupSettings(true); setEditGroupNameValue(activeGroupConv.groupName || ''); }}
+              onClick={() => openGroupSettings(activeGroupConv.groupName || '')}
               className="flex-1 min-w-0 text-left hover:opacity-80 transition"
             >
               <h2 className="font-medium text-white text-[15px] leading-tight">{activeGroupConv.groupName || 'Group'}</h2>
@@ -2692,8 +2693,7 @@ export default function MessagesPage() {
                 {activeGroupConv && (
                   <button
                     onClick={() => {
-                      setShowGroupSettings(true);
-                      setEditGroupNameValue(activeGroupConv.groupName || '');
+                      openGroupSettings(activeGroupConv.groupName || '');
                       setShowChatMenu(false);
                     }}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
@@ -3154,7 +3154,7 @@ export default function MessagesPage() {
             {/* Header */}
             <div className="px-4 pt-3 pb-3 flex items-center gap-3 bg-gradient-to-r from-purple-700 via-violet-600 to-indigo-600">
               <button
-                onClick={() => { setShowGroupSettings(false); setEditingGroupName(false); setShowAddMemberPicker(false); setAddMemberSearchTerm(''); }}
+                onClick={() => closeGroupSettings()}
                 className="p-1 rounded-full hover:bg-white/10 transition"
               >
                 <ArrowLeft size={20} className="text-white" />
@@ -3189,7 +3189,7 @@ export default function MessagesPage() {
                       <Check size={16} className="text-white" />
                     </button>
                     <button
-                      onClick={() => setEditingGroupName(false)}
+                      onClick={() => cancelEditGroupName()}
                       className="p-2 rounded-full"
                       style={{ backgroundColor: 'var(--aurora-surface-variant)' }}
                     >
@@ -3203,7 +3203,7 @@ export default function MessagesPage() {
                     </h3>
                     {amAdmin && (
                       <button
-                        onClick={() => { setEditingGroupName(true); setEditGroupNameValue(activeGroupConv.groupName || ''); }}
+                        onClick={() => startEditGroupName(activeGroupConv.groupName || '')}
                         className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[var(--aurora-surface-variant)] transition"
                       >
                         <Edit3 size={16} style={{ color: 'var(--msg-secondary)' }} />
@@ -3224,7 +3224,7 @@ export default function MessagesPage() {
                   </h4>
                   {amAdmin && (
                     <button
-                      onClick={() => setShowAddMemberPicker(!showAddMemberPicker)}
+                      onClick={() => toggleAddMemberPicker()}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition hover:opacity-80"
                       style={{ backgroundColor: 'var(--msg-own-bubble-hover)', color: '#4F46E5' }}
                     >
