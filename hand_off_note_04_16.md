@@ -4017,3 +4017,14 @@ NEW `hooks/useChatAppearance.ts` (domain 5): owns wallpaper (localStorage load-o
 **Verified:** tsc exit 0. Ship web + Android (`npm run cap:sync` — mind the copy step). **Device test:** 3-dots → Wallpaper → preview updates as you pick a preset/color; Photo tab → Choose a photo → gallery opens → compresses → preview shows it with readable bubbles → Apply persists across restart; huge image → graceful "not enough space" message; existing users' old preset still applied on first open (backward compat).
 
 *Updated July 5, 2026 (Session 57) — wallpaper feature expanded: custom photo upload + solid colors + 4 new presets (11 total) + live-preview picker on shared Modal; storage migrated to typed {type,value} with legacy fallback; readability scrim on photos. tsc clean; NOT committed; ship web + Android.*
+
+---
+
+### Session 58 (July 5, 2026) — D1 Tranche 6: Forward/Lightbox Domain (first Med-risk tranche)
+
+NEW `hooks/useForwarding.ts` (domain 6): two related sub-flows — (A) image lightbox + forward-from-lightbox (lightboxImage/lightboxForwardOpen/forwardingImage), (B) message forward (forwardingMessage/showForwardPicker/forwardingMsg). Grouped useState with semantic transitions (openLightbox/closeLightbox/openLightboxForward/closeLightboxForward, openMessageForward/closeMessageForward); the two in-flight boolean setters (setForwardingImage/setForwardingMsg) exposed RAW so the page's async send handlers keep their exact try/finally sequencing. The two Firestore+E2EE send handlers (forwardImageToConversation, forwardMessageToConversation) stay in the page — only their success-path closes collapsed to closeLightbox()/closeMessageForward(). All JSX call sites rewired (lightbox open/close, forward picker dismiss ×handlers, context-menu forward). messages.tsx **54→48 useState** (76 at start; domains 1–6 done, over halfway). Chose grouped-useState over a formal reducer: no state interdependency that a reducer would simplify, and it kept the async finally-blocks untouched (lower risk). Plan doc updated; next = domain 7 (pinned/starred/disappearing — has Firestore subscriptions).
+
+**Verified:** tsc exit 0; zero stray old setters. Ship web + Android (`npm run cap:sync` — mind the copy step; use `npm run cap:sync && firebase deploy --only hosting` to keep both current).
+**Device test:** tap a photo → lightbox opens → download works → forward icon → pick a conversation → "Image forwarded", lightbox closes; long-press a message → Forward → pick conversation → "Message forwarded", picker closes; forward a photo message (image survives); all dismiss paths (backdrop/touch/X) close cleanly.
+
+*Updated July 5, 2026 (Session 58) — tranche 6 done: useForwarding (image-lightbox + message-forward sub-flows). messages.tsx at 48/76 useState, domains 1–6 complete (past halfway). tsc clean; NOT committed.*

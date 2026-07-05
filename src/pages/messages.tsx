@@ -78,6 +78,7 @@ import { useChatNotification } from '@/hooks/useChatNotification';
 import { useMessageActions } from '@/hooks/useMessageActions';
 import { useChatSearch } from '@/hooks/useChatSearch';
 import { useChatAppearance } from '@/hooks/useChatAppearance';
+import { useForwarding } from '@/hooks/useForwarding';
 import { useChatModeration } from '@/hooks/useChatModeration';
 import {
   LinkPreviewCard,
@@ -198,15 +199,16 @@ export default function MessagesPage() {
   const [pendingFile, setPendingFile] = useState<{ name: string; size: number; type: string; data: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Image lightbox state
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const [lightboxForwardOpen, setLightboxForwardOpen] = useState(false);
-  const [forwardingImage, setForwardingImage] = useState(false);
+  // Forward + image-lightbox domain → hooks/useForwarding (Session 58, tranche 6)
+  const {
+    lightboxImage, openLightbox, closeLightbox,
+    lightboxForwardOpen, openLightboxForward, closeLightboxForward,
+    forwardingImage, setForwardingImage,
+    forwardingMessage, showForwardPicker, openMessageForward, closeMessageForward,
+    forwardingMsg, setForwardingMsg,
+  } = useForwarding();
 
-  // Batch 2: Forward, Pin, Star, Export state
-  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
-  const [showForwardPicker, setShowForwardPicker] = useState(false);
-  const [forwardingMsg, setForwardingMsg] = useState(false);
+  // Batch 2: Pin, Star, Export state
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
   const [showStarredView, setShowStarredView] = useState(false);
@@ -1571,8 +1573,7 @@ export default function MessagesPage() {
       });
 
       showNotif('Image forwarded', 'success');
-      setLightboxForwardOpen(false);
-      setLightboxImage(null);
+      closeLightbox();
     } catch (err) {
       console.error('Error forwarding image:', err);
       showNotif('Failed to forward image', 'error');
@@ -2027,8 +2028,7 @@ export default function MessagesPage() {
         lastMessageRead: false,
       });
       showNotif('Message forwarded', 'success');
-      setShowForwardPicker(false);
-      setForwardingMessage(null);
+      closeMessageForward();
     } catch (err) {
       console.error('Error forwarding message:', err);
       showNotif('Failed to forward message', 'error');
@@ -3096,11 +3096,11 @@ export default function MessagesPage() {
 
       {/* Forward message picker modal */}
       {showForwardPicker && forwardingMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowForwardPicker(false); setForwardingMessage(null); }} onTouchStart={() => { setShowForwardPicker(false); setForwardingMessage(null); }} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => closeMessageForward()} onTouchStart={() => closeMessageForward()} style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
           <div className="bg-white dark:bg-[var(--aurora-surface)] rounded-xl shadow-xl w-[90%] max-w-md max-h-[70vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
             <div className="px-4 py-3 border-b border-[var(--aurora-border)] flex items-center justify-between">
               <h3 className="font-semibold" style={{ color: 'var(--msg-text)' }}>Forward to...</h3>
-              <button onClick={() => { setShowForwardPicker(false); setForwardingMessage(null); }} className="p-1 rounded-full hover:bg-gray-100">
+              <button onClick={() => closeMessageForward()} className="p-1 rounded-full hover:bg-gray-100">
                 <X size={18} />
               </button>
             </div>
@@ -3522,7 +3522,7 @@ export default function MessagesPage() {
                                       alt="Shared image"
                                       className="w-full max-w-[280px] object-cover cursor-pointer"
                                       style={{ maxHeight: '300px', display: 'block' }}
-                                      onClick={() => setLightboxImage(msg.image!)}
+                                      onClick={() => openLightbox(msg.image!)}
                                     />
                                     {/* Overlay timestamp on image-only messages */}
                                     {isImageOnly && (
@@ -3950,8 +3950,7 @@ export default function MessagesPage() {
             textareaRef.current?.focus();
           }}
           onForward={forwardMessagesEnabled ? () => {
-            setForwardingMessage(contextMenuMsg);
-            setShowForwardPicker(true);
+            openMessageForward(contextMenuMsg);
             setContextMenuMsg(null);
           } : undefined}
           onPin={pinnedMessagesEnabled ? () => {
@@ -4114,8 +4113,8 @@ export default function MessagesPage() {
         <div
           className="fixed inset-0 z-[9999] flex flex-col"
           style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
-          onClick={(e) => { if (e.target === e.currentTarget) { setLightboxImage(null); setLightboxForwardOpen(false); } }}
-          onTouchStart={(e) => { if (e.target === e.currentTarget) { setLightboxImage(null); setLightboxForwardOpen(false); } }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeLightbox() }}
+          onTouchStart={(e) => { if (e.target === e.currentTarget) closeLightbox() }}
         >
           {/* Top bar */}
           <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
@@ -4128,7 +4127,7 @@ export default function MessagesPage() {
                 <Download size={22} className="text-white" />
               </button>
               <button
-                onClick={() => setLightboxForwardOpen(true)}
+                onClick={openLightboxForward}
                 className="p-2 rounded-full hover:bg-white/10 transition-colors"
                 aria-label="Forward image"
               >
@@ -4136,7 +4135,7 @@ export default function MessagesPage() {
               </button>
             </div>
             <button
-              onClick={() => { setLightboxImage(null); setLightboxForwardOpen(false); }}
+              onClick={() => closeLightbox()}
               className="p-2 rounded-full hover:bg-white/10 transition-colors"
               aria-label="Close"
             >
@@ -4160,8 +4159,8 @@ export default function MessagesPage() {
             <div
               className="absolute inset-0 z-[10000] flex items-end sm:items-center justify-center"
               style={{ backgroundColor: 'rgba(0,0,0,0.5)', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
-              onClick={(e) => { if (e.target === e.currentTarget) setLightboxForwardOpen(false); }}
-              onTouchStart={(e) => { if (e.target === e.currentTarget) setLightboxForwardOpen(false); }}
+              onClick={(e) => { if (e.target === e.currentTarget) closeLightboxForward(); }}
+              onTouchStart={(e) => { if (e.target === e.currentTarget) closeLightboxForward(); }}
             >
               <div
                 className="w-full sm:max-w-md bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl max-h-[70vh] flex flex-col shadow-2xl"
@@ -4171,7 +4170,7 @@ export default function MessagesPage() {
                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">Forward to</h3>
                   <button
-                    onClick={() => setLightboxForwardOpen(false)}
+                    onClick={closeLightboxForward}
                     className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[var(--aurora-surface-variant)] dark:hover:bg-gray-700 transition-colors"
                   >
                     <X size={20} className="text-gray-500" />
