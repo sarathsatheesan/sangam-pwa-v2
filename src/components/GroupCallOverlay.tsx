@@ -73,20 +73,29 @@ function ParticipantTile({
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  // Re-run the attach effect when tracks arrive on the SAME stream object
+  // (ontrack can add a video track after the first emit — the <video> element
+  // only mounts then, and a [stream]-only dep would skip setting srcObject).
+  const videoTrackCount = stream ? stream.getVideoTracks().length : 0;
+
   useEffect(() => {
     if (!stream) return;
     if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-      if (isLocal) videoRef.current.muted = true;
+      // Remote tiles get a VIDEO-ONLY stream and stay muted: their audio plays
+      // through the dedicated <audio> element below. An unmuted video element
+      // carrying audio is blocked from autoplay on Chrome/Android (native
+      // play-button overlay instead of the feed) and double-played the audio.
+      videoRef.current.srcObject = isLocal ? stream : new MediaStream(stream.getVideoTracks());
+      videoRef.current.muted = true;
       safariSafePlay(videoRef.current);
     }
-    // Separate audio element for remote participants (Safari fix)
+    // Separate audio element for remote participants (Safari fix + sole audio path)
     if (!isLocal && audioRef.current) {
       const audioStream = new MediaStream(stream.getAudioTracks());
       audioRef.current.srcObject = audioStream;
       safariSafePlay(audioRef.current);
     }
-  }, [stream, isLocal]);
+  }, [stream, isLocal, videoTrackCount]);
 
   const initials = name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -107,7 +116,7 @@ function ParticipantTile({
           ref={videoRef}
           autoPlay
           playsInline
-          muted={isLocal}
+          muted
           style={{
             width: '100%',
             height: '100%',
