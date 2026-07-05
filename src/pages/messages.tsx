@@ -78,6 +78,7 @@ import { reportError } from '@/utils/reportError';
 import { useChatNotification } from '@/hooks/useChatNotification';
 import { useMessageActions } from '@/hooks/useMessageActions';
 import { useChatSearch } from '@/hooks/useChatSearch';
+import { useChatAppearance } from '@/hooks/useChatAppearance';
 import { useChatModeration } from '@/hooks/useChatModeration';
 import {
   LinkPreviewCard,
@@ -168,12 +169,16 @@ export default function MessagesPage() {
   // Also restores the amber match-highlight (dead since Session 33) and
   // deletes the never-used chatSearchIndex state.
   const { searchOpen, toggleSearch, closeSearch, searchQuery, setSearchQuery } = useChatSearch();
-  const [selectedWallpaper, setSelectedWallpaper] = useState<string>('default');
-  const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
+  // Chat appearance domain → hooks/useChatAppearance (Session 57, D1 tranche 5).
+  // wallpaper (localStorage-persisted) + picker open state + compact density.
+  const {
+    selectedWallpaper, selectWallpaper,
+    wallpaperPickerOpen, openWallpaperPicker, closeWallpaperPicker,
+    compactMode, toggleCompactMode,
+  } = useChatAppearance();
   const [showChatMenu, setShowChatMenu] = useState(false);
   const chatMenuRef = useRef<HTMLDivElement>(null);
   // useClickOutside hook replaced with ClickOutsideOverlay component in JSX
-  const [compactMode, setCompactMode] = useState(false);
 
   // Notification State
   // Notification toast domain → hooks/useChatNotification (Session 50, D1 tranche 1)
@@ -244,13 +249,7 @@ export default function MessagesPage() {
   // Refs
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load wallpaper from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('selectedWallpaper');
-    if (saved && saved in WALLPAPER_PRESETS) {
-      setSelectedWallpaper(saved);
-    }
-  }, []);
+  // Wallpaper localStorage load moved into useChatAppearance (Session 57).
 
   // Subscribe to call manager state changes (for header button enabled/disabled state)
   useEffect(() => {
@@ -2704,7 +2703,7 @@ export default function MessagesPage() {
                 {wallpaperEnabled && (
                 <button
                   onClick={() => {
-                    setShowWallpaperPicker(true);
+                    openWallpaperPicker();
                     setShowChatMenu(false);
                   }}
                   className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
@@ -2715,7 +2714,7 @@ export default function MessagesPage() {
                 )}
                 <button
                   onClick={() => {
-                    setCompactMode(!compactMode);
+                    toggleCompactMode();
                     setShowChatMenu(false);
                   }}
                   className="w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-[var(--aurora-surface-variant)] transition flex items-center gap-3 text-sm"
@@ -3986,14 +3985,11 @@ export default function MessagesPage() {
         />
       )}
       {isRecording && <VoiceRecorder onSend={(dur, blob) => { setIsRecording(false); sendVoiceMessage(dur, blob); }} onCancel={() => setIsRecording(false)} />}
-      {showWallpaperPicker && (
+      {wallpaperPickerOpen && (
         <WallpaperPicker
           current={selectedWallpaper}
-          onSelect={(preset) => {
-            setSelectedWallpaper(preset);
-            localStorage.setItem('selectedWallpaper', preset);
-          }}
-          onClose={() => setShowWallpaperPicker(false)}
+          onSelect={selectWallpaper}
+          onClose={closeWallpaperPicker}
         />
       )}
       {/* COMMENTED OUT — undo feature disabled (duplicate of delete) */}
