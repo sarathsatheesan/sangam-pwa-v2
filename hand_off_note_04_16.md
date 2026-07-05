@@ -4028,3 +4028,8 @@ NEW `hooks/useForwarding.ts` (domain 6): two related sub-flows — (A) image lig
 **Device test:** tap a photo → lightbox opens → download works → forward icon → pick a conversation → "Image forwarded", lightbox closes; long-press a message → Forward → pick conversation → "Message forwarded", picker closes; forward a photo message (image survives); all dismiss paths (backdrop/touch/X) close cleanly.
 
 *Updated July 5, 2026 (Session 58) — tranche 6 done: useForwarding (image-lightbox + message-forward sub-flows). messages.tsx at 48/76 useState, domains 1–6 complete (past halfway). tsc clean; NOT committed.*
+
+**Session 58 addendum — Android-sync guardrails (stop the stale-bundle recurrence):** the copy-to-Android step was skipped 3× (search fix, wallpaper, tranche 5) because `firebase deploy --only hosting` builds dist/ but never touches Android. Two tools added:
+1. **`npm run ship`** (package.json) — ONE command for both platforms: test → build → cap sync android → firebase deploy hosting → prints a reminder to open Android Studio + Run ▶. Use this instead of a bare `firebase deploy`. (Android device install still needs the manual Run ▶ — Capacitor can't push to a physical device headlessly, but assets are guaranteed synced.)
+2. **`npm run android:check`** (scripts/check-android-sync.mjs) — compares dist/ vs android/.../public entry-chunk hashes; exits 1 with the fix command if stale. Run before any device test.
+NEW WORKFLOW: `npm run ship` to deploy web + sync Android, then Run ▶ in Android Studio; if ever unsure whether the tablet is current, `npm run android:check`. tsc/JSON valid.

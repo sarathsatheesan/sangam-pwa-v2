@@ -13,7 +13,9 @@
     "test:coverage": "vitest run --coverage",
     "cap:sync": "npm test && npm run build && npx cap sync android",
     "cap:open": "npx cap open android",
-    "android:assets": "capacitor-assets generate --android"
+    "android:assets": "capacitor-assets generate --android",
+    "android:check": "node scripts/check-android-sync.mjs",
+    "ship": "npm test && npm run build && npx cap sync android && firebase deploy --only hosting && echo '\\n✅ SHIPPED: web (Firebase) + Android assets synced. Now open Android Studio and Run ▶ to install on device.'"
   },
   "dependencies": {
     "@capacitor/app": "^7.0.0",
