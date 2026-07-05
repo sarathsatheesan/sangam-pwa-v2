@@ -197,8 +197,13 @@ export const validateMessage = (text: string): { valid: boolean; error?: string 
  * Example usage:
  * renderFormattedText("Hello **world** and *welcome*")
  * Output: "Hello <strong>world</strong> and <em>welcome</em>"
+ *
+ * Session 56: optional `highlightQuery` wraps case-insensitive matches in
+ * plain-text segments with an amber <mark> (chat-search highlighting).
+ * Matches inside bold/italic/code/link segments are not marked (rare;
+ * the bubble-level ring still flags those messages).
  */
-export const renderFormattedText = (text: string): React.ReactNode => {
+export const renderFormattedText = (text: string, highlightQuery?: string): React.ReactNode => {
   const parts: React.ReactNode[] = [];
   let key = 0;
   const combined = /(\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|`(.+?)`)/g;
@@ -262,7 +267,30 @@ export const renderFormattedText = (text: string): React.ReactNode => {
     if (!hasUrlMatch) linkedParts.push(part);
   }
 
-  return linkedParts.length > 0 ? <>{linkedParts}</> : text;
+  // Third pass (Session 56): chat-search highlight in plain-text segments.
+  const q = highlightQuery?.trim().toLowerCase();
+  if (!q) return linkedParts.length > 0 ? <>{linkedParts}</> : text;
+
+  const highlighted: React.ReactNode[] = [];
+  for (const part of linkedParts) {
+    if (typeof part !== 'string') { highlighted.push(part); continue; }
+    const lower = part.toLowerCase();
+    let idx = 0;
+    let found = lower.indexOf(q, idx);
+    if (found === -1) { highlighted.push(part); continue; }
+    while (found !== -1) {
+      if (found > idx) highlighted.push(part.slice(idx, found));
+      highlighted.push(
+        <mark key={`hl-${key++}`} className="bg-amber-300/70 dark:bg-amber-400/40 text-inherit rounded-sm px-0.5">
+          {part.slice(found, found + q.length)}
+        </mark>
+      );
+      idx = found + q.length;
+      found = lower.indexOf(q, idx);
+    }
+    if (idx < part.length) highlighted.push(part.slice(idx));
+  }
+  return <>{highlighted}</>;
 };
 
 /**

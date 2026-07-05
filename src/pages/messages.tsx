@@ -3497,7 +3497,7 @@ export default function MessagesPage() {
                                 </div>
                                 {msg.text && (
                                   <div className="chat-text break-words mt-1" style={{ color: 'var(--msg-text)' }}>
-                                    {renderFormattedText(msg.text)}
+                                    {renderFormattedText(msg.text, isSearchMatch ? searchQuery : undefined)}
                                   </div>
                                 )}
                                 <div className="flex justify-end mt-0.5">
@@ -3543,7 +3543,7 @@ export default function MessagesPage() {
                                 {!isImageOnly && (
                                   <div className={`px-2.5 ${isImageWithText ? 'pt-1' : 'pt-1.5'} pb-1`}>
                                     <div className={`chat-text break-words ${compactMode ? '!text-[13px]' : ''}`} style={{ color: msg.senderId === 'system' ? 'var(--msg-system-text)' : 'var(--msg-text)' }}>
-                                      {msg.text && renderFormattedText(msg.text)}
+                                      {msg.text && renderFormattedText(msg.text, isSearchMatch ? searchQuery : undefined)}
                                       {/* Link preview for URLs in message */}
                                       {linkPreviewsEnabled && msg.text && !msg.deleted && (() => {
                                         const urls = msg.text.match(URL_REGEX);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronUp, ChevronDown, X, Search as SearchIcon } from 'lucide-react';
 import type { Message } from '@/types/messages';
 
@@ -30,12 +30,15 @@ export function MessageSearchBar({
     return messages.filter((m) => m.text.toLowerCase().includes(query.toLowerCase()));
   }, [messages, query]);
 
-  useEffect(() => {
-    if (matches.length > 0) {
-      const idx = messages.findIndex((m) => m.id === matches[currentMatch]?.id);
-      onNavigate(idx);
-    }
-  }, [currentMatch, matches, messages, onNavigate]);
+  // Session 56: navigation is now EXPLICIT (▲▼ buttons / Enter key) instead
+  // of an effect that fired on every keystroke — the old auto-scroll made the
+  // screen jump up/down while typing (user-reported on iPad).
+  const navigateToMatch = (matchIdx: number) => {
+    const target = matches[matchIdx];
+    if (!target) return;
+    const idx = messages.findIndex((m) => m.id === target.id);
+    onNavigate(idx);
+  };
 
   return (
     <div className="flex items-center gap-2 p-3 border-b border-[var(--aurora-border)] bg-[var(--aurora-surface)]">
@@ -50,6 +53,14 @@ export function MessageSearchBar({
           setCurrentMatch(0);
           onQueryChange?.(e.target.value);
         }}
+        onKeyDown={(e) => {
+          // Enter (mobile keyboard "Go") = deliberate single jump to the
+          // current match — typing itself never scrolls.
+          if (e.key === 'Enter' && matches.length > 0) {
+            e.preventDefault();
+            navigateToMatch(currentMatch);
+          }
+        }}
         className="flex-1 bg-transparent text-base outline-none"
       />
       {matches.length > 0 && (
@@ -60,14 +71,22 @@ export function MessageSearchBar({
       {matches.length > 1 && (
         <>
           <button
-            onClick={() => setCurrentMatch((i) => (i > 0 ? i - 1 : matches.length - 1))}
+            onClick={() => {
+              const next = currentMatch > 0 ? currentMatch - 1 : matches.length - 1;
+              setCurrentMatch(next);
+              navigateToMatch(next);
+            }}
             className="p-2 hover:bg-[var(--aurora-input)] rounded"
             aria-label="Previous search result"
           >
             <ChevronUp size={16} />
           </button>
           <button
-            onClick={() => setCurrentMatch((i) => (i < matches.length - 1 ? i + 1 : 0))}
+            onClick={() => {
+              const next = currentMatch < matches.length - 1 ? currentMatch + 1 : 0;
+              setCurrentMatch(next);
+              navigateToMatch(next);
+            }}
             className="p-2 hover:bg-[var(--aurora-input)] rounded"
             aria-label="Next search result"
           >
