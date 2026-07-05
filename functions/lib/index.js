@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processNotification = exports.remindRecurringOrders = exports.expireStaleQuoteRequests = exports.onCateringOrderStatusChange = exports.processRecurringCateringOrders = exports.transcribeVoiceMessage = exports.sendNewMessageNotification = void 0;
+exports.processNotification = exports.remindRecurringOrders = exports.expireStaleQuoteRequests = exports.onCateringOrderStatusChange = exports.processRecurringCateringOrders = exports.transcribeVoiceMessage = exports.sendIncomingGroupCallNotification = exports.sendIncomingCallNotification = exports.sendNewMessageNotification = void 0;
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
@@ -137,16 +137,28 @@ exports.sendNewMessageNotification = (0, firestore_1.onDocumentCreated)("convers
         conversationId,
         senderId,
         senderName,
-        click_action: `https://mithr-1e5f4.web.app/messages`,
+        click_action: `https://enovoapp.com/messages`,
     };
-    // Send to all tokens
+    // Send to all tokens.
+    // android.* is REQUIRED for heads-up + reliable background delivery on
+    // Android 8+ — without a high-importance channelId + priority, the native
+    // app shows nothing or a silent low-priority notification (Bug 7).
     const response = await admin.messaging().sendEachForMulticast({
         tokens,
         notification,
         data,
+        android: {
+            priority: "high",
+            notification: {
+                channelId: "messages",
+                priority: "high",
+                defaultSound: true,
+                tag: `msg-${conversationId}`,
+            },
+        },
         webpush: {
             fcmOptions: {
-                link: `https://mithr-1e5f4.web.app/messages`,
+                link: `https://enovoapp.com/messages`,
             },
             notification: {
                 icon: "/icon-192.png",
@@ -179,6 +191,201 @@ exports.sendNewMessageNotification = (0, firestore_1.onDocumentCreated)("convers
                 fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
             });
         }
+    }
+});
+/**
+ * Cloud Function: sendIncomingCallNotification
+ *
+ * Triggers when a new 1:1 call document is created (calls/{callId}). Sends a
+ * HIGH-priority FCM to the callee so their device rings / shows an incoming-call
+ * heads-up even when the eNoVo app isn't focused.
+ *
+ * Before this existed, incoming calls relied solely on an in-app Firestore
+ * listener — which only fires if the callee already has the app open on a screen
+ * that mounts the call overlay. That's why call notifications "didn't fire" (Bug 1).
+ *
+ * Firestore path: /calls/{callId}
+ */
+exports.sendIncomingCallNotification = (0, firestore_1.onDocumentCreated)("calls/{callId}", async (event) => {
+    var _a;
+    const snap = event.data;
+    if (!snap)
+        return;
+    const call = snap.data();
+    // Only the initial ringing state should notify (ignore later writes).
+    if (!call || call.status !== "ringing")
+        return;
+    const calleeId = call.calleeId;
+    const callerId = call.callerId || "";
+    const callerName = call.callerName || "Someone";
+    const callType = call.callType === "video" ? "video" : "voice";
+    if (!calleeId)
+        return;
+    const calleeDoc = await db.collection("users").doc(calleeId).get();
+    if (!calleeDoc.exists)
+        return;
+    const tokens = ((_a = calleeDoc.data()) === null || _a === void 0 ? void 0 : _a.fcmTokens) || [];
+    if (tokens.length === 0)
+        return;
+    const callId = event.params.callId;
+    const response = await admin.messaging().sendEachForMulticast({
+        tokens,
+        notification: {
+            title: callerName,
+            body: `Incoming ${callType} call`,
+        },
+        data: {
+            type: "incoming_call",
+            callId,
+            callerId,
+            callerName,
+            callType,
+            click_action: "https://enovoapp.com/messages",
+        },
+        android: {
+            priority: "high",
+            // Expire with the client-side 45s ring timeout — a stale call push is useless.
+            ttl: 45000,
+            notification: {
+                channelId: "calls",
+                priority: "max",
+                defaultSound: true,
+                defaultVibrateTimings: true,
+                tag: `call-${callId}`,
+                visibility: "public",
+            },
+        },
+        webpush: {
+            fcmOptions: { link: "https://enovoapp.com/messages" },
+            notification: {
+                icon: "/icon-192.png",
+                badge: "/icon-192.png",
+                tag: `call-${callId}`,
+                renotify: true,
+                requireInteraction: true,
+            },
+        },
+    });
+    // Clean up stale tokens
+    if (response.failureCount > 0) {
+        const toRemove = [];
+        response.responses.forEach((resp, idx) => {
+            var _a;
+            if (!resp.success &&
+                ((_a = resp.error) === null || _a === void 0 ? void 0 : _a.code) === "messaging/registration-token-not-registered") {
+                toRemove.push(tokens[idx]);
+            }
+        });
+        for (const token of toRemove) {
+            await db.collection("users").doc(calleeId).update({
+                fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
+            });
+        }
+    }
+});
+/**
+ * Cloud Function: sendIncomingGroupCallNotification
+ *
+ * Triggers when a new group call room is created (groupCalls/{roomId}). Sends a
+ * HIGH-priority FCM to every group member EXCEPT the creator, so their devices
+ * ring / show a heads-up even when the eNoVo app isn't focused.
+ *
+ * Mirrors sendIncomingCallNotification (1:1). Group calls have no single callee,
+ * so we fan out to `memberUids`. Without this (and the in-app listener), other
+ * members were never alerted — the initiator would sit alone and the call
+ * appeared "broken".
+ *
+ * Firestore path: /groupCalls/{roomId}
+ */
+exports.sendIncomingGroupCallNotification = (0, firestore_1.onDocumentCreated)("groupCalls/{roomId}", async (event) => {
+    const snap = event.data;
+    if (!snap)
+        return;
+    const room = snap.data();
+    if (!room || room.status !== "active")
+        return;
+    const createdBy = room.createdBy || "";
+    const createdByName = room.createdByName || "Someone";
+    const callType = room.callType === "video" ? "video" : "audio";
+    const conversationId = room.conversationId || "";
+    const memberUids = room.memberUids || [];
+    // Everyone except the person who started the call.
+    const recipients = memberUids.filter((uid) => uid && uid !== createdBy);
+    if (recipients.length === 0)
+        return;
+    const roomId = event.params.roomId;
+    // Gather FCM tokens for all recipients (dedup, and remember token→owner so
+    // we can prune stale ones).
+    const tokenOwners = new Map();
+    await Promise.all(recipients.map(async (uid) => {
+        var _a;
+        const userDoc = await db.collection("users").doc(uid).get();
+        if (!userDoc.exists)
+            return;
+        const tokens = ((_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.fcmTokens) || [];
+        tokens.forEach((t) => { if (t)
+            tokenOwners.set(t, uid); });
+    }));
+    const tokens = Array.from(tokenOwners.keys());
+    if (tokens.length === 0)
+        return;
+    const response = await admin.messaging().sendEachForMulticast({
+        tokens,
+        notification: {
+            title: `${createdByName} · Group call`,
+            body: `Incoming group ${callType} call`,
+        },
+        data: {
+            type: "incoming_call",
+            callId: roomId,
+            callerId: createdBy,
+            callerName: createdByName,
+            callType,
+            conversationId,
+            isGroup: "true",
+            click_action: "https://enovoapp.com/messages",
+        },
+        android: {
+            priority: "high",
+            ttl: 45000,
+            notification: {
+                channelId: "calls",
+                priority: "max",
+                defaultSound: true,
+                defaultVibrateTimings: true,
+                tag: `groupcall-${roomId}`,
+                visibility: "public",
+            },
+        },
+        webpush: {
+            fcmOptions: { link: "https://enovoapp.com/messages" },
+            notification: {
+                icon: "/icon-192.png",
+                badge: "/icon-192.png",
+                tag: `groupcall-${roomId}`,
+                renotify: true,
+                requireInteraction: true,
+            },
+        },
+    });
+    // Prune stale tokens from their owning user docs.
+    if (response.failureCount > 0) {
+        const staleByUser = new Map();
+        response.responses.forEach((resp, idx) => {
+            var _a;
+            if (!resp.success && ((_a = resp.error) === null || _a === void 0 ? void 0 : _a.code) === "messaging/registration-token-not-registered") {
+                const token = tokens[idx];
+                const owner = tokenOwners.get(token);
+                if (owner) {
+                    const list = staleByUser.get(owner) || [];
+                    list.push(token);
+                    staleByUser.set(owner, list);
+                }
+            }
+        });
+        await Promise.all(Array.from(staleByUser.entries()).map(([uid, staleTokens]) => db.collection("users").doc(uid).update({
+            fcmTokens: admin.firestore.FieldValue.arrayRemove(...staleTokens),
+        })));
     }
 });
 /**
