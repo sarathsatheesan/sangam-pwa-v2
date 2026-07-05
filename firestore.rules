@@ -11,11 +11,16 @@ service cloud.firestore {
     }
 
     // ─── App Config (feature settings, admin emails) ──
-    // Read allowed for all (needed for signup page to check KYC feature flags)
-    // Write restricted to authenticated users
+    // Read allowed for all (needed for signup page to check KYC feature flags).
+    // SECURITY (C3, 2026-07-05): write is ADMIN-ONLY. This doc holds
+    // `adminEmails` (consumed by isAdminUser()) and feature flags — previously
+    // any authenticated user could write it and add themselves to adminEmails,
+    // a full privilege-escalation. Only the admin panel writes this doc
+    // (admin-list mgmt + FeatureSettingsContext toggles), so isAdminUser()
+    // preserves every legitimate flow. Bootstrap the first admin via console.
     match /appConfig/{docId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if isAdminUser();
     }
 
     // ─── Users collection ─────────────────────────────
@@ -41,15 +46,23 @@ service cloud.firestore {
     }
 
     // ─── Banned users ─────────────────────────────────
+    // SECURITY (H3, 2026-07-05): write is admin-only. Was open to any
+    // authenticated user — a banned user could self-unban by deleting their own
+    // doc (incl. via "Delete My Data"), and anyone could ban anyone. Admin
+    // moderation writes via isAdminUser(); dataPrivacy's cleanup deleteDoc is
+    // already wrapped in a swallowed try/catch so self-serve deletion is
+    // unaffected (banned users correctly can no longer wipe their ban). Move
+    // account-deletion cleanup of these docs to a Cloud Function later.
     match /bannedUsers/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if isAdminUser();
     }
 
     // ─── Disabled users ───────────────────────────────
+    // SECURITY (H3, 2026-07-05): write is admin-only (see bannedUsers note).
     match /disabledUsers/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if isAdminUser();
     }
 
     // ─── Top-level connections collection ──────────────
@@ -95,7 +108,25 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
+      // SECURITY (H2, 2026-07-05): update stays broadly allowed because
+      // legitimate any-user flows write here (posting a review updates the
+      // rating aggregate; the 3-strike report flow sets isHidden). But the
+      // TRUST fields (verified / verificationMethod) may only be changed by an
+      // admin — previously any user could self-verify their own business by
+      // flipping `verified:true`. The admin verify toggle runs under
+      // isAdminUser(); owner edits and review/report writes never touch these
+      // fields, so this is transparent to them. (Follow-up: field-lock ownerId
+      // + move review/report aggregates server-side for full least-privilege.)
+      // .get(field, default) is used so older docs missing these fields don't
+      // error the comparison (which would deny legit review/report updates).
+      allow update: if request.auth != null && (
+        isAdminUser()
+        || (request.resource.data.get('verified', false) == resource.data.get('verified', false)
+            && request.resource.data.get('verificationMethod', '') == resource.data.get('verificationMethod', ''))
+      );
+      // Delete restricted to the owner or an admin (was any authenticated user).
+      allow delete: if request.auth != null
+        && (isAdminUser() || request.auth.uid == resource.data.get('ownerId', ''));
 
       // Analytics subcollection (daily event counters)
       match /analytics/{dateKey} {
@@ -370,13 +401,25 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.participants;
       allow update: if request.auth != null
         && request.auth.uid in resource.data.participants;
-      allow delete: if request.auth != null;
+      // SECURITY (M7, 2026-07-05): was `if request.auth != null` — any user
+      // could delete anyone's conversation. Now participant-scoped.
+      allow delete: if request.auth != null
+        && request.auth.uid in resource.data.participants;
 
+      // SECURITY (C4, 2026-07-05): the messages subcollection previously
+      // allowed read/create/update/delete to ANY authenticated user — the
+      // parent-doc participant check did NOT extend here, so anyone who knew a
+      // (predictable, UID-derived) conversation ID could read/tamper/delete a
+      // thread's messages. Now every op requires the caller be a participant of
+      // the parent conversation. update/delete stay participant-scoped (not
+      // sender-only) because pin/star/read-receipts/disappearing-cleanup are
+      // performed by any participant, not just the message's sender.
       match /messages/{messageId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
-        allow update: if request.auth != null;
-        allow delete: if request.auth != null;
+        function convParticipants() {
+          return get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+        }
+        allow read, create, update, delete: if request.auth != null
+          && request.auth.uid in convParticipants();
       }
     }
 
@@ -412,9 +455,12 @@ service cloud.firestore {
     }
 
     // ─── Announcements ────────────────────────────────
+    // SECURITY (M3, 2026-07-05): write is admin-only (only the admin panel
+    // creates/toggles/deletes announcements). Previously any authenticated user
+    // could push an app-wide announcement.
     match /announcements/{announcementId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if isAdminUser();
     }
 
     // ─── Moderation queue ─────────────────────────────
@@ -432,8 +478,22 @@ service cloud.firestore {
     }
 
     // ─── Notifications (email/SMS/push queue — written by client, processed by Cloud Functions) ────
+    // SECURITY (H4, 2026-07-05):
+    //  - READ is now recipient-scoped (was `auth != null` — any user could read
+    //    every notification, incl. others' content/PII). Safe: the noti list UI
+    //    only ever reads the current user's own notifications.
+    //  - CREATE remains open pending a Cloud Function callable, because the
+    //    `processNotification` trigger fans these out to email/SMS/push and MANY
+    //    client flows legitimately enqueue notifications today. Flipping this to
+    //    `false` now would break notifications app-wide. TRACKED RISK: until the
+    //    callable exists, a user can enqueue a notification to an arbitrary
+    //    recipientId (spam/phishing on our infra). Mitigation plan: (1) a
+    //    `requestNotification` callable that validates the sender↔recipient
+    //    relationship + rate-limits, then (2) set create:false here. See report
+    //    §5 H4 and functions/src/index.ts:processNotification.
     match /notifications/{notifId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.recipientId;
       allow create: if request.auth != null;
       allow update: if request.auth != null && request.auth.uid == resource.data.recipientId;
     }
@@ -476,9 +536,11 @@ service cloud.firestore {
     }
 
     // ─── Admin settings (legacy) ──────────────────────
+    // SECURITY (M3, 2026-07-05): write is admin-only (no client write path
+    // found; was open to any authenticated user).
     match /adminSettings/{docId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow write: if isAdminUser();
     }
   }
 }

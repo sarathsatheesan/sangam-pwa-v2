@@ -43,6 +43,32 @@
     ],
     "headers": [
       {
+        "//": "SECURITY (M2, 2026-07-05): global security headers on all paths. HSTS forces HTTPS on the custom domains (no `preload` yet — add after confirming all subdomains are HTTPS, since preload is hard to reverse). Permissions-Policy allows camera/mic/geolocation for SELF only (calls + Near-Me maps need them) and denies the rest. NOTE: Content-Security-Policy is intentionally NOT set here — the app loads from many origins (Firebase, Google Maps, Leaflet CDN, microlink, Giphy, Metered TURN); CSP must be built from an origin inventory and rolled out via Content-Security-Policy-Report-Only first. See report §5 M2.",
+        "source": "**",
+        "headers": [
+          {
+            "key": "Strict-Transport-Security",
+            "value": "max-age=31536000; includeSubDomains"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "X-Frame-Options",
+            "value": "SAMEORIGIN"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(self), microphone=(self), geolocation=(self), payment=(), usb=(), magnetometer=(), accelerometer=()"
+          }
+        ]
+      },
+      {
         "source": "/index.html",
         "headers": [
           {

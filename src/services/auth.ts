@@ -291,7 +291,9 @@ export const sendPhoneOTP = async (
   _recaptchaContainerId: string = 'recaptcha-container'
 ): Promise<{ sent: boolean; error?: string }> => {
   try {
-    console.log('[OTP] Starting sendPhoneOTP for:', phoneNumber);
+    // SECURITY (L1, 2026-07-05): do not log the raw phone number (PII). Log a
+    // masked form for triage instead.
+    console.log('[OTP] Starting sendPhoneOTP for:', phoneNumber ? `***${String(phoneNumber).slice(-4)}` : '(none)');
 
     // Reuse existing verifier if available (avoids repeated challenges)
     if (!recaptchaVerifierInstance) {
