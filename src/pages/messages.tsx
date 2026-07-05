@@ -5,14 +5,29 @@ import { useSearchParams } from 'react-router-dom';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
   collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
-  onSnapshot, serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion, writeBatch,
+  serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion,
 } from 'firebase/firestore';
 import { db, functions, httpsCallable, initMessaging, getToken, onMessage } from '@/services/firebase';
+// Firestore I/O extracted to services/messages.ts (Session 67, companion 10b).
+// The effects below stay in the page (same deps/cleanup); only the queries,
+// snapshot plumbing, and the decrypt pipeline moved.
+import {
+  fetchAllUsers,
+  subscribeToConversations,
+  subscribeToActiveGroupCall,
+  subscribeToThreadMessages,
+  subscribeToPresenceOfUsers,
+  startPresenceHeartbeat,
+  publishPublicKey,
+  fetchPeerPublicKey,
+  fetchGroupKeyMaterial,
+  markThreadRead,
+} from '@/services/messages';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureSettings } from '@/contexts/FeatureSettingsContext';
 import {
-  generateConversationKey, encryptMessage, decryptMessage,
-  getOrCreateKeyPair, deriveSharedKey, e2eEncrypt, e2eDecrypt,
+  generateConversationKey, encryptMessage,
+  getOrCreateKeyPair, deriveSharedKey, e2eEncrypt,
   generateGroupKey, exportGroupKey, wrapGroupKeyForMember,
   unwrapGroupKeyWithECDH, wrapGroupKeyForMemberWithECDH,
   getDeterministicSharedKey,
@@ -43,14 +58,11 @@ import {
 } from '@/utils/groupWebrtc';
 
 // ===== IMPORTS FROM EXTRACTED FILES =====
-import type { User, Message, Conversation, ViewState, NotificationType, PresenceStatus, LinkPreviewData } from '@/types/messages';
+import type { User, Message, Conversation, ViewState, NotificationType, LinkPreviewData } from '@/types/messages';
 import {
   EMOJI_CATEGORIES,
   QUICK_REPLIES,
   MESSAGE_CONFIG,
-  PRESENCE_HEARTBEAT_INTERVAL,
-  PRESENCE_AWAY_TIMEOUT,
-  PRESENCE_OFFLINE_THRESHOLD,
   DISAPPEARING_TIMER_OPTIONS,
   MESSAGE_REPORT_CATEGORIES,
   URL_REGEX,
@@ -111,9 +123,9 @@ export default function MessagesPage() {
   const groupMessagingEnabled = isFeatureEnabled('messages_groupMessaging');
   const [searchParams, setSearchParams] = useSearchParams();
   // Core chat data domain → hooks/useChatData (Session 62, tranche 10a — STATE
-  // only; the 6 onSnapshot subscriptions + msgSnapshotSeqRef guard stay in the
-  // page, services/messages.ts extraction is deferred to 10b). Raw setters,
-  // identical names → subscription/handler call sites unchanged.
+  // only). The Firestore subscriptions + msgSnapshotSeqRef guard + decrypt
+  // pipeline now live in services/messages.ts (Session 67, companion 10b);
+  // the effects below call the service with these raw setters.
   const {
     viewState, setViewState,
     conversations, setConversations,
@@ -306,14 +318,9 @@ export default function MessagesPage() {
       if (!cancelled) setActiveGroupCallId(roomId);
     }).catch((err) => reportError(err, { op: 'get-active-group-call' }));
     // Also listen for groupCalls changes for this conversation
-    const q = query(
-      collection(db, 'groupCalls'),
-      where('conversationId', '==', selectedConvId),
-      where('status', '==', 'active'),
-    );
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = subscribeToActiveGroupCall(selectedConvId, (roomId) => {
       if (!cancelled) {
-        setActiveGroupCallId(snap.empty ? null : snap.docs[0].id);
+        setActiveGroupCallId(roomId);
       }
     });
     return () => { cancelled = true; unsub(); };
@@ -330,9 +337,7 @@ export default function MessagesPage() {
         e2ePrivateKeyRef.current = privateKey;
         e2ePublicKeyRef.current = publicKey;
         // Ensure public key is published (getOrCreateKeyPair handles full sync for new keys)
-        await updateDoc(doc(db, 'users', user.uid), {
-          e2ePublicKey: publicKey,
-        });
+        await publishPublicKey(user.uid, publicKey);
         setE2eReady(true);
         console.log('[E2EE] Initialized successfully');
       } catch (err) {
@@ -354,16 +359,15 @@ export default function MessagesPage() {
       if (e2eSharedKeysRef.current.has(cacheKey)) return;
       try {
         // Fetch peer's public key from Firestore
-        const peerDoc = await getDoc(doc(db, 'users', selectedUser.id));
-        const peerData = peerDoc.data();
-        if (!peerData?.e2ePublicKey) {
+        const peerPublicKey = await fetchPeerPublicKey(selectedUser.id);
+        if (!peerPublicKey) {
           // Peer hasn't set up E2EE yet — will fall back to legacy
           return;
         }
         if (cancelled) return;
         const sharedKey = await deriveSharedKey(
           e2ePrivateKeyRef.current!,
-          peerData.e2ePublicKey as ExportedPublicKey
+          peerPublicKey
         );
         if (!cancelled) {
           e2eSharedKeysRef.current.set(cacheKey, sharedKey);
@@ -388,26 +392,16 @@ export default function MessagesPage() {
     let cancelled = false;
     const unwrapKey = async () => {
       try {
-        // Fetch group conversation for e2eGroupKeys
-        const convDoc = await getDoc(doc(db, 'conversations', selectedConvId));
-        const convData = convDoc.data();
-        if (!convData?.e2eGroupKeys || !convData.e2eGroupKeys[user.uid]) {
-          // No group key distributed for us yet
-          return;
-        }
-        const wrappedKey = convData.e2eGroupKeys[user.uid];
-        const distributorUid = convData.e2eKeyDistributor || convData.groupCreatedBy;
-
-        // Fetch distributor's public key
-        const distributorDoc = await getDoc(doc(db, 'users', distributorUid));
-        const distributorData = distributorDoc.data();
-        if (!distributorData?.e2ePublicKey) return;
+        // Fetch the wrapped group key + distributor public key (null = not
+        // distributed for us yet / distributor has no E2EE — legacy fallback)
+        const material = await fetchGroupKeyMaterial(user.uid, selectedConvId);
+        if (!material) return;
 
         if (cancelled) return;
         const groupKey = await unwrapGroupKeyWithECDH(
-          wrappedKey,
+          material.wrappedKey,
           e2ePrivateKeyRef.current!,
-          distributorData.e2ePublicKey as ExportedPublicKey
+          material.distributorPublicKey
         );
         if (!cancelled) {
           e2eGroupKeysRef.current.set(selectedConvId, groupKey);
@@ -433,12 +427,7 @@ export default function MessagesPage() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const snap = await getDocs(collection(db, 'users'));
-        const usersData: User[] = [];
-        snap.forEach((d) => {
-          usersData.push({ id: d.id, ...d.data() } as User);
-        });
-        setUsers(usersData);
+        setUsers(await fetchAllUsers());
       } catch (err) {
         console.error('Error fetching users:', err);
         showNotif('Failed to load users', 'error');
@@ -496,67 +485,8 @@ export default function MessagesPage() {
   // Uses heartbeat (60s), visibilitychange (away detection), and beforeunload (offline).
   useEffect(() => {
     if (!user?.uid || !onlineLastSeenEnabled) return;
-    const userDocRef = doc(db, 'users', user.uid);
-    let heartbeatTimer: ReturnType<typeof setInterval>;
-    let awayTimer: ReturnType<typeof setTimeout>;
-
-    const updatePresence = async (status: PresenceStatus) => {
-      try {
-        await updateDoc(userDocRef, {
-          presenceStatus: status,
-          isOnline: status !== 'offline',
-          lastSeen: serverTimestamp(),
-        });
-      } catch (err) {
-        console.error('Error updating presence:', err);
-      }
-    };
-
-    // Set online immediately
-    updatePresence('online');
-
-    // Heartbeat: refresh lastSeen every 60s while tab is visible
-    heartbeatTimer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        updatePresence('online');
-      }
-    }, PRESENCE_HEARTBEAT_INTERVAL);
-
-    // Visibility change: tab hidden → start away timer, tab visible → set online
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        awayTimer = setTimeout(() => {
-          updatePresence('away');
-        }, PRESENCE_AWAY_TIMEOUT);
-      } else {
-        clearTimeout(awayTimer);
-        updatePresence('online');
-      }
-    };
-
-    // Before unload / pagehide: set offline (best-effort, may not always fire)
-    // `pagehide` is more reliable than `beforeunload` on iOS Safari and Android Chrome.
-    // We listen on both for maximum cross-browser coverage.
-    const handleBeforeUnload = () => {
-      updatePresence('offline');
-    };
-    const handlePageHide = () => {
-      updatePresence('offline');
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
-
-    return () => {
-      clearInterval(heartbeatTimer);
-      clearTimeout(awayTimer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('pagehide', handlePageHide);
-      // Set offline on unmount
-      updatePresence('offline');
-    };
+    // Full heartbeat/visibility/unload lifecycle → services/messages.ts
+    return startPresenceHeartbeat(user.uid);
   }, [user?.uid]);
 
   // Real-time presence listener for users in active conversations
@@ -576,59 +506,39 @@ export default function MessagesPage() {
 
     if (otherUserIds.size === 0) return;
 
-    // Subscribe to each user's presence (Firestore doesn't support 'in' with onSnapshot for > 30)
-    const unsubscribes: (() => void)[] = [];
-    const userIdArray = Array.from(otherUserIds);
-
-    // Batch into groups of 10 for Firestore 'in' query limit
-    for (let i = 0; i < userIdArray.length; i += 10) {
-      const batch = userIdArray.slice(i, i + 10);
-      const q = query(
-        collection(db, 'users'),
-        where('__name__', 'in', batch)
-      );
-      const unsub = onSnapshot(q, (snap) => {
+    // Batched 'in' subscriptions → services/messages.ts; the page keeps the
+    // setUsers merge so presence flows into the same state as before.
+    return subscribeToPresenceOfUsers(
+      Array.from(otherUserIds),
+      (updates) => {
         setUsers((prev) => {
           const updated = [...prev];
-          snap.docChanges().forEach((change) => {
-            if (change.type === 'modified' || change.type === 'added') {
-              const data = change.doc.data();
-              const idx = updated.findIndex((u) => u.id === change.doc.id);
-              if (idx >= 0) {
-                updated[idx] = {
-                  ...updated[idx],
-                  isOnline: data.isOnline ?? false,
-                  lastSeen: data.lastSeen ?? undefined,
-                  presenceStatus: data.presenceStatus ?? 'offline',
-                };
-              }
+          updates.forEach((change) => {
+            const idx = updated.findIndex((u) => u.id === change.id);
+            if (idx >= 0) {
+              updated[idx] = {
+                ...updated[idx],
+                isOnline: change.isOnline,
+                lastSeen: change.lastSeen,
+                presenceStatus: change.presenceStatus,
+              };
             }
           });
           return updated;
         });
-      }, (err) => {
+      },
+      (err) => {
         console.error('Error listening to user presence:', err);
-      });
-      unsubscribes.push(unsub);
-    }
-
-    return () => {
-      unsubscribes.forEach((unsub) => unsub());
-    };
+      },
+    );
   }, [user?.uid, conversations]);
 
   // Fetch conversations with real-time updates
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = onSnapshot(
-      query(collection(db, 'conversations'), where('participants', 'array-contains', user.uid), orderBy('updatedAt', 'desc')),
-      (snap) => {
-        const convs: Conversation[] = [];
-        snap.forEach((d) => {
-          convs.push({ id: d.id, ...d.data() } as Conversation);
-        });
-        setConversations(convs);
-      },
+    const unsubscribe = subscribeToConversations(
+      user.uid,
+      setConversations,
       (err) => {
         console.error('Error fetching conversations:', err);
         showNotif('Failed to load conversations', 'error');
@@ -650,226 +560,44 @@ export default function MessagesPage() {
     }
     if (!convId) return;
     setMessagesLoading(true);
-    // Reset per-subscription: the first snapshot of this thread is the initial load.
-    let didInitialScroll = false;
-    const unsubscribe = onSnapshot(
-      query(collection(db, 'conversations', convId, 'messages'), orderBy('createdAt', 'asc')),
-      async (snap) => {
-        // Monotonic guard against out-of-order async handlers (Issue 1).
-        const mySeq = ++msgSnapshotSeqRef.current;
-        // serverTimestamps: 'estimate' makes a just-sent message's pending
-        // `createdAt` resolve to a local estimate instead of null — otherwise the
-        // sender's own message has no timestamp for ordering/date-grouping and
-        // doesn't render until the next snapshot (i.e. the next message).
-        const rawMsgs = snap.docs.map((d) => ({ ...d.data({ serverTimestamps: 'estimate' }), id: d.id }));
-        const msgs: Message[] = [];
-        for (const rawMsg of rawMsgs) {
-          let text = (rawMsg as Record<string, unknown>).text as string || '';
-          let image = (rawMsg as Record<string, unknown>).image as string | undefined;
-          let voiceMessage = (rawMsg as Record<string, unknown>).voiceMessage as Message['voiceMessage'];
-
-          const isEncrypted = (rawMsg as Record<string, unknown>).encrypted;
-
-          if (isEncrypted) {
-            // Determine which decryption key to use
-            const activeConv = selectedConvId ? conversations.find((c) => c.id === selectedConvId) : null;
-            const isGroupConv = !!activeConv?.isGroup;
-
-            // Helper to check if a string is still encrypted (decryption failed)
-            const isStillEncrypted = (s: string): boolean => {
-              try {
-                const p = JSON.parse(s);
-                return !!(p.v === 2 && p.iv && p.ct);
-              } catch { return false; }
-            };
-
-            // Helper to try decrypting all fields with a given key.
-            // Returns true if at least one field was successfully decrypted.
-            // Does NOT replace text with friendly message — caller handles that after all strategies.
-            const tryDecryptAllFields = async (key: CryptoKey): Promise<boolean> => {
-              let anyDecrypted = false;
-
-              // Try to decrypt text (skip if empty or not v2 JSON)
-              if (text) {
-                try {
-                  const textParsed = JSON.parse(text);
-                  if (textParsed.v === 2) {
-                    const decryptedText = await e2eDecrypt(text, key);
-                    if (!isStillEncrypted(decryptedText)) {
-                      text = decryptedText;
-                      anyDecrypted = true;
-                    }
-                  }
-                } catch { /* text is not v2 JSON — skip */ }
-              }
-
-              // Try to decrypt image
-              if (image) {
-                try {
-                  const imgParsed = JSON.parse(image);
-                  if (imgParsed.v === 2) {
-                    const decryptedImg = await e2eDecrypt(image, key);
-                    if (!isStillEncrypted(decryptedImg)) {
-                      image = decryptedImg;
-                      anyDecrypted = true;
-                    } else {
-                      image = undefined; // Can't decrypt — hide broken image
-                    }
-                  }
-                } catch { /* not encrypted or not JSON */ }
-              }
-
-              // Try to decrypt voice message
-              if (voiceMessage?.audioUrl) {
-                try {
-                  const voiceParsed = JSON.parse(voiceMessage.audioUrl);
-                  if (voiceParsed.v === 2) {
-                    const decryptedAudio = await e2eDecrypt(voiceMessage.audioUrl, key);
-                    if (!isStillEncrypted(decryptedAudio)) {
-                      voiceMessage = { ...voiceMessage, audioUrl: decryptedAudio };
-                      anyDecrypted = true;
-                    }
-                  }
-                } catch { /* not encrypted or not JSON */ }
-              }
-
-              return anyDecrypted;
-            };
-
-            if (isGroupConv && selectedConvId) {
-              // Group decryption
-              const groupKey = e2eGroupKeysRef.current.get(selectedConvId);
-              if (groupKey) {
-                let groupIsV2 = false;
-                try { const p = JSON.parse(text); groupIsV2 = p.v === 2; } catch {}
-                if (!groupIsV2 && image) {
-                  try { const p = JSON.parse(image); groupIsV2 = p.v === 2; } catch {}
-                }
-                if (groupIsV2) {
-                  const ok = await tryDecryptAllFields(groupKey);
-                  if (!ok) {
-                    text = '\u{1F512} This message cannot be decrypted on this device';
-                  }
-                }
-              }
-            } else if (selectedUser) {
-              // 1:1 decryption — try strategies in order:
-              // 1) Deterministic V2 key (new default, cross-device safe)
-              // 2) ECDH shared key (old V2 messages)
-              // 3) Per-message ECDH key (old V2 messages with stored sender key)
-              // 4) Legacy V1 (oldest messages)
-              // Check if EITHER text or image is v2 encrypted
-              let isV2 = false;
-              try { const p = JSON.parse(text); isV2 = p.v === 2; } catch { /* not v2 text */ }
-              if (!isV2 && image) {
-                try { const p = JSON.parse(image); isV2 = p.v === 2; } catch { /* not v2 image */ }
-              }
-
-              if (isV2) {
-                let decrypted = false;
-
-                // Strategy 1: Deterministic key (works cross-device, cross-browser)
-                try {
-                  const detKey = await getDeterministicSharedKey(user.uid, selectedUser.id);
-                  decrypted = await tryDecryptAllFields(detKey);
-                } catch (err) {
-                  console.warn('[E2EE] Deterministic decrypt failed:', err);
-                }
-
-                // Strategy 2: ECDH shared key (for old messages encrypted with ECDH)
-                if (!decrypted) {
-                  const sharedKey = e2eSharedKeysRef.current.get(selectedUser.id);
-                  if (sharedKey) {
-                    try {
-                      decrypted = await tryDecryptAllFields(sharedKey);
-                    } catch { /* ECDH decrypt failed */ }
-                  }
-                }
-
-                // Strategy 3: Per-message sender public key ECDH
-                if (!decrypted) {
-                  const msgSenderPubKey = (rawMsg as Record<string, unknown>).senderPublicKey as ExportedPublicKey | undefined;
-                  const msgSenderId = (rawMsg as Record<string, unknown>).senderId as string;
-                  if (msgSenderPubKey && e2ePrivateKeyRef.current) {
-                    try {
-                      const peerPubKey = msgSenderId === user.uid
-                        ? (await getDoc(doc(db, 'users', selectedUser.id))).data()?.e2ePublicKey as ExportedPublicKey
-                        : msgSenderPubKey;
-                      if (peerPubKey) {
-                        const perMsgKey = await deriveSharedKey(e2ePrivateKeyRef.current, peerPubKey);
-                        decrypted = await tryDecryptAllFields(perMsgKey);
-                      }
-                    } catch { /* per-message ECDH failed */ }
-                  }
-                }
-
-                // All V2 strategies failed — show friendly message
-                if (!decrypted) {
-                  text = '\u{1F512} This message cannot be decrypted on this device';
-                  image = undefined;
-                }
-              } else {
-                // Not a v2 payload — try legacy v1 decrypt
-                try {
-                  const convKey = generateConversationKey(user.uid, selectedUser.id);
-                  if (text) text = decryptMessage(text, convKey);
-                } catch {
-                  text = '[Encrypted]';
-                }
-              }
-            }
-          }
-
-          msgs.push({ ...(rawMsg as Record<string, unknown>), id: (rawMsg as Record<string, unknown>).id as string, text, image, voiceMessage } as Message);
-        }
-        // If a newer snapshot started while we were decrypting, drop this stale
-        // result — applying it would overwrite the newer list and make recent
-        // messages disappear (Issue 1).
-        if (mySeq !== msgSnapshotSeqRef.current) return;
+    // Snapshot + decrypt pipeline + msgSnapshotSeqRef race guard moved to
+    // services/messages.ts (subscribeToThreadMessages, Session 67 / 10b).
+    // The page keeps: same deps, loading flag, state application, scroll.
+    // Group-ness computed here has the same stale-closure semantics as the
+    // pre-extraction handler (which read the effect's closed-over conversations).
+    const activeConv = selectedConvId ? conversations.find((c) => c.id === selectedConvId) : null;
+    const unsubscribe = subscribeToThreadMessages({
+      uid: user.uid,
+      convId,
+      selectedUserId: selectedUser?.id ?? null,
+      isGroupConv: !!activeConv?.isGroup,
+      selectedConvId,
+      e2e: {
+        privateKeyRef: e2ePrivateKeyRef,
+        sharedKeysRef: e2eSharedKeysRef,
+        groupKeysRef: e2eGroupKeysRef,
+      },
+      seqRef: msgSnapshotSeqRef,
+      onMessages: (msgs, initialLoad) => {
         setMessages(msgs);
         setPinnedMessages(msgs.filter(m => m.pinned));
         setMessagesLoading(false);
         // Reliable scroll-to-bottom (Issue 2). On a thread's first load, pin to
         // the bottom and retry to catch late layout (images, wrapped bubbles) so
         // it lands at the latest message. On later updates, a single pin is enough.
-        if (!didInitialScroll) {
-          didInitialScroll = true;
+        if (initialLoad) {
           requestAnimationFrame(() => scrollToBottom());
           setTimeout(() => scrollToBottom(), 200);
           setTimeout(() => scrollToBottom(), 500);
         } else {
           scrollToBottom();
         }
-
-        // Mark unread messages from other user(s) as read
-        if (convId && document.visibilityState === 'visible') {
-          const unreadFromOthers = snap.docs.filter((d) => {
-            const data = d.data();
-            return data.senderId !== user.uid && !data.read;
-          });
-          if (unreadFromOthers.length > 0) {
-            try {
-              const batch = writeBatch(db);
-              unreadFromOthers.forEach((d) => {
-                batch.update(doc(db, 'conversations', convId!, 'messages', d.id), {
-                  read: true,
-                  readAt: serverTimestamp(),
-                });
-              });
-              // Also reset unreadCount and mark last message as read on the conversation doc
-              batch.update(doc(db, 'conversations', convId!), { unreadCount: 0, lastMessageRead: true });
-              await batch.commit();
-            } catch (err) {
-              console.error('Error marking messages as read:', err);
-            }
-          }
-        }
       },
-      (err) => {
+      onError: (err) => {
         console.error('Error fetching messages:', err);
         showNotif('Failed to load messages', 'error');
-      }
-    );
+      },
+    });
     unsubscribersRef.current.push(unsubscribe);
     return () => unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -886,23 +614,7 @@ export default function MessagesPage() {
     const handleVisibilityForRead = async () => {
       if (document.visibilityState !== 'visible') return;
       try {
-        const msgsRef = collection(db, 'conversations', activeConvId, 'messages');
-        const msgsSnap = await getDocs(msgsRef);
-        const unreadFromOthers = msgsSnap.docs.filter((d) => {
-          const data = d.data();
-          return data.senderId !== user.uid && !data.read;
-        });
-        if (unreadFromOthers.length > 0) {
-          const batch = writeBatch(db);
-          unreadFromOthers.forEach((d) => {
-            batch.update(doc(db, 'conversations', activeConvId, 'messages', d.id), {
-              read: true,
-              readAt: serverTimestamp(),
-            });
-          });
-          batch.update(doc(db, 'conversations', activeConvId), { unreadCount: 0, lastMessageRead: true });
-          await batch.commit();
-        }
+        await markThreadRead(user.uid, activeConvId);
       } catch (err) {
         console.error('Error marking messages as read on visibility change:', err);
       }
