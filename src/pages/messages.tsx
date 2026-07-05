@@ -3419,29 +3419,17 @@ export default function MessagesPage() {
                       // screen grows — no breakpoint jump.
                       style={{ maxWidth: 'min(85%, 480px)' }}
                     >
-                      {/* WhatsApp bubble tail */}
-                      {isFirstInGroup && (
-                        <div
-                          className="absolute top-0"
-                          style={{
-                            [isMine ? 'right' : 'left']: '-6px',
-                            width: 0,
-                            height: 0,
-                            borderTop: `8px solid ${isMine ? 'var(--msg-own-bubble)' : 'var(--aurora-surface)'}`,
-                            [isMine ? 'borderLeft' : 'borderRight']: '8px solid transparent',
-                          }}
-                        />
-                      )}
+                      {/* Session 63: WhatsApp bubble tail removed — clean fully
+                          rounded bubbles (the tail read as a stray arrow on the
+                          pill-shaped call/voice bubbles). */}
                       {(() => {
                         const hasImage = !!(msg.image && !msg.image.startsWith('{'));
                         const isImageOnly = hasImage && !msg.text;
                         const isImageWithText = hasImage && !!msg.text;
-                        const roundedClass = isFirstInGroup
-                          ? (isMine ? 'rounded-tl-lg rounded-tr-sm' : 'rounded-tr-lg rounded-tl-sm')
-                          : 'rounded-t-lg';
+                        const roundedClass = 'rounded-2xl';
                         return (
                           <div
-                            className={`overflow-hidden ${roundedClass} rounded-b-lg shadow-sm cursor-pointer select-none`}
+                            className={`overflow-hidden ${roundedClass} shadow-sm cursor-pointer select-none`}
                             style={{
                               backgroundColor: msg.senderId === 'system' ? 'var(--aurora-surface-variant)' : isMine ? 'var(--msg-own-bubble)' : 'var(--aurora-surface)',
                               boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)',
