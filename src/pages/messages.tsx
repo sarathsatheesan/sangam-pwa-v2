@@ -81,6 +81,7 @@ import { useChatAppearance } from '@/hooks/useChatAppearance';
 import { useForwarding } from '@/hooks/useForwarding';
 import { usePinnedAndDisappearing } from '@/hooks/usePinnedAndDisappearing';
 import { useComposer } from '@/hooks/useComposer';
+import { useChatData } from '@/hooks/useChatData';
 import { useChatModeration } from '@/hooks/useChatModeration';
 import { useGroupManagement } from '@/hooks/useGroupManagement';
 import {
@@ -107,10 +108,22 @@ export default function MessagesPage() {
   const { isFeatureEnabled } = useFeatureSettings();
   const groupMessagingEnabled = isFeatureEnabled('messages_groupMessaging');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [viewState, setViewState] = useState<ViewState>('list');
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Core chat data domain → hooks/useChatData (Session 62, tranche 10a — STATE
+  // only; the 6 onSnapshot subscriptions + msgSnapshotSeqRef guard stay in the
+  // page, services/messages.ts extraction is deferred to 10b). Raw setters,
+  // identical names → subscription/handler call sites unchanged.
+  const {
+    viewState, setViewState,
+    conversations, setConversations,
+    selectedUser, setSelectedUser,
+    messages, setMessages,
+    loading, setLoading,
+    messagesLoading, setMessagesLoading,
+    users, setUsers,
+    searchTerm, setSearchTerm,
+    activeFilter, setActiveFilter,
+    selectedConvId, setSelectedConvId,
+  } = useChatData();
   // Composer domain → hooks/useComposer (Session 61, tranche 9). Raw setters,
   // identical names → call sites unchanged. textareaRef + resize effect +
   // handleFormat stay in the page (ref-entangled with the send pipeline).
@@ -127,10 +140,6 @@ export default function MessagesPage() {
     imageCompressing, setImageCompressing,
     pendingFile, setPendingFile,
   } = useComposer();
-  const [loading, setLoading] = useState(true);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const encryptionEnabled = isFeatureEnabled('messages_encryption');
   const voiceMessagesEnabled = isFeatureEnabled('messages_voiceMessages');
   const voiceToTextEnabled = isFeatureEnabled('messages_voiceToText');
@@ -151,7 +160,7 @@ export default function MessagesPage() {
   const wallpaperEnabled = isFeatureEnabled('messages_wallpaper');
   const searchEnabled = isFeatureEnabled('messages_search');
   const readReceiptsEnabled = isFeatureEnabled('messages_readReceipts');
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'connects' | 'archived'>('all');
+  // activeFilter → useChatData (declared above)
   // Group management UI domain → hooks/useGroupManagement (Session 60, tranche 8)
   const {
     showPenMenu, togglePenMenu, closePenMenu,
@@ -166,7 +175,7 @@ export default function MessagesPage() {
     showAddMemberPicker, toggleAddMemberPicker, closeAddMemberPicker,
     addMemberSearchTerm, setAddMemberSearchTerm,
   } = useGroupManagement();
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  // selectedConvId → useChatData (declared above)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);

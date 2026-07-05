@@ -4068,3 +4068,19 @@ NEW `hooks/useComposer.ts` (domain 9): 11 composer states — messageText, showF
 **Device test (composer — exercise everything):** type + send text; **B**/*i* formatting toolbar; reply-to a message (preview bar + send); edit your own message (populates composer, save); emoji picker (recent emojis update); GIF picker; voice record; attach an image (compressing → preview → send); attach a file; multiline auto-resize of the textarea; all clear correctly after send.
 
 *Updated July 5, 2026 (Session 61) — tranche 9 done: useComposer (11 states, raw setters/zero call-site churn; textareaRef stays in page). 16 active useState declarations remain (metric corrected), domains 1–9 complete. Only domains 10 (core data + services/messages.ts) and 11 (E2EE/calls) left. tsc clean; NOT committed; ship via npm run ship.*
+
+---
+
+### Session 62 (July 5, 2026) — D1 Tranche 10a: Core-Data STATE Extraction (High-risk domain, SPLIT)
+
+DELIBERATE SPLIT of the highest-risk domain: **10a (this session) = STATE only**; **10b (deferred) = the services/messages.ts I/O extraction**. Rationale: combining the render-backbone state extraction with moving 6 onSnapshot subscriptions + the msgSnapshotSeqRef snapshot-race guard (Session 42) in one step is how the messaging core gets destabilized — 10b earns its own focused session with the E2EE test suite as a guard.
+
+NEW `hooks/useChatData.ts`: 10 core states (viewState, conversations, selectedUser, messages, loading, messagesLoading, users, searchTerm, activeFilter, selectedConvId) as RAW setters with identical names → all ~30 subscription/handler call sites byte-unchanged; only scattered declarations moved. The 6 onSnapshot listeners, msgSnapshotSeqRef, all effects and refs STAY in the page and keep calling setConversations/setMessages/etc. unchanged. messages.tsx now at **6 ACTIVE useState** — ALL domain 11 (e2eReady, e2eKeyVersion, callState, groupCallState, activeGroupCallId + 1). Domains 1–10a done.
+
+**Verified:** tsc exit 0; 0 core-data states left as raw useState.
+**Ship web + Android:** `npm run ship` then Run ▶.
+**Device test (core data is EVERYTHING — full regression):** conversation list loads + live-updates; open a 1:1 and a group; send/receive; search conversations; filter tabs (All/Unread/Connects/Archived); mobile list↔thread nav; new message + group creation still populate the list. If anything's off here it's the render backbone — revert is `git checkout src/pages/messages.tsx src/hooks/useChatData.ts` (isolated).
+
+**NEXT:** tranche 11 (E2EE + calls, 5-6 states, the FINALE — CallManager singleton interlock, run encryption.test.ts as guard). THEN companion 10b: services/messages.ts (move the 6 subscriptions + guard out of the page). After both, messages.tsx state decomposition is COMPLETE.
+
+*Updated July 5, 2026 (Session 62) — tranche 10a done: useChatData (10 core-data states, STATE-only split; subscriptions/services deferred to 10b). messages.tsx at 6 active useState (all domain 11). Domains 1–10a complete. tsc clean; NOT committed; ship via npm run ship.*
