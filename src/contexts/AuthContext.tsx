@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import type { UserProfile } from '../services/auth';
 import { ADMIN_EMAILS } from '../constants/config';
@@ -78,14 +78,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           try {
             const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
-              const profileData = userDocSnap.data() as UserData;
+              const rawProfile = userDocSnap.data() as UserData;
+
+              // SECURITY (C-01, 2026-09-02): email/phone live in the
+              // owner/admin-only subdoc users/{uid}/private/profile. Load it and
+              // merge in memory so existing consumers keep working unchanged.
+              const privRef = doc(db, 'users', currentUser.uid, 'private', 'profile');
+              let privData: Record<string, any> = {};
+              try {
+                const privSnap = await getDoc(privRef);
+                if (privSnap.exists()) privData = privSnap.data();
+              } catch (_e) { /* non-fatal */ }
+
+              // One-time lazy migration: move email/phone off the
+              // world-readable profile doc for accounts created before C-01.
+              const toMove: Record<string, any> = {};
+              if (rawProfile.email) toMove.email = rawProfile.email;
+              if ((rawProfile as any).phone) toMove.phone = (rawProfile as any).phone;
+              if (Object.keys(toMove).length > 0) {
+                try {
+                  await setDoc(privRef, { uid: currentUser.uid, ...toMove, updatedAt: new Date() }, { merge: true });
+                  await updateDoc(userDocRef, { email: deleteField(), phone: deleteField() });
+                  privData = { ...toMove, ...privData };
+                } catch (_e) { /* non-fatal — retried on next sign-in */ }
+              }
+
+              const profileData: UserData = {
+                ...rawProfile,
+                email: (privData.email as string) || rawProfile.email || currentUser.email || '',
+                ...(privData.phone ? { phone: privData.phone } : {}),
+              } as UserData;
               setUserProfile(profileData);
 
-              // Auto-backfill missing fields
+              // Auto-backfill missing fields (email intentionally excluded —
+              // it must not return to the world-readable doc).
               const backfill: Record<string, any> = {};
-              if (!profileData.email) {
-                backfill.email = currentUser.email || '';
-              }
               if (!profileData.createdAt && currentUser.metadata.creationTime) {
                 backfill.createdAt = new Date(currentUser.metadata.creationTime);
               }
@@ -93,9 +120,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
                 backfill.name = currentUser.displayName;
               }
               if (Object.keys(backfill).length > 0) {
-                const updatedProfile = { ...profileData, ...backfill };
-                await setDoc(userDocRef, updatedProfile, { merge: true });
-                setUserProfile(updatedProfile);
+                await setDoc(userDocRef, backfill, { merge: true });
+                setUserProfile({ ...profileData, ...backfill });
               }
             } else {
               // Create profile doc if it doesn't exist
@@ -111,7 +137,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
                 createdAt: new Date(),
                 updatedAt: new Date(),
               };
-              await setDoc(userDocRef, newProfile);
+              // SECURITY (C-01): the public doc gets no email; it goes to the
+              // owner/admin-only private subdoc instead.
+              await setDoc(userDocRef, { ...newProfile, email: '' });
+              try {
+                await setDoc(doc(db, 'users', currentUser.uid, 'private', 'profile'), {
+                  uid: currentUser.uid,
+                  email: currentUser.email || '',
+                  updatedAt: new Date(),
+                }, { merge: true });
+              } catch (_e) { /* non-fatal */ }
               setUserProfile(newProfile);
             }
           } catch (error) {

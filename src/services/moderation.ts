@@ -4,7 +4,7 @@
  * feed.tsx and forum.tsx (and future modules) all follow the same flow when a
  * user reports content:
  *   1. append a record to the `reports` collection
- *   2. find-or-increment the crowdsourced `moderationQueue` entry keyed by
+ *   2. blind-upsert the crowdsourced `moderationQueue` entry keyed by
  *      contentId (increment reportCount + arrayUnion the reporter, or create
  *      the entry with reportCount 1)
  *   3. the CALLER decides what to do at the 3-strike threshold (auto-hide
@@ -17,14 +17,12 @@
  */
 import {
   collection,
-  query,
-  where,
-  getDocs,
   addDoc,
-  updateDoc,
   doc,
   arrayUnion,
   serverTimestamp,
+  setDoc,
+  increment,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -54,11 +52,11 @@ export interface SubmitReportParams {
 }
 
 /**
- * Runs the shared report flow. Returns the total report count after this
- * report, so callers can apply their module-specific 3-strike handling.
- * Throws on failure — callers already have try/catch + user feedback.
+ * Runs the shared report flow. The 3-strike escalation (auto-hide + author
+ * notification) runs server-side in the onModerationQueueWritten Cloud
+ * Function. Throws on failure — callers already have try/catch + feedback.
  */
-export async function submitContentReport(params: SubmitReportParams): Promise<number> {
+export async function submitContentReport(params: SubmitReportParams): Promise<void> {
   const { contentId, reportDoc, modQueueDoc, reporter } = params;
 
   // 1. Record-keeping entry (stealth: author is not notified)
@@ -68,28 +66,19 @@ export async function submitContentReport(params: SubmitReportParams): Promise<n
     status: 'pending',
   });
 
-  // 2. Find-or-increment the crowdsourced moderationQueue entry
-  const existing = await getDocs(
-    query(collection(db, 'moderationQueue'), where('contentId', '==', contentId)),
-  );
-
-  if (existing.docs.length > 0) {
-    const entry = existing.docs[0];
-    const totalReportCount = ((entry.data().reportCount as number) || 1) + 1;
-    await updateDoc(doc(db, 'moderationQueue', entry.id), {
-      reportCount: totalReportCount,
-      reporters: arrayUnion(reporter),
-    });
-    return totalReportCount;
-  }
-
-  await addDoc(collection(db, 'moderationQueue'), {
+  // 2. SECURITY (H-05, 2026-09-02): the queue is write-only for members —
+  // reads are admin-only, so the old find-or-increment (query + update) is a
+  // blind upsert keyed by contentId. reportCount uses a server-side increment,
+  // and the 3-strike escalation now runs in the onModerationQueueWritten
+  // Cloud Function.
+  await setDoc(doc(db, 'moderationQueue', contentId), {
     ...modQueueDoc,
-    reportCount: 1,
-    reporters: [reporter],
+    contentId,
+    reportCount: increment(1),
+    reporters: arrayUnion(reporter),
+    lastReportedAt: serverTimestamp(),
     createdAt: serverTimestamp(),
-  });
-  return 1;
+  }, { merge: true });
 }
 
 /**

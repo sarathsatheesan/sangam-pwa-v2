@@ -24,13 +24,35 @@ service cloud.firestore {
     }
 
     // ─── Users collection ─────────────────────────────
+    // SECURITY (C-01, 2026-09-02): admins may list private profile subdocs
+    // across all users (collection-group query used by the admin panel).
+    match /{path=**}/private/{privDocId} {
+      allow read: if isAdminUser();
+    }
+
     match /users/{userId} {
       allow read: if request.auth != null;
       // Users can write their own doc; admins can update any user (for approvals)
       allow create: if request.auth != null && request.auth.uid == userId;
+      // SECURITY (C-03, 2026-09-02): a member must not be able to change their
+      // own accountType (free self-upgrade to the Business tier — external
+      // security review finding C-03). Tier changes happen via the business
+      // sign-up + admin review flow; after creation only admins may change it.
+      // All other own-doc updates (profile, presence, tokens, verifiedAt after
+      // email verification) are unaffected.
       allow update: if request.auth != null
-        && (request.auth.uid == userId || isAdminUser());
+        && (isAdminUser()
+          || (request.auth.uid == userId
+            && request.resource.data.get('accountType', '') == resource.data.get('accountType', '')));
       allow delete: if request.auth != null && request.auth.uid == userId;
+
+      // SECURITY (C-01, 2026-09-02): private member data (email, phone) lives in
+      // this owner/admin-only subdocument, not the world-readable profile doc
+      // (external security review finding C-01).
+      match /private/{docId} {
+        allow read, write: if request.auth != null
+          && (request.auth.uid == userId || isAdminUser());
+      }
 
       // Legacy connections subcollection
       match /connections/{connectionId} {
@@ -465,15 +487,22 @@ service cloud.firestore {
 
     // ─── Moderation queue ─────────────────────────────
     match /moderationQueue/{itemId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      // SECURITY (H-05, 2026-09-02): reports are confidential to moderators
+      // (external security review finding H-05) — READ and DELETE are admin-only.
+      // CREATE/UPDATE stay open: reporters upsert an entry keyed by contentId
+      // with blind increments (no reads needed); the 3-strike escalation runs in
+      // the onModerationQueueWritten Cloud Function. Tracked risk: reportCount
+      // inflation by a hostile user — admins review every item, and server-only
+      // writes are staged with H4-create.
+      allow read, delete: if isAdminUser();
+      allow create, update: if request.auth != null;
     }
 
     // ─── Reports ──────────────────────────────────────
     match /reports/{reportId} {
-      allow read: if request.auth != null;
+      // SECURITY (H-05, 2026-09-02): reporter identities are confidential — read
+      // is admin-only. Any signed-in member may still file a report.
+      allow read: if isAdminUser();
       allow create: if request.auth != null;
     }
 

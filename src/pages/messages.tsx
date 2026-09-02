@@ -4,8 +4,21 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { ClickOutsideOverlay } from '@/components/ClickOutsideOverlay';
 import {
-  collection, query, orderBy, where, getDocs, addDoc, doc, setDoc, updateDoc,
-  serverTimestamp, Timestamp, getDoc, deleteDoc, arrayUnion,
+  collection,
+  query,
+  orderBy,
+  where,
+  getDocs,
+  addDoc,
+  doc,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+  Timestamp,
+  getDoc,
+  deleteDoc,
+  arrayUnion,
+  increment,
 } from 'firebase/firestore';
 import { db, functions, httpsCallable, initMessaging, getToken, onMessage } from '@/services/firebase';
 // Firestore I/O extracted to services/messages.ts (Session 67, companion 10b).
@@ -681,52 +694,33 @@ export default function MessagesPage() {
         status: 'pending',
       });
 
-      // Write to moderationQueue
-      const modQueueQuery = query(
-        collection(db, 'moderationQueue'),
-        where('contentId', '==', reportMessageId)
-      );
-      const existingMods = await getDocs(modQueueQuery);
-      let totalReportCount = 1;
-
-      if (existingMods.docs.length > 0) {
-        const existingDoc = existingMods.docs[0];
-        totalReportCount = (existingDoc.data().reportCount || 1) + 1;
-        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
-          reportCount: totalReportCount,
-          reporters: arrayUnion({
-            uid: user.uid,
-            name: user.displayName || 'Anonymous',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        await addDoc(collection(db, 'moderationQueue'), {
-          type: 'message',
-          content: reportMessageText.slice(0, 200),
-          contentId: reportMessageId,
-          collection: 'messages',
-          authorId: reportSenderId,
-          authorName: senderUser?.name || 'Unknown',
-          authorAvatar: senderUser?.avatar || '',
+      // SECURITY (H-05, 2026-09-02): the moderation queue is write-only for
+      // members (reads are admin-only). Blind upsert keyed by contentId —
+      // reportCount increments server-side, and the 3-strike escalation now
+      // runs in the onModerationQueueWritten Cloud Function.
+      await setDoc(doc(db, 'moderationQueue', reportMessageId), {
+        type: 'message',
+        content: reportMessageText.slice(0, 200),
+        contentId: reportMessageId,
+        collection: 'messages',
+        authorId: reportSenderId,
+        authorName: senderUser?.name || 'Unknown',
+        authorAvatar: senderUser?.avatar || '',
+        category: reportReason,
+        categoryLabel: categoryObj?.label || reportReason,
+        reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
+        reportedBy: user.uid,
+        reporterName: user.displayName || 'Anonymous',
+        reportCount: increment(1),
+        reporters: arrayUnion({
+          uid: user.uid,
+          name: user.displayName || 'Anonymous',
           category: reportReason,
-          categoryLabel: categoryObj?.label || reportReason,
-          reason: `${categoryObj?.label || reportReason}${reportDetails.trim() ? ': ' + reportDetails.trim() : ''}`,
-          reportedBy: user.uid,
-          reporterName: user.displayName || 'Anonymous',
-          reportCount: 1,
-          reporters: [{
-            uid: user.uid,
-            name: user.displayName || 'Anonymous',
-            category: reportReason,
-            details: reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }],
-          createdAt: serverTimestamp(),
-        });
-      }
+          details: reportDetails.trim() || '',
+          createdAt: new Date().toISOString(),
+        }),
+        createdAt: serverTimestamp(),
+      }, { merge: true });
 
       closeReportModal();
       showNotif('Report submitted. Thank you for helping keep the community safe.', 'success');

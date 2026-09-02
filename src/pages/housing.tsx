@@ -1064,7 +1064,7 @@ export default function HousingPage() {
       // `reports` record then find-or-increments the moderationQueue entry.
       // The service adds createdAt/status to reportDoc and
       // reportCount/reporters/createdAt to modQueueDoc — not included here.
-      const totalReportCount = await submitContentReport({
+      await submitContentReport({
         contentId: reportListingId,
         reportDoc: {
           listingId: reportListingId,
@@ -1102,19 +1102,8 @@ export default function HousingPage() {
       });
 
       // 3-strike auto-hide (housing-specific tail — stays in the page)
-      if (totalReportCount >= 3) {
-        await hideListing(reportListingId, 'Auto-hidden: reached 3 community reports');
-        if (reportedListing?.posterId) {
-          await sendListingHiddenNotification({
-            recipientId: reportedListing.posterId,
-            recipientName: reportedListing.posterName || '',
-            postId: reportListingId,
-            reason: 'Your housing listing received multiple community reports and has been temporarily hidden for review.',
-            message: 'Your housing listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
-            actionUrl: '/housing',
-          });
-        }
-      }
+      // 3-strike auto-hide + author notification now run server-side in the
+      // onModerationQueueWritten Cloud Function (SECURITY H-05, 2026-09-02).
 
       // Mute-on-report: hide this listing from the reporter's view
       await muteListingForUser(user.uid, reportListingId);

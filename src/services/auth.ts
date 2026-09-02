@@ -142,8 +142,10 @@ export const signUpWithEmail = async (
 
     // Save user profile to Firestore
     const userDocRef = doc(db, 'users', user.uid);
+    // SECURITY (C-01, 2026-09-02): email and phone are private member data —
+    // they go to users/{uid}/private/profile (owner/admin-only), never to the
+    // world-readable profile doc.
     const userData: Record<string, any> = {
-      email,
       uid: user.uid,
       name: profile.name,
       preferredName: profile.preferredName || '',
@@ -153,7 +155,6 @@ export const signUpWithEmail = async (
       profession: profile.profession || '',
       interests: profile.interests || [],
       accountType: extras?.accountType || 'individual',
-      phone: extras?.phone || '',
       verifiedAt: null,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -194,6 +195,16 @@ export const signUpWithEmail = async (
     }
 
     await setDoc(userDocRef, userData);
+
+    // SECURITY (C-01): private contact details, owner/admin-only.
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'private', 'profile'), {
+        uid: user.uid,
+        email,
+        phone: extras?.phone || '',
+        updatedAt: serverTimestamp(),
+      });
+    } catch (_e) { /* non-fatal — AuthContext lazily retries on next sign-in */ }
 
     // Save custom business type to collection if provided
     if (
@@ -416,16 +427,23 @@ export const verifyPhoneOTP = async (
     const userDoc = await getDoc(doc(db, 'users', result.user.uid));
     if (!userDoc.exists()) {
       // New phone-only user — create minimal profile
+      // SECURITY (C-01, 2026-09-02): phone stays out of the public profile doc.
       await setDoc(doc(db, 'users', result.user.uid), {
         uid: result.user.uid,
-        email: '',
         name: '',
-        phone: result.user.phoneNumber || '',
         accountType: 'individual',
         verifiedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      try {
+        await setDoc(doc(db, 'users', result.user.uid, 'private', 'profile'), {
+          uid: result.user.uid,
+          email: '',
+          phone: result.user.phoneNumber || '',
+          updatedAt: serverTimestamp(),
+        });
+      } catch (_e) { /* non-fatal */ }
     }
 
     return { user: result.user };

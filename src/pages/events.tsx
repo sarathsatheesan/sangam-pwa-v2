@@ -558,7 +558,7 @@ export default function EventsPage() {
       // adds createdAt + status) and find-or-increments the moderationQueue
       // entry (service adds reportCount, reporters, createdAt). Payloads are
       // byte-identical to what this handler wrote inline before.
-      const totalReportCount = await submitContentReport({
+      await submitContentReport({
         contentId: reportEventId,
         reportDoc: {
           eventId: reportEventId,
@@ -596,19 +596,8 @@ export default function EventsPage() {
       });
 
       // 3-strike auto-hide (stays in the page, driven by the returned count)
-      if (totalReportCount >= 3) {
-        await hideEvent(reportEventId, 'Auto-hidden: reached 3 community reports');
-        if (reportedEvent?.posterId) {
-          await sendEventHiddenNotification({
-            recipientId: reportedEvent.posterId,
-            recipientName: reportedEvent.posterName || '',
-            postId: reportEventId,
-            reason: 'Your event received multiple community reports and has been temporarily hidden for review.',
-            message: 'Your event has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
-            actionUrl: '/events',
-          });
-        }
-      }
+      // 3-strike auto-hide + author notification now run server-side in the
+      // onModerationQueueWritten Cloud Function (SECURITY H-05, 2026-09-02).
 
       // Mute-on-report: hide this event from the reporter's view
       await muteEventForUser(user.uid, reportEventId);

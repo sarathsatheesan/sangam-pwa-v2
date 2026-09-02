@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { SpeechClient } from "@google-cloud/speech";
@@ -1017,5 +1017,70 @@ export const processNotification = onDocumentCreated(
 
     // Record analytics
     await recordNotificationAnalytics(template, result.channel, result.status);
+  }
+);
+
+/**
+ * Cloud Function: onModerationQueueWritten  (SECURITY H-05, 2026-09-02)
+ *
+ * The moderation queue is write-only for members (reads are admin-only), so
+ * the 3-strike auto-hide that previously ran on reporters' clients runs here.
+ * When an item reaches 3+ reports: hide the reported content and notify its
+ * author, exactly as the old client logic did. Idempotent via `escalatedAt`.
+ */
+export const onModerationQueueWritten = onDocumentWritten(
+  "moderationQueue/{itemId}",
+  async (event) => {
+    const after = event.data?.after?.data();
+    if (!after) return;
+    const count = (after.reportCount as number) || 0;
+    if (count < 3 || after.escalatedAt) return;
+
+    const coll = after.collection as string | undefined;
+    const contentId = (after.contentId as string) || event.params.itemId;
+    // Chat messages had no client-side auto-hide; keep that behavior.
+    if (!coll || coll === "messages") return;
+
+    const wording: Record<string, { noun: string; actionUrl: string }> = {
+      posts: { noun: "post", actionUrl: "/feed" },
+      events: { noun: "event", actionUrl: "/events" },
+      marketplaceListings: { noun: "marketplace listing", actionUrl: "/marketplace" },
+      listings: { noun: "housing listing", actionUrl: "/housing" },
+      housing: { noun: "housing listing", actionUrl: "/housing" },
+      businesses: { noun: "business listing", actionUrl: "/business" },
+    };
+    const w = wording[coll] || { noun: "content", actionUrl: "/" };
+
+    try {
+      await db.collection(coll).doc(contentId).update({
+        isHidden: true,
+        hiddenAt: new Date().toISOString(),
+        hiddenReason: "Auto-hidden: reached 3 community reports",
+      });
+    } catch (e) {
+      console.error("[moderation] auto-hide failed", coll, contentId, e);
+    }
+
+    if (after.authorId) {
+      try {
+        await db.collection("notifications").add({
+          type: "content_hidden",
+          recipientId: after.authorId,
+          recipientName: after.authorName || "",
+          postId: contentId,
+          reason: `Your ${w.noun} received multiple community reports and has been temporarily hidden for review.`,
+          message: `Your ${w.noun} has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.`,
+          actionUrl: w.actionUrl,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        console.error("[moderation] author notification failed", contentId, e);
+      }
+    }
+
+    await event.data!.after.ref.update({
+      escalatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   }
 );

@@ -1195,7 +1195,7 @@ export default function MarketplacePage() {
       // Shared report flow (Session 47/48): appends to `reports` (service adds
       // createdAt + status:'pending') and finds-or-increments the crowdsourced
       // moderationQueue entry (service adds reportCount/reporters/createdAt).
-      const totalReportCount = await submitContentReport({
+      await submitContentReport({
         contentId: reportListingId,
         reportDoc: {
           listingId: reportListingId,
@@ -1233,19 +1233,8 @@ export default function MarketplacePage() {
       });
 
       // 3-strike auto-hide (marketplace-specific tail — stays in the page)
-      if (totalReportCount >= 3) {
-        await hideListing(reportListingId, 'Auto-hidden: reached 3 community reports');
-        if (reportedListing?.sellerId) {
-          await sendListingHiddenNotification({
-            recipientId: reportedListing.sellerId,
-            recipientName: reportedListing.sellerName || '',
-            postId: reportListingId,
-            reason: 'Your marketplace listing received multiple community reports and has been temporarily hidden for review.',
-            message: 'Your marketplace listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
-            actionUrl: '/marketplace',
-          });
-        }
-      }
+      // 3-strike auto-hide + author notification now run server-side in the
+      // onModerationQueueWritten Cloud Function (SECURITY H-05, 2026-09-02).
 
       // Mute-on-report: hide this listing from the reporter's view
       await muteListingForUser(user.uid, reportListingId);

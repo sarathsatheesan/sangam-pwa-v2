@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.processNotification = exports.remindRecurringOrders = exports.expireStaleQuoteRequests = exports.onCateringOrderStatusChange = exports.processRecurringCateringOrders = exports.transcribeVoiceMessage = exports.sendIncomingGroupCallNotification = exports.sendIncomingCallNotification = exports.sendNewMessageNotification = void 0;
+exports.onModerationQueueWritten = exports.processNotification = exports.remindRecurringOrders = exports.expireStaleQuoteRequests = exports.onCateringOrderStatusChange = exports.processRecurringCateringOrders = exports.transcribeVoiceMessage = exports.sendIncomingGroupCallNotification = exports.sendIncomingCallNotification = exports.sendNewMessageNotification = void 0;
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
@@ -907,5 +907,67 @@ exports.processNotification = (0, firestore_1.onDocumentCreated)("notifications/
     console.log(`[notify] Result for ${notifId}: ${result.channel} → ${result.status}${result.error ? ` (${result.error})` : ""}`);
     // Record analytics
     await (0, notificationRouter_1.recordNotificationAnalytics)(template, result.channel, result.status);
+});
+/**
+ * Cloud Function: onModerationQueueWritten  (SECURITY H-05, 2026-09-02)
+ *
+ * The moderation queue is write-only for members (reads are admin-only), so
+ * the 3-strike auto-hide that previously ran on reporters' clients runs here.
+ * When an item reaches 3+ reports: hide the reported content and notify its
+ * author, exactly as the old client logic did. Idempotent via `escalatedAt`.
+ */
+exports.onModerationQueueWritten = (0, firestore_1.onDocumentWritten)("moderationQueue/{itemId}", async (event) => {
+    var _a, _b;
+    const after = (_b = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after) === null || _b === void 0 ? void 0 : _b.data();
+    if (!after)
+        return;
+    const count = after.reportCount || 0;
+    if (count < 3 || after.escalatedAt)
+        return;
+    const coll = after.collection;
+    const contentId = after.contentId || event.params.itemId;
+    // Chat messages had no client-side auto-hide; keep that behavior.
+    if (!coll || coll === "messages")
+        return;
+    const wording = {
+        posts: { noun: "post", actionUrl: "/feed" },
+        events: { noun: "event", actionUrl: "/events" },
+        marketplaceListings: { noun: "marketplace listing", actionUrl: "/marketplace" },
+        listings: { noun: "housing listing", actionUrl: "/housing" },
+        housing: { noun: "housing listing", actionUrl: "/housing" },
+        businesses: { noun: "business listing", actionUrl: "/business" },
+    };
+    const w = wording[coll] || { noun: "content", actionUrl: "/" };
+    try {
+        await db.collection(coll).doc(contentId).update({
+            isHidden: true,
+            hiddenAt: new Date().toISOString(),
+            hiddenReason: "Auto-hidden: reached 3 community reports",
+        });
+    }
+    catch (e) {
+        console.error("[moderation] auto-hide failed", coll, contentId, e);
+    }
+    if (after.authorId) {
+        try {
+            await db.collection("notifications").add({
+                type: "content_hidden",
+                recipientId: after.authorId,
+                recipientName: after.authorName || "",
+                postId: contentId,
+                reason: `Your ${w.noun} received multiple community reports and has been temporarily hidden for review.`,
+                message: `Your ${w.noun} has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.`,
+                actionUrl: w.actionUrl,
+                read: false,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        }
+        catch (e) {
+            console.error("[moderation] author notification failed", contentId, e);
+        }
+    }
+    await event.data.after.ref.update({
+        escalatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 });
 //# sourceMappingURL=index.js.map

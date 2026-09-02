@@ -19,6 +19,7 @@ import {
   getDoc,
   orderBy,
   limit,
+  collectionGroup,
 } from 'firebase/firestore';
 import {
   LayoutDashboard,
@@ -411,12 +412,22 @@ export default function AdminPage() {
     try {
       setLoading(true);
       const querySnapshot = await getDocs(collection(db, 'users'));
+      // SECURITY (C-01, 2026-09-02): emails/phones live in owner/admin-only
+      // private subdocs; admins read them via a collection-group query.
+      const privByUid: Record<string, any> = {};
+      try {
+        const privSnap = await getDocs(collectionGroup(db, 'private'));
+        privSnap.docs.forEach((pDoc) => {
+          const pd = pDoc.data();
+          if (pd.uid) privByUid[pd.uid] = pd;
+        });
+      } catch (_e) { /* non-fatal — legacy docs still carry the fields */ }
       const usersData: UserRecord[] = querySnapshot.docs.map((docSnap) => {
         const d = docSnap.data();
         return {
           id: docSnap.id,
           name: d.name || 'No Name',
-          email: d.email,
+          email: privByUid[docSnap.id]?.email || d.email,
           avatar: d.avatar,
           city: d.city,
           isAdmin: d.isAdmin || false,
@@ -427,7 +438,7 @@ export default function AdminPage() {
           businessType: d.businessType,
           adminReviewRequired: d.adminReviewRequired,
           adminApproved: d.adminApproved,
-          phone: d.phone,
+          phone: privByUid[docSnap.id]?.phone || d.phone,
           tinNumber: d.tinNumber,
           tinValidationStatus: d.tinValidationStatus,
           verificationDocUrls: d.verificationDocUrls,

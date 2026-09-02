@@ -5,8 +5,18 @@
 
 import { useCallback, useEffect } from 'react';
 import {
-  collection, getDocs, addDoc, doc, updateDoc,
-  query, where, getDoc, serverTimestamp, arrayUnion,
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  updateDoc,
+  query,
+  where,
+  getDoc,
+  serverTimestamp,
+  arrayUnion,
+  increment,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import { REPORT_CATEGORIES } from '@/components/business/businessConstants';
@@ -66,80 +76,36 @@ export function useBusinessModeration(
         status: 'pending',
       });
 
-      // Check if moderationQueue entry already exists for this business
-      const modQueueQuery = query(
-        collection(db, 'moderationQueue'),
-        where('contentId', '==', state.reportBusinessId)
-      );
-      const existingMods = await getDocs(modQueueQuery);
-
-      let totalReportCount = 1;
-
-      if (existingMods.docs.length > 0) {
-        const existingDoc = existingMods.docs[0];
-        const existingData = existingDoc.data();
-        totalReportCount = (existingData.reportCount || 1) + 1;
-        await updateDoc(doc(db, 'moderationQueue', existingDoc.id), {
-          reportCount: totalReportCount,
-          reporters: arrayUnion({
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: state.reportReason,
-            details: state.reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }),
-        });
-      } else {
-        await addDoc(collection(db, 'moderationQueue'), {
-          type: 'business',
-          content: reportedBusiness?.name || '',
-          contentId: state.reportBusinessId,
-          collection: 'businesses',
-          authorId: reportedBusiness?.ownerId || '',
-          authorName: reportedBusiness?.name || 'Unknown Business',
-          authorAvatar: '',
-          images: reportedBusiness?.photos || [],
+      // SECURITY (H-05, 2026-09-02): the moderation queue is write-only for
+      // members (reads are admin-only). Blind upsert keyed by contentId —
+      // reportCount increments server-side, and the 3-strike escalation now
+      // runs in the onModerationQueueWritten Cloud Function.
+      await setDoc(doc(db, 'moderationQueue', state.reportBusinessId), {
+        type: 'business',
+        content: reportedBusiness?.name || '',
+        contentId: state.reportBusinessId,
+        collection: 'businesses',
+        authorId: reportedBusiness?.ownerId || '',
+        authorName: reportedBusiness?.name || 'Unknown Business',
+        authorAvatar: '',
+        images: reportedBusiness?.photos || [],
+        category: state.reportReason,
+        categoryLabel: categoryObj?.label || state.reportReason,
+        reason: `${categoryObj?.label || state.reportReason}${state.reportDetails.trim() ? ': ' + state.reportDetails.trim() : ''}`,
+        reportedBy: user.uid,
+        reporterName: userProfile?.name || user.displayName || 'Anonymous',
+        reporterAvatar: userProfile?.avatar || '',
+        reportCount: increment(1),
+        reporters: arrayUnion({
+          uid: user.uid,
+          name: userProfile?.name || user.displayName || 'Anonymous',
+          avatar: userProfile?.avatar || '',
           category: state.reportReason,
-          categoryLabel: categoryObj?.label || state.reportReason,
-          reason: `${categoryObj?.label || state.reportReason}${state.reportDetails.trim() ? ': ' + state.reportDetails.trim() : ''}`,
-          reportedBy: user.uid,
-          reporterName: userProfile?.name || user.displayName || 'Anonymous',
-          reporterAvatar: userProfile?.avatar || '',
-          reportCount: 1,
-          reporters: [{
-            uid: user.uid,
-            name: userProfile?.name || user.displayName || 'Anonymous',
-            avatar: userProfile?.avatar || '',
-            category: state.reportReason,
-            details: state.reportDetails.trim() || '',
-            createdAt: new Date().toISOString(),
-          }],
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      // 3-strike auto-hide
-      if (totalReportCount >= 3) {
-        await updateDoc(doc(db, 'businesses', state.reportBusinessId), {
-          isHidden: true,
-          hiddenAt: new Date().toISOString(),
-          hiddenReason: 'Auto-hidden: reached 3 community reports',
-        });
-        if (reportedBusiness?.ownerId) {
-          await addDoc(collection(db, 'notifications'), {
-            type: 'content_hidden',
-            recipientId: reportedBusiness.ownerId,
-            recipientName: reportedBusiness.name || '',
-            postId: state.reportBusinessId,
-            reason: 'Your business listing received multiple community reports and has been temporarily hidden for review.',
-            message: 'Your business listing has been temporarily hidden after multiple community reports. A moderator will review it shortly. If you believe this was a mistake, you can submit an appeal by contacting support.',
-            actionUrl: '/business',
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-        }
-      }
+          details: state.reportDetails.trim() || '',
+          createdAt: new Date().toISOString(),
+        }),
+        createdAt: serverTimestamp(),
+      }, { merge: true });
 
       // Mute-on-report: hide this business from the reporter's view
       await updateDoc(doc(db, 'users', user.uid), {
