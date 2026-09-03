@@ -144,9 +144,9 @@ export async function submitBusinessRegistration(
       addressComponents: formData.addressComponents || null,
       stateOfIncorp: formData.stateOfIncorp || null,
 
-      // TIN (stored but will be encrypted at rest by Firestore)
-      tin: formData.tin || null,
-      tinType: formData.tinType || null,
+      // SECURITY (H-01, 2026-09-03): the TIN itself goes to the owner/admin-
+      // only businesses/{id}/private/kyc subdoc created below — only the
+      // boolean verification flag stays on the readable listing.
       tinVerified: false,
 
       // KYC / Registration status
@@ -155,9 +155,6 @@ export async function submitBusinessRegistration(
       verified: !adminReviewRequired,
       verifiedAt: adminReviewRequired ? null : serverTimestamp(),
       verificationMethod: adminReviewRequired ? null : 'self',
-
-      // Beneficial owners
-      beneficialOwners: formData.beneficialOwners || [],
 
       // Photos placeholder (will be updated after upload)
       photos: [],
@@ -173,6 +170,19 @@ export async function submitBusinessRegistration(
 
     const docRef = await addDoc(collection(db, 'businesses'), businessData);
     const businessId = docRef.id;
+
+    // SECURITY (H-01, 2026-09-03): KYC data — owner/admin-only subdoc.
+    try {
+      await setDoc(doc(db, 'businesses', businessId, 'private', 'kyc'), {
+        ownerId: userId,
+        tin: formData.tin || null,
+        tinType: formData.tinType || null,
+        beneficialOwners: formData.beneficialOwners || [],
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('Failed to store private KYC data:', err);
+    }
 
     // 2. Upload photos to Storage (parallel)
     let uploadedPhotoUrls: string[] = [];
@@ -208,10 +218,14 @@ export async function submitBusinessRegistration(
         updates.photos = uploadedPhotoUrls;
         updates.coverPhotoIndex = Math.min(coverPhotoIndex, uploadedPhotoUrls.length - 1);
       }
-      if (uploadedDocs.length > 0) {
-        updates.verificationDocs = uploadedDocs;
+      if (Object.keys(updates).length > 0) {
+        await updateDoc(docRef, updates);
       }
-      await updateDoc(docRef, updates);
+      // SECURITY (H-01, 2026-09-03): verification documents are KYC data.
+      if (uploadedDocs.length > 0) {
+        await setDoc(doc(db, 'businesses', businessId, 'private', 'kyc'),
+          { verificationDocs: uploadedDocs, updatedAt: serverTimestamp() }, { merge: true });
+      }
     }
 
     // 5. Clean up any draft for this user — a leftover draft would repopulate
@@ -312,6 +326,19 @@ export async function fetchPendingRegistrations(): Promise<PendingBusiness[]> {
     console.warn('Failed to load wizard registrations:', err);
   }
 
+  // SECURITY (H-01, 2026-09-03): TIN/docs now live in businesses/{id}/private/
+  // kyc — merge them in for the admin review UI (admins may read private docs).
+  for (const r of results) {
+    try {
+      const kycSnap = await getDoc(doc(db, 'businesses', r.id, 'private', 'kyc'));
+      if (kycSnap.exists()) {
+        const kyc = kycSnap.data();
+        (r as any).tin = (r as any).tin || kyc.tin || undefined;
+        (r as any).verificationDocs = (r as any).verificationDocs || kyc.verificationDocs || undefined;
+      }
+    } catch (_e) { /* non-fatal — unmigrated docs still carry the fields */ }
+  }
+
   // 2. Fetch from 'users' collection (signup-based business accounts pending review)
   try {
     const usersQuery = query(
@@ -320,26 +347,33 @@ export async function fetchPendingRegistrations(): Promise<PendingBusiness[]> {
       where('adminReviewRequired', '==', true),
     );
     const usersSnap = await getDocs(usersQuery);
-    usersSnap.docs.forEach((d) => {
+    for (const d of usersSnap.docs) {
       const data = d.data();
       // Skip if already approved
-      if (data.adminApproved === true) return;
+      if (data.adminApproved === true) continue;
+      // SECURITY (H-01, 2026-09-03): TIN/docs live in the private subdoc;
+      // public-doc fallback covers unmigrated accounts.
+      let priv: Record<string, any> = {};
+      try {
+        const privSnap = await getDoc(doc(db, 'users', d.id, 'private', 'profile'));
+        if (privSnap.exists()) priv = privSnap.data();
+      } catch (_e) { /* non-fatal */ }
       results.push({
         id: d.id,
         name: data.businessName || data.name || 'Unknown',
         category: data.businessType || '',
-        email: data.email || '',
-        phone: data.phone || '',
+        email: priv.email || data.email || '',
+        phone: priv.phone || data.phone || '',
         country: data.businessAddress?.country || '',
         ownerName: data.name || '',
         kycStatus: data.adminApproved === false ? 'pending' : 'submitted',
         registrationStatus: 'submitted',
         createdAt: data.createdAt,
-        tin: data.tinNumber,
-        verificationDocs: data.verificationDocUrls,
+        tin: priv.tinNumber || data.tinNumber,
+        verificationDocs: priv.verificationDocUrls || data.verificationDocUrls,
         _source: 'signup',
       } as any);
-    });
+    }
   } catch (err) {
     console.warn('Failed to load signup-based business registrations:', err);
   }
@@ -361,6 +395,18 @@ export async function approveRegistration(businessId: string, source?: string): 
     const userSnap = await getDoc(userRef);
     if (!userSnap.exists()) throw new Error('User not found');
     const userData = userSnap.data();
+
+    // SECURITY (H-01, 2026-09-03): KYC data lives in the private subdoc
+    // (admins can read it); fall back to the public doc for unmigrated accounts.
+    let userPriv: Record<string, any> = {};
+    try {
+      const privSnap = await getDoc(doc(db, 'users', businessId, 'private', 'profile'));
+      if (privSnap.exists()) userPriv = privSnap.data();
+    } catch (_e) { /* non-fatal */ }
+    const kycTin = userPriv.tinNumber || userData.tinNumber || null;
+    const kycDocs = userPriv.verificationDocUrls || userData.verificationDocUrls || [];
+    const kycPhotoId = userPriv.photoIdUrl || userData.photoIdUrl || null;
+    const kycOwners = userPriv.beneficialOwners || userData.beneficialOwners || [];
 
     // 2. Update the user document
     await updateDoc(userRef, {
@@ -409,8 +455,8 @@ export async function approveRegistration(businessId: string, source?: string): 
       addressComponents: address,
       stateOfIncorp: userData.stateOfIncorp || null,
 
-      // TIN
-      tin: userData.tinNumber || null,
+      // SECURITY (H-01, 2026-09-03): the TIN itself goes to the private
+      // KYC subdoc created below — only the boolean flag is public.
       tinVerified: userData.tinValidationStatus === 'valid',
 
       // Registration & verification status — pre-approved
@@ -424,13 +470,8 @@ export async function approveRegistration(businessId: string, source?: string): 
       profitStatus: userData.profitStatus || '',
       isRegistered: userData.isRegistered ?? false,
 
-      // KYC docs
-      verificationDocs: (userData.verificationDocUrls || []).map((url: string, i: number) => ({
-        url,
-        name: `Document ${i + 1}`,
-      })),
-      photoIdUrl: userData.photoIdUrl || null,
-      beneficialOwners: userData.beneficialOwners || [],
+      // SECURITY (H-01, 2026-09-03): verification docs, photo ID and
+      // beneficial owners go to the private KYC subdoc created below.
 
       // Photos & analytics
       photos: [],
@@ -445,7 +486,24 @@ export async function approveRegistration(businessId: string, source?: string): 
       _signupUserId: businessId,
     };
 
-    await addDoc(collection(db, 'businesses'), businessListing);
+    const newBizRef = await addDoc(collection(db, 'businesses'), businessListing);
+
+    // SECURITY (H-01, 2026-09-03): owner/admin-only KYC subdoc.
+    try {
+      await setDoc(doc(db, 'businesses', newBizRef.id, 'private', 'kyc'), {
+        ownerId: businessId,
+        tin: kycTin,
+        verificationDocs: (kycDocs as string[]).map((url: string, i: number) => ({
+          url,
+          name: `Document ${i + 1}`,
+        })),
+        photoIdUrl: kycPhotoId,
+        beneficialOwners: kycOwners,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn('Failed to store private KYC data for approved business:', err);
+    }
   } else {
     // Approve wizard-based business
     const bizRef = doc(db, 'businesses', businessId);

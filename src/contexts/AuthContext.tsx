@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteField, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import type { UserProfile } from '../services/auth';
 
@@ -90,13 +90,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
               // One-time lazy migration: move email/phone off the
               // world-readable profile doc for accounts created before C-01.
+              // SECURITY (H-01, 2026-09-03): business KYC data (tax ID,
+              // beneficial owners, verification docs, photo ID) migrates the
+              // same way for accounts created before H-01.
+              const KYC_FIELDS = ['tinNumber', 'tinValidationDetails', 'beneficialOwners', 'verificationDocUrls', 'photoIdUrl'] as const;
               const toMove: Record<string, any> = {};
               if (rawProfile.email) toMove.email = rawProfile.email;
               if ((rawProfile as any).phone) toMove.phone = (rawProfile as any).phone;
+              for (const f of KYC_FIELDS) {
+                const v = (rawProfile as any)[f];
+                if (v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) {
+                  toMove[f] = v;
+                }
+              }
               if (Object.keys(toMove).length > 0) {
                 try {
                   await setDoc(privRef, { uid: currentUser.uid, ...toMove, updatedAt: new Date() }, { merge: true });
-                  await updateDoc(userDocRef, { email: deleteField(), phone: deleteField() });
+                  const clears: Record<string, any> = { email: deleteField(), phone: deleteField() };
+                  for (const f of Object.keys(toMove)) clears[f] = deleteField();
+                  await updateDoc(userDocRef, clears);
                   privData = { ...toMove, ...privData };
                 } catch (_e) { /* non-fatal — retried on next sign-in */ }
               }
@@ -105,6 +117,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
                 ...rawProfile,
                 email: (privData.email as string) || rawProfile.email || currentUser.email || '',
                 ...(privData.phone ? { phone: privData.phone } : {}),
+                ...(privData.tinNumber !== undefined ? { tinNumber: privData.tinNumber } : {}),
+                ...(privData.tinValidationDetails !== undefined ? { tinValidationDetails: privData.tinValidationDetails } : {}),
+                ...(privData.beneficialOwners !== undefined ? { beneficialOwners: privData.beneficialOwners } : {}),
+                ...(privData.verificationDocUrls !== undefined ? { verificationDocUrls: privData.verificationDocUrls } : {}),
+                ...(privData.photoIdUrl !== undefined ? { photoIdUrl: privData.photoIdUrl } : {}),
               } as UserData;
               setUserProfile(profileData);
 
@@ -150,6 +167,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           } catch (error) {
             console.error('Error loading user profile:', error);
           }
+
+          // 1b. SECURITY (H-01, 2026-09-03): lazy migration for business
+          // listings owned by this user — move KYC fields (tax ID, beneficial
+          // owners, verification docs, photo ID) off the readable listing into
+          // businesses/{id}/private/kyc. Fire-and-forget; retried next sign-in.
+          (async () => {
+            try {
+              const bizSnap = await getDocs(
+                query(collection(db, 'businesses'), where('ownerId', '==', currentUser.uid))
+              );
+              for (const bizDoc of bizSnap.docs) {
+                const b = bizDoc.data();
+                const kyc: Record<string, any> = {};
+                if (b.tin) kyc.tin = b.tin;
+                if (b.tinType) kyc.tinType = b.tinType;
+                if (Array.isArray(b.beneficialOwners) && b.beneficialOwners.length > 0) kyc.beneficialOwners = b.beneficialOwners;
+                if (Array.isArray(b.verificationDocs) && b.verificationDocs.length > 0) kyc.verificationDocs = b.verificationDocs;
+                if (b.photoIdUrl) kyc.photoIdUrl = b.photoIdUrl;
+                if (Object.keys(kyc).length === 0) continue;
+                await setDoc(doc(db, 'businesses', bizDoc.id, 'private', 'kyc'),
+                  { ownerId: currentUser.uid, ...kyc, updatedAt: new Date() }, { merge: true });
+                await updateDoc(bizDoc.ref, {
+                  tin: deleteField(), tinType: deleteField(), beneficialOwners: deleteField(),
+                  verificationDocs: deleteField(), photoIdUrl: deleteField(),
+                });
+              }
+            } catch (_e) { /* non-fatal — retried on next sign-in */ }
+          })();
 
           // 2. Check ban status (independent)
           try {

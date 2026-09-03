@@ -167,9 +167,9 @@ export const signUpWithEmail = async (
       userData.businessType = biz.businessType || '';
       userData.customBusinessType = biz.customBusinessType || '';
       userData.isRegistered = biz.isRegistered ?? false;
-      userData.tinNumber = biz.tinNumber || '';
+      // SECURITY (H-01, 2026-09-03): tinNumber and validation details are tax
+      // data — they go to users/{uid}/private/profile below, never here.
       userData.tinValidationStatus = biz.tinValidationStatus || 'not_checked';
-      userData.tinValidationDetails = biz.tinValidationDetails || null;
       userData.profitStatus = biz.profitStatus || '';
       userData.adminReviewRequired = biz.adminReviewRequired || biz.tinValidationStatus === 'invalid' || !biz.isRegistered;
       userData.adminApproved = biz.isRegistered ? undefined : false;
@@ -182,28 +182,37 @@ export const signUpWithEmail = async (
         userData.stateOfIncorp = biz.stateOfIncorp;
       }
 
-      // KYC fields
-      if (biz.beneficialOwners && biz.beneficialOwners.length > 0) {
-        userData.beneficialOwners = biz.beneficialOwners;
-      }
-      if (biz.verificationDocUrls && biz.verificationDocUrls.length > 0) {
-        userData.verificationDocUrls = biz.verificationDocUrls;
-      }
-      if (biz.photoIdUrl) {
-        userData.photoIdUrl = biz.photoIdUrl;
-      }
+      // SECURITY (H-01, 2026-09-03): beneficial owners, verification docs and
+      // photo ID are KYC data — stored in the private subdoc below, not here.
     }
 
     await setDoc(userDocRef, userData);
 
     // SECURITY (C-01): private contact details, owner/admin-only.
+    // SECURITY (H-01, 2026-09-03): business KYC data (tax ID, beneficial
+    // owners, verification docs, photo ID) lives here too.
     try {
-      await setDoc(doc(db, 'users', user.uid, 'private', 'profile'), {
+      const privateData: Record<string, any> = {
         uid: user.uid,
         email,
         phone: extras?.phone || '',
         updatedAt: serverTimestamp(),
-      });
+      };
+      if (extras?.accountType === 'business') {
+        const biz = extras as BusinessExtras;
+        privateData.tinNumber = biz.tinNumber || '';
+        privateData.tinValidationDetails = biz.tinValidationDetails || null;
+        if (biz.beneficialOwners && biz.beneficialOwners.length > 0) {
+          privateData.beneficialOwners = biz.beneficialOwners;
+        }
+        if (biz.verificationDocUrls && biz.verificationDocUrls.length > 0) {
+          privateData.verificationDocUrls = biz.verificationDocUrls;
+        }
+        if (biz.photoIdUrl) {
+          privateData.photoIdUrl = biz.photoIdUrl;
+        }
+      }
+      await setDoc(doc(db, 'users', user.uid, 'private', 'profile'), privateData);
     } catch (_e) { /* non-fatal — AuthContext lazily retries on next sign-in */ }
 
     // Save custom business type to collection if provided

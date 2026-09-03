@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserSettings } from '@/contexts/UserSettingsContext';
 import { db, auth } from '@/services/firebase';
-import { doc, updateDoc, getDoc, arrayRemove, collection, query, where, getDocs, limit, documentId } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, arrayRemove, collection, query, where, getDocs, limit, documentId , setDoc } from 'firebase/firestore';
 import type { DocumentData, Timestamp } from 'firebase/firestore';
 import type { UserData } from '@/contexts/AuthContext';
 import { signOut } from 'firebase/auth';
@@ -986,7 +986,8 @@ export default function ProfilePage() {
         updateData.businessName = editForm.businessName;
         updateData.businessType = editForm.businessType;
         updateData.isRegistered = editForm.isRegistered;
-        updateData.tinNumber = editForm.tinNumber || '';
+        // SECURITY (H-01, 2026-09-03): tinNumber is tax data — written to the
+        // owner/admin-only private subdoc below, not the readable profile doc.
         updateData.tinValidationStatus = isUnregisteredBusiness ? 'not_checked' : editForm.tinValidationStatus;
         updateData.tinValidationMessage = editForm.tinValidationMessage;
         if (isUnregisteredBusiness || editForm.tinValidationStatus === 'invalid') {
@@ -995,6 +996,12 @@ export default function ProfilePage() {
         }
       }
       await updateDoc(userDocRef, updateData);
+      if (editForm.accountType === 'business') {
+        try {
+          await setDoc(doc(db, 'users', user.uid, 'private', 'profile'),
+            { uid: user.uid, tinNumber: editForm.tinNumber || '' }, { merge: true });
+        } catch (_e) { /* non-fatal */ }
+      }
       // Cast via unknown: UserData declares heritage as `string` but the app stores string[],
       // and messagingPrivacy holds display labels ('Everyone') rather than the declared lowercase union.
       setUserProfile({

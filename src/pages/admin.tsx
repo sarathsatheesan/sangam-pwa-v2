@@ -439,10 +439,12 @@ export default function AdminPage() {
           adminReviewRequired: d.adminReviewRequired,
           adminApproved: d.adminApproved,
           phone: privByUid[docSnap.id]?.phone || d.phone,
-          tinNumber: d.tinNumber,
+          // SECURITY (H-01, 2026-09-03): KYC values live in the private
+          // subdoc; the public-doc fallback covers unmigrated accounts.
+          tinNumber: privByUid[docSnap.id]?.tinNumber || d.tinNumber,
           tinValidationStatus: d.tinValidationStatus,
-          verificationDocUrls: d.verificationDocUrls,
-          photoIdUrl: d.photoIdUrl,
+          verificationDocUrls: privByUid[docSnap.id]?.verificationDocUrls || d.verificationDocUrls,
+          photoIdUrl: privByUid[docSnap.id]?.photoIdUrl || d.photoIdUrl,
         };
       });
       setUsers(usersData);

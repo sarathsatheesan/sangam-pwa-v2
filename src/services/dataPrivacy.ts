@@ -312,8 +312,22 @@ export async function deleteMyData(userId: string): Promise<DeletionResult> {
   // 1. Delete Posts
   result.deletedCounts.posts = await batchDeleteQuery('posts', 'userId', userId);
 
-  // 2. Delete Businesses
-  result.deletedCounts.businesses = await batchDeleteQuery('businesses', 'ownerId', userId);
+  // 2. Delete Businesses (private KYC subdoc first — SECURITY H-01,
+  // 2026-09-03: it must not orphan when the listing is deleted)
+  try {
+    const bizSnap = await getDocs(
+      query(collection(db, 'businesses'), where('ownerId', '==', userId))
+    );
+    for (const bizDoc of bizSnap.docs) {
+      try {
+        await deleteDoc(doc(db, 'businesses', bizDoc.id, 'private', 'kyc'));
+      } catch (_) {}
+    }
+    result.deletedCounts.businesses = await batchDeleteDocs(bizSnap.docs, 'businesses');
+  } catch (e: any) {
+    result.errors.push(`businesses: ${e.message}`);
+    result.success = false;
+  }
 
   // 3. Delete Listings
   result.deletedCounts.listings = await batchDeleteQuery('listings', 'posterId', userId);
