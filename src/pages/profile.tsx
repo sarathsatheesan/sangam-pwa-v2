@@ -2684,8 +2684,8 @@ export default function ProfilePage() {
             </h3>
             <p className="text-gray-600 dark:text-gray-300 mb-4">
               {deleteDataStep === 1
-                ? 'Are you sure you want to permanently delete all your data? This cannot be undone.'
-                : 'This is your final warning. All your data will be permanently deleted. Continue?'}
+                ? 'This permanently deletes your account and your content: profile, posts, comments, listings, events, forum activity, messages, connections, notifications and saved catering data. Reviews you wrote and past catering orders are kept for other members\u2019 records but are anonymized \u2014 your name and contact details are removed. This cannot be undone.'
+                : 'This is your final warning. Your data will be permanently deleted or anonymized as described. Continue?'}
             </p>
             <div className="flex gap-3 justify-end">
               <button onClick={() => { setShowDeleteDataConfirm(false); setDeleteDataStep(1); }} className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Cancel</button>

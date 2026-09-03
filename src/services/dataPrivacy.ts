@@ -5,10 +5,12 @@
 
 import {
   collection,
+  collectionGroup,
   query,
   where,
   getDocs,
   deleteDoc,
+  updateDoc,
   doc,
   getDoc,
   writeBatch,
@@ -265,6 +267,48 @@ export async function deleteMyData(userId: string): Promise<DeletionResult> {
     return count;
   }
 
+  // Helper: batch delete an array of doc snapshots
+  async function batchDeleteDocs(docs: { ref: any }[], label: string): Promise<number> {
+    let count = 0;
+    try {
+      const batchSize = 450;
+      for (let i = 0; i < docs.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const chunk = docs.slice(i, i + batchSize);
+        chunk.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+        count += chunk.length;
+      }
+    } catch (e: any) {
+      result.errors.push(`${label}: ${e.message}`);
+      result.success = false;
+    }
+    return count;
+  }
+
+  // Helper: anonymize (not delete) docs that must survive for other parties'
+  // records — reviews and vendor order history keep their content/ratings but
+  // lose every identity and contact field (SECURITY H-07, 2026-09-03).
+  async function anonymizeQuery(
+    collectionName: string,
+    field: string,
+    updates: Record<string, string>
+  ): Promise<number> {
+    let count = 0;
+    try {
+      const q = query(collection(db, collectionName), where(field, '==', userId));
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        await updateDoc(d.ref, updates);
+        count++;
+      }
+    } catch (e: any) {
+      result.errors.push(`${collectionName} (anonymize): ${e.message}`);
+      result.success = false;
+    }
+    return count;
+  }
+
   // 1. Delete Posts
   result.deletedCounts.posts = await batchDeleteQuery('posts', 'userId', userId);
 
@@ -280,6 +324,21 @@ export async function deleteMyData(userId: string): Promise<DeletionResult> {
   // 5. Delete Travel Posts
   result.deletedCounts.travelPosts = await batchDeleteQuery('travelPosts', 'posterId', userId);
 
+  // 5b. Delete Marketplace Listings (SECURITY H-07, 2026-09-03: previously
+  // missing — marketplace items survived account deletion)
+  result.deletedCounts.marketplaceListings = await batchDeleteQuery(
+    'marketplaceListings',
+    'sellerId',
+    userId
+  );
+
+  // 5c. Delete Marketplace Comments
+  result.deletedCounts.marketplaceComments = await batchDeleteQuery(
+    'marketplaceComments',
+    'userId',
+    userId
+  );
+
   // 6. Delete Forum Threads (and their likes subcollection)
   try {
     const threadsQuery = query(collection(db, 'forumThreads'), where('authorId', '==', userId));
@@ -289,7 +348,8 @@ export async function deleteMyData(userId: string): Promise<DeletionResult> {
     for (const threadDoc of threadsSnap.docs) {
       // Delete likes subcollection first
       try {
-        const likesSnap = await getDocs(collection(db, 'forumThreads', threadDoc.id, 'likes'));
+        // SECURITY H-07, 2026-09-03: subcollection is 'forumLikes' (was wrongly 'likes')
+        const likesSnap = await getDocs(collection(db, 'forumThreads', threadDoc.id, 'forumLikes'));
         const batch = writeBatch(db);
         likesSnap.docs.forEach((likeDoc) => batch.delete(likeDoc.ref));
         if (likesSnap.docs.length > 0) await batch.commit();
@@ -311,7 +371,7 @@ export async function deleteMyData(userId: string): Promise<DeletionResult> {
 
     for (const replyDoc of repliesSnap.docs) {
       try {
-        const likesSnap = await getDocs(collection(db, 'forumReplies', replyDoc.id, 'likes'));
+        const likesSnap = await getDocs(collection(db, 'forumReplies', replyDoc.id, 'forumLikes'));
         const batch = writeBatch(db);
         likesSnap.docs.forEach((likeDoc) => batch.delete(likeDoc.ref));
         if (likesSnap.docs.length > 0) await batch.commit();
@@ -382,6 +442,106 @@ export async function deleteMyData(userId: string): Promise<DeletionResult> {
     result.success = false;
   }
 
+  // 9b. Delete the user's comments on posts, events and housing listings
+  // (collection-group sweep across all 'comments' subcollections;
+  // SECURITY H-07, 2026-09-03)
+  try {
+    const commentsSnap = await getDocs(
+      query(collectionGroup(db, 'comments'), where('userId', '==', userId))
+    );
+    result.deletedCounts.comments = await batchDeleteDocs(commentsSnap.docs, 'comments');
+  } catch (e: any) {
+    result.errors.push(`comments: ${e.message}`);
+    result.success = false;
+  }
+
+  // 9c. Delete the user's forum votes everywhere (collection-group)
+  try {
+    const votesSnap = await getDocs(
+      query(collectionGroup(db, 'forumLikes'), where('userId', '==', userId))
+    );
+    result.deletedCounts.forumVotes = await batchDeleteDocs(votesSnap.docs, 'forumLikes');
+  } catch (e: any) {
+    result.errors.push(`forumLikes: ${e.message}`);
+    result.success = false;
+  }
+
+  // 9d. Delete connections (top-level collection + legacy subcollection)
+  try {
+    const connsSnap = await getDocs(
+      query(collection(db, 'connections'), where('users', 'array-contains', userId))
+    );
+    result.deletedCounts.connections = await batchDeleteDocs(connsSnap.docs, 'connections');
+  } catch (e: any) {
+    result.errors.push(`connections: ${e.message}`);
+    result.success = false;
+  }
+  try {
+    const legacyConnsSnap = await getDocs(collection(db, 'users', userId, 'connections'));
+    await batchDeleteDocs(legacyConnsSnap.docs, 'legacyConnections');
+  } catch (_) {}
+
+  // 9e. Delete notifications addressed to the user
+  result.deletedCounts.notifications = await batchDeleteQuery(
+    'notifications',
+    'recipientId',
+    userId
+  );
+  result.deletedCounts.cateringNotifications = await batchDeleteQuery(
+    'cateringNotifications',
+    'recipientId',
+    userId
+  );
+
+  // 9f. Delete catering personal data (favorites, recurring orders, templates)
+  result.deletedCounts.cateringFavorites = await batchDeleteQuery(
+    'cateringFavorites',
+    'userId',
+    userId
+  );
+  result.deletedCounts.cateringRecurring = await batchDeleteQuery(
+    'cateringRecurring',
+    'userId',
+    userId
+  );
+  result.deletedCounts.cateringTemplates = await batchDeleteQuery(
+    'cateringTemplates',
+    'creatorId',
+    userId
+  );
+
+  // 9g. Anonymize (not delete) records other parties rely on: reviews stay for
+  // business rating integrity, orders/quotes stay for vendor records — but all
+  // identity and contact fields are stripped.
+  const ANON = 'Deleted user';
+  result.deletedCounts.businessReviewsAnonymized = await anonymizeQuery(
+    'businessReviews',
+    'userId',
+    { userId: 'deleted', userName: ANON }
+  );
+  result.deletedCounts.cateringOrdersAnonymized = await anonymizeQuery(
+    'cateringOrders',
+    'customerId',
+    {
+      customerId: 'deleted',
+      customerName: ANON,
+      customerEmail: '',
+      customerPhone: '',
+      contactName: ANON,
+      contactPhone: '',
+    }
+  );
+  result.deletedCounts.cateringQuoteRequestsAnonymized = await anonymizeQuery(
+    'cateringQuoteRequests',
+    'customerId',
+    { customerId: 'deleted', customerName: ANON, customerEmail: '', customerPhone: '' }
+  );
+  result.deletedCounts.cateringQuoteResponsesAnonymized = await anonymizeQuery(
+    'cateringQuoteResponses',
+    'customerId',
+    { customerId: 'deleted', customerName: ANON, customerEmail: '', customerPhone: '' }
+  );
+
   // 10. Delete banned/disabled entries if they exist
   try {
     await deleteDoc(doc(db, 'bannedUsers', userId));
@@ -390,7 +550,19 @@ export async function deleteMyData(userId: string): Promise<DeletionResult> {
     await deleteDoc(doc(db, 'disabledUsers', userId));
   } catch (_) {}
 
-  // 11. Delete user profile document
+  // 10b. Delete per-user settings documents
+  try {
+    await deleteDoc(doc(db, 'userSettings', userId));
+  } catch (_) {}
+  try {
+    await deleteDoc(doc(db, 'notificationPreferences', userId));
+  } catch (_) {}
+
+  // 11. Delete user profile document (private subdoc first — SECURITY H-07,
+  // 2026-09-03: the C-01 private profile subdoc must not orphan)
+  try {
+    await deleteDoc(doc(db, 'users', userId, 'private', 'profile'));
+  } catch (_) {}
   try {
     await deleteDoc(doc(db, 'users', userId));
     result.deletedCounts.profile = 1;

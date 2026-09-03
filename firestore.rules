@@ -389,6 +389,16 @@ service cloud.firestore {
       allow read: if request.auth != null;
     }
 
+    // ─── Comments: collection-group READ (SECURITY H-07, 2026-09-03) ─────
+    // deleteMyData() uses collectionGroup('comments') where userId == uid to
+    // find the user's own comments across posts/events/listings before account
+    // deletion. Scoped to the requester's own comments; writes remain governed
+    // by the specific per-path rules above.
+    match /{path=**}/comments/{commentId} {
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.userId;
+    }
+
     // ─── Calls (WebRTC signaling) ─────────────────────
     match /calls/{callId} {
       allow read: if request.auth != null
@@ -536,6 +546,9 @@ service cloud.firestore {
         && request.auth.uid == resource.data.recipientId;
       allow create: if request.auth != null;
       allow update: if request.auth != null && request.auth.uid == resource.data.recipientId;
+      // SECURITY (H-07, 2026-09-03): recipients may delete their own
+      // notifications (needed by the account-deletion sweep).
+      allow delete: if request.auth != null && request.auth.uid == resource.data.recipientId;
     }
 
     // ─── Catering In-App Notifications ────────────────
@@ -545,7 +558,10 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update: if request.auth != null
         && request.auth.uid == resource.data.recipientId;
-      allow delete: if false;
+      // SECURITY (H-07, 2026-09-03): recipients may delete their own
+      // notifications (needed by the account-deletion sweep). Was `if false`.
+      allow delete: if request.auth != null
+        && request.auth.uid == resource.data.recipientId;
     }
 
     // ─── Vendor Image Audit Log (liability trail) ──────
