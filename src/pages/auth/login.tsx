@@ -326,18 +326,23 @@ export const LoginPage: React.FC = () => {
 
       navigate('/');
     } catch (error: any) {
-      const errorMessage =
-        error?.code === 'auth/user-not-found'
-          ? 'Email not found. Please check your email or sign up.'
-          : error?.code === 'auth/wrong-password'
-            ? 'Incorrect password. Please try again.'
-            : error?.code === 'auth/invalid-email'
-              ? 'Invalid email address.'
-              : error?.code === 'auth/invalid-credential'
-                ? 'Invalid email or password. Please try again.'
-                : error?.code === 'auth/too-many-requests'
-                  ? 'Too many failed attempts. Please try again later.'
-                  : error?.message || 'Sign in failed. Please try again.';
+      // SECURITY (L-10, 2026-09-03): every sign-in failure maps to a specific,
+      // helpful message — no silent failures, no raw provider error strings.
+      const code = error?.code || '';
+      const messages: Record<string, string> = {
+        'auth/user-not-found': 'No account found with this email. Check the address or sign up.',
+        'auth/wrong-password': 'Incorrect password. Try again, or use "Forgot password?" below.',
+        'auth/invalid-email': 'That email address is not valid. Check it for typos.',
+        'auth/invalid-credential': 'Email or password is incorrect. Try again, or use "Forgot password?" below.',
+        'auth/invalid-login-credentials': 'Email or password is incorrect. Try again, or use "Forgot password?" below.',
+        'auth/missing-password': 'Please enter your password.',
+        'auth/user-disabled': 'This account has been disabled. Contact support if you believe this is a mistake.',
+        'auth/too-many-requests': 'Too many failed attempts. Wait a few minutes and try again, or reset your password.',
+        'auth/network-request-failed': 'Could not reach the server. Check your internet connection and try again.',
+        'auth/internal-error': 'Something went wrong on our side. Please try again.',
+      };
+      const errorMessage = messages[code]
+        || `Sign in failed${code ? ` (${code.replace('auth/', '')})` : ''}. Please try again.`;
 
       setErrors({ general: errorMessage });
     } finally {

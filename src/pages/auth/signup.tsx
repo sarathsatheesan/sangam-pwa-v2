@@ -16,6 +16,7 @@ import { db } from '../../services/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../services/firebase';
 import { useToast } from '@/contexts/ToastContext';
+import { validatePassword, passwordScore, SCORE_LABELS, SCORE_COLORS } from '@/utils/passwordStrength';
 
 // ── Constants ──
 
@@ -307,10 +308,10 @@ export const SignupPage: React.FC = () => {
       }
     }
 
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    // SECURITY (M-08, 2026-09-03): real strength rules (was: any 6+ chars).
+    const pwCheck = validatePassword(formData.password, formData.email);
+    if (!pwCheck.ok) {
+      newErrors.password = pwCheck.message || 'Password is too weak';
     }
 
     if (!formData.phone.trim()) {
@@ -678,7 +679,7 @@ export const SignupPage: React.FC = () => {
         <div className="relative">
           <input
             type={showPassword ? 'text' : 'password'}
-            placeholder="At least 6 characters"
+            placeholder="8+ chars with a mix of cases, numbers or symbols"
             value={formData.password}
             onChange={(e) => updateFormData('password', e.target.value)}
             className={`w-full px-4 py-3 pr-12 border rounded-xl text-aurora-text placeholder-aurora-text-muted focus:outline-none focus:ring-2 focus:ring-aurora-indigo ${
@@ -698,6 +699,20 @@ export const SignupPage: React.FC = () => {
             )}
           </button>
         </div>
+        {formData.password && (() => {
+          const score = passwordScore(formData.password);
+          return (
+            <div className="mt-2">
+              <div className="flex gap-1">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-1.5 flex-1 rounded-full transition-colors"
+                    style={{ background: i <= score ? SCORE_COLORS[score] : 'var(--aurora-border, #e5e7eb)' }} />
+                ))}
+              </div>
+              <p className="text-xs mt-1" style={{ color: SCORE_COLORS[score] }}>{SCORE_LABELS[score]}</p>
+            </div>
+          );
+        })()}
         {errors.password && <p className="text-aurora-danger text-sm mt-2">{errors.password}</p>}
       </div>
 
