@@ -1,5 +1,3 @@
-export const ADMIN_EMAILS = ['sarath.s1884@gmail.com'];
-
 // Encryption salt for E2E message encryption key derivation
 export const ENCRYPTION_SALT = 'sangam_e2e_v1_salt';
 

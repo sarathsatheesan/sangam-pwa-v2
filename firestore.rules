@@ -4,20 +4,31 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ─── Helper: Check if user is admin ───────────────
+    // SECURITY (H-04, 2026-09-02): admin status now comes from a Firebase Auth
+    // custom claim ({ admin: true }), set by the onAdminConfigWritten Cloud
+    // Function from the admin-only adminConfig/settings doc. Previously this
+    // read appConfig/settings.adminEmails, a world-readable doc that exposed
+    // the admin email list to everyone.
     function isAdminUser() {
-      return request.auth != null
-        && exists(/databases/$(database)/documents/appConfig/settings)
-        && request.auth.token.email in get(/databases/$(database)/documents/appConfig/settings).data.adminEmails;
+      return request.auth != null && request.auth.token.admin == true;
     }
 
-    // ─── App Config (feature settings, admin emails) ──
+    // ─── Admin Config (admin email list) ──────────────
+    // SECURITY (H-04, 2026-09-02): admin-only doc. The email list lives here
+    // (not in world-readable appConfig). A Cloud Function syncs it to Auth
+    // custom claims. Bootstrap the first admin doc via Firebase console.
+    match /adminConfig/{docId} {
+      allow read, write: if isAdminUser();
+    }
+
+    // ─── App Config (feature settings) ────────────────
     // Read allowed for all (needed for signup page to check KYC feature flags).
-    // SECURITY (C3, 2026-07-05): write is ADMIN-ONLY. This doc holds
-    // `adminEmails` (consumed by isAdminUser()) and feature flags — previously
-    // any authenticated user could write it and add themselves to adminEmails,
-    // a full privilege-escalation. Only the admin panel writes this doc
-    // (admin-list mgmt + FeatureSettingsContext toggles), so isAdminUser()
-    // preserves every legitimate flow. Bootstrap the first admin via console.
+    // SECURITY (C3, 2026-07-05): write is ADMIN-ONLY — previously any
+    // authenticated user could write it, a full privilege-escalation.
+    // SECURITY (H-04, 2026-09-02): the admin email list moved to the
+    // admin-only adminConfig/settings doc; a legacy `adminEmails` field may
+    // linger here for old clients' UI gating until they update — it grants
+    // nothing (rules + new clients check the auth custom claim instead).
     match /appConfig/{docId} {
       allow read: if true;
       allow write: if isAdminUser();

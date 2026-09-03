@@ -952,9 +952,12 @@ export default function AdminPage() {
   }
 
   // ─── Admin Emails ──────────────────────────────
+  // SECURITY (H-04, 2026-09-02): the admin email list lives in the
+  // admin-only adminConfig/settings doc (was world-readable appConfig).
+  // The onAdminConfigWritten Cloud Function syncs it to Auth custom claims.
   async function loadAdminEmails() {
     try {
-      const docSnap = await getDoc(doc(db, 'appConfig', 'settings'));
+      const docSnap = await getDoc(doc(db, 'adminConfig', 'settings'));
       if (docSnap.exists()) {
         setAdminEmails(docSnap.data().adminEmails || []);
       }
@@ -975,13 +978,13 @@ export default function AdminPage() {
     }
     try {
       const updatedEmails = [...adminEmails, email];
-      await updateDoc(doc(db, 'appConfig', 'settings'), { adminEmails: updatedEmails });
+      await updateDoc(doc(db, 'adminConfig', 'settings'), { adminEmails: updatedEmails });
       setAdminEmails(updatedEmails);
       setNewAdminEmail('');
     } catch (error) {
       try {
         const updatedEmails = [...adminEmails, email];
-        await setDoc(doc(db, 'appConfig', 'settings'), { adminEmails: updatedEmails }, { merge: true });
+        await setDoc(doc(db, 'adminConfig', 'settings'), { adminEmails: updatedEmails }, { merge: true });
         setAdminEmails(updatedEmails);
         setNewAdminEmail('');
       } catch (e) {
@@ -1004,7 +1007,7 @@ export default function AdminPage() {
         setConfirmModal(null);
         try {
           const updatedEmails = adminEmails.filter((e) => e !== email);
-          await updateDoc(doc(db, 'appConfig', 'settings'), { adminEmails: updatedEmails });
+          await updateDoc(doc(db, 'adminConfig', 'settings'), { adminEmails: updatedEmails });
           setAdminEmails(updatedEmails);
         } catch (error) {
           console.error('Error removing admin:', error);

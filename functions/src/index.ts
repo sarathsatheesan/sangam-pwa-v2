@@ -1084,3 +1084,72 @@ export const onModerationQueueWritten = onDocumentWritten(
     });
   }
 );
+
+/**
+ * Cloud Function: onAdminConfigWritten (SECURITY H-04, 2026-09-02)
+ *
+ * Syncs Firebase Auth custom claims ({ admin: true }) with the email list
+ * stored in adminConfig/settings.adminEmails. Firestore security rules and
+ * the client check the custom claim instead of a world-readable email list.
+ *
+ * Safety: if the incoming list is missing or empty, this is a NO-OP —
+ * a bad write can never mass-revoke every admin.
+ */
+export const onAdminConfigWritten = onDocumentWritten(
+  "adminConfig/settings",
+  async (event) => {
+    const after = event.data?.after?.data();
+    const emails: string[] = Array.isArray(after?.adminEmails)
+      ? (after!.adminEmails as string[])
+          .filter((e) => typeof e === "string" && e.includes("@"))
+          .map((e) => e.toLowerCase().trim())
+      : [];
+
+    // No-op guard: never act on an empty/missing list.
+    if (emails.length === 0) {
+      console.warn("[adminClaims] adminEmails empty or missing — no-op");
+      return;
+    }
+
+    const auth = admin.auth();
+
+    // 1. Grant the admin claim to every listed email.
+    const grantedUids = new Set<string>();
+    for (const email of emails) {
+      try {
+        const user = await auth.getUserByEmail(email);
+        grantedUids.add(user.uid);
+        if (user.customClaims?.admin !== true) {
+          await auth.setCustomUserClaims(user.uid, {
+            ...(user.customClaims || {}),
+            admin: true,
+          });
+          console.log("[adminClaims] granted admin to", email);
+        }
+      } catch (e) {
+        console.error("[adminClaims] grant failed for", email, e);
+      }
+    }
+
+    // 2. Revoke the claim from any user who holds it but is not listed.
+    try {
+      let pageToken: string | undefined;
+      do {
+        const page = await auth.listUsers(1000, pageToken);
+        for (const user of page.users) {
+          if (user.customClaims?.admin === true && !grantedUids.has(user.uid)) {
+            const { admin: _drop, ...rest } = user.customClaims;
+            await auth.setCustomUserClaims(
+              user.uid,
+              Object.keys(rest).length ? rest : null
+            );
+            console.log("[adminClaims] revoked admin from", user.email || user.uid);
+          }
+        }
+        pageToken = page.pageToken;
+      } while (pageToken);
+    } catch (e) {
+      console.error("[adminClaims] revoke scan failed", e);
+    }
+  }
+);

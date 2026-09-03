@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onModerationQueueWritten = exports.processNotification = exports.remindRecurringOrders = exports.expireStaleQuoteRequests = exports.onCateringOrderStatusChange = exports.processRecurringCateringOrders = exports.transcribeVoiceMessage = exports.sendIncomingGroupCallNotification = exports.sendIncomingCallNotification = exports.sendNewMessageNotification = void 0;
+exports.onAdminConfigWritten = exports.onModerationQueueWritten = exports.processNotification = exports.remindRecurringOrders = exports.expireStaleQuoteRequests = exports.onCateringOrderStatusChange = exports.processRecurringCateringOrders = exports.transcribeVoiceMessage = exports.sendIncomingGroupCallNotification = exports.sendIncomingCallNotification = exports.sendNewMessageNotification = void 0;
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-functions/v2/firestore");
 const https_1 = require("firebase-functions/v2/https");
@@ -969,5 +969,66 @@ exports.onModerationQueueWritten = (0, firestore_1.onDocumentWritten)("moderatio
     await event.data.after.ref.update({
         escalatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+});
+/**
+ * Cloud Function: onAdminConfigWritten (SECURITY H-04, 2026-09-02)
+ *
+ * Syncs Firebase Auth custom claims ({ admin: true }) with the email list
+ * stored in adminConfig/settings.adminEmails. Firestore security rules and
+ * the client check the custom claim instead of a world-readable email list.
+ *
+ * Safety: if the incoming list is missing or empty, this is a NO-OP —
+ * a bad write can never mass-revoke every admin.
+ */
+exports.onAdminConfigWritten = (0, firestore_1.onDocumentWritten)("adminConfig/settings", async (event) => {
+    var _a, _b, _c, _d;
+    const after = (_b = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after) === null || _b === void 0 ? void 0 : _b.data();
+    const emails = Array.isArray(after === null || after === void 0 ? void 0 : after.adminEmails)
+        ? after.adminEmails
+            .filter((e) => typeof e === "string" && e.includes("@"))
+            .map((e) => e.toLowerCase().trim())
+        : [];
+    // No-op guard: never act on an empty/missing list.
+    if (emails.length === 0) {
+        console.warn("[adminClaims] adminEmails empty or missing — no-op");
+        return;
+    }
+    const auth = admin.auth();
+    // 1. Grant the admin claim to every listed email.
+    const grantedUids = new Set();
+    for (const email of emails) {
+        try {
+            const user = await auth.getUserByEmail(email);
+            grantedUids.add(user.uid);
+            if (((_c = user.customClaims) === null || _c === void 0 ? void 0 : _c.admin) !== true) {
+                await auth.setCustomUserClaims(user.uid, {
+                    ...(user.customClaims || {}),
+                    admin: true,
+                });
+                console.log("[adminClaims] granted admin to", email);
+            }
+        }
+        catch (e) {
+            console.error("[adminClaims] grant failed for", email, e);
+        }
+    }
+    // 2. Revoke the claim from any user who holds it but is not listed.
+    try {
+        let pageToken;
+        do {
+            const page = await auth.listUsers(1000, pageToken);
+            for (const user of page.users) {
+                if (((_d = user.customClaims) === null || _d === void 0 ? void 0 : _d.admin) === true && !grantedUids.has(user.uid)) {
+                    const { admin: _drop, ...rest } = user.customClaims;
+                    await auth.setCustomUserClaims(user.uid, Object.keys(rest).length ? rest : null);
+                    console.log("[adminClaims] revoked admin from", user.email || user.uid);
+                }
+            }
+            pageToken = page.pageToken;
+        } while (pageToken);
+    }
+    catch (e) {
+        console.error("[adminClaims] revoke scan failed", e);
+    }
 });
 //# sourceMappingURL=index.js.map

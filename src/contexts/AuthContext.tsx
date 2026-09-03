@@ -4,7 +4,6 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { auth, db } from '../services/firebase';
 import type { UserProfile } from '../services/auth';
-import { ADMIN_EMAILS } from '../constants/config';
 
 export interface UserData extends UserProfile {
   uid: string;
@@ -70,7 +69,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           const userDocRef = doc(db, 'users', currentUser.uid);
           const bannedDocRef = doc(db, 'bannedUsers', currentUser.uid);
           const disabledDocRef = doc(db, 'disabledUsers', currentUser.uid);
-          const appConfigRef = doc(db, 'appConfig', 'settings');
 
           // ── Load each resource independently so one failure doesn't block others ──
 
@@ -171,33 +169,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             setIsDisabled(false);
           }
 
-          // 4. Check admin status — ALWAYS falls through to hardcoded check
+          // 4. Check admin status via Firebase Auth custom claim.
+          // SECURITY (H-04, 2026-09-02): the claim is set server-side by the
+          // onAdminConfigWritten Cloud Function from adminConfig/settings.
+          // No hardcoded email list and no world-readable admin list.
           let isUserAdmin = false;
-
-          // 4a. Try dynamic admin list from Firestore
           try {
-            const appConfigSnap = await getDoc(appConfigRef);
-            if (appConfigSnap.exists()) {
-              const appConfig = appConfigSnap.data();
-              if (
-                appConfig.adminEmails &&
-                Array.isArray(appConfig.adminEmails) &&
-                appConfig.adminEmails.some(
-                  (e: string) => e.toLowerCase() === (currentUser.email || '').toLowerCase()
-                )
-              ) {
-                isUserAdmin = true;
-              }
-            }
+            const token = await currentUser.getIdTokenResult();
+            isUserAdmin = token.claims.admin === true;
           } catch (error) {
-            console.error('Error loading appConfig (non-fatal, using hardcoded fallback):', error);
-          }
-
-          // 4b. ALWAYS fall back to hardcoded ADMIN_EMAILS
-          if (!isUserAdmin) {
-            isUserAdmin = ADMIN_EMAILS.some(
-              (e) => e.toLowerCase() === (currentUser.email || '').toLowerCase()
-            );
+            console.error('Error reading auth token claims:', error);
           }
 
           setIsAdmin(isUserAdmin);
@@ -215,12 +196,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       } catch (error) {
         console.error('Error in auth state change:', error);
-        // Even on catastrophic failure, check hardcoded admin
+        // Even on catastrophic failure, honor the auth token's admin claim
         if (currentUser) {
-          const fallbackAdmin = ADMIN_EMAILS.some(
-            (e) => e.toLowerCase() === (currentUser.email || '').toLowerCase()
-          );
-          setIsAdmin(fallbackAdmin);
+          try {
+            const token = await currentUser.getIdTokenResult();
+            setIsAdmin(token.claims.admin === true);
+          } catch {
+            setIsAdmin(false);
+          }
         } else {
           setIsAdmin(false);
         }
