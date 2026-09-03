@@ -66,6 +66,8 @@ interface VendorCateringDashboardProps {
    * component stays usable in isolation (tests, storybook).
    */
   onSwitchVendorTab?: (tab: 'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory' | 'menu') => void;
+  /** UX-P1: open the Quotes tab focused on a specific request (bell deep-link). */
+  onOpenQuoteRequest?: (requestId: string) => void;
 }
 
 // SB-10: Derive vendor STATUS_CONFIG from shared STATUS_THEME + add icons
@@ -97,7 +99,7 @@ function formatEtaValue(value: string, mode: string): string {
   return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
-export default function VendorCateringDashboard({ businessId, businessName, onSwitchVendorTab }: VendorCateringDashboardProps) {
+export default function VendorCateringDashboard({ businessId, businessName, onSwitchVendorTab, onOpenQuoteRequest }: VendorCateringDashboardProps) {
   const { user } = useAuth();
   const [orders, setOrders] = useState<CateringOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -843,7 +845,9 @@ export default function VendorCateringDashboard({ businessId, businessName, onSw
               if (n.orderId) {
                 setExpandedOrder(n.orderId);
               } else if (n.quoteRequestId) {
-                onSwitchVendorTab?.('quotes');
+                // UX-P1 (audit F-03): deep-link to the exact request, not just the tab.
+                if (onOpenQuoteRequest) onOpenQuoteRequest(n.quoteRequestId);
+                else onSwitchVendorTab?.('quotes');
               }
             }}
             userId={user?.uid}

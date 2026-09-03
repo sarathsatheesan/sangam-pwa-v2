@@ -37,6 +37,9 @@ import {
   isQuoteRequestEditable,
   quoteEditTimeRemaining,
   subscribeToCustomerQuoteRequests,
+  subscribeToBusinessOrders,
+  subscribeToBusinessQuoteResponses,
+  fetchQuoteRequestsForBusiness,
   saveFavoriteOrder,
   notifyVendorNewOrder,
   getTaxRate,
@@ -280,6 +283,31 @@ export default function CateringPage() {
     }
   }, [showRfqModal]);
   const [vendorTab, setVendorTab] = useState<'orders' | 'quotes' | 'analytics' | 'reviews' | 'inventory' | 'menu'>('quotes');
+
+  // ── UX-P1 (Quotes audit): bell deep-link target + live tab count badges ──
+  const [quoteFocusId, setQuoteFocusId] = useState<string | null>(null);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [openQuotesCount, setOpenQuotesCount] = useState(0);
+  const ownedBizIdForBadges = state.view === 'vendor' ? userOwnedBusiness?.id : undefined;
+  useEffect(() => {
+    if (!ownedBizIdForBadges) { setPendingOrdersCount(0); setOpenQuotesCount(0); return; }
+    // Orders: live pending count (shares the underlying Firestore watch with the Orders tab)
+    const unsubOrders = subscribeToBusinessOrders(ownedBizIdForBadges, (orders) => {
+      setPendingOrdersCount(orders.filter((o) => o.status === 'pending').length);
+    });
+    // Quotes: open = requests this business hasn't responded to yet
+    let reqs: { id: string }[] = [];
+    let respIds = new Set<string>();
+    const recompute = () => setOpenQuotesCount(reqs.filter((r) => !respIds.has(r.id)).length);
+    fetchQuoteRequestsForBusiness(ownedBizIdForBadges)
+      .then((r) => { reqs = r; recompute(); })
+      .catch(() => { /* non-fatal — badge stays at 0 */ });
+    const unsubResponses = subscribeToBusinessQuoteResponses(ownedBizIdForBadges, (responses) => {
+      respIds = new Set(responses.map((resp) => resp.quoteRequestId));
+      recompute();
+    });
+    return () => { unsubOrders(); unsubResponses(); };
+  }, [ownedBizIdForBadges]);
   const [selectedQuoteRequest, setSelectedQuoteRequest] = useState<CateringQuoteRequest | null>(null);
   const [editingQuoteRequestId, setEditingQuoteRequestId] = useState<string | null>(null);
   const [selectedFavoriteForRecurring, setSelectedFavoriteForRecurring] = useState<FavoriteOrder | null>(null);
@@ -1695,13 +1723,13 @@ export default function CateringPage() {
               style={{ borderColor: 'var(--aurora-border)', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
             >
               {([
-                { key: 'orders' as const, label: 'Orders' },
-                { key: 'quotes' as const, label: 'Quotes' },
+                { key: 'orders' as const, label: 'Orders', count: pendingOrdersCount },
+                { key: 'quotes' as const, label: 'Quotes', count: openQuotesCount },
                 { key: 'analytics' as const, label: 'Analytics' },
                 { key: 'reviews' as const, label: 'Reviews', icon: <Star size={13} /> },
                 { key: 'inventory' as const, label: 'Inventory', icon: <Package size={13} /> },
                 { key: 'menu' as const, label: 'Menu', icon: <UtensilsCrossed size={13} /> },
-              ]).map((tab) => (
+              ] as Array<{ key: typeof vendorTab; label: string; icon?: React.ReactNode; count?: number }>).map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setVendorTab(tab.key)}
@@ -1715,6 +1743,16 @@ export default function CateringPage() {
                 >
                   {tab.icon}
                   {tab.label}
+                  {/* UX-P1 (Quotes audit F-04): action-needed count badges */}
+                  {typeof tab.count === 'number' && tab.count > 0 && (
+                    <span
+                      className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold text-white"
+                      style={{ backgroundColor: tab.key === 'quotes' ? '#F59E0B' : '#6366F1' }}
+                      aria-label={`${tab.count} needing attention`}
+                    >
+                      {tab.count > 99 ? '99+' : tab.count}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -1726,6 +1764,10 @@ export default function CateringPage() {
                 businessId={ownedBusiness.id}
                 businessName={ownedBusiness.name}
                 onSwitchVendorTab={setVendorTab}
+                onOpenQuoteRequest={(requestId) => {
+                  setQuoteFocusId(requestId);
+                  setVendorTab('quotes');
+                }}
               />
             )}
             {vendorTab === 'quotes' && (
@@ -1734,6 +1776,8 @@ export default function CateringPage() {
                 businessName={ownedBusiness.name}
                 businessHeritage={Array.isArray(ownedBusiness.heritage) ? ownedBusiness.heritage[0] : ownedBusiness.heritage}
                 businessRating={ownedBusiness.rating}
+                focusRequestId={quoteFocusId}
+                onFocusHandled={() => setQuoteFocusId(null)}
               />
             )}
             {vendorTab === 'analytics' && (

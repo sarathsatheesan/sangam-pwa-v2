@@ -90,6 +90,10 @@ interface VendorQuoteResponseProps {
   businessName: string;
   businessHeritage?: string;
   businessRating?: number;
+  /** UX-P1: request to scroll to + highlight on mount (bell deep-link). */
+  focusRequestId?: string | null;
+  /** UX-P1: called once the focus request has been handled. */
+  onFocusHandled?: () => void;
 }
 
 export default function VendorQuoteResponse({
@@ -97,6 +101,8 @@ export default function VendorQuoteResponse({
   businessName,
   businessHeritage,
   businessRating,
+  focusRequestId,
+  onFocusHandled,
 }: VendorQuoteResponseProps) {
   const { addToast } = useToast();
   const [requests, setRequests] = useState<CateringQuoteRequest[]>([]);
@@ -106,6 +112,15 @@ export default function VendorQuoteResponse({
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [editingResponseId, setEditingResponseId] = useState<string | null>(null);
 
+  // UX-P1 (audit F-10): privacy notice is dismissible; remembered per browser.
+  const [privacyDismissed, setPrivacyDismissed] = useState(() => {
+    try { return localStorage.getItem('vendor-quotes-privacy-dismissed') === '1'; } catch { return false; }
+  });
+  const dismissPrivacyNotice = () => {
+    setPrivacyDismissed(true);
+    try { localStorage.setItem('vendor-quotes-privacy-dismissed', '1'); } catch { /* non-fatal */ }
+  };
+
   // ── Reprice response state ──
   const [repriceRespondingId, setRepriceRespondingId] = useState<string | null>(null); // loading
   const [repriceCounterAmount, setRepriceCounterAmount] = useState('');
@@ -114,7 +129,10 @@ export default function VendorQuoteResponse({
 
   // ── Accordion & sorting state ──
   const [sectionExpanded, setSectionExpanded] = useState<Record<string, boolean>>({
-    open: false,       // Open Requests collapsed by default
+    // UX-P1 (audit F-05): Open Requests is the money section — expanded by
+    // default. Completed work (accepted) stays expanded too; declined stays
+    // tucked away.
+    open: true,        // Needs response — expanded by default
     accepted: true,    // Accepted expanded by default
     pending: true,     // Awaiting Decision expanded by default
     declined: false,   // Declined collapsed by default
@@ -530,6 +548,14 @@ export default function VendorQuoteResponse({
     }, 150);
   }, []);
 
+  // ── UX-P1 (audit F-03): bell deep-link — scroll to + highlight a request ──
+  useEffect(() => {
+    if (!focusRequestId || loading) return;
+    handleReminderClick(focusRequestId);
+    onFocusHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRequestId, loading]);
+
   // ── Reminder engine ──
   useEffect(() => {
     const check = () => {
@@ -579,16 +605,27 @@ export default function VendorQuoteResponse({
 
   return (
     <div className="space-y-5">
-      {/* Privacy notice */}
-      <div
-        className="flex items-start gap-3 p-3 rounded-xl"
-        style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)' }}
-      >
-        <ShieldCheck size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--aurora-accent)' }} />
-        <p className="text-xs" style={{ color: 'var(--aurora-text-secondary)' }}>
-          Customer details are hidden until they accept your quote. You'll be notified in real-time when a customer accepts.
-        </p>
-      </div>
+      {/* Privacy notice — dismissible (UX-P1, audit F-10) */}
+      {!privacyDismissed && (
+        <div
+          className="flex items-start gap-3 p-3 rounded-xl"
+          style={{ backgroundColor: 'rgba(99, 102, 241, 0.05)' }}
+        >
+          <ShieldCheck size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--aurora-accent)' }} />
+          <p className="text-xs flex-1" style={{ color: 'var(--aurora-text-secondary)' }}>
+            Customer details are hidden until they accept your quote. You'll be notified in real-time when a customer accepts.
+          </p>
+          <button
+            type="button"
+            onClick={dismissPrivacyNotice}
+            aria-label="Dismiss privacy notice"
+            className="flex-shrink-0 p-1 rounded-lg"
+            style={{ color: 'var(--aurora-text-secondary)', WebkitTapHighlightColor: 'transparent', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}
+          >
+            <XCircle size={14} />
+          </button>
+        </div>
+      )}
 
       {/* ── Active Reminders Banner — clickable pills with snooze ── */}
       {activeReminders.length > 0 && (
